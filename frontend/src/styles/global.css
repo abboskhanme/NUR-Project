@@ -1,0 +1,45 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Cozy card */
+@layer components {
+  .card {
+    @apply bg-card rounded-card shadow-cozy p-5 border border-black/5;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-button font-medium transition-colors select-none;
+  }
+  .btn-primary {
+    @apply btn bg-primary text-white hover:bg-primary-700 disabled:opacity-50;
+  }
+  .btn-ghost {
+    @apply btn bg-transparent text-ink hover:bg-black/5;
+  }
+  .btn-danger {
+    @apply btn bg-danger text-white hover:opacity-90;
+  }
+  .input {
+    @apply w-full rounded-button border border-black/10 px-3 py-2 outline-none
+           focus:border-primary focus:ring-2 focus:ring-primary/20 bg-white;
+  }
+  .label {
+    @apply text-sm font-medium text-ink/80 mb-1 inline-block;
+  }
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "app": {
+    "name": "NurBunker ERP"
+  },
+  "nav": {
+    "dashboard": "Bosh sahifa",
+    "sales": "Sotuv",
+    "customers": "Mijozlar",
+    "products": "Mahsulotlar",
+    "service": "Servis",
+    "finance": "Moliya",
+    "hr": "Xodimlar",
+    "supply": "Ta'minot",
+    "reports": "Hisobotlar",
+    "users": "Foydalanuvchilar",
+    "settings": "Sozlamalar",
+    "logout": "Chiqish",
+    "queue": "Navbat"
+  },
+  "auth": {
+    "login": "Tizimga kirish",
+    "email": "Email",
+    "password": "Parol",
+    "submit": "Kirish",
+    "wrong": "Email yoki parol noto'g'ri",
+    "remember": "Meni eslab qol"
+  },
+  "actions": {
+    "create": "Yangi",
+    "edit": "Tahrirlash",
+    "delete": "O'chirish",
+    "save": "Saqlash",
+    "cancel": "Bekor qilish",
+    "search": "Qidirish",
+    "export": "Eksport",
+    "import": "Import",
+    "filter": "Filtr"
+  },
+  "orders": {
+    "title": "Buyurtmalar",
+    "new": "Yangi buyurtma",
+    "code": "Kod",
+    "customer": "Mijoz",
+    "model": "Model",
+    "status": "Status",
+    "amount": "Summa",
+    "date": "Sana"
+  },
+  "status": {
+    "new": "Navbatda",
+    "confirmed": "Tasdiqlangan",
+    "in_production": "Ishlab chiqarishda",
+    "ready": "Tayyor",
+    "delivered": "Yetkazilgan",
+    "paid": "To'langan",
+    "rejected": "Rad etilgan",
+    "cancelled": "Bekor qilingan",
+    "all": "Barcha statuslar"
+  }
+}

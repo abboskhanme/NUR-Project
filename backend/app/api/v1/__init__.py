@@ -1,0 +1,33 @@
+"""API v1 aggregator router."""
+from fastapi import APIRouter
+
+from app.api.v1 import (
+    auth,
+    users,
+    customers,
+    products,
+    orders,
+    service,
+    finance,
+    hr,
+    supply,
+    telegram,
+    notifications,
+    reports,
+    permissions,
+)
+
+api_router = APIRouter()
+api_router.include_router(auth.router, prefix="/auth", tags=["Auth"])
+api_router.include_router(users.router, prefix="/users", tags=["Users"])
+api_router.include_router(customers.router, prefix="/customers", tags=["Customers"])
+api_router.include_router(products.router, prefix="/products", tags=["Products"])
+api_router.include_router(orders.router, prefix="/orders", tags=["Sales / Orders"])
+api_router.include_router(service.router, prefix="/service", tags=["Service"])
+api_router.include_router(finance.router, prefix="/finance", tags=["Finance"])
+api_router.include_router(hr.router, prefix="/hr", tags=["HR"])
+api_router.include_router(supply.router, prefix="/supply", tags=["Supply"])
+api_router.include_router(telegram.router, prefix="/telegram", tags=["Telegram Bot"])
+api_router.include_router(notifications.router, prefix="/notifications", tags=["Notifications"])
+api_router.include_router(reports.router, prefix="/reports", tags=["Reports"])
+api_router.include_router(permissions.router, prefix="/permissions", tags=["Permissions"])

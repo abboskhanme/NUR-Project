@@ -1,0 +1,60 @@
+{
+  "app": {
+    "name": "NurBunker ERP"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "sales": "Sales",
+    "customers": "Customers",
+    "products": "Products",
+    "service": "Service",
+    "finance": "Finance",
+    "hr": "HR",
+    "supply": "Supply",
+    "reports": "Reports",
+    "users": "Users",
+    "settings": "Settings",
+    "logout": "Logout",
+    "queue": "Queue"
+  },
+  "auth": {
+    "login": "Sign in",
+    "email": "Email",
+    "password": "Password",
+    "submit": "Sign in",
+    "wrong": "Wrong email or password",
+    "remember": "Remember me"
+  },
+  "actions": {
+    "create": "New",
+    "edit": "Edit",
+    "delete": "Delete",
+    "save": "Save",
+    "cancel": "Cancel",
+    "search": "Search",
+    "export": "Export",
+    "import": "Import",
+    "filter": "Filter"
+  },
+  "orders": {
+    "title": "Orders",
+    "new": "New order",
+    "code": "Code",
+    "customer": "Customer",
+    "model": "Model",
+    "status": "Status",
+    "amount": "Amount",
+    "date": "Date"
+  },
+  "status": {
+    "new": "Queue",
+    "confirmed": "Confirmed",
+    "in_production": "In production",
+    "ready": "Ready",
+    "delivered": "Delivered",
+    "paid": "Paid",
+    "rejected": "Rejected",
+    "cancelled": "Cancelled",
+    "all": "All statuses"
+  }
+}

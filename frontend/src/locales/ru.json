@@ -1,0 +1,60 @@
+{
+  "app": {
+    "name": "NurBunker ERP"
+  },
+  "nav": {
+    "dashboard": "Главная",
+    "sales": "Продажи",
+    "customers": "Клиенты",
+    "products": "Товары",
+    "service": "Сервис",
+    "finance": "Финансы",
+    "hr": "Кадры",
+    "supply": "Снабжение",
+    "reports": "Отчёты",
+    "users": "Пользователи",
+    "settings": "Настройки",
+    "logout": "Выйти",
+    "queue": "Очередь"
+  },
+  "auth": {
+    "login": "Вход в систему",
+    "email": "Email",
+    "password": "Пароль",
+    "submit": "Войти",
+    "wrong": "Неверный email или пароль",
+    "remember": "Запомнить меня"
+  },
+  "actions": {
+    "create": "Новый",
+    "edit": "Изменить",
+    "delete": "Удалить",
+    "save": "Сохранить",
+    "cancel": "Отмена",
+    "search": "Поиск",
+    "export": "Экспорт",
+    "import": "Импорт",
+    "filter": "Фильтр"
+  },
+  "orders": {
+    "title": "Заказы",
+    "new": "Новый заказ",
+    "code": "Код",
+    "customer": "Клиент",
+    "model": "Модель",
+    "status": "Статус",
+    "amount": "Сумма",
+    "date": "Дата"
+  },
+  "status": {
+    "new": "В очереди",
+    "confirmed": "Подтверждён",
+    "in_production": "В производстве",
+    "ready": "Готов",
+    "delivered": "Доставлен",
+    "paid": "Оплачен",
+    "rejected": "Отклонён",
+    "cancelled": "Отменён",
+    "all": "Все статусы"
+  }
+}

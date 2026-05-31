@@ -1,0 +1,80 @@
+"""Service module schemas."""
+import uuid
+from datetime import date, datetime
+from decimal import Decimal
+from typing import Optional
+
+from pydantic import BaseModel
+
+from app.schemas.common import ORMBase
+
+
+class ServiceTicketBase(BaseModel):
+    order_id: Optional[uuid.UUID] = None
+    customer_id: uuid.UUID
+    serial_id: Optional[str] = None
+    address: Optional[str] = None
+    problem: str
+    category: Optional[str] = None
+    scheduled_at: Optional[datetime] = None
+    in_warranty: bool = False
+
+
+class ServiceTicketCreate(ServiceTicketBase):
+    pass
+
+
+class ServiceTicketUpdate(BaseModel):
+    status: Optional[str] = None
+    scheduled_at: Optional[datetime] = None
+    resolution: Optional[str] = None
+    client_cost: Optional[Decimal] = None
+    closed_at: Optional[datetime] = None
+    in_warranty: Optional[bool] = None
+
+
+class ServiceVisitIn(BaseModel):
+    planned_at: Optional[datetime] = None
+    started_at: Optional[datetime] = None
+    finished_at: Optional[datetime] = None
+    travel_cost: Decimal = Decimal(0)
+    note: Optional[str] = None
+
+
+class ServiceVisitOut(ORMBase):
+    id: uuid.UUID
+    ticket_id: uuid.UUID
+    planned_at: Optional[datetime] = None
+    started_at: Optional[datetime] = None
+    finished_at: Optional[datetime] = None
+    travel_cost: Decimal
+    note: Optional[str] = None
+
+
+class ServiceTicketOut(ORMBase):
+    id: uuid.UUID
+    code: str
+    order_id: Optional[uuid.UUID] = None
+    customer_id: uuid.UUID
+    serial_id: Optional[str] = None
+    address: Optional[str] = None
+    problem: str
+    category: Optional[str] = None
+    opened_at: datetime
+    scheduled_at: Optional[datetime] = None
+    closed_at: Optional[datetime] = None
+    status: str
+    in_warranty: bool
+    resolution: Optional[str] = None
+    client_cost: Decimal
+    visits: list[ServiceVisitOut] = []
+
+
+class WarrantyInfo(BaseModel):
+    order_id: uuid.UUID
+    warranty_start: Optional[date] = None
+    year1_end: Optional[date] = None
+    year3_end: Optional[date] = None
+    days_remaining_year1: Optional[int] = None
+    days_remaining_year3: Optional[int] = None
+    current_status: str  # active_full / active_service_only / expired / not_delivered

@@ -1,0 +1,62 @@
+"""Service tickets and visits (warranty)."""
+import uuid
+from datetime import date, datetime
+from decimal import Decimal
+from typing import Optional
+
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Numeric, String, Text
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
+
+
+SERVICE_STATUSES = ("new", "scheduled", "in_progress", "completed", "cancelled")
+
+
+class ServiceTicket(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "service_tickets"
+
+    code: Mapped[str] = mapped_column(String(30), unique=True, index=True)
+    order_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("orders.id", ondelete="SET NULL"), index=True
+    )
+    customer_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("customers.id", ondelete="RESTRICT"), index=True
+    )
+    serial_id: Mapped[Optional[str]] = mapped_column(String(50))
+    address: Mapped[Optional[str]] = mapped_column(Text)
+    problem: Mapped[str] = mapped_column(Text, nullable=False)
+    category: Mapped[Optional[str]] = mapped_column(String(50))
+
+    opened_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    scheduled_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    closed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+
+    status: Mapped[str] = mapped_column(String(20), default="new", index=True)
+    in_warranty: Mapped[bool] = mapped_column(Boolean, default=False)
+    resolution: Mapped[Optional[str]] = mapped_column(Text)
+    client_cost: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
+
+    created_by_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+    )
+
+    visits: Mapped[list["ServiceVisit"]] = relationship(
+        back_populates="ticket", cascade="all, delete-orphan", lazy="selectin"
+    )
+
+
+class ServiceVisit(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "service_visits"
+
+    ticket_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("service_tickets.id", ondelete="CASCADE"), index=True
+    )
+    planned_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    started_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    travel_cost: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
+    note: Mapped[Optional[str]] = mapped_column(Text)
+
+    ticket: Mapped[ServiceTicket] = relationship(back_populates="visits")
