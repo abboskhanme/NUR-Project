@@ -35,6 +35,13 @@ const today = () => new Date().toISOString().slice(0, 10);
 const num = (s: string | number | null | undefined) => {
   const n = parseFloat(String(s ?? '')); return Number.isNaN(n) ? 0 : n;
 };
+// Faqat raqam, leading nol o'chiriladi, minglik probel bilan: "0150000" -> "150 000"
+const onlyDigits = (s: string | number | null | undefined) =>
+  String(s ?? '').replace(/\D/g, '').replace(/^0+/, '');
+const fmtInt = (s: string | number | null | undefined) => {
+  const d = onlyDigits(s);
+  return d ? d.replace(/\B(?=(\d{3})+(?!\d))/g, ' ') : '';
+};
 
 export default function OrderModal({
   order,
@@ -73,20 +80,29 @@ export default function OrderModal({
     return () => window.removeEventListener('keydown', esc);
   }, [onClose]);
 
-  async function fetchRate() {
+  async function fetchRate(silent = false) {
     try {
-      const r = await api.get('/finance/exchange-rates', { params: { limit: 1 } });
-      const latest = r.data?.[0];
+      const r = await api.get('/finance/exchange-rates/latest');
+      const latest = r.data;
       if (latest?.usd_to_uzs) {
         setRate(String(num(latest.usd_to_uzs)));
-        toast.success('Joriy kurs olindi');
-      } else {
+        if (!silent) {
+          const src = latest.source === 'cbu' ? 'CBU joriy kursi' : 'Joriy kurs';
+          toast.success(`${src} olindi`);
+        }
+      } else if (!silent) {
         toast.error('Kurs topilmadi');
       }
     } catch {
-      toast.error('Kursni olishda xatolik');
+      if (!silent) toast.error('Kursni olishda xatolik');
     }
   }
+
+  // Yangi buyurtma ochilganda joriy kursni avtomatik to'ldiramiz
+  useEffect(() => {
+    if (isCreate && !rate) fetchRate(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const rateNum = num(rate);
 
@@ -97,7 +113,7 @@ export default function OrderModal({
   const grandTotal = useMemo(() => items.reduce((s, it) => s + rowTotal(it), 0), [items, rateNum]);
 
   function addRow() {
-    setItems((p) => [...p, { product_id: products[0]?.id ?? '', bunker_direction: '', quantity: 1, unit_price_usd: '', discount: '0' }]);
+    setItems((p) => [...p, { product_id: products[0]?.id ?? '', bunker_direction: '', quantity: 1, unit_price_usd: '', discount: '' }]);
   }
   function updateRow(idx: number, patch: Partial<ItemRow>) {
     setItems((p) => p.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
@@ -111,7 +127,7 @@ export default function OrderModal({
     const dir = prod?.bunker_direction ?? items[idx].bunker_direction;
     updateRow(idx, {
       product_id: productId,
-      unit_price_usd: items[idx].unit_price_usd || prefill,
+      unit_price_usd: prefill, // narx mahsulotdan olinadi, qo'lda o'zgartirilmaydi
       bunker_direction: items[idx].bunker_direction || (dir ?? ''),
     });
   }
@@ -136,6 +152,7 @@ export default function OrderModal({
     if (!customer) { toast.error('Mijozni tanlang'); return; }
     if (items.length === 0) { toast.error('Kamida bitta mahsulot qo\'shing'); return; }
     if (items.some((it) => !it.product_id)) { toast.error('Mahsulotni tanlang'); return; }
+    if (items.some((it) => isMainItem(it) && !it.bunker_direction)) { toast.error('Bunker tomonini tanlang'); return; }
 
     // Asosiy (kotyol) va qo'shimcha mahsulotlarni ajratamiz.
     // Qoida: 1 kotyol = 1 buyurtma; qo'shimcha mahsulotlar faqat birinchi buyurtmaga.
@@ -215,7 +232,7 @@ export default function OrderModal({
               <div className="flex gap-2">
                 <input type="text" inputMode="decimal" className="input" placeholder="0"
                        value={rate} onChange={(e) => setRate(e.target.value.replace(/[^\d.]/g, ''))} />
-                <button type="button" onClick={fetchRate} className="btn-ghost shrink-0" title="Joriy kursni olish">
+                <button type="button" onClick={() => fetchRate()} className="btn-ghost shrink-0" title="Joriy kursni olish">
                   <RefreshCw size={15} />
                 </button>
               </div>
@@ -237,11 +254,22 @@ export default function OrderModal({
               <div className="text-sm text-ink-soft py-3 text-center">Mahsulot qo'shilmagan</div>
             ) : (
               <div className="space-y-2">
+                {/* Ustun nomlari */}
+                <div className="grid grid-cols-12 gap-2 px-0.5 text-[11px] font-medium text-ink-soft">
+                  <div className="col-span-3">Mahsulot *</div>
+                  <div className="col-span-2">Bunker</div>
+                  <div className="col-span-2">Soni</div>
+                  <div className="col-span-2">Narx (USD)</div>
+                  <div className="col-span-2">Chegirma (UZS)</div>
+                  <div className="col-span-1" />
+                </div>
                 {items.map((it, idx) => (
                   <div key={idx} className="grid grid-cols-12 gap-2 items-center">
-                    <select className="input col-span-3" value={it.product_id}
-                            onChange={(e) => onProductChange(idx, e.target.value)}>
-                      <option value="">— mahsulot —</option>
+                    <select
+                      className={`input col-span-3 ${!it.product_id ? 'border-danger ring-1 ring-danger/40' : ''}`}
+                      value={it.product_id} required
+                      onChange={(e) => onProductChange(idx, e.target.value)}>
+                      <option value="">— mahsulot tanlang —</option>
                       {products.map((p) => (
                         <option key={p.id} value={p.id}>
                           {p.display_name ?? p.model ?? p.name ?? '—'}
@@ -249,9 +277,11 @@ export default function OrderModal({
                       ))}
                     </select>
                     {products.find((p) => p.id === it.product_id)?.product_type !== 'additional' ? (
-                      <select className="input col-span-2" value={it.bunker_direction}
-                              onChange={(e) => updateRow(idx, { bunker_direction: e.target.value })} title="Yo'nalish">
-                        <option value="">Yo'nalish</option>
+                      <select
+                        className={`input col-span-2 ${!it.bunker_direction ? 'border-danger ring-1 ring-danger/40' : ''}`}
+                        value={it.bunker_direction} required
+                        onChange={(e) => updateRow(idx, { bunker_direction: e.target.value })} title="Bunker">
+                        <option value="">Bunker</option>
                         <option value="right">O'NGA</option>
                         <option value="left">CHAPGA</option>
                       </select>
@@ -260,12 +290,13 @@ export default function OrderModal({
                     )}
                     <input type="number" min={1} className="input col-span-2" value={it.quantity}
                            onChange={(e) => updateRow(idx, { quantity: parseInt(e.target.value, 10) || 1 })} title="Soni" />
-                    <input type="text" inputMode="decimal" className="input col-span-2" placeholder="$ narx"
-                           value={it.unit_price_usd}
-                           onChange={(e) => updateRow(idx, { unit_price_usd: e.target.value.replace(/[^\d.]/g, '') })} title="Dona narxi (USD)" />
-                    <input type="text" inputMode="decimal" className="input col-span-2" placeholder="Chegirma UZS"
-                           value={it.discount}
-                           onChange={(e) => updateRow(idx, { discount: e.target.value.replace(/[^\d.]/g, '') })} title="Chegirma (UZS)" />
+                    <input type="text" inputMode="decimal" readOnly tabIndex={-1}
+                           className="input col-span-2 bg-black/5 text-ink-soft cursor-not-allowed"
+                           placeholder="$ narx" value={it.unit_price_usd}
+                           title="Dona narxi (USD) — mahsulotdan olinadi, faqat chegirma orqali o'zgartiriladi" />
+                    <input type="text" inputMode="numeric" className="input col-span-2 text-right" placeholder="0"
+                           value={fmtInt(it.discount)}
+                           onChange={(e) => updateRow(idx, { discount: onlyDigits(e.target.value) })} title="Chegirma (UZS)" />
                     <button type="button" onClick={() => removeRow(idx)} className="col-span-1 p-1 rounded hover:bg-danger/10 text-danger justify-self-end">
                       <Trash2 size={15} />
                     </button>

@@ -1,4 +1,4 @@
-# NurBunker ERP/CRM — NUR TECHNO GROUP
+# NUR Project — NUR TECHNO GROUP
 
 NUR TECHNO GROUP kompaniyasining ichki ERP / CRM tizimi. Sotuv, Servis, Moliya,
 HR va Ta'minot bo'limlarini birlashtiruvchi zamonaviy veb-platforma.

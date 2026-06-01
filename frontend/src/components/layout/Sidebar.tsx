@@ -38,7 +38,7 @@ export default function Sidebar() {
     <aside className="h-screen sticky top-0 bg-card border-r border-black/5 flex flex-col">
       <div className="flex items-center gap-3 px-4 h-16 border-b border-black/5">
         <div className="w-9 h-9 rounded-button bg-primary text-white flex items-center justify-center font-bold">N</div>
-        {!collapsed && <div className="font-semibold text-sm">NurBunker ERP</div>}
+        {!collapsed && <div className="font-semibold text-sm">NUR Project</div>}
       </div>
 
       <nav className="flex-1 overflow-y-auto py-2">

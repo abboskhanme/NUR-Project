@@ -1,8 +1,20 @@
-"""Seed the database with initial roles, super admin user, sectors, products."""
+"""Seed the database with initial roles, super admin user, sectors, products.
+
+Namunaviy (demo) baza ma'lumotlari — mahsulotlar, mijozlar, xodimlar — alohida
+`scripts/sample_data.json` faylida saqlanadi. Bu skript har 'docker compose up' da
+ishlaydi va o'sha fayldan o'qib bazani to'ldiradi. Hammasi IDEMPOTENT: mavjud yozuv
+qayta qo'shilmaydi, shuning uchun `docker compose down` qilib qayta ko'targaningizda
+namunaviy ma'lumotlar yana tiklanadi, sizning qo'lda kiritgan ma'lumotlaringiz esa
+o'chmaydi.
+
+Ma'lumotni o'zgartirish uchun faqat sample_data.json'ni tahrirlang — kodga tegmang.
+"""
 import asyncio
+import json
 import random
 from datetime import date, time, timedelta
 from decimal import Decimal
+from pathlib import Path
 
 from sqlalchemy import select
 
@@ -19,6 +31,41 @@ from app.models.supply import SupplySector
 from app.models.user import Role, User
 
 
+# ---------------------------------------------------------------------------
+# Namunaviy ma'lumotlar fayli — products / customers / employees shu yerdan
+# ---------------------------------------------------------------------------
+SAMPLE_DATA_PATH = Path(__file__).parent / "sample_data.json"
+
+
+def _load_sample_data() -> dict:
+    try:
+        with open(SAMPLE_DATA_PATH, encoding="utf-8") as f:
+            data = json.load(f)
+        print(f"[i] Namunaviy ma'lumotlar yuklandi: {SAMPLE_DATA_PATH.name}")
+        return data
+    except FileNotFoundError:
+        print(f"[!] {SAMPLE_DATA_PATH.name} topilmadi — namunaviy ma'lumotlar o'tkazib yuborildi")
+        return {}
+    except json.JSONDecodeError as e:
+        print(f"[!] {SAMPLE_DATA_PATH.name} JSON xato ({e}) — namunaviy ma'lumotlar o'tkazib yuborildi")
+        return {}
+
+
+SAMPLE = _load_sample_data()
+
+
+def _dec(v) -> Decimal:
+    """JSON son/satrini xavfsiz Decimalga aylantiradi."""
+    return Decimal(str(v if v is not None else 0))
+
+
+def _parse_date(v):
+    return date.fromisoformat(v) if v else None
+
+
+# ---------------------------------------------------------------------------
+# Tizim konfiguratsiyasi (namunaviy emas — har doim kerak)
+# ---------------------------------------------------------------------------
 DEFAULT_ROLES = [
     ("super_admin", "Super Admin (barcha modul)"),
     ("director", "Bosh direktor"),
@@ -44,31 +91,6 @@ SUPPLY_SECTORS = [
 ]
 
 
-PRODUCT_MODELS = [
-    ("PREMIUM 3", 150, "right", Decimal("1200")),
-    ("PREMIUM 3", 200, "right", Decimal("1400")),
-    ("PREMIUM 4", 200, "right", Decimal("1500")),
-    ("PREMIUM 4", 300, "right", Decimal("1700")),
-    ("ULTRA", 300, "right", Decimal("1900")),
-    ("ULTRA", 400, "right", Decimal("2100")),
-    ("MAGNUM", 400, "right", Decimal("2200")),
-    ("MAGNUM", 500, "right", Decimal("2500")),
-    ("OPTIMA", 200, "right", Decimal("1300")),
-    ("OPTIMA", 300, "right", Decimal("1500")),
-]
-
-
-# Qo'shimcha mahsulotlar (nom, o'lchov birligi, narx USD)
-ADDITIONAL_PRODUCTS = [
-    ("Turba (issiqlik quvuri)", "metr", Decimal("3")),
-    ("Defizor (radiator)", "dona", Decimal("25")),
-    ("Aylanma nasos", "dona", Decimal("60")),
-    ("Termostat", "dona", Decimal("15")),
-    ("Montaj komplekti", "komplekt", Decimal("40")),
-    ("Kengaytma baki", "dona", Decimal("35")),
-]
-
-
 INCOME_CATS = [
     ("Mahsulot sotuvi", "sales_payment"),
     ("Avans to'lovi", "advance_payment"),
@@ -91,56 +113,21 @@ EXPENSE_CATS = [
 ]
 
 
-SAMPLE_POSITIONS = [
-    "Usta", "Yordamchi ishchi", "Payvandchi", "Montajchi",
-    "Operator", "Omborchi", "Haydovchi", "Tozalovchi",
-]
-
-
-# (ism, lavozim, telefon, soatbay_summa, ish_boshlagan, tug'ilgan, manzil)
-SAMPLE_WORKERS = [
-    ("Aliyev Bobur",        "Usta",            "+998 90 123 45 67", 22000, date(2026, 1, 6),  date(1990, 3, 12), "Toshkent, Yunusobod"),
-    ("Karimov Sardor",      "Payvandchi",      "+998 91 234 56 78", 20000, date(2026, 1, 20), date(1988, 7, 25), "Toshkent, Chilonzor"),
-    ("Toshmatov Jasur",     "Montajchi",       "+998 93 345 67 89", 19000, date(2026, 2, 3),  date(1995, 11, 2), "Toshkent, Sergeli"),
-    ("Rahimov Otabek",      "Yordamchi ishchi","+998 94 456 78 90", 16000, date(2026, 2, 17), date(1999, 1, 18), "Toshkent, Olmazor"),
-    ("Yusupov Diyor",       "Operator",        "+998 95 567 89 01", 18000, date(2026, 3, 2),  date(1992, 9, 9),  "Toshkent, Mirzo Ulug'bek"),
-    ("Sobirov Akmal",       "Omborchi",        "+998 97 678 90 12", 17000, date(2026, 3, 16), date(1985, 5, 30), "Toshkent, Yashnobod"),
-    ("Nazarov Shahzod",     "Haydovchi",       "+998 98 789 01 23", 17500, date(2026, 4, 1),  date(1991, 12, 5), "Toshkent, Bektemir"),
-    ("Ismoilov Bekzod",     "Yordamchi ishchi","+998 99 890 12 34", 16000, date(2026, 4, 14), date(2000, 2, 22), "Toshkent, Uchtepa"),
-]
-
-
-# (ism, telefon, qo'shimcha_telefon, davlat, viloyat, shahar/tuman, manzil, manba, izoh)
-SAMPLE_CUSTOMERS = [
-    ("Abdullayev Jahongir", "+998 90 111 22 33", "+998 91 111 22 33", "Uzbekistan", "Toshkent", "Yunusobod", "Amir Temur ko'chasi 12", "manual", "Doimiy mijoz"),
-    ("Mirzayeva Nodira",    "+998 93 222 33 44", None,                 "Uzbekistan", "Toshkent", "Chilonzor", "Bunyodkor shoh ko'chasi 45", "manual", None),
-    ("Qodirov Sherzod",     "+998 94 333 44 55", None,                 "Uzbekistan", "Samarqand", "Samarqand sh.", "Registon ko'chasi 8", "telegram_bot", "Telegram bot orqali"),
-    ("Tursunova Malika",    "+998 95 444 55 66", "+998 97 444 55 66",  "Uzbekistan", "Buxoro", "Buxoro sh.", "Mustaqillik ko'chasi 23", "manual", None),
-    ("Ergashev Bekzod",     "+998 97 555 66 77", None,                 "Uzbekistan", "Andijon", "Andijon sh.", "Navoiy ko'chasi 56", "manual", "Ulgurji buyurtma"),
-    ("Yo'ldosheva Sevara",  "+998 98 666 77 88", None,                 "Uzbekistan", "Farg'ona", "Farg'ona sh.", "Al-Farg'oniy ko'chasi 17", "manual", None),
-    ("Sodiqov Aziz",        "+998 99 777 88 99", "+998 90 777 88 99",  "Uzbekistan", "Namangan", "Namangan sh.", "Uychi ko'chasi 9", "manual", None),
-    ("Rashidova Gulnora",   "+998 90 888 99 00", None,                 "Uzbekistan", "Qashqadaryo", "Qarshi sh.", "Mustaqillik ko'chasi 34", "telegram_bot", None),
-    ("Olimov Farrux",       "+998 91 999 00 11", None,                 "Uzbekistan", "Surxondaryo", "Termiz sh.", "Alpomish ko'chasi 21", "manual", "Yetkazib berish kerak"),
-    ("Hamidova Dilnoza",    "+998 93 100 20 30", None,                 "Uzbekistan", "Xorazm", "Urganch sh.", "Al-Xorazmiy ko'chasi 5", "manual", None),
-    ("Jo'rayev Sanjar",     "+998 94 200 30 40", "+998 95 200 30 40",  "Uzbekistan", "Navoiy", "Navoiy sh.", "Navoiy ko'chasi 78", "manual", None),
-    ("Nurmatova Kamola",    "+998 95 300 40 50", None,                 "Uzbekistan", "Jizzax", "Jizzax sh.", "Sharof Rashidov ko'chasi 14", "manual", None),
-    ("Saidov Ulug'bek",     "+998 97 400 50 60", None,                 "Uzbekistan", "Sirdaryo", "Guliston sh.", "Istiqlol ko'chasi 30", "manual", "Naqd to'lov"),
-    ("Bozorov Davron",      "+998 98 500 60 70", None,                 "Uzbekistan", "Toshkent viloyati", "Chirchiq sh.", "Sanoat ko'chasi 11", "manual", None),
-    ("Allayorov Rustam",    "+998 99 600 70 80", "+998 90 600 70 80",  "Uzbekistan", "Qoraqalpog'iston", "Nukus sh.", "Berdaq ko'chasi 41", "telegram_bot", "Uzoq hudud"),
-]
-
-
+# ---------------------------------------------------------------------------
+# Mijozlar (sample_data.json -> customers)
+# ---------------------------------------------------------------------------
 async def _seed_customers(db):
-    """Namunaviy 15 ta mijoz (idempotent — telefon bo'yicha tekshiriladi)."""
+    """Namunaviy mijozlar (idempotent — telefon bo'yicha tekshiriladi)."""
     created = 0
-    for full_name, phone, phone2, country, region, city, address, source, note in SAMPLE_CUSTOMERS:
-        res = await db.execute(select(Customer).where(Customer.phone == phone))
+    for c in SAMPLE.get("customers", []):
+        res = await db.execute(select(Customer).where(Customer.phone == c["phone"]))
         if res.scalar_one_or_none():
             continue
         db.add(Customer(
-            full_name=full_name, phone=phone, phone2=phone2,
-            country=country, region=region, city=city, address=address,
-            source=source, note=note,
+            full_name=c["full_name"], phone=c["phone"], phone2=c.get("phone2"),
+            country=c.get("country", "Uzbekistan"), region=c.get("region"),
+            city=c.get("city"), address=c.get("address"),
+            source=c.get("source", "manual"), note=c.get("note"),
         ))
         created += 1
     print(f"[+] Mijozlar namunasi: {created} yangi mijoz")
@@ -235,11 +222,16 @@ async def _seed_orders(db):
     print(f"[+] Buyurtma namunasi: {created} yangi buyurtma")
 
 
+# ---------------------------------------------------------------------------
+# Xodimlar — office (ofis) + worker (ishchi), sample_data.json -> employees
+# ---------------------------------------------------------------------------
 async def _seed_hr_samples(db):
-    """Namunaviy lavozimlar va oddiy ishchilar (idempotent) + bittasiga namuna davomat."""
-    # Lavozimlar
+    """Namunaviy xodimlar (ofis + ishchi, idempotent) + ishchilarga namuna davomat."""
+    employees = SAMPLE.get("employees", [])
+
+    # Lavozimlar — barcha xodimlardagi unikal lavozimlar
     pos_by_name = {}
-    for name in SAMPLE_POSITIONS:
+    for name in sorted({e["position"] for e in employees if e.get("position")}):
         res = await db.execute(select(Position).where(Position.name == name))
         p = res.scalar_one_or_none()
         if not p:
@@ -248,53 +240,65 @@ async def _seed_hr_samples(db):
             await db.flush()
         pos_by_name[name] = p
 
-    # Ishchilar
-    created_emps = []
-    for full_name, pos_name, phone, rate, hire, birth, addr in SAMPLE_WORKERS:
+    # Xodimlar — full_name + employment_type bo'yicha idempotent
+    created_emps = 0
+    for e in employees:
+        emp_type = e.get("employment_type", "worker")
         res = await db.execute(
             select(Employee).where(
-                Employee.full_name == full_name,
+                Employee.full_name == e["full_name"],
+                Employee.employment_type == emp_type,
+            )
+        )
+        if res.scalar_one_or_none():
+            continue
+
+        pos = pos_by_name.get(e.get("position"))
+        hire = _parse_date(e.get("hire_date"))
+        salary_type = e.get("salary_type", "hourly")
+        amount = _dec(e.get("salary_amount"))
+        currency = e.get("currency", "UZS")
+
+        emp = Employee(
+            full_name=e["full_name"],
+            phone=e.get("phone"),
+            secondary_phone=e.get("secondary_phone"),
+            birth_date=_parse_date(e.get("birth_date")),
+            address=e.get("address"),
+            position_id=pos.id if pos else None,
+            hire_date=hire,
+            employment_type=emp_type,
+            salary_type=salary_type,
+            salary_amount=amount,
+            currency=currency,
+            status="active",
+            has_account=bool(e.get("has_account", False)),
+        )
+        db.add(emp)
+        await db.flush()
+
+        # Boshlang'ich stavka tarixi — ish boshlagan sanadan
+        if hire:
+            db.add(SalaryRate(
+                employee_id=emp.id, effective_from=hire,
+                salary_type=salary_type, amount=amount, currency=currency,
+            ))
+        created_emps += 1
+
+    # Namuna davomat — birinchi 5 ISHCHI (worker) uchun oxirgi 3 oy (~92 kun),
+    # yakshanba dam. Ofis xodimlariga davomat kiritilmaydi (oylik fixed).
+    worker_names = [e["full_name"] for e in employees if e.get("employment_type") == "worker"][:5]
+    targets = []
+    if worker_names:
+        res = await db.execute(
+            select(Employee).where(
+                Employee.full_name.in_(worker_names),
                 Employee.employment_type == "worker",
             )
         )
-        emp = res.scalar_one_or_none()
-        if not emp:
-            emp = Employee(
-                full_name=full_name,
-                phone=phone,
-                birth_date=birth,
-                address=addr,
-                position_id=pos_by_name[pos_name].id,
-                hire_date=hire,
-                employment_type="worker",
-                salary_type="hourly",
-                salary_amount=Decimal(rate),
-                currency="UZS",
-                status="active",
-                has_account=False,
-            )
-            db.add(emp)
-            await db.flush()
-            # Boshlang'ich stavka tarixi — ish boshlagan sanadan
-            db.add(SalaryRate(
-                employee_id=emp.id, effective_from=hire,
-                salary_type="hourly", amount=Decimal(rate), currency="UZS",
-            ))
-            created_emps.append(emp)
+        targets = res.scalars().all()
 
-    # Namuna davomat — birinchi 5 ishchi uchun oxirgi 3 oy (~92 kun), yakshanba dam.
-    # Idempotent: mavjud yozuvlar o'tkazib yuboriladi, shuning uchun avval yaratilgan
-    # ishchilarga ham keyingi seed'da davomat to'ldiriladi.
     today = date.today()
-    target_names = [w[0] for w in SAMPLE_WORKERS[:5]]
-    res = await db.execute(
-        select(Employee).where(
-            Employee.full_name.in_(target_names),
-            Employee.employment_type == "worker",
-        )
-    )
-    targets = res.scalars().all()
-
     check_in = time(8, 30)
     check_out = time(18, 0)
     hours = Decimal("9.50")
@@ -321,7 +325,12 @@ async def _seed_hr_samples(db):
                 hours_worked=hours, daily_pay=daily,
             ))
             filled += 1
-    print(f"[+] HR namuna: {len(created_emps)} yangi ishchi, {len(targets)} ishchiga davomat ({filled} kun)")
+
+    office_cnt = sum(1 for e in employees if e.get("employment_type") == "office")
+    worker_cnt = sum(1 for e in employees if e.get("employment_type") == "worker")
+    print(f"[+] HR namuna: {created_emps} yangi xodim "
+          f"({office_cnt} ofis / {worker_cnt} ishchi manbada), "
+          f"{len(targets)} ishchiga davomat ({filled} kun)")
 
 
 async def seed():
@@ -395,33 +404,33 @@ async def seed():
             if not res.scalar_one_or_none():
                 db.add(FinanceCategory(name=name, code=code, kind="expense"))
 
-        # Products
-        for model, kvm, direction, price in PRODUCT_MODELS:
+        # Products — asosiy (main) mahsulotlar (sample_data.json -> products_main)
+        for p in SAMPLE.get("products_main", []):
             res = await db.execute(
                 select(Product).where(
                     Product.product_type == "main",
-                    Product.model == model,
-                    Product.kvm == kvm,
+                    Product.model == p["model"],
+                    Product.kvm == p["kvm"],
                 )
             )
             if not res.scalar_one_or_none():
                 db.add(Product(
-                    product_type="main", model=model, kvm=kvm,
-                    base_price_usd=price, status="active",
+                    product_type="main", model=p["model"], kvm=p["kvm"],
+                    base_price_usd=_dec(p.get("base_price_usd")), status="active",
                 ))
 
         # Qo'shimcha mahsulotlar (idempotent — nom bo'yicha)
-        for name, unit, price in ADDITIONAL_PRODUCTS:
+        for p in SAMPLE.get("products_additional", []):
             res = await db.execute(
                 select(Product).where(
                     Product.product_type == "additional",
-                    Product.name == name,
+                    Product.name == p["name"],
                 )
             )
             if not res.scalar_one_or_none():
                 db.add(Product(
-                    product_type="additional", name=name, unit=unit,
-                    base_price_usd=price, status="active",
+                    product_type="additional", name=p["name"], unit=p.get("unit"),
+                    base_price_usd=_dec(p.get("base_price_usd")), status="active",
                 ))
 
         # Namunaviy mijozlar
@@ -431,7 +440,7 @@ async def seed():
         await db.flush()
         await _seed_orders(db)
 
-        # HR — namunaviy lavozim va ishchilar
+        # HR — namunaviy ofis va ishchi xodimlar
         await _seed_hr_samples(db)
 
         await db.commit()

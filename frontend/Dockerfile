@@ -1,4 +1,4 @@
-# NurBunker Frontend — React + Vite (dev mode)
+# NUR Project Frontend — React + Vite (dev mode)
 FROM node:20-alpine
 
 WORKDIR /app

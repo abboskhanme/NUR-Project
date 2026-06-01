@@ -1,4 +1,4 @@
-# NurBunker Backend (FastAPI)
+# NUR Project Backend (FastAPI)
 
 Python 3.11+ FastAPI backend NUR TECHNO GROUP ERP/CRM tizimi uchun.
 

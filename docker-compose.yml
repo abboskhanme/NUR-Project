@@ -1,7 +1,11 @@
-# NurBunker ERP/CRM — Docker Compose (development)
+# NUR Project — Docker Compose (development)
 # Ishga tushirish: docker compose up -d
-# To'xtatish: docker compose down
+# To'xtatish:      docker compose down
 # Hammasini o'chirish (DB ham): docker compose down -v
+
+# Qat'iy project nomi — volume nomi (nur-erp_postgres_data) qaysi papka/yo'ldan
+# ishga tushirilsa ham o'zgarmaydi, shuning uchun baza hech qachon "adashib" yo'qolmaydi.
+name: nur-erp
 
 services:
   postgres:
@@ -16,7 +20,10 @@ services:
       # Prod'da bu qatorni olib tashlang va parolni .env orqali bering.
       POSTGRES_HOST_AUTH_METHOD: trust
     ports:
-      - "5432:5432"
+      # Host 5433 -> container 5432. Boshqa project host'da 5432ni band qilgani uchun
+      # ziddiyatdan qochamiz. Backend baribir ichki tarmoq orqali 'postgres:5432'ga
+      # ulanadi — bu o'zgarish faqat hostdan ulanishga taalluqli.
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -40,7 +47,9 @@ services:
       INIT_ADMIN_PASSWORD: Admin@12345
       INIT_ADMIN_NAME: Super Admin
     ports:
-      - "8000:8000"
+      # Host 8001 -> container 8000. Boshqa project 8000ni band qilgani uchun
+      # ziddiyatdan qochish maqsadida tashqi port 8001 ga ko'chirildi.
+      - "8001:8000"
     volumes:
       - ./backend:/app
     depends_on:
@@ -61,7 +70,7 @@ services:
     container_name: nur-frontend
     restart: unless-stopped
     environment:
-      VITE_API_BASE_URL: http://localhost:8000/api/v1
+      VITE_API_BASE_URL: http://localhost:8001/api/v1
     ports:
       - "5173:5173"
     volumes:
@@ -73,3 +82,8 @@ services:
 
 volumes:
   postgres_data:
+    # Volume nomini ANIQ belgilaymiz: eski 'nurproject' loyihasida yaratilgan va
+    # sizning bazangiz turgan volume'ni qayta ishlatamiz. Endi project nomi yoki
+    # papka o'zgarsa ham shu volume (va undagi baza) doimo ishlatiladi — ma'lumot
+    # boshqa "adashgan" volume'da qolib ketmaydi.
+    name: nurproject_postgres_data

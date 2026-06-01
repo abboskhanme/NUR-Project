@@ -17,7 +17,7 @@ from app.schemas.finance import (
     ExchangeRateBase, ExchangeRateOut,
     TransactionCreate, TransactionOut,
 )
-from app.services.finance_service import apply_transaction, current_balances
+from app.services.finance_service import apply_transaction, current_balances, ensure_today_rate
 
 router = APIRouter()
 
@@ -109,6 +109,15 @@ async def list_rates(db: Annotated[AsyncSession, Depends(get_db)], _: CurrentUse
                      limit: int = Query(30, le=200)):
     res = await db.execute(select(ExchangeRate).order_by(ExchangeRate.date.desc()).limit(limit))
     return [ExchangeRateOut.model_validate(r) for r in res.scalars().all()]
+
+
+@router.get("/exchange-rates/latest", response_model=ExchangeRateOut)
+async def latest_rate(db: Annotated[AsyncSession, Depends(get_db)], _: CurrentUser):
+    """Bugungi kurs (kunlik avto-sinx — kerak bo'lsa CBU'dan jonli oladi)."""
+    rate = await ensure_today_rate(db)
+    if not rate:
+        raise HTTPException(status_code=404, detail="Kurs topilmadi")
+    return rate
 
 
 @router.post("/exchange-rates", response_model=ExchangeRateOut, status_code=201,

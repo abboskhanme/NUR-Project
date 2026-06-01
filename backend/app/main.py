@@ -1,4 +1,4 @@
-"""NurBunker ERP/CRM — FastAPI application entrypoint."""
+"""NUR Project — FastAPI application entrypoint."""
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI

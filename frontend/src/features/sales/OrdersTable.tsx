@@ -45,6 +45,13 @@ const STATUS_STYLES: Record<string, string> = {
 const num = (s: string | number | null | undefined) => {
   const n = parseFloat(String(s ?? '')); return Number.isNaN(n) ? 0 : n;
 };
+// Faqat raqam, leading nol o'chiriladi, minglik probel bilan: "0150000" -> "150 000"
+const onlyDigits = (s: string | number | null | undefined) =>
+  String(s ?? '').replace(/\D/g, '').replace(/^0+/, '');
+const fmtInt = (s: string | number | null | undefined) => {
+  const d = onlyDigits(s);
+  return d ? d.replace(/\B(?=(\d{3})+(?!\d))/g, ' ') : '';
+};
 
 export default function OrdersTable({
   orders, products, onChanged, onPay,
@@ -178,7 +185,9 @@ function Row({
   // onBlur: faqat o'zgargan bo'lsa saqlaymiz
   const blurNum = (orig: string | number, key: 'unit_price_usd' | 'quantity' | 'discount') =>
     (e: React.FocusEvent<HTMLInputElement>) => {
-      const v = key === 'quantity' ? (parseInt(e.target.value, 10) || 1) : num(e.target.value);
+      const v = key === 'quantity'
+        ? (parseInt(e.target.value, 10) || 1)
+        : num(e.target.value.replace(/\s/g, '')); // probellarni olib tashlab raqamga aylantiramiz
       if (v !== num(orig)) saveMain({ [key]: v });
     };
 
@@ -233,17 +242,18 @@ function Row({
       </td>
 
       {/* Narx / soni / chegirma */}
-      <td className={cell + ' text-right'}>
-        <input type="text" inputMode="decimal" defaultValue={String(num(main?.unit_price_usd))}
-               className={inp + ' text-right'} onBlur={blurNum(main?.unit_price_usd ?? 0, 'unit_price_usd')} />
+      <td className={cell + ' text-right text-ink-soft'} title="Narx mahsulotlar bo'limidan olinadi — bu yerda o'zgartirilmaydi">
+        {num(main?.unit_price_usd)}
       </td>
       <td className={cell + ' text-right'}>
         <input type="number" min={1} defaultValue={main?.quantity ?? 1}
                className={inp + ' text-right'} onBlur={blurNum(main?.quantity ?? 1, 'quantity')} />
       </td>
       <td className={cell + ' text-right'}>
-        <input type="text" inputMode="decimal" defaultValue={String(num(main?.discount))}
-               className={inp + ' text-right'} onBlur={blurNum(main?.discount ?? 0, 'discount')} />
+        <input type="text" inputMode="numeric" defaultValue={fmtInt(main?.discount)} placeholder="0"
+               className={inp + ' text-right'}
+               onChange={(e) => { e.target.value = fmtInt(e.target.value); }}
+               onBlur={blurNum(main?.discount ?? 0, 'discount')} />
       </td>
 
       {/* Hisob */}

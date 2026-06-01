@@ -1,4 +1,4 @@
-# NurBunker Frontend (React + Vite)
+# NUR Project Frontend (React + Vite)
 
 NUR TECHNO GROUP ERP/CRM tizimining web ilovasi.
 

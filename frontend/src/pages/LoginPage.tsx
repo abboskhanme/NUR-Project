@@ -35,7 +35,7 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         <div className="text-center mb-6">
           <div className="inline-flex w-14 h-14 rounded-2xl bg-primary text-white text-xl font-bold items-center justify-center shadow-cozy">N</div>
-          <h1 className="mt-3 text-2xl font-bold">NurBunker ERP</h1>
+          <h1 className="mt-3 text-2xl font-bold">NUR Project</h1>
           <p className="text-sm text-ink-soft mt-1">NUR TECHNO GROUP — ichki tizim</p>
         </div>
 

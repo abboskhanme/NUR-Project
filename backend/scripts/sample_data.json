@@ -1,0 +1,73 @@
+{
+  "_comment": "NUR ERP — namunaviy (demo) baza ma'lumotlari. Seed (scripts/seed.py) har 'docker compose up' da shu fayldan o'qib bazani to'ldiradi (idempotent: mavjud yozuv qayta qo'shilmaydi). Ma'lumotni shu yerda tahrirlang — kodga tegmasdan.",
+
+  "products_main": [
+    { "model": "PREMIUM 3", "kvm": 150, "base_price_usd": 1200 },
+    { "model": "PREMIUM 3", "kvm": 200, "base_price_usd": 1400 },
+    { "model": "PREMIUM 3", "kvm": 300, "base_price_usd": 1600 },
+    { "model": "PREMIUM 4", "kvm": 200, "base_price_usd": 1500 },
+    { "model": "PREMIUM 4", "kvm": 300, "base_price_usd": 1700 },
+    { "model": "ULTRA", "kvm": 300, "base_price_usd": 1900 },
+    { "model": "ULTRA", "kvm": 400, "base_price_usd": 2100 },
+    { "model": "MAGNUM", "kvm": 400, "base_price_usd": 2200 },
+    { "model": "MAGNUM", "kvm": 500, "base_price_usd": 2500 },
+    { "model": "MAGNUM", "kvm": 600, "base_price_usd": 2800 },
+    { "model": "OPTIMA", "kvm": 200, "base_price_usd": 1300 },
+    { "model": "OPTIMA", "kvm": 300, "base_price_usd": 1500 }
+  ],
+
+  "products_additional": [
+    { "name": "Turba (issiqlik quvuri)", "unit": "metr", "base_price_usd": 3 },
+    { "name": "Defizor (radiator)", "unit": "dona", "base_price_usd": 25 },
+    { "name": "Aylanma nasos", "unit": "dona", "base_price_usd": 60 },
+    { "name": "Termostat", "unit": "dona", "base_price_usd": 15 },
+    { "name": "Montaj komplekti", "unit": "komplekt", "base_price_usd": 40 },
+    { "name": "Kengaytma baki", "unit": "dona", "base_price_usd": 35 },
+    { "name": "Filtr (suv tozalagich)", "unit": "dona", "base_price_usd": 18 },
+    { "name": "Manometr", "unit": "dona", "base_price_usd": 8 },
+    { "name": "Ventil (kran)", "unit": "dona", "base_price_usd": 5 },
+    { "name": "Dudburon truba", "unit": "metr", "base_price_usd": 12 }
+  ],
+
+  "customers": [
+    { "full_name": "Abdullayev Jahongir", "phone": "+998 90 111 22 33", "phone2": "+998 91 111 22 33", "country": "Uzbekistan", "region": "Toshkent", "city": "Yunusobod", "address": "Amir Temur ko'chasi 12", "source": "manual", "note": "Doimiy mijoz" },
+    { "full_name": "Mirzayeva Nodira", "phone": "+998 93 222 33 44", "phone2": null, "country": "Uzbekistan", "region": "Toshkent", "city": "Chilonzor", "address": "Bunyodkor shoh ko'chasi 45", "source": "manual", "note": null },
+    { "full_name": "Qodirov Sherzod", "phone": "+998 94 333 44 55", "phone2": null, "country": "Uzbekistan", "region": "Samarqand", "city": "Samarqand sh.", "address": "Registon ko'chasi 8", "source": "telegram_bot", "note": "Telegram bot orqali" },
+    { "full_name": "Tursunova Malika", "phone": "+998 95 444 55 66", "phone2": "+998 97 444 55 66", "country": "Uzbekistan", "region": "Buxoro", "city": "Buxoro sh.", "address": "Mustaqillik ko'chasi 23", "source": "manual", "note": null },
+    { "full_name": "Ergashev Bekzod", "phone": "+998 97 555 66 77", "phone2": null, "country": "Uzbekistan", "region": "Andijon", "city": "Andijon sh.", "address": "Navoiy ko'chasi 56", "source": "manual", "note": "Ulgurji buyurtma" },
+    { "full_name": "Yo'ldosheva Sevara", "phone": "+998 98 666 77 88", "phone2": null, "country": "Uzbekistan", "region": "Farg'ona", "city": "Farg'ona sh.", "address": "Al-Farg'oniy ko'chasi 17", "source": "manual", "note": null },
+    { "full_name": "Sodiqov Aziz", "phone": "+998 99 777 88 99", "phone2": "+998 90 777 88 99", "country": "Uzbekistan", "region": "Namangan", "city": "Namangan sh.", "address": "Uychi ko'chasi 9", "source": "manual", "note": null },
+    { "full_name": "Rashidova Gulnora", "phone": "+998 90 888 99 00", "phone2": null, "country": "Uzbekistan", "region": "Qashqadaryo", "city": "Qarshi sh.", "address": "Mustaqillik ko'chasi 34", "source": "telegram_bot", "note": null },
+    { "full_name": "Olimov Farrux", "phone": "+998 91 999 00 11", "phone2": null, "country": "Uzbekistan", "region": "Surxondaryo", "city": "Termiz sh.", "address": "Alpomish ko'chasi 21", "source": "manual", "note": "Yetkazib berish kerak" },
+    { "full_name": "Hamidova Dilnoza", "phone": "+998 93 100 20 30", "phone2": null, "country": "Uzbekistan", "region": "Xorazm", "city": "Urganch sh.", "address": "Al-Xorazmiy ko'chasi 5", "source": "manual", "note": null },
+    { "full_name": "Jo'rayev Sanjar", "phone": "+998 94 200 30 40", "phone2": "+998 95 200 30 40", "country": "Uzbekistan", "region": "Navoiy", "city": "Navoiy sh.", "address": "Navoiy ko'chasi 78", "source": "manual", "note": null },
+    { "full_name": "Nurmatova Kamola", "phone": "+998 95 300 40 50", "phone2": null, "country": "Uzbekistan", "region": "Jizzax", "city": "Jizzax sh.", "address": "Sharof Rashidov ko'chasi 14", "source": "manual", "note": null },
+    { "full_name": "Saidov Ulug'bek", "phone": "+998 97 400 50 60", "phone2": null, "country": "Uzbekistan", "region": "Sirdaryo", "city": "Guliston sh.", "address": "Istiqlol ko'chasi 30", "source": "manual", "note": "Naqd to'lov" },
+    { "full_name": "Bozorov Davron", "phone": "+998 98 500 60 70", "phone2": null, "country": "Uzbekistan", "region": "Toshkent viloyati", "city": "Chirchiq sh.", "address": "Sanoat ko'chasi 11", "source": "manual", "note": null },
+    { "full_name": "Allayorov Rustam", "phone": "+998 99 600 70 80", "phone2": "+998 90 600 70 80", "country": "Uzbekistan", "region": "Qoraqalpog'iston", "city": "Nukus sh.", "address": "Berdaq ko'chasi 41", "source": "telegram_bot", "note": "Uzoq hudud" },
+    { "full_name": "Sharipov Oybek", "phone": "+998 90 700 80 90", "phone2": null, "country": "Uzbekistan", "region": "Toshkent", "city": "Sergeli", "address": "Yangi Sergeli 7-kvartal 3", "source": "manual", "note": null },
+    { "full_name": "Maxmudova Zuhra", "phone": "+998 91 800 90 10", "phone2": null, "country": "Uzbekistan", "region": "Samarqand", "city": "Kattaqo'rg'on", "address": "Do'stlik ko'chasi 19", "source": "manual", "note": "Tavsiya bilan keldi" },
+    { "full_name": "G'aniyev Shavkat", "phone": "+998 93 900 10 20", "phone2": "+998 94 900 10 20", "country": "Uzbekistan", "region": "Andijon", "city": "Asaka sh.", "address": "Mehnat ko'chasi 27", "source": "manual", "note": null }
+  ],
+
+  "employees": [
+    { "full_name": "Karimov Jasur", "position": "Bosh direktor", "phone": "+998 90 010 00 01", "secondary_phone": null, "birth_date": "1980-04-10", "address": "Toshkent, Yunusobod", "hire_date": "2025-09-01", "employment_type": "office", "salary_type": "fixed", "salary_amount": 12000000, "currency": "UZS", "has_account": true },
+    { "full_name": "Aliyeva Nilufar", "position": "Sotuv menejeri", "phone": "+998 90 010 00 02", "secondary_phone": null, "birth_date": "1990-08-22", "address": "Toshkent, Mirzo Ulug'bek", "hire_date": "2025-09-15", "employment_type": "office", "salary_type": "fixed", "salary_amount": 8000000, "currency": "UZS", "has_account": true },
+    { "full_name": "Rahmonov Dilshod", "position": "Moliya menejeri", "phone": "+998 90 010 00 03", "secondary_phone": null, "birth_date": "1986-02-14", "address": "Toshkent, Chilonzor", "hire_date": "2025-10-01", "employment_type": "office", "salary_type": "fixed", "salary_amount": 9000000, "currency": "UZS", "has_account": true },
+    { "full_name": "Sultonova Madina", "position": "HR menejeri", "phone": "+998 90 010 00 04", "secondary_phone": null, "birth_date": "1993-11-30", "address": "Toshkent, Yashnobod", "hire_date": "2025-10-10", "employment_type": "office", "salary_type": "fixed", "salary_amount": 7000000, "currency": "UZS", "has_account": true },
+    { "full_name": "Tojiyev Aziz", "position": "Buxgalter", "phone": "+998 90 010 00 05", "secondary_phone": null, "birth_date": "1989-06-18", "address": "Toshkent, Olmazor", "hire_date": "2025-11-01", "employment_type": "office", "salary_type": "fixed", "salary_amount": 6500000, "currency": "UZS", "has_account": false },
+    { "full_name": "Yusupova Shahnoza", "position": "Ofis menejeri", "phone": "+998 90 010 00 06", "secondary_phone": null, "birth_date": "1996-01-25", "address": "Toshkent, Uchtepa", "hire_date": "2025-11-20", "employment_type": "office", "salary_type": "fixed", "salary_amount": 5500000, "currency": "UZS", "has_account": false },
+    { "full_name": "Qosimov Bahodir", "position": "Servis menejeri", "phone": "+998 90 010 00 07", "secondary_phone": null, "birth_date": "1987-09-05", "address": "Toshkent, Sergeli", "hire_date": "2025-12-01", "employment_type": "office", "salary_type": "fixed", "salary_amount": 7500000, "currency": "UZS", "has_account": false },
+
+    { "full_name": "Aliyev Bobur", "position": "Usta", "phone": "+998 90 123 45 67", "secondary_phone": null, "birth_date": "1990-03-12", "address": "Toshkent, Yunusobod", "hire_date": "2026-01-06", "employment_type": "worker", "salary_type": "hourly", "salary_amount": 22000, "currency": "UZS", "has_account": false },
+    { "full_name": "Karimov Sardor", "position": "Payvandchi", "phone": "+998 91 234 56 78", "secondary_phone": null, "birth_date": "1988-07-25", "address": "Toshkent, Chilonzor", "hire_date": "2026-01-20", "employment_type": "worker", "salary_type": "hourly", "salary_amount": 20000, "currency": "UZS", "has_account": false },
+    { "full_name": "Toshmatov Jasur", "position": "Montajchi", "phone": "+998 93 345 67 89", "secondary_phone": null, "birth_date": "1995-11-02", "address": "Toshkent, Sergeli", "hire_date": "2026-02-03", "employment_type": "worker", "salary_type": "hourly", "salary_amount": 19000, "currency": "UZS", "has_account": false },
+    { "full_name": "Rahimov Otabek", "position": "Yordamchi ishchi", "phone": "+998 94 456 78 90", "secondary_phone": null, "birth_date": "1999-01-18", "address": "Toshkent, Olmazor", "hire_date": "2026-02-17", "employment_type": "worker", "salary_type": "hourly", "salary_amount": 16000, "currency": "UZS", "has_account": false },
+    { "full_name": "Yusupov Diyor", "position": "Operator", "phone": "+998 95 567 89 01", "secondary_phone": null, "birth_date": "1992-09-09", "address": "Toshkent, Mirzo Ulug'bek", "hire_date": "2026-03-02", "employment_type": "worker", "salary_type": "hourly", "salary_amount": 18000, "currency": "UZS", "has_account": false },
+    { "full_name": "Sobirov Akmal", "position": "Omborchi", "phone": "+998 97 678 90 12", "secondary_phone": null, "birth_date": "1985-05-30", "address": "Toshkent, Yashnobod", "hire_date": "2026-03-16", "employment_type": "worker", "salary_type": "hourly", "salary_amount": 17000, "currency": "UZS", "has_account": false },
+    { "full_name": "Nazarov Shahzod", "position": "Haydovchi", "phone": "+998 98 789 01 23", "secondary_phone": null, "birth_date": "1991-12-05", "address": "Toshkent, Bektemir", "hire_date": "2026-04-01", "employment_type": "worker", "salary_type": "hourly", "salary_amount": 17500, "currency": "UZS", "has_account": false },
+    { "full_name": "Ismoilov Bekzod", "position": "Yordamchi ishchi", "phone": "+998 99 890 12 34", "secondary_phone": null, "birth_date": "2000-02-22", "address": "Toshkent, Uchtepa", "hire_date": "2026-04-14", "employment_type": "worker", "salary_type": "hourly", "salary_amount": 16000, "currency": "UZS", "has_account": false },
+    { "full_name": "Qurbonov Sherali", "position": "Payvandchi", "phone": "+998 90 901 23 45", "secondary_phone": null, "birth_date": "1994-08-08", "address": "Toshkent, Yangihayot", "hire_date": "2026-04-28", "employment_type": "worker", "salary_type": "hourly", "salary_amount": 20000, "currency": "UZS", "has_account": false },
+    { "full_name": "Egamberdiyev Ulug'bek", "position": "Montajchi", "phone": "+998 91 012 34 56", "secondary_phone": null, "birth_date": "1997-03-19", "address": "Toshkent, Chilonzor", "hire_date": "2026-05-12", "employment_type": "worker", "salary_type": "hourly", "salary_amount": 18500, "currency": "UZS", "has_account": false }
+  ]
+}
