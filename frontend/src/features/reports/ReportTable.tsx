@@ -23,14 +23,14 @@ interface Props<T> {
   footer?: ReactNode;
 }
 
-export default function ReportTable<T extends Record<string, unknown>>({
+export default function ReportTable<T extends object>({
   rows, columns, filename, emptyText = "Ma'lumot yo'q", footer,
 }: Props<T>) {
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
   const valueOf = (row: T, col: Column<T>): string | number =>
-    col.value ? col.value(row) : (row[col.key] as string | number);
+    col.value ? col.value(row) : ((row as Record<string, unknown>)[col.key] as string | number);
 
   const sorted = useMemo(() => {
     if (!rows) return undefined;
