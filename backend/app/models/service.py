@@ -11,7 +11,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
 
 
-SERVICE_STATUSES = ("new", "scheduled", "in_progress", "completed", "cancelled")
+SERVICE_STATUSES = ("new", "scheduled", "completed", "cancelled")
 
 
 class ServiceTicket(UUIDPrimaryKeyMixin, TimestampMixin, Base):
@@ -45,6 +45,12 @@ class ServiceTicket(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     visits: Mapped[list["ServiceVisit"]] = relationship(
         back_populates="ticket", cascade="all, delete-orphan", lazy="selectin"
     )
+    customer: Mapped[Optional["Customer"]] = relationship(  # noqa: F821
+        "Customer", lazy="selectin", viewonly=True
+    )
+    order: Mapped[Optional["Order"]] = relationship(  # noqa: F821
+        "Order", lazy="selectin", viewonly=True
+    )
 
 
 class ServiceVisit(UUIDPrimaryKeyMixin, TimestampMixin, Base):
@@ -60,3 +66,11 @@ class ServiceVisit(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     note: Mapped[Optional[str]] = mapped_column(Text)
 
     ticket: Mapped[ServiceTicket] = relationship(back_populates="visits")
+
+
+class ServiceCategory(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    """Servis muammolari toifalari — ariza yaratishda dropdownda ishlatiladi."""
+    __tablename__ = "service_categories"
+
+    name: Mapped[str] = mapped_column(String(80), unique=True, index=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)

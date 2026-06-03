@@ -1,7 +1,5 @@
 import { useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import toast from 'react-hot-toast';
-import { Plus } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 
 import { api } from '@/api/client';
 import Card from '@/components/ui/Card';
@@ -21,21 +19,7 @@ const MONTHS = [
   'Iyul', 'Avgust', 'Sentyabr', 'Oktyabr', 'Noyabr', 'Dekabr',
 ];
 
-function clean(raw: string) {
-  return raw.replace(/[^\d]/g, '');
-}
-function display(raw: string) {
-  if (!raw) return '';
-  return raw.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
-}
-
 export default function AdvancesCard({ employeeId }: { employeeId: string }) {
-  const qc = useQueryClient();
-  const [open, setOpen] = useState(false);
-  const [amount, setAmount] = useState('');
-  const [advDate, setAdvDate] = useState(new Date().toISOString().slice(0, 10));
-  const [note, setNote] = useState('');
-  const [saving, setSaving] = useState(false);
   const nowYear = new Date().getFullYear();
   const [filterMonth, setFilterMonth] = useState(0); // 0 = barchasi, 1-12
   const [filterYear, setFilterYear] = useState(nowYear);
@@ -56,66 +40,8 @@ export default function AdvancesCard({ employeeId }: { employeeId: string }) {
   const items = data ?? [];
   const total = items.reduce((s, a) => s + (parseFloat(a.amount) || 0), 0);
 
-  async function handleSave() {
-    if (!amount || parseInt(amount, 10) <= 0) {
-      toast.error('Summani kiriting');
-      return;
-    }
-    setSaving(true);
-    try {
-      await api.post('/hr/advances', {
-        employee_id: employeeId,
-        advance_date: advDate,
-        amount,
-        note: note || null,
-      });
-      toast.success('Avans qo\'shildi');
-      setAmount(''); setNote(''); setOpen(false);
-      qc.invalidateQueries({ queryKey: ['hr', 'advances', employeeId] });
-      qc.invalidateQueries({ queryKey: ['hr', 'summary', employeeId] });
-      qc.invalidateQueries({ queryKey: ['hr', 'history', employeeId] });
-    } catch (e: any) {
-      toast.error(e?.response?.data?.detail || 'Xatolik');
-    } finally {
-      setSaving(false);
-    }
-  }
-
   return (
-    <Card
-      title="Avanslar"
-      action={
-        <button onClick={() => setOpen((o) => !o)} className="btn-ghost">
-          <Plus size={15} /> Avans
-        </button>
-      }
-    >
-      {open && (
-        <div className="flex items-end gap-x-6 gap-y-3 flex-wrap mb-4 p-4 bg-black/[0.02] rounded-button">
-          <div className="flex flex-col gap-1">
-            <label className="label !mb-0">Sana</label>
-            <input type="date" className="input !w-40" value={advDate} onChange={(e) => setAdvDate(e.target.value)} />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="label !mb-0">Summa</label>
-            <input
-              className="input !w-40"
-              inputMode="numeric"
-              placeholder="0"
-              value={display(amount)}
-              onChange={(e) => setAmount(clean(e.target.value))}
-            />
-          </div>
-          <div className="flex flex-col gap-1 flex-1 min-w-[140px]">
-            <label className="label !mb-0">Izoh</label>
-            <input className="input" value={note} onChange={(e) => setNote(e.target.value)} />
-          </div>
-          <button onClick={handleSave} disabled={saving} className="btn-primary disabled:opacity-50">
-            {saving ? '...' : 'Saqlash'}
-          </button>
-        </div>
-      )}
-
+    <Card title="Avans / oylik to'lovlari">
       {/* Oy bo'yicha filter */}
       <div className="flex items-center gap-2 flex-wrap mb-3">
         <span className="text-sm text-ink-soft">Oy:</span>
@@ -154,7 +80,7 @@ export default function AdvancesCard({ employeeId }: { employeeId: string }) {
           ))}
         </div>
       ) : items.length === 0 ? (
-        <EmptyState title="Avans yo'q" description="Hozircha avans berilmagan." />
+        <EmptyState title="To'lov yo'q" description="Hozircha avans yoki oylik to'lanmagan." />
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">

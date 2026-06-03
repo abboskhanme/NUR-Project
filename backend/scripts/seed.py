@@ -27,7 +27,8 @@ from app.models.order import Order, OrderItem, Payment
 from app.models.finance import Account, FinanceCategory
 from app.models.hr import Attendance, Employee, Position, SalaryRate
 from app.models.product import Product
-from app.models.supply import SupplySector
+from app.models.service import ServiceCategory
+from app.models.supply import Item, Vendor
 from app.models.user import Role, User
 
 
@@ -75,19 +76,32 @@ DEFAULT_ROLES = [
     ("service_technician", "Servis ustasi"),
     ("finance_manager", "Moliya menejeri"),
     ("hr_manager", "HR menejeri"),
-    ("supply_lazer", "Ta'minot — LAZER sektor"),
-    ("supply_chugun", "Ta'minot — CHUGUN sektor"),
-    ("supply_main", "Ta'minot — ASOSIY (Umid Tokir) sektor"),
-    ("supply_mardon", "Ta'minot — MARDON sektor"),
+    ("supply_manager", "Ta'minot menejeri (barcha taminotchilar)"),
+    ("supplier", "Taminotchi (faqat o'z mahsulotlari)"),
     ("viewer", "Ko'rish (read-only)"),
 ]
 
+# Maxsus ruxsatlar — DEFAULT_ROLES yaratilgandan keyin qo'llanadi.
+# (super_admin'da allaqachon *:* bor.)
+ROLE_PERMS = {
+    "supply_manager": ["supply:read", "supply:write", "supply:delete", "supply:export"],
+    "supplier": ["supply:read", "supply:write"],
+}
 
-SUPPLY_SECTORS = [
-    ("LAZER", "LAZER"),
-    ("CHUGUN", "CHUGUN"),
-    ("ASOSIY (Umid Tokir)", "ASOSIY"),
-    ("MARDON", "MARDON"),
+
+# Taminotchi login akkauntlari (email, parol, F.I.Sh) va ularning vendor nomi.
+# Login qilganda har biri faqat o'z mahsulotlari/kirimlarini ko'radi.
+SUPPLIERS = [
+    {
+        "email": "taminotchi1@nur.uz", "password": "taminotchi1",
+        "full_name": "Umid Tokir", "vendor": "Umid Tokir",
+        "phone": "+998901112233",
+    },
+    {
+        "email": "taminotchi2@nur.uz", "password": "taminotchi2",
+        "full_name": "Mardon Ta'minot", "vendor": "Mardon",
+        "phone": "+998901112244",
+    },
 ]
 
 
@@ -333,12 +347,51 @@ async def _seed_hr_samples(db):
           f"{len(targets)} ishchiga davomat ({filled} kun)")
 
 
+async def _ensure_supply_schema():
+    """Eski supply jadvallarini taminotchi-asosli sxemaga moslaydi (idempotent).
+    alembic ishlatilmaydigan dev oqimi uchun — create_all mavjud jadvalni ALTER qilmaydi.
+    Har bir buyruq alohida tranzaksiyada — bittasi xato bersa qolganlari ishlaydi."""
+    stmts = [
+        # vendors
+        "ALTER TABLE vendors ADD COLUMN IF NOT EXISTS user_id UUID",
+        "ALTER TABLE vendors ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true",
+        "ALTER TABLE vendors DROP COLUMN IF EXISTS sector_id",
+        "CREATE UNIQUE INDEX IF NOT EXISTS ix_vendors_user_id ON vendors (user_id)",
+        # items
+        "ALTER TABLE items ADD COLUMN IF NOT EXISTS vendor_id UUID",
+        "ALTER TABLE items ADD COLUMN IF NOT EXISTS unit_price NUMERIC(16,2) NOT NULL DEFAULT 0",
+        "ALTER TABLE items ADD COLUMN IF NOT EXISTS note TEXT",
+        "ALTER TABLE items DROP COLUMN IF EXISTS sector_id",
+        "ALTER TABLE items DROP COLUMN IF EXISTS default_vendor_id",
+        "CREATE INDEX IF NOT EXISTS ix_items_vendor_id ON items (vendor_id)",
+        # goods_receipts
+        "ALTER TABLE goods_receipts ADD COLUMN IF NOT EXISTS note TEXT",
+        "ALTER TABLE goods_receipts DROP COLUMN IF EXISTS currency",
+        # vendor_payments
+        "ALTER TABLE vendor_payments ADD COLUMN IF NOT EXISTS receipt_id UUID",
+        "ALTER TABLE vendor_payments DROP COLUMN IF EXISTS currency",
+        # stock_movements
+        "ALTER TABLE stock_movements ADD COLUMN IF NOT EXISTS created_by_id UUID",
+        # eski sektor jadvali
+        "DROP TABLE IF EXISTS supply_sectors CASCADE",
+    ]
+    for sql in stmts:
+        try:
+            async with engine.begin() as conn:
+                await conn.exec_driver_sql(sql)
+        except Exception as e:  # noqa: BLE001 — jadval hali yo'q bo'lsa o'tkazib yuboramiz
+            print(f"[i] supply schema: '{sql[:48]}...' -> {e}")
+
+
 async def seed():
     print(f"Connecting to DB at: {settings.DATABASE_URL}")
 
     # Ensure tables exist
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    # Ta'minot moduli taminotchi-asosli bo'lgani uchun mavjud jadvallarga yangi
+    # ustunlarni qo'shamiz (create_all eski jadvalni ALTER qilmaydi). Idempotent.
+    await _ensure_supply_schema()
 
     async with AsyncSessionLocal() as db:
         # Roles — super_admin'ga to'liq ruxsat (*:*), boshqalari bo'sh
@@ -355,6 +408,15 @@ async def seed():
                 items = perms.get("permissions") if isinstance(perms, dict) else perms
                 if not items or "*:*" not in items:
                     existing.permissions = {"permissions": ["*:*"]}
+
+        # Ta'minot rollariga maxsus ruxsatlar (bo'sh bo'lsa to'ldiramiz)
+        for rname, perms in ROLE_PERMS.items():
+            r = (await db.execute(select(Role).where(Role.name == rname))).scalar_one_or_none()
+            if r:
+                cur = r.permissions or {}
+                items = cur.get("permissions") if isinstance(cur, dict) else cur
+                if not items:
+                    r.permissions = {"permissions": perms}
 
         # Rolelarni darhol flush qilamiz — keyin super_admin role'ni topa olamiz
         await db.flush()
@@ -376,11 +438,54 @@ async def seed():
             db.add(admin)
             print(f"[+] Created super admin: {settings.INIT_ADMIN_EMAIL} / {settings.INIT_ADMIN_PASSWORD}")
 
-        # Supply sectors
-        for name, code in SUPPLY_SECTORS:
-            res = await db.execute(select(SupplySector).where(SupplySector.code == code))
-            if not res.scalar_one_or_none():
-                db.add(SupplySector(name=name, code=code))
+        # Taminotchilar — login akkaunt (supplier roli) + bog'langan vendor yozuvi
+        supplier_role = (await db.execute(
+            select(Role).where(Role.name == "supplier")
+        )).scalar_one_or_none()
+        for s in SUPPLIERS:
+            u = (await db.execute(select(User).where(User.email == s["email"]))).scalar_one_or_none()
+            if not u:
+                u = User(
+                    email=s["email"], password_hash=hash_password(s["password"]),
+                    full_name=s["full_name"], phone=s.get("phone"),
+                    is_active=True, is_superadmin=False, locale="uz", theme="light",
+                    roles=[supplier_role] if supplier_role else [],
+                )
+                db.add(u)
+                await db.flush()
+                print(f"[+] Created supplier login: {s['email']} / {s['password']}")
+            # Vendor yozuvi — userga bog'langan
+            v = (await db.execute(select(Vendor).where(Vendor.name == s["vendor"]))).scalar_one_or_none()
+            if not v:
+                db.add(Vendor(name=s["vendor"], user_id=u.id, phone=s.get("phone"), is_active=True))
+            elif v.user_id is None:
+                v.user_id = u.id
+
+        # Namunaviy mahsulotlar (ehtiyot qismlar) — har taminotchiga bir nechta
+        await db.flush()
+        SAMPLE_ITEMS = {
+            "Umid Tokir": [
+                ("Profil truba 40x40", "metr", Decimal("18000"), Decimal("120"), Decimal("50")),
+                ("List temir 2mm", "list", Decimal("450000"), Decimal("8"), Decimal("3")),
+                ("Payvand elektrod 3mm", "kg", Decimal("22000"), Decimal("15"), Decimal("10")),
+            ],
+            "Mardon": [
+                ("Bolt M8", "dona", Decimal("700"), Decimal("400"), Decimal("200")),
+                ("Quyma chugun plita", "dona", Decimal("320000"), Decimal("5"), Decimal("2")),
+                ("Bo'yoq (kukun)", "kg", Decimal("65000"), Decimal("12"), Decimal("8")),
+            ],
+        }
+        for vname, rows in SAMPLE_ITEMS.items():
+            v = (await db.execute(select(Vendor).where(Vendor.name == vname))).scalar_one_or_none()
+            if not v:
+                continue
+            for name, unit, price, stock, minq in rows:
+                exists = (await db.execute(
+                    select(Item).where(Item.vendor_id == v.id, Item.name == name)
+                )).scalar_one_or_none()
+                if not exists:
+                    db.add(Item(name=name, vendor_id=v.id, unit=unit,
+                                unit_price=price, stock_qty=stock, min_qty=minq))
 
         # Default accounts
         for name, currency, ledger in [
@@ -403,6 +508,15 @@ async def seed():
             res = await db.execute(select(FinanceCategory).where(FinanceCategory.code == code))
             if not res.scalar_one_or_none():
                 db.add(FinanceCategory(name=name, code=code, kind="expense"))
+
+        # Servis toifalari (default ro'yxat — keyin UI orqali tahrirlanadi)
+        for sc_name in [
+            "Ta'mirlash", "Profilaktika", "Ehtiyot qism almashtirish",
+            "Sozlash / kalibrovka", "O'rnatish", "Konsultatsiya",
+        ]:
+            res = await db.execute(select(ServiceCategory).where(ServiceCategory.name == sc_name))
+            if not res.scalar_one_or_none():
+                db.add(ServiceCategory(name=sc_name))
 
         # Products — asosiy (main) mahsulotlar (sample_data.json -> products_main)
         for p in SAMPLE.get("products_main", []):

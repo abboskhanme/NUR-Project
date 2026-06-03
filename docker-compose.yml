@@ -47,9 +47,9 @@ services:
       INIT_ADMIN_PASSWORD: Admin@12345
       INIT_ADMIN_NAME: Super Admin
     ports:
-      # Host 8001 -> container 8000. Boshqa project 8000ni band qilgani uchun
-      # ziddiyatdan qochish maqsadida tashqi port 8001 ga ko'chirildi.
-      - "8001:8000"
+      # Host 8011 -> container 8000. 8000/8001/8002 boshqa projectlar yoki Windows
+      # tomonidan band bo'lgani uchun tashqi port 8011 ga ko'chirildi.
+      - "8011:8000"
     volumes:
       - ./backend:/app
     depends_on:
@@ -70,7 +70,7 @@ services:
     container_name: nur-frontend
     restart: unless-stopped
     environment:
-      VITE_API_BASE_URL: http://localhost:8001/api/v1
+      VITE_API_BASE_URL: http://localhost:8011/api/v1
     ports:
       - "5173:5173"
     volumes:

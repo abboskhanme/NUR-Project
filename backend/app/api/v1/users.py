@@ -12,6 +12,7 @@ from app.core.permissions import require_permission  # Yangi permission tizimi
 from app.core.security import hash_password
 from app.db.session import get_db
 from app.models.hr import Employee, Position
+from app.models.supply import Vendor
 from app.models.user import Role, User, UserAvatar
 from app.schemas.auth import (
     AdminPasswordReset,
@@ -90,6 +91,32 @@ async def _sync_employee_from_user(db: AsyncSession, user: User) -> None:
             emp.position_id = position_id
 
 
+async def _sync_vendor_from_user(db: AsyncSession, user: User) -> None:
+    """'supplier' rolli foydalanuvchi uchun bog'langan Taminotchi (Vendor) yozuvini
+    yaratadi/yangilaydi. Shu sababli taminotchilar alohida qo'shilmaydi — Foydalanuvchilar
+    bo'limida 'Taminotchi' roli berilgan har bir user avtomatik Ta'minot bo'limida paydo bo'ladi.
+
+    Rol olib tashlansa yoki user arxivlansa — vendor nofaol qilinadi (ma'lumot o'chmaydi).
+    """
+    role_names = {r.name for r in (user.roles or [])}
+    res = await db.execute(select(Vendor).where(Vendor.user_id == user.id))
+    vendor = res.scalar_one_or_none()
+
+    if "supplier" in role_names:
+        if vendor is None:
+            db.add(Vendor(
+                name=user.full_name, user_id=user.id,
+                phone=user.phone, is_active=user.is_active,
+            ))
+        else:
+            vendor.name = user.full_name
+            vendor.phone = user.phone
+            vendor.is_active = user.is_active
+    elif vendor is not None:
+        # Taminotchi roli olib tashlandi — yozuvni o'chirmaymiz, faqat nofaol qilamiz
+        vendor.is_active = False
+
+
 # ============================================================
 # CRUD
 # ============================================================
@@ -154,6 +181,8 @@ async def create_user(
     await db.flush()
     # Avtomatik ravishda HR bo'limiga "Ofis xodimi" sifatida qo'shamiz
     await _sync_employee_from_user(db, user)
+    # 'supplier' rolli bo'lsa — Ta'minot bo'limiga taminotchi sifatida qo'shamiz
+    await _sync_vendor_from_user(db, user)
     await db.commit()
     await db.refresh(user)
     return user
@@ -193,6 +222,8 @@ async def update_user(
 
     # Bog'langan HR yozuvini sinxronlaymiz (ism, telefon, lavozim, status)
     await _sync_employee_from_user(db, user)
+    # Bog'langan taminotchi yozuvini sinxronlaymiz (rol/nom/status)
+    await _sync_vendor_from_user(db, user)
     await db.commit()
     await db.refresh(user)
     return user
@@ -215,6 +246,7 @@ async def delete_user(
     user.is_active = False
     # Bog'langan xodim ham arxivlanadi (status=terminated)
     await _sync_employee_from_user(db, user)
+    await _sync_vendor_from_user(db, user)
     await db.commit()
 
 
@@ -233,6 +265,7 @@ async def restore_user(
     user.is_active = True
     # Bog'langan xodim qayta faollashadi (status=active)
     await _sync_employee_from_user(db, user)
+    await _sync_vendor_from_user(db, user)
     await db.commit()
     await db.refresh(user)
     return user

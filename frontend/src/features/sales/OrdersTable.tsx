@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import { ExternalLink, Plus } from 'lucide-react';
 
 import { api } from '@/api/client';
-import { formatUZS } from '@/lib/format';
+import { formatUZS, formatPhone } from '@/lib/format';
 
 export interface ProductOpt {
   id: string; product_type?: string; model?: string | null; name?: string | null;
@@ -22,6 +22,7 @@ interface OrderItem {
 export interface OrderFull {
   id: string; code: string; status: string; order_date: string; delivered_at?: string | null;
   exchange_rate: string;
+  delivery_address?: string | null;
   customer?: { id: string; full_name: string; phone: string; region?: string | null; address?: string | null } | null;
   items: OrderItem[];
   items_total_uzs: string; paid_uzs: string; balance_uzs: string;
@@ -63,17 +64,18 @@ export default function OrdersTable({
 }) {
   return (
     <div className="overflow-x-auto -mx-2">
-      <table className="text-sm border-collapse table-fixed w-[1774px]">
+      <table className="text-sm border-collapse table-fixed w-[1930px]">
         <colgroup>
           <col style={{ width: 140 }} />{/* Buyurtma */}
           <col style={{ width: 140 }} />{/* Yetkazilgan */}
           <col style={{ width: 170 }} />{/* Mijoz */}
+          <col style={{ width: 140 }} />{/* Telefon */}
           <col style={{ width: 180 }} />{/* Manzil */}
           <col style={{ width: 180 }} />{/* Model */}
           <col style={{ width: 96 }} />{/* Yo'nalish */}
-          <col style={{ width: 90 }} />{/* Narx $ */}
+          <col style={{ width: 70 }} />{/* Narx $ */}
           <col style={{ width: 64 }} />{/* Soni */}
-          <col style={{ width: 84 }} />{/* Chegirma */}
+          <col style={{ width: 120 }} />{/* Chegirma */}
           <col style={{ width: 140 }} />{/* Jami */}
           <col style={{ width: 160 }} />{/* To'langan */}
           <col style={{ width: 140 }} />{/* Qoldiq */}
@@ -85,6 +87,7 @@ export default function OrdersTable({
             <th>Buyurtma</th>
             <th>Yetkazilgan</th>
             <th>Mijoz</th>
+            <th>Telefon</th>
             <th>Manzil</th>
             <th>Model</th>
             <th>Yo'nalish</th>
@@ -211,9 +214,31 @@ function Row({
         <input defaultValue={o.customer?.full_name ?? ''} className={inp}
                onBlur={(e) => e.target.value !== (o.customer?.full_name ?? '') && patchCustomer({ full_name: e.target.value })} />
       </td>
+      {/* Telefon — faqat ko'rish uchun, tahrirlanmaydi */}
+      <td className={cell + ' text-ink-soft'} title="Telefon raqami (tahrirlanmaydi)">
+        {o.customer?.phone ? formatPhone(o.customer.phone) : '—'}
+      </td>
       <td className={cell}>
-        <input defaultValue={o.customer?.address ?? ''} className={inp}
-               onBlur={(e) => e.target.value !== (o.customer?.address ?? '') && patchCustomer({ address: e.target.value })} />
+        {/* Buyurtmada yetkazish manzili bo'lsa o'shani ko'rsatamiz (masalan usta ish joyi),
+            aks holda mijozning manzili. Tahrirlash ham shu manbaga yoziladi. */}
+        {(() => {
+          const hasDelivery = !!(o.delivery_address && o.delivery_address.trim());
+          const shown = hasDelivery ? o.delivery_address! : (o.customer?.address ?? '');
+          return (
+            <input
+              key={hasDelivery ? 'delivery' : 'customer'}
+              defaultValue={shown}
+              className={inp}
+              title={hasDelivery ? 'Yetkazish manzili (buyurtma)' : 'Mijoz manzili'}
+              onBlur={(e) => {
+                const v = e.target.value;
+                if (v === shown) return;
+                if (hasDelivery) patchOrder({ delivery_address: v || null });
+                else patchCustomer({ address: v });
+              }}
+            />
+          );
+        })()}
       </td>
 
       {/* Mahsulot */}

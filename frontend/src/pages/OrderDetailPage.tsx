@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import {
-  ArrowLeft, Pencil, Phone, MapPin, User, Package, Plus, Trash2,
+  ArrowLeft, Pencil, Phone, MapPin, User, Package, Plus, Trash2, ExternalLink, ShieldCheck,
 } from 'lucide-react';
 
 import { api } from '@/api/client';
@@ -11,6 +11,7 @@ import Card from '@/components/ui/Card';
 import StatusBadge from '@/components/ui/StatusBadge';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import { formatDate, formatUZS, formatUSD, formatPhone } from '@/lib/format';
+import { computeWarranty, WARRANTY_META } from '@/features/service/warranty';
 import OrderModal, { OrderEditData } from '@/features/sales/OrderModal';
 import PaymentModal from '@/features/sales/PaymentModal';
 
@@ -128,6 +129,13 @@ export default function OrderDetailPage() {
   const nexts = NEXT_STATUS[o.status] ?? [];
   const balance = parseFloat(o.balance_uzs || '0');
 
+  const w = computeWarranty(o.delivered_at);
+  const wm = WARRANTY_META[w.status];
+  const wDays =
+    w.status === 'active_full' ? ` · ${w.daysYear1} kun qoldi`
+    : w.status === 'active_service_only' ? ` · ${w.daysYear3} kun qoldi`
+    : '';
+
   return (
     <div className="space-y-4">
       <button onClick={() => navigate('/orders')} className="flex items-center gap-1.5 text-sm text-ink-soft hover:text-ink">
@@ -145,6 +153,11 @@ export default function OrderDetailPage() {
             <div className="text-sm text-ink-soft mt-1">
               Sana: {formatDate(o.order_date)}
               {o.delivered_at && ` • Yetkazilgan: ${formatDate(o.delivered_at)}`}
+            </div>
+            <div className="mt-2">
+              <span className={`badge ${wm.cls}`} title={wm.long}>
+                <ShieldCheck size={12} className="mr-1" /> Servis kafolati: {wm.short}{wDays}
+              </span>
             </div>
           </div>
           <button onClick={() => setEditing(true)} className="btn-ghost"><Pencil size={15} /> Tahrirlash</button>
@@ -176,7 +189,19 @@ export default function OrderDetailPage() {
 
       {/* Customer + spec */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card title="Mijoz">
+        <Card
+          title="Mijoz"
+          action={o.customer && (
+            <button
+              type="button"
+              onClick={() => navigate(`/customers/${o.customer!.id}`)}
+              className="btn-ghost text-sm flex items-center gap-1.5"
+              title="Mijoz haqida batafsil"
+            >
+              <ExternalLink size={14} /> Profilni ochish
+            </button>
+          )}
+        >
           {o.customer ? (
             <div className="space-y-1.5 text-sm">
               <div className="flex items-center gap-2 font-medium"><User size={14} className="text-ink/40" /> {o.customer.full_name}</div>

@@ -1,78 +1,83 @@
-import { useQuery } from '@tanstack/react-query';
-import { BarChart, Bar, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid, Cell } from 'recharts';
+import { useState } from 'react';
+import { ShoppingCart, Wallet, Wrench, Truck } from 'lucide-react';
 
-import { api } from '@/api/client';
-import Card from '@/components/ui/Card';
+import DateRangeFilter, { presetRange } from '@/features/reports/DateRangeFilter';
+import SalesReport from '@/features/reports/SalesReport';
+import FinanceReport from '@/features/reports/FinanceReport';
+import ServiceReport from '@/features/reports/ServiceReport';
+import SupplyReport from '@/features/reports/SupplyReport';
+import { formatDate } from '@/lib/format';
+import type { DateRange } from '@/features/reports/types';
 
-const COLORS = ['#1E3A5F', '#2980B9', '#27AE60', '#F39C12', '#E74C3C'];
+type Tab = 'sales' | 'finance' | 'service' | 'supply';
+type Preset = 'this_month' | 'last_month' | 'last_30' | 'last_90' | 'this_year';
+
+const TABS: Array<{ key: Tab; label: string; icon: typeof ShoppingCart }> = [
+  { key: 'sales', label: 'Sotuv', icon: ShoppingCart },
+  { key: 'finance', label: 'Moliya', icon: Wallet },
+  { key: 'service', label: 'Servis', icon: Wrench },
+  { key: 'supply', label: "Ta'minot", icon: Truck },
+];
 
 export default function ReportsPage() {
-  const byModel = useQuery({
-    queryKey: ['report-by-model'],
-    queryFn: () => api.get('/reports/sales/by-model').then((r) => r.data as Array<{ model: string; count: number; total_uzs: number }>),
-  });
-  const byRegion = useQuery({
-    queryKey: ['report-by-region'],
-    queryFn: () => api.get('/reports/sales/by-region').then((r) => r.data as Array<{ region: string; count: number; total_uzs: number }>),
-  });
-  const pnl = useQuery({
-    queryKey: ['pnl'],
-    queryFn: () => api.get('/reports/finance/pnl').then((r) => r.data),
-  });
+  const [tab, setTab] = useState<Tab>('sales');
+  const [preset, setPreset] = useState<Preset | null>('this_month');
+  const [range, setRange] = useState<DateRange>(() => presetRange('this_month'));
+
+  function applyPreset(p: Preset) {
+    setPreset(p);
+    setRange(presetRange(p));
+  }
+  function applyRange(r: DateRange) {
+    setPreset(null); // qo'lda tahrirlanganda preset bekor
+    setRange(r);
+  }
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold">Hisobotlar</h1>
-        <p className="text-sm text-ink-soft">KPI, sotuv tahlili, P&L</p>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card title="Sotuv — model bo'yicha">
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={byModel.data ?? []}>
-              <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-              <XAxis dataKey="model" />
-              <YAxis />
-              <Tooltip />
-              <Bar dataKey="count">
-                {(byModel.data ?? []).map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </Card>
-
-        <Card title="Sotuv — viloyat bo'yicha">
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={byRegion.data ?? []}>
-              <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-              <XAxis dataKey="region" />
-              <YAxis />
-              <Tooltip />
-              <Bar dataKey="count">
-                {(byRegion.data ?? []).map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </Card>
-      </div>
-
-      <Card title="Moliya P&L (joriy oy)">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
-          <div>
-            <div className="text-sm text-ink-soft">Kirim</div>
-            <div className="text-2xl font-bold text-success mt-1">{pnl.data?.income?.toLocaleString() ?? 0}</div>
-          </div>
-          <div>
-            <div className="text-sm text-ink-soft">Chiqim</div>
-            <div className="text-2xl font-bold text-danger mt-1">{pnl.data?.expense?.toLocaleString() ?? 0}</div>
-          </div>
-          <div>
-            <div className="text-sm text-ink-soft">Sof foyda</div>
-            <div className="text-2xl font-bold mt-1">{pnl.data?.net?.toLocaleString() ?? 0}</div>
-          </div>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">Hisobotlar</h1>
+          <p className="text-sm text-ink-soft">
+            {formatDate(range.from)} — {formatDate(range.to)}
+          </p>
         </div>
-      </Card>
+      </div>
+
+      {/* Davr filtri */}
+      <div className="card !p-3">
+        <DateRangeFilter
+          range={range}
+          onChange={applyRange}
+          activePreset={preset}
+          onPreset={applyPreset}
+        />
+      </div>
+
+      {/* Bo'lim tablari */}
+      <div className="flex gap-1 border-b border-black/10 overflow-x-auto">
+        {TABS.map((t) => {
+          const Icon = t.icon;
+          return (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px whitespace-nowrap transition ${
+                tab === t.key
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-ink-soft hover:text-ink'
+              }`}
+            >
+              <Icon size={16} /> {t.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {tab === 'sales' && <SalesReport range={range} />}
+      {tab === 'finance' && <FinanceReport range={range} />}
+      {tab === 'service' && <ServiceReport range={range} />}
+      {tab === 'supply' && <SupplyReport range={range} />}
     </div>
   );
 }

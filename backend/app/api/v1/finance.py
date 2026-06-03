@@ -1,6 +1,8 @@
-"""Finance: accounts, categories, transactions, exchange rates."""
+"""Finance: accounts, categories, transactions, exchange rates, employee payments."""
+import calendar
 import uuid
 from datetime import date, datetime
+from decimal import Decimal
 from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -10,14 +12,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.dependencies import CurrentUser, require_roles
 from app.db.session import get_db
 from app.models.finance import Account, ExchangeRate, FinanceCategory, FinanceTransaction
+from app.models.hr import Employee, SalaryAdvance
 from app.schemas.common import Page
 from app.schemas.finance import (
     AccountCreate, AccountOut, BalanceSummary,
     CategoryCreate, CategoryOut,
+    EmployeePaymentIn,
     ExchangeRateBase, ExchangeRateOut,
+    FinanceSummary,
     TransactionCreate, TransactionOut,
 )
-from app.services.finance_service import apply_transaction, current_balances, ensure_today_rate
+from app.services.finance_service import (
+    apply_transaction, current_balances, ensure_today_rate, month_summary,
+)
 
 router = APIRouter()
 
@@ -39,6 +46,23 @@ async def create_account(payload: AccountCreate, db: Annotated[AsyncSession, Dep
     return a
 
 
+@router.delete("/accounts/{account_id}", status_code=204,
+               dependencies=[Depends(require_roles("super_admin", "finance_manager"))])
+async def delete_account(account_id: uuid.UUID, db: Annotated[AsyncSession, Depends(get_db)]):
+    res = await db.execute(select(Account).where(Account.id == account_id))
+    acc = res.scalar_one_or_none()
+    if not acc:
+        raise HTTPException(status_code=404, detail="Hisobvaraq topilmadi")
+    used = (await db.execute(
+        select(func.count()).select_from(FinanceTransaction).where(
+            FinanceTransaction.account_id == account_id)
+    )).scalar() or 0
+    if used:
+        raise HTTPException(status_code=400, detail="Tranzaksiyalarda ishlatilgan, o'chirib bo'lmaydi")
+    await db.delete(acc)
+    await db.commit()
+
+
 # ---- Categories ----
 @router.get("/categories", response_model=list[CategoryOut])
 async def list_categories(db: Annotated[AsyncSession, Depends(get_db)], _: CurrentUser,
@@ -58,6 +82,23 @@ async def create_category(payload: CategoryCreate, db: Annotated[AsyncSession, D
     await db.commit()
     await db.refresh(c)
     return c
+
+
+@router.delete("/categories/{category_id}", status_code=204,
+               dependencies=[Depends(require_roles("super_admin", "finance_manager"))])
+async def delete_category(category_id: uuid.UUID, db: Annotated[AsyncSession, Depends(get_db)]):
+    res = await db.execute(select(FinanceCategory).where(FinanceCategory.id == category_id))
+    cat = res.scalar_one_or_none()
+    if not cat:
+        raise HTTPException(status_code=404, detail="Kategoriya topilmadi")
+    used = (await db.execute(
+        select(func.count()).select_from(FinanceTransaction).where(
+            FinanceTransaction.category_id == category_id)
+    )).scalar() or 0
+    if used:
+        raise HTTPException(status_code=400, detail="Tranzaksiyalarda ishlatilgan, o'chirib bo'lmaydi")
+    await db.delete(cat)
+    await db.commit()
 
 
 # ---- Transactions ----
@@ -82,18 +123,42 @@ async def list_transactions(
         q = q.where(and_(*conds))
 
     total = (await db.execute(select(func.count()).select_from(q.subquery()))).scalar() or 0
-    res = await db.execute(q.order_by(FinanceTransaction.date.desc())
+    res = await db.execute(q.order_by(FinanceTransaction.date.desc(), FinanceTransaction.created_at.desc())
                             .offset((page - 1) * page_size).limit(page_size))
-    return Page[TransactionOut](
-        items=[TransactionOut.model_validate(t) for t in res.scalars().all()],
-        total=total, page=page, page_size=page_size,
-    )
+    rows = res.scalars().all()
+
+    # Kategoriya/hisobvaraq nomlarini bir so'rovda yuklab, embed qilamiz
+    cat_ids = {t.category_id for t in rows if t.category_id}
+    acc_ids = {t.account_id for t in rows if t.account_id}
+    cat_names: dict = {}
+    acc_names: dict = {}
+    if cat_ids:
+        cr = await db.execute(select(FinanceCategory.id, FinanceCategory.name)
+                              .where(FinanceCategory.id.in_(cat_ids)))
+        cat_names = {i: n for i, n in cr.all()}
+    if acc_ids:
+        ar = await db.execute(select(Account.id, Account.name).where(Account.id.in_(acc_ids)))
+        acc_names = {i: n for i, n in ar.all()}
+
+    items = []
+    for t in rows:
+        out = TransactionOut.model_validate(t)
+        out.category_name = cat_names.get(t.category_id)
+        out.account_name = acc_names.get(t.account_id)
+        items.append(out)
+
+    return Page[TransactionOut](items=items, total=total, page=page, page_size=page_size)
 
 
 @router.post("/transactions", response_model=TransactionOut, status_code=201,
              dependencies=[Depends(require_roles("super_admin", "finance_manager"))])
 async def create_transaction(payload: TransactionCreate, user: CurrentUser,
                              db: Annotated[AsyncSession, Depends(get_db)]):
+    if payload.type not in ("income", "expense"):
+        raise HTTPException(status_code=422, detail="Noto'g'ri tranzaksiya turi")
+    if payload.amount is None or payload.amount <= 0:
+        raise HTTPException(status_code=422, detail="Summa 0 dan katta bo'lishi kerak")
+
     tx = FinanceTransaction(created_by_id=user.id, **payload.model_dump())
     db.add(tx)
     await db.flush()
@@ -101,6 +166,106 @@ async def create_transaction(payload: TransactionCreate, user: CurrentUser,
     await db.commit()
     await db.refresh(tx)
     return tx
+
+
+@router.delete("/transactions/{tx_id}", status_code=204,
+               dependencies=[Depends(require_roles("super_admin", "finance_manager"))])
+async def delete_transaction(tx_id: uuid.UUID, db: Annotated[AsyncSession, Depends(get_db)]):
+    res = await db.execute(select(FinanceTransaction).where(FinanceTransaction.id == tx_id))
+    tx = res.scalar_one_or_none()
+    if not tx:
+        raise HTTPException(status_code=404, detail="Tranzaksiya topilmadi")
+    await apply_transaction(db, tx, reverse=True)  # balansni qaytarish
+    await db.delete(tx)
+    await db.commit()
+
+
+# ---- Summary (oylik KPI) ----
+@router.get("/summary", response_model=FinanceSummary)
+async def finance_summary(db: Annotated[AsyncSession, Depends(get_db)], _: CurrentUser,
+                          year: int = Query(...), month: int = Query(..., ge=1, le=12)):
+    return FinanceSummary(**await month_summary(db, year, month))
+
+
+# ---- Employee payments (avans / oylik) ----
+@router.post("/employee-payments", response_model=TransactionOut, status_code=201,
+             dependencies=[Depends(require_roles("super_admin", "finance_manager"))])
+async def create_employee_payment(payload: EmployeePaymentIn, user: CurrentUser,
+                                  db: Annotated[AsyncSession, Depends(get_db)]):
+    """Moliyachi xodimga avans yoki oylik to'laydi.
+
+    Bir vaqtda: (1) HR SalaryAdvance yozuvi (xodim tarixiga tushadi va oylik
+    qoldig'ini kamaytiradi) + (2) Moliya chiqim tranzaksiyasi (hisobvaraq
+    balansidan ayriladi). Oylikda summa backend'da net qoldiqdan hisoblanadi.
+    """
+    from app.api.v1.hr import _month_aggregate  # lazy import — circular importdan qochish
+
+    if payload.kind not in ("advance", "salary"):
+        raise HTTPException(status_code=422, detail="Noto'g'ri to'lov turi")
+
+    emp = (await db.execute(
+        select(Employee).where(Employee.id == payload.employee_id)
+    )).scalar_one_or_none()
+    if not emp:
+        raise HTTPException(status_code=404, detail="Xodim topilmadi")
+
+    month_start = date(payload.year, payload.month, 1)
+    last_day = calendar.monthrange(payload.year, payload.month)[1]
+    month_end = date(payload.year, payload.month, last_day)
+
+    if payload.kind == "salary":
+        _, _, _, _, net = await _month_aggregate(db, emp, payload.year, payload.month)
+        amount = net
+        if amount is None or amount <= 0:
+            raise HTTPException(status_code=400, detail="To'lanadigan qoldiq oylik yo'q")
+        cat_code = "employee_salary"
+        default_note = f"Oylik to'lovi — {emp.full_name} ({payload.month:02d}.{payload.year})"
+    else:
+        amount = payload.amount or Decimal(0)
+        if amount <= 0:
+            raise HTTPException(status_code=422, detail="Summa 0 dan katta bo'lishi kerak")
+        cat_code = "advance_to_employee"
+        default_note = f"Avans — {emp.full_name}"
+
+    # Sana o'sha oy ichida bo'lishi kerak (aggregate sanaga qarab oyga biriktiradi)
+    today = date.today()
+    pay_date = payload.date or (today if month_start <= today <= month_end else month_end)
+    if not (month_start <= pay_date <= month_end):
+        pay_date = month_end
+
+    currency = payload.currency or emp.currency or "UZS"
+    note = payload.note or default_note
+
+    # 1) HR: SalaryAdvance (xodim oylik-avans tarixiga)
+    adv = SalaryAdvance(employee_id=emp.id, advance_date=pay_date, amount=amount,
+                        currency=currency, note=note, created_by_id=user.id)
+    db.add(adv)
+
+    # 2) Moliya: kategoriya + operatsion hisobvaraq + chiqim tranzaksiyasi
+    cat = (await db.execute(
+        select(FinanceCategory).where(FinanceCategory.code == cat_code)
+    )).scalar_one_or_none()
+    acc = (await db.execute(
+        select(Account).where(and_(
+            Account.currency == currency, Account.ledger == "operational"
+        )).limit(1)
+    )).scalar_one_or_none()
+
+    tx = FinanceTransaction(
+        date=pay_date, type="expense", category_id=cat.id if cat else None,
+        amount=amount, currency=currency, account_id=acc.id if acc else None,
+        note=note, created_by_id=user.id,
+    )
+    db.add(tx)
+    await db.flush()
+    await apply_transaction(db, tx)
+    await db.commit()
+    await db.refresh(tx)
+
+    out = TransactionOut.model_validate(tx)
+    out.category_name = cat.name if cat else None
+    out.account_name = acc.name if acc else None
+    return out
 
 
 # ---- Exchange Rate ----

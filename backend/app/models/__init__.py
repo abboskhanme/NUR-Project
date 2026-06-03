@@ -4,7 +4,7 @@ from app.models.user import Role, User, UserAvatar, UserRole
 from app.models.customer import Customer
 from app.models.product import Product, Inventory
 from app.models.order import Order, OrderItem, Payment
-from app.models.service import ServiceTicket, ServiceVisit
+from app.models.service import ServiceCategory, ServiceTicket, ServiceVisit
 from app.models.finance import (
     Account,
     FinanceCategory,
@@ -22,7 +22,6 @@ from app.models.hr import (
     PayrollItem,
 )
 from app.models.supply import (
-    SupplySector,
     Vendor,
     Item,
     GoodsReceipt,
@@ -45,6 +44,7 @@ __all__ = [
     "Payment",
     "ServiceTicket",
     "ServiceVisit",
+    "ServiceCategory",
     "Account",
     "FinanceCategory",
     "FinanceTransaction",
@@ -57,7 +57,6 @@ __all__ = [
     "SalaryAdvance",
     "PayrollRun",
     "PayrollItem",
-    "SupplySector",
     "Vendor",
     "Item",
     "GoodsReceipt",

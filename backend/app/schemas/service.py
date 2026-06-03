@@ -49,6 +49,23 @@ class ServiceVisitOut(ORMBase):
     finished_at: Optional[datetime] = None
     travel_cost: Decimal
     note: Optional[str] = None
+    created_at: datetime
+
+
+class CustomerMini(ORMBase):
+    id: uuid.UUID
+    full_name: str
+    phone: str
+    address: Optional[str] = None
+
+
+class OrderMini(ORMBase):
+    id: uuid.UUID
+    code: str
+    delivered_at: Optional[date] = None
+    status: str
+    delivery_address: Optional[str] = None
+    product_summary: Optional[str] = None  # masalan: "OPTIMA 400 kvm"
 
 
 class ServiceTicketOut(ORMBase):
@@ -68,6 +85,8 @@ class ServiceTicketOut(ORMBase):
     resolution: Optional[str] = None
     client_cost: Decimal
     visits: list[ServiceVisitOut] = []
+    customer: Optional[CustomerMini] = None
+    order: Optional[OrderMini] = None
 
 
 class WarrantyInfo(BaseModel):
@@ -78,3 +97,23 @@ class WarrantyInfo(BaseModel):
     days_remaining_year1: Optional[int] = None
     days_remaining_year3: Optional[int] = None
     current_status: str  # active_full / active_service_only / expired / not_delivered
+
+
+class ServiceCategoryIn(BaseModel):
+    name: str
+
+
+class ServiceCategoryOut(ORMBase):
+    id: uuid.UUID
+    name: str
+    is_active: bool = True
+
+
+class ServiceSummary(BaseModel):
+    total: int
+    new: int
+    scheduled: int
+    completed: int
+    cancelled: int
+    in_warranty_open: int
+    scheduled_next7: int

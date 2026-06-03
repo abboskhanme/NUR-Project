@@ -27,7 +27,11 @@ ACTIVE_QUEUE_STATUSES = ("new", "ready")
 
 
 def _own_only(current) -> bool:
-    role_perms: dict = {}
+    # QURISH BOSQICHI: hozircha hamma foydalanuvchi barcha buyurtmalarni ko'radi,
+    # kim sotganidan qat'i nazar. Rolelar tayyor bo'lgach, pastdagi qatorni
+    # o'chirib, "own_orders_only" ruxsati orqali cheklovni qayta yoqish mumkin.
+    return False
+    role_perms: dict = {}  # noqa: F841 (kelajakda rolelar uchun)
     for r in (current.roles or []):
         role_perms.update(r.permissions or {})
     return bool(role_perms.get("own_orders_only"))

@@ -1,11 +1,10 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Search, ShoppingCart, Wallet, AlertCircle, CalendarClock } from 'lucide-react';
 
 import { api } from '@/api/client';
 import Card from '@/components/ui/Card';
 import EmptyState from '@/components/ui/EmptyState';
-import DateInput from '@/components/ui/DateInput';
 import { formatUZS } from '@/lib/format';
 import OrderModal from '@/features/sales/OrderModal';
 import PaymentModal from '@/features/sales/PaymentModal';
@@ -29,14 +28,41 @@ const STATUS_OPTIONS = [
   { value: 'rejected', label: 'Rad etildi' },
 ];
 
+// Oy nomlari (1-12). month === 0 => butun yil
+const MONTHS = [
+  'Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun',
+  'Iyul', 'Avgust', 'Sentabr', 'Oktabr', 'Noyabr', 'Dekabr',
+];
+const pad2 = (n: number) => String(n).padStart(2, '0');
+
 export default function OrdersPage() {
   const qc = useQueryClient();
+  const now = new Date();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  // Default: joriy oy va yil. month: 1-12, 0 = butun yil
+  const [month, setMonth] = useState<number>(now.getMonth() + 1);
+  const [year, setYear] = useState<number>(now.getFullYear());
   const [showCreate, setShowCreate] = useState(false);
   const [payingId, setPayingId] = useState<string | null>(null);
+
+  // Tanlangan oy/yildan sana oralig'ini hisoblaymiz (backend date_from/date_to kutadi)
+  const { dateFrom, dateTo } = useMemo(() => {
+    if (month === 0) {
+      return { dateFrom: `${year}-01-01`, dateTo: `${year}-12-31` };
+    }
+    const lastDay = new Date(year, month, 0).getDate();
+    return {
+      dateFrom: `${year}-${pad2(month)}-01`,
+      dateTo: `${year}-${pad2(month)}-${pad2(lastDay)}`,
+    };
+  }, [month, year]);
+
+  // Yil ro'yxati: joriy yildan 4 yil orqaga
+  const YEARS = Array.from({ length: 5 }, (_, i) => now.getFullYear() - i);
+
+  // KPI sarlavhasidagi davr nomi: tanlangan oy + yil (yoki butun yil)
+  const periodLabel = month === 0 ? `${year}` : `${MONTHS[month - 1]} ${year}`;
 
   const { data, isLoading } = useQuery({
     queryKey: ['orders', search, statusFilter, dateFrom, dateTo],
@@ -87,17 +113,13 @@ export default function OrdersPage() {
         </button>
       </div>
 
-      {/* KPI cards */}
+      {/* KPI cards — tanlangan davr (oy/yil) bo'yicha */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Kpi icon={<ShoppingCart size={18} />} label="Buyurtma · bu oy" value={s ? String(s.month_orders) : '—'}
-             sub={s ? `Jami: ${s.total_orders}` : undefined} />
-        <Kpi icon={<Wallet size={18} />} label="Savdo · bu oy" value={s ? formatUZS(s.month_revenue) : '—'}
-             sub={s ? `Jami: ${formatUZS(s.revenue_total)}` : undefined} accent="text-ink" />
-        <Kpi icon={<CalendarClock size={18} />} label="To'langan · bu oy" value={s ? formatUZS(s.month_paid) : '—'}
-             sub={s ? `Jami: ${formatUZS(s.paid_total)}` : undefined} accent="text-success" />
-        <Kpi icon={<AlertCircle size={18} />} label="Qoldiq · bu oy"
-             value={s ? formatUZS(parseFloat(s.month_revenue) - parseFloat(s.month_paid)) : '—'}
-             sub={s ? `Jami qarz: ${formatUZS(s.outstanding_total)}` : undefined} accent="text-danger" />
+        <Kpi icon={<ShoppingCart size={18} />} label={`Buyurtma · ${periodLabel}`} value={s ? String(s.total_orders) : '—'} />
+        <Kpi icon={<Wallet size={18} />} label={`Savdo · ${periodLabel}`} value={s ? formatUZS(s.revenue_total) : '—'} accent="text-ink" />
+        <Kpi icon={<CalendarClock size={18} />} label={`To'langan · ${periodLabel}`} value={s ? formatUZS(s.paid_total) : '—'} accent="text-success" />
+        <Kpi icon={<AlertCircle size={18} />} label={`Qoldiq · ${periodLabel}`}
+             value={s ? formatUZS(s.outstanding_total) : '—'} accent="text-danger" />
       </div>
 
       <Card>
@@ -112,8 +134,13 @@ export default function OrdersPage() {
             <option value="">Barcha statuslar</option>
             {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
-          <DateInput value={dateFrom} onChange={setDateFrom} placeholder="Sanadan (kun.oy.yil)" className="max-w-[170px]" />
-          <DateInput value={dateTo} onChange={setDateTo} placeholder="Sanagacha (kun.oy.yil)" className="max-w-[170px]" />
+          <select value={month} onChange={(e) => setMonth(Number(e.target.value))} className="input max-w-[150px]" title="Oy">
+            <option value={0}>Butun yil</option>
+            {MONTHS.map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
+          </select>
+          <select value={year} onChange={(e) => setYear(Number(e.target.value))} className="input max-w-[110px]" title="Yil">
+            {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
+          </select>
         </div>
 
         {isLoading ? (

@@ -74,6 +74,9 @@ class TransactionOut(ORMBase):
     related_order_id: Optional[uuid.UUID] = None
     note: Optional[str] = None
     created_at: datetime
+    # embed qilingan nomlar (ro'yxat jadvali uchun)
+    category_name: Optional[str] = None
+    account_name: Optional[str] = None
 
 
 class ExchangeRateBase(BaseModel):
@@ -94,3 +97,31 @@ class BalanceSummary(BaseModel):
     usd: Decimal
     gazna: Decimal
     last_updated: datetime
+
+
+class EmployeePaymentIn(BaseModel):
+    employee_id: uuid.UUID
+    kind: str  # 'advance' (avans) | 'salary' (oylik)
+    amount: Optional[Decimal] = None  # avans uchun majburiy; oylikda backend hisoblaydi
+    year: int
+    month: int
+    date: Optional[date] = None  # ko'rsatilmasa: oyga mos sana
+    currency: str = "UZS"
+    note: Optional[str] = None
+
+
+class CategoryBreakdown(BaseModel):
+    type: str
+    category_name: str
+    total: Decimal
+
+
+class FinanceSummary(BaseModel):
+    year: int
+    month: int
+    income_total: Decimal
+    expense_total: Decimal
+    net: Decimal
+    usd_income_total: Decimal = Decimal(0)
+    usd_expense_total: Decimal = Decimal(0)
+    by_category: list[CategoryBreakdown]
