@@ -119,7 +119,7 @@ export default function ReportTable<T extends object>({
               <tr key={i} className="border-b border-black/5 hover:bg-primary/5">
                 {columns.map((c) => (
                   <td key={c.key} className={`py-2 px-2 ${align(c.align)}`}>
-                    {c.render ? c.render(row) : String(row[c.key] ?? '')}
+                    {c.render ? c.render(row) : String((row as Record<string, unknown>)[c.key] ?? '')}
                   </td>
                 ))}
               </tr>
