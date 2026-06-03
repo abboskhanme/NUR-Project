@@ -89,18 +89,16 @@ ROLE_PERMS = {
 }
 
 
-# Taminotchi login akkauntlari (email, parol, F.I.Sh) va ularning vendor nomi.
+# Taminotchi login akkauntlari (telefon=login, parol, F.I.Sh) va ularning vendor nomi.
 # Login qilganda har biri faqat o'z mahsulotlari/kirimlarini ko'radi.
 SUPPLIERS = [
     {
-        "email": "taminotchi1@nur.uz", "password": "taminotchi1",
+        "phone": "+998901112233", "password": "taminotchi1",
         "full_name": "Umid Tokir", "vendor": "Umid Tokir",
-        "phone": "+998901112233",
     },
     {
-        "email": "taminotchi2@nur.uz", "password": "taminotchi2",
+        "phone": "+998901112244", "password": "taminotchi2",
         "full_name": "Mardon Ta'minot", "vendor": "Mardon",
-        "phone": "+998901112244",
     },
 ]
 
@@ -383,12 +381,54 @@ async def _ensure_supply_schema():
             print(f"[i] supply schema: '{sql[:48]}...' -> {e}")
 
 
+async def _ensure_user_schema():
+    """Login email -> telefon raqamga o'tkazadi (idempotent, alembic'siz dev oqimi uchun).
+    create_all eski 'users' jadvalini ALTER qilmaydi, shuning uchun bu yerda qo'lda:
+      - mavjud super-admin'ning bo'sh telefonini INIT_ADMIN_PHONE bilan to'ldiramiz
+      - qolgan bo'sh telefonlarni unikal vaqtinchalik qiymat bilan to'ldiramiz
+      - dublikatlarni unikal qilamiz
+      - phone -> NOT NULL + unique index
+      - email index/ustunini olib tashlaymiz
+    Har bir buyruq alohida tranzaksiyada — bittasi xato bersa qolganlari ishlaydi."""
+    ph = settings.INIT_ADMIN_PHONE.replace("'", "''")
+    stmts = [
+        # 1) mavjud super-admin'ga kanonik login telefonini beramiz (parol o'zgarmaydi)
+        f"""UPDATE users SET phone = '{ph}'
+            WHERE id = (
+                SELECT id FROM users
+                WHERE is_superadmin = true AND (phone IS NULL OR btrim(phone) = '')
+                ORDER BY created_at NULLS FIRST LIMIT 1
+            )
+            AND NOT EXISTS (SELECT 1 FROM users WHERE phone = '{ph}')""",
+        # 2) qolgan bo'sh telefonlar -> unikal vaqtinchalik qiymat
+        "UPDATE users SET phone = 'tmp+' || substr(replace(id::text, '-', ''), 1, 12) "
+        "WHERE phone IS NULL OR btrim(phone) = ''",
+        # 3) dublikat telefonlarni unikal qilamiz
+        "UPDATE users u SET phone = u.phone || '-' || substr(replace(u.id::text, '-', ''), 1, 6) "
+        "WHERE EXISTS (SELECT 1 FROM users u2 WHERE u2.phone = u.phone AND u2.id <> u.id)",
+        # 4) phone -> NOT NULL + unique index
+        "ALTER TABLE users ALTER COLUMN phone SET NOT NULL",
+        "CREATE UNIQUE INDEX IF NOT EXISTS ix_users_phone ON users (phone)",
+        # 5) email index/ustunini olib tashlaymiz
+        "DROP INDEX IF EXISTS ix_users_email",
+        "ALTER TABLE users DROP COLUMN IF EXISTS email",
+    ]
+    for sql in stmts:
+        try:
+            async with engine.begin() as conn:
+                await conn.exec_driver_sql(sql)
+        except Exception as e:  # noqa: BLE001 — jadval/ustun hali yo'q bo'lsa o'tkazib yuboramiz
+            print(f"[i] user schema: '{' '.join(sql.split())[:48]}...' -> {e}")
+
+
 async def seed():
     print(f"Connecting to DB at: {settings.DATABASE_URL}")
 
     # Ensure tables exist
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    # Login email -> telefon: mavjud 'users' jadvalini idempotent moslaymiz
+    await _ensure_user_schema()
     # Ta'minot moduli taminotchi-asosli bo'lgani uchun mavjud jadvallarga yangi
     # ustunlarni qo'shamiz (create_all eski jadvalni ALTER qilmaydi). Idempotent.
     await _ensure_supply_schema()
@@ -422,38 +462,38 @@ async def seed():
         await db.flush()
 
         # Super admin user
-        res = await db.execute(select(User).where(User.email == settings.INIT_ADMIN_EMAIL))
+        res = await db.execute(select(User).where(User.phone == settings.INIT_ADMIN_PHONE))
         if not res.scalar_one_or_none():
             # super_admin role'ni topamiz (user yaratishdan OLDIN — async lazy-load muammosini chetlab o'tish uchun)
             role_res = await db.execute(select(Role).where(Role.name == "super_admin"))
             super_role = role_res.scalar_one_or_none()
 
             admin = User(
-                email=settings.INIT_ADMIN_EMAIL,
+                phone=settings.INIT_ADMIN_PHONE,
                 password_hash=hash_password(settings.INIT_ADMIN_PASSWORD),
                 full_name=settings.INIT_ADMIN_NAME,
                 is_active=True, is_superadmin=True, locale="uz", theme="light",
                 roles=[super_role] if super_role else [],
             )
             db.add(admin)
-            print(f"[+] Created super admin: {settings.INIT_ADMIN_EMAIL} / {settings.INIT_ADMIN_PASSWORD}")
+            print(f"[+] Created super admin: {settings.INIT_ADMIN_PHONE} / {settings.INIT_ADMIN_PASSWORD}")
 
         # Taminotchilar — login akkaunt (supplier roli) + bog'langan vendor yozuvi
         supplier_role = (await db.execute(
             select(Role).where(Role.name == "supplier")
         )).scalar_one_or_none()
         for s in SUPPLIERS:
-            u = (await db.execute(select(User).where(User.email == s["email"]))).scalar_one_or_none()
+            u = (await db.execute(select(User).where(User.phone == s["phone"]))).scalar_one_or_none()
             if not u:
                 u = User(
-                    email=s["email"], password_hash=hash_password(s["password"]),
-                    full_name=s["full_name"], phone=s.get("phone"),
+                    phone=s["phone"], password_hash=hash_password(s["password"]),
+                    full_name=s["full_name"],
                     is_active=True, is_superadmin=False, locale="uz", theme="light",
                     roles=[supplier_role] if supplier_role else [],
                 )
                 db.add(u)
                 await db.flush()
-                print(f"[+] Created supplier login: {s['email']} / {s['password']}")
+                print(f"[+] Created supplier login: {s['phone']} / {s['password']}")
             # Vendor yozuvi — userga bog'langan
             v = (await db.execute(select(Vendor).where(Vendor.name == s["vendor"]))).scalar_one_or_none()
             if not v:

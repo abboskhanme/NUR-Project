@@ -47,7 +47,7 @@ Swagger UI: <http://localhost:8000/api/docs>
 
 Seed scripti yaratadi:
 
-- Email: `admin@nurtechno.uz`
+- Telefon: `+998901234567`
 - Parol: `Admin@12345`
 
 ## Asosiy endpointlar

@@ -3,9 +3,8 @@ import { persist } from 'zustand/middleware';
 
 export interface User {
   id: string;
-  email: string;
+  phone: string;
   full_name: string;
-  phone?: string | null;
   avatar_url?: string | null;
   position?: string | null;
   locale: string;

@@ -33,7 +33,7 @@ export default function TopBar() {
           )}
           <div className="hidden md:block text-xs">
             <div className="font-medium text-ink">{user?.full_name}</div>
-            <div className="text-ink-soft truncate max-w-[140px]">{user?.email}</div>
+            <div className="text-ink-soft truncate max-w-[140px]">{user?.phone}</div>
           </div>
           <button onClick={onLogout} className="p-2 rounded-button hover:bg-black/5 text-ink/60" title="Chiqish">
             <LogOut size={18} />

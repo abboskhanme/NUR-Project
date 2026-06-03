@@ -11,7 +11,7 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const setAuth = useAuthStore((s) => s.setAuth);
 
-  const [email, setEmail] = useState('admin@nurtechno.uz');
+  const [phone, setPhone] = useState('+998901234567');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -19,7 +19,7 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      const { data } = await api.post('/auth/login', { email, password });
+      const { data } = await api.post('/auth/login', { phone, password });
       setAuth(data.user, data.access_token, data.refresh_token);
       toast.success(`Xush kelibsiz, ${data.user.full_name}!`);
       navigate('/');
@@ -43,14 +43,15 @@ export default function LoginPage() {
           <h2 className="text-lg font-semibold">{t('auth.login')}</h2>
 
           <div>
-            <label className="label">{t('auth.email')}</label>
+            <label className="label">{t('auth.phone')}</label>
             <input
-              type="email"
-              autoComplete="email"
+              type="tel"
+              autoComplete="tel"
               required
               className="input"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              placeholder="+998 90 123 45 67"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
             />
           </div>
 
@@ -71,7 +72,7 @@ export default function LoginPage() {
           </button>
 
           <div className="text-xs text-ink-soft text-center">
-            Default: admin@nurtechno.uz / Admin@12345
+            Default: +998901234567 / Admin@12345
           </div>
         </form>
       </div>

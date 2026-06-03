@@ -19,10 +19,10 @@
   },
   "auth": {
     "login": "Tizimga kirish",
-    "email": "Email",
+    "phone": "Telefon raqam",
     "password": "Parol",
     "submit": "Kirish",
-    "wrong": "Email yoki parol noto'g'ri",
+    "wrong": "Telefon raqam yoki parol noto'g'ri",
     "remember": "Meni eslab qol"
   },
   "actions": {

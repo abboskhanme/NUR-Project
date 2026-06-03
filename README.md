@@ -67,7 +67,7 @@ Frontend manzili: <http://localhost:5173>
 
 Seed scripti standart Super Admin yaratadi:
 
-- Email: `admin@nurtechno.uz`
+- Telefon: `+998901234567`
 - Parol: `Admin@12345`
 
 (Parolni darhol o'zgartiring — Settings → Parolni o'zgartirish)

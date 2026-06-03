@@ -19,10 +19,10 @@
   },
   "auth": {
     "login": "Sign in",
-    "email": "Email",
+    "phone": "Phone number",
     "password": "Password",
     "submit": "Sign in",
-    "wrong": "Wrong email or password",
+    "wrong": "Wrong phone number or password",
     "remember": "Remember me"
   },
   "actions": {

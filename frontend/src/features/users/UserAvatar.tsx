@@ -13,7 +13,7 @@ export default function UserAvatar({
   size = 32,
   cacheBust,
 }: {
-  user: { id: string; full_name?: string | null; email?: string; avatar_url?: string | null };
+  user: { id: string; full_name?: string | null; phone?: string | null; avatar_url?: string | null };
   size?: number;
   cacheBust?: number | string;
 }) {
@@ -25,11 +25,11 @@ export default function UserAvatar({
   }, [user.id, user.avatar_url, cacheBust]);
 
   const initials = useMemo(() => {
-    const name = (user.full_name || user.email || 'U').trim();
+    const name = (user.full_name || 'U').trim();
     const parts = name.split(/\s+/).filter(Boolean);
     if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
     return name.slice(0, 1).toUpperCase();
-  }, [user.full_name, user.email]);
+  }, [user.full_name]);
 
   const showImage = !!user.avatar_url && !imgError;
 
@@ -42,7 +42,7 @@ export default function UserAvatar({
     return (
       <img
         src={url}
-        alt={user.full_name || user.email || 'avatar'}
+        alt={user.full_name || 'avatar'}
         className="rounded-full object-cover border border-black/5 shrink-0 bg-card"
         style={style}
         loading="lazy"
@@ -59,7 +59,7 @@ export default function UserAvatar({
     <div
       className="rounded-full bg-primary text-white font-semibold flex items-center justify-center shrink-0 select-none"
       style={style}
-      title={user.full_name || user.email || ''}
+      title={user.full_name || ''}
     >
       {initials}
     </div>

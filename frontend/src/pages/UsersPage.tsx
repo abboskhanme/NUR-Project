@@ -115,7 +115,7 @@ export default function UsersPage() {
           <div className="flex items-center gap-2 mb-4 bg-white border border-black/10 rounded-button px-3 py-1.5">
             <Search size={16} className="text-ink/40" />
             <input
-              placeholder="Email yoki ism bo'yicha qidirish..."
+              placeholder="Telefon yoki ism bo'yicha qidirish..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="bg-transparent outline-none flex-1 text-sm"
@@ -136,8 +136,7 @@ export default function UsersPage() {
                 <thead className="text-left text-ink-soft border-b border-black/5">
                   <tr>
                     <th className="py-2 pr-3">Foydalanuvchi</th>
-                    <th className="py-2 pr-3">Email</th>
-                    <th className="py-2 pr-3">Telefon</th>
+                    <th className="py-2 pr-3">Telefon (login)</th>
                     <th className="py-2 pr-3">Lavozim</th>
                     <th className="py-2 pr-3">Rollar</th>
                     <th className="py-2 pr-3 text-right">Amallar</th>
@@ -152,7 +151,6 @@ export default function UsersPage() {
                           <div className="font-medium truncate max-w-[160px]">{u.full_name}</div>
                         </div>
                       </td>
-                      <td className="py-2 pr-3 truncate max-w-[200px]">{u.email}</td>
                       <td className="py-2 pr-3">{u.phone || '—'}</td>
                       <td className="py-2 pr-3">{u.position || '—'}</td>
                       <td className="py-2 pr-3">
@@ -220,7 +218,7 @@ export default function UsersPage() {
         title="Arxivga ko'chirish"
         message={
           <>
-            <span className="font-medium">{deleteUser?.full_name}</span> ({deleteUser?.email})
+            <span className="font-medium">{deleteUser?.full_name}</span> ({deleteUser?.phone})
             ni arxivga ko'chirishni tasdiqlaysizmi? Foydalanuvchi nofaol qilinadi, ma'lumotlari saqlanadi. Arxivdan tiklash mumkin.
           </>
         }

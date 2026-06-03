@@ -5,7 +5,7 @@ import { X } from 'lucide-react';
 
 import { api } from '@/api/client';
 
-interface UserLite { id: string; full_name: string; email: string }
+interface UserLite { id: string; full_name: string; phone: string }
 export interface VendorLite {
   id: string; name: string; user_id?: string | null;
   phone?: string | null; address?: string | null; note?: string | null; is_active: boolean;

@@ -46,7 +46,7 @@ class Settings(BaseSettings):
     CBU_API_URL: str = "https://cbu.uz/uz/arkhiv-kursov-valyut/json/"
 
     # Seed admin
-    INIT_ADMIN_EMAIL: str = "admin@nurtechno.uz"
+    INIT_ADMIN_PHONE: str = "+998901234567"
     INIT_ADMIN_PASSWORD: str = "Admin@12345"
     INIT_ADMIN_NAME: str = "Super Admin"
 

@@ -43,7 +43,7 @@ services:
       SECRET_KEY: dev-secret-change-me-in-production
       DEBUG: "true"
       ALLOWED_ORIGINS_STR: "http://localhost:5173,http://127.0.0.1:5173"
-      INIT_ADMIN_EMAIL: admin@nurtechno.uz
+      INIT_ADMIN_PHONE: "+998901234567"
       INIT_ADMIN_PASSWORD: Admin@12345
       INIT_ADMIN_NAME: Super Admin
     ports:

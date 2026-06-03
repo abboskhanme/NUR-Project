@@ -1,4 +1,5 @@
-"""Security utilities: JWT, password hashing."""
+"""Security utilities: JWT, password hashing, telefon normalizatsiyasi."""
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
@@ -8,6 +9,18 @@ from passlib.context import CryptContext
 from app.core.config import settings
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+
+def phone_digits(raw: str | None) -> str:
+    """Telefon raqamdan faqat raqamlarni qaytaradi (format/bo'shliqni e'tiborsiz qoldiradi)."""
+    return re.sub(r"\D", "", raw or "")
+
+
+def normalize_phone(raw: str | None) -> str:
+    """Kanonik login formati: '+' + raqamlar (masalan '+998 90 123 45 67' -> '+998901234567').
+    Bo'sh bo'lsa bo'sh satr qaytaradi."""
+    d = phone_digits(raw)
+    return f"+{d}" if d else ""
 
 
 def hash_password(password: str) -> str:

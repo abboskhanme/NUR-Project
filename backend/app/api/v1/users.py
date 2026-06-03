@@ -1,4 +1,4 @@
-"""User management (Super Admin) — CRUD, avatar, parol/email reset, rollar, arxiv."""
+"""User management (Super Admin) — CRUD, avatar, parol reset, rollar, arxiv."""
 import uuid
 from datetime import date
 from typing import Annotated
@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import CurrentUser, require_roles
 from app.core.permissions import require_permission  # Yangi permission tizimi
-from app.core.security import hash_password
+from app.core.security import hash_password, normalize_phone, phone_digits
 from app.db.session import get_db
 from app.models.hr import Employee, Position
 from app.models.supply import Vendor
@@ -126,7 +126,7 @@ async def list_users(
     current: CurrentUser,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    q: str | None = Query(None, description="Email yoki ism bo'yicha qidiruv"),
+    q: str | None = Query(None, description="Telefon yoki ism bo'yicha qidiruv"),
     is_active: bool | None = Query(None, description="Aktivlar (true) yoki arxiv (false)"),
 ):
     stmt = select(User)
@@ -134,10 +134,10 @@ async def list_users(
     if q:
         like = f"%{q.lower()}%"
         stmt = stmt.where(
-            func.lower(User.email).like(like) | func.lower(User.full_name).like(like)
+            func.lower(User.phone).like(like) | func.lower(User.full_name).like(like)
         )
         count_stmt = count_stmt.where(
-            func.lower(User.email).like(like) | func.lower(User.full_name).like(like)
+            func.lower(User.phone).like(like) | func.lower(User.full_name).like(like)
         )
     if is_active is not None:
         stmt = stmt.where(User.is_active == is_active)
@@ -162,15 +162,19 @@ async def create_user(
     current: CurrentUser,
 ):
     _ensure_superadmin(current)
-    exists = await db.execute(select(User).where(User.email == payload.email))
+    new_phone = normalize_phone(payload.phone)
+    if not new_phone:
+        raise HTTPException(status_code=422, detail="Telefon raqam noto'g'ri")
+    exists = await db.execute(
+        select(User).where(func.regexp_replace(User.phone, r"\D", "", "g") == phone_digits(new_phone))
+    )
     if exists.scalar_one_or_none():
-        raise HTTPException(status_code=409, detail="Email allaqachon mavjud")
+        raise HTTPException(status_code=409, detail="Bu telefon raqam allaqachon mavjud")
 
     user = User(
-        email=payload.email,
+        phone=new_phone,
         password_hash=hash_password(payload.password),
         full_name=payload.full_name,
-        phone=payload.phone,
         position=payload.position,
     )
     if payload.role_names:
@@ -201,14 +205,23 @@ async def update_user(
     if not user:
         raise HTTPException(404, "Foydalanuvchi topilmadi")
 
-    if payload.email is not None and payload.email != user.email:
-        dup = await db.execute(select(User).where(User.email == payload.email, User.id != user_id))
-        if dup.scalar_one_or_none():
-            raise HTTPException(409, "Bunday email allaqachon ishlatilgan")
-        user.email = payload.email
+    if payload.phone is not None:
+        new_phone = normalize_phone(payload.phone)
+        if not new_phone:
+            raise HTTPException(422, "Telefon raqam noto'g'ri")
+        if new_phone != user.phone:
+            dup = await db.execute(
+                select(User).where(
+                    func.regexp_replace(User.phone, r"\D", "", "g") == phone_digits(new_phone),
+                    User.id != user_id,
+                )
+            )
+            if dup.scalar_one_or_none():
+                raise HTTPException(409, "Bunday telefon raqam allaqachon ishlatilgan")
+            user.phone = new_phone
 
     for field in (
-        "full_name", "phone", "avatar_url", "position",
+        "full_name", "avatar_url", "position",
         "locale", "theme", "is_active", "is_superadmin", "telegram_chat_id",
     ):
         val = getattr(payload, field, None)

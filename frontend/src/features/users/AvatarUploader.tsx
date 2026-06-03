@@ -11,7 +11,7 @@ export default function AvatarUploader({
   endpoint,
   onChanged,
 }: {
-  user: { id: string; full_name?: string | null; email?: string; avatar_url?: string | null };
+  user: { id: string; full_name?: string | null; phone?: string | null; avatar_url?: string | null };
   size?: number;
   endpoint: string;
   onChanged?: (u: any) => void;

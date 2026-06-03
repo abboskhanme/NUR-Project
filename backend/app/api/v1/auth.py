@@ -11,8 +11,11 @@ from app.core.security import (
     create_refresh_token,
     decode_token,
     hash_password,
+    normalize_phone,
+    phone_digits,
     verify_password,
 )
+from sqlalchemy import func
 from app.db.session import get_db
 from app.models.user import User, UserAvatar
 from app.schemas.auth import (
@@ -31,14 +34,18 @@ MAX_AVATAR_BYTES = 2 * 1024 * 1024
 router = APIRouter()
 
 
-@router.post("/login", response_model=LoginResponse, summary="Login (email + parol)")
+@router.post("/login", response_model=LoginResponse, summary="Login (telefon raqam + parol)")
 async def login(payload: LoginRequest, db: Annotated[AsyncSession, Depends(get_db)]):
-    res = await db.execute(select(User).where(User.email == payload.email))
+    # Format/bo'shliqdan qat'i nazar — faqat raqamlar bo'yicha solishtiramiz
+    digits = phone_digits(payload.phone)
+    res = await db.execute(
+        select(User).where(func.regexp_replace(User.phone, r"\D", "", "g") == digits)
+    )
     user = res.scalar_one_or_none()
     if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Email yoki parol noto'g'ri",
+            detail="Telefon raqam yoki parol noto'g'ri",
         )
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Akkount o'chirilgan")
@@ -92,7 +99,21 @@ async def update_me(
     user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    for field in ("full_name", "phone", "avatar_url", "position", "locale", "theme", "telegram_chat_id"):
+    if payload.phone is not None:
+        new_phone = normalize_phone(payload.phone)
+        if not new_phone:
+            raise HTTPException(status_code=422, detail="Telefon raqam noto'g'ri")
+        if new_phone != user.phone:
+            dup = await db.execute(
+                select(User).where(
+                    func.regexp_replace(User.phone, r"\D", "", "g") == phone_digits(new_phone),
+                    User.id != user.id,
+                )
+            )
+            if dup.scalar_one_or_none():
+                raise HTTPException(status_code=409, detail="Bu telefon raqam allaqachon ishlatilgan")
+        user.phone = new_phone
+    for field in ("full_name", "avatar_url", "position", "locale", "theme", "telegram_chat_id"):
         val = getattr(payload, field, None)
         if val is not None:
             setattr(user, field, val)

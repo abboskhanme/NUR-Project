@@ -2,13 +2,13 @@
 import uuid
 from typing import Optional
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 
 from app.schemas.common import ORMBase
 
 
 class LoginRequest(BaseModel):
-    email: EmailStr
+    phone: str = Field(min_length=4, max_length=20)
     password: str = Field(min_length=6)
 
 
@@ -43,9 +43,8 @@ class RoleUpdate(BaseModel):
 
 class UserOut(ORMBase):
     id: uuid.UUID
-    email: EmailStr
+    phone: str
     full_name: str
-    phone: Optional[str] = None
     avatar_url: Optional[str] = None
     position: Optional[str] = None
     locale: str = "uz"
@@ -68,18 +67,16 @@ class PasswordChange(BaseModel):
 
 
 class UserCreate(BaseModel):
-    email: EmailStr
+    phone: str = Field(min_length=4, max_length=20)
     password: str = Field(min_length=8)
     full_name: str
-    phone: Optional[str] = None
     position: Optional[str] = None
     role_names: list[str] = []
 
 
 class UserUpdate(BaseModel):
-    email: Optional[EmailStr] = None
+    phone: Optional[str] = Field(default=None, min_length=4, max_length=20)
     full_name: Optional[str] = None
-    phone: Optional[str] = None
     avatar_url: Optional[str] = None
     position: Optional[str] = None
     locale: Optional[str] = None

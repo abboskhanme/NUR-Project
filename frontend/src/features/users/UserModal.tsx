@@ -9,9 +9,8 @@ import AvatarUploader from './AvatarUploader';
 
 export interface UserRow {
   id: string;
-  email: string;
+  phone: string;
   full_name: string;
-  phone?: string | null;
   position?: string | null;
   avatar_url?: string | null;
   is_active: boolean;
@@ -41,7 +40,6 @@ export default function UserModal({
   const isCreate = user === null;
   const [tab, setTab] = useState<Tab>('profile');
 
-  const [email, setEmail] = useState(user?.email ?? '');
   const [fullName, setFullName] = useState(user?.full_name ?? '');
   const [phone, setPhone] = useState(user?.phone ?? '');
   const [position, setPosition] = useState(user?.position ?? '');
@@ -73,8 +71,8 @@ export default function UserModal({
   }
 
   async function handleSave() {
-    if (!email || !fullName) {
-      toast.error("Email va to'liq ism majburiy");
+    if (!phone || !fullName) {
+      toast.error("Telefon raqam va to'liq ism majburiy");
       return;
     }
     if (isCreate && password.length < 8) {
@@ -85,16 +83,16 @@ export default function UserModal({
     try {
       if (isCreate) {
         await api.post('/users', {
-          email, password, full_name: fullName,
-          phone: phone || null, position: position || null,
+          phone, password, full_name: fullName,
+          position: position || null,
           role_names: selectedRoles,
         });
         toast.success('Foydalanuvchi yaratildi');
       } else {
         // is_superadmin endi yuborilmaydi — faqat super_admin roli orqali boshqariladi
         await api.patch(`/users/${user!.id}`, {
-          email, full_name: fullName,
-          phone: phone || null, position: position || null,
+          phone, full_name: fullName,
+          position: position || null,
           is_active: isActive,
           role_names: selectedRoles,
         });
@@ -188,13 +186,8 @@ export default function UserModal({
 
               <div className="space-y-3">
                 <div>
-                  <label className="label">Email *</label>
-                  <input
-                    type="email"
-                    className="input"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                  />
+                  <label className="label">Telefon raqam (login) *</label>
+                  <PhoneInput value={phone} onChange={setPhone} />
                 </div>
                 <div>
                   <label className="label">To'liq ism *</label>
@@ -204,19 +197,13 @@ export default function UserModal({
                     onChange={(e) => setFullName(e.target.value)}
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="label">Telefon</label>
-                    <PhoneInput value={phone} onChange={setPhone} />
-                  </div>
-                  <div>
-                    <label className="label">Lavozim</label>
-                    <input
-                      className="input"
-                      value={position}
-                      onChange={(e) => setPosition(e.target.value)}
-                    />
-                  </div>
+                <div>
+                  <label className="label">Lavozim</label>
+                  <input
+                    className="input"
+                    value={position}
+                    onChange={(e) => setPosition(e.target.value)}
+                  />
                 </div>
 
                 {isCreate && (

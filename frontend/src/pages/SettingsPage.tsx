@@ -24,7 +24,9 @@ export default function SettingsPage() {
 
   // Profil o'zgarganmi?
   const profileChanged = useMemo(
-    () => fullName.trim() !== origFullName.trim() || (phone ?? '').trim() !== (origPhone ?? '').trim(),
+    () =>
+      fullName.trim() !== origFullName.trim() ||
+      (phone ?? '').trim() !== (origPhone ?? '').trim(),
     [fullName, phone, origFullName, origPhone],
   );
 
@@ -33,6 +35,10 @@ export default function SettingsPage() {
 
   async function saveProfile() {
     if (!profileChanged) return;
+    if (!phone.trim()) {
+      toast.error('Login telefon raqami bo\'sh bo\'lishi mumkin emas');
+      return;
+    }
     setSavingProfile(true);
     try {
       const { data } = await api.patch('/auth/me', { full_name: fullName, phone });
@@ -81,13 +87,11 @@ export default function SettingsPage() {
       <Card title="Profil">
         <div className="space-y-3">
           <div>
-            <label className="label">Email</label>
-            <input
-              className="input"
-              value={user?.email ?? ''}
-              disabled
-              title="Email faqat super-admin tomonidan o'zgartiriladi"
-            />
+            <label className="label">Telefon raqam (login)</label>
+            <PhoneInput value={phone} onChange={setPhone} defaultCountry="UZ" />
+            <p className="mt-1 text-xs text-ink-soft">
+              Bu raqam tizimga kirish uchun ishlatiladi.
+            </p>
           </div>
           <div>
             <label className="label">To'liq ism</label>
@@ -96,10 +100,6 @@ export default function SettingsPage() {
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
             />
-          </div>
-          <div>
-            <label className="label">Telefon</label>
-            <PhoneInput value={phone} onChange={setPhone} defaultCountry="UZ" />
           </div>
           <button
             className="btn-primary disabled:opacity-40 disabled:cursor-not-allowed"
