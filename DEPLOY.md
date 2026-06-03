@@ -63,18 +63,20 @@ git push origin main
 
 ---
 
-## 3. Domenni serverga yo'naltirish (DNS)
+## 3. (IXTIYORIY) Domenni serverga yo'naltirish (DNS)
 
-Domeningiz boshqaruv panelida (yoki DigitalOcean → Networking → Domains) **A record** qo'shing:
+**Domensiz boshlasangiz bu qadamni o'tkazib yuboring** — sayt to'g'ridan-to'g'ri
+`http://SERVER_IP` orqali ochiladi (`.env.prod` da `DOMAIN=:80`).
+
+Keyinroq domen qo'shganda: domen panelida (yoki DigitalOcean → Networking → Domains) **A record** qo'shing:
 
 | Type | Host | Value (IP)        |
 |------|------|-------------------|
-| A    | erp  | 164.92.xx.xx      |
+| A    | erp  | 209.38.218.18     |
 
-Ya'ni `erp.nurtechno.uz` → droplet IP. (Asosiy domenni ishlatmoqchi bo'lsangiz, Host: `@`.)
-DNS tarqalishi 5–30 daqiqa olishi mumkin.
-
-> Caddy HTTPS sertifikat olishidan oldin DNS to'g'ri ulanган bo'lishi shart.
+Ya'ni `erp.nurtechno.uz` → droplet IP. So'ng `.env.prod` da `DOMAIN=erp.nurtechno.uz`
+qilib, `docker compose ... up -d` qayta ishga tushiring — Caddy avtomatik HTTPS oladi.
+DNS tarqalishi 5–30 daqiqa oladi.
 
 ---
 
@@ -132,7 +134,7 @@ nano .env.prod
 
 Quyidagilarni to'ldiring:
 
-- **`DOMAIN`** → `erp.nurtechno.uz`
+- **`DOMAIN`** → domensiz boshlasangiz `:80` qoldiring (sayt `http://SERVER_IP` da ochiladi). Domen bor bo'lsa: `erp.nurtechno.uz`.
 - **`POSTGRES_PASSWORD`** → kuchli parol. Yaratish: `openssl rand -hex 16`
 - **`DATABASE_URL`** → yuqoridagi parol bilan **bir xil** bo'lsin:
   `postgresql+asyncpg://postgres:O'SHA_PAROL@postgres:5432/nur_erp`
@@ -159,12 +161,14 @@ docker compose -f docker-compose.prod.yml logs -f
 Quyidagilarni ko'rsangiz tayyor:
 - postgres: `database system is ready to accept connections`
 - backend: `[init] Seeding DB...` → `Starting uvicorn` → `Application startup complete`
-- caddy: sertifikat olgani haqida xabar (`certificate obtained`)
+- caddy: domensiz — `serving initial configuration`; domen bilan — `certificate obtained`
 
-Endi brauzerda oching: **https://erp.nurtechno.uz**
+Endi brauzerda oching:
+- domensiz: **http://209.38.218.18**
+- domen bilan: **https://erp.nurtechno.uz**
 
 Login: `.env.prod` dagi `INIT_ADMIN_EMAIL` / `INIT_ADMIN_PASSWORD`.
-API hujjatlar: `https://erp.nurtechno.uz/api/docs`
+API hujjatlar: `/api/docs` (masalan `http://209.38.218.18/api/docs`)
 
 ---
 
