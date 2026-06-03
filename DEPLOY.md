@@ -1,7 +1,7 @@
 # NUR Project — DigitalOcean'ga deploy qilish (qadam-baqadam)
 
-Bu qo'llanma **Droplet + Docker + Managed Database + domen (HTTPS)** sxemasi uchun.
-Stack: FastAPI (backend) + React/Vite (frontend) + PostgreSQL.
+Bu qo'llanma **hammasi bitta Droplet ichida** (Docker + ichki PostgreSQL + Caddy/HTTPS) sxemasi uchun.
+Stack: FastAPI (backend) + React/Vite (frontend) + PostgreSQL — hammasi bir serverda.
 
 ---
 
@@ -11,16 +11,14 @@ Stack: FastAPI (backend) + React/Vite (frontend) + PostgreSQL.
 - Sizda allaqachon `docker-compose` bor — shu ishni qayta ishlatamiz, sozlash minimal.
 - Arzon va to'liq nazorat: bitta $6–12/oy server hamma narsani ko'taradi.
 - Xatolarni topish va loglarni ko'rish oson.
-- App Platform har bir servis uchun alohida to'lov oladi va Docker dev-rejimini qayta yozishni talab qiladi.
 
-**Managed Database** (baza alohida) — ERP uchun **tavsiya etaman**:
-- Avtomatik kunlik **backup** va vaqt bo'yicha tiklash (point-in-time recovery). Sizning buyurtma/moliya ma'lumotlaringiz biznes uchun kritik — bu eng katta afzallik.
-- Droplet o'chib qolsa ham baza tirik qoladi (alohida turadi).
-- Avtomatik xavfsizlik yangilanishlari, monitoring, kerak bo'lsa replikatsiya.
-- Kamchiligi: ~$15/oy qo'shimcha.
-- **Pulni tejash kerak bo'lsa:** boshида bazani droplet ichida ishlatib, keyinroq Managed'ga ko'chirsa bo'ladi (compose faylida tayyor variant izoh ostida turibdi). Lekin u holda backup'ni o'zingiz sozlashingiz kerak.
+**Baza shu droplet ichida** (Managed DB emas):
+- Qo'shimcha to'lov yo'q — Managed DB ~$15/oy bo'lardi, bu yerda baza serverning bir qismi.
+- Sodda: bitta `docker compose up` hammasini ko'taradi.
+- **Diqqat — backup o'zingizning zimmangizda.** Managed DB avtomatik backup qilardi; bu yerda buni biz o'zimiz sozlaymiz (pastdagi **"Backup"** bo'limiga qarang — bu MUHIM, chunki ERP ma'lumotlari kritik).
+- Keyinroq biznes o'ssa, bazani Managed DB ga ko'chirish mumkin — faqat `DATABASE_URL` o'zgaradi.
 
-> Qisqasi: **Droplet + Docker + Managed DB** — ishonchlilik va narx muvozanati eng yaxshi.
+> Qisqasi: hozircha **bitta droplet** — eng arzon va sodda. Faqat **backup**ni albatta yoqing.
 
 ---
 
@@ -53,37 +51,19 @@ git push origin main
 
 ---
 
-## 2. Managed PostgreSQL bazasini yaratish
-
-1. DigitalOcean panelida: **Create → Databases**.
-2. Engine: **PostgreSQL** (eng yangi versiya, masalan 16).
-3. Plan: eng arzon (**Basic, 1 GB / $15/oy**) — boshlash uchun yetarli.
-4. Datacenter: **Frankfurt (FRA1)** yoki **Amsterdam (AMS3)** — O'zbekistonga eng yaqin va tez.
-5. Nom bering (masalan `nur-db`) → **Create**.
-6. Yaratilgach: **Users & Databases** bo'limida `nur_erp` nomli yangi database yarating (yoki standart `defaultdb` ni ishlatasiz).
-7. **Connection details** → "Connection string" ni nusxalab oling. U shunday ko'rinadi:
-   ```
-   postgresql://doadmin:PAROL@db-nur-...ondigitalocean.com:25060/nur_erp?sslmode=require
-   ```
-   Buni 4-qadamda `.env.prod` ga yozasiz (boshini `postgresql+asyncpg://` ga o'zgartirib, oxiridagi `?sslmode=require` ni olib tashlab).
-
-> Bazani 3-qadamdagi droplet bilan **bir xil region**da yarating — tezlik va ichki tarmoq uchun.
-
----
-
-## 3. Droplet (server) yaratish
+## 2. Droplet (server) yaratish
 
 1. **Create → Droplets**.
 2. Image: **Ubuntu 24.04 LTS**.
-3. Plan: **Basic → Regular → $6/oy** (1 GB RAM) bilan boshlasa bo'ladi. Sekinlashsa $12/oy (2 GB) ga oshirasiz.
-4. Region: baza bilan **bir xil** (FRA1 yoki AMS3).
+3. Plan: **Basic → Regular → $12/oy (2 GB RAM)** tavsiya — baza ham shu serverda turgani uchun 1 GB ozlik qilishi mumkin. Pulni tejash uchun $6/oy (1 GB) bilan boshlab, sekinlashsa oshirsa bo'ladi.
+4. Region: **Frankfurt (FRA1)** yoki **Amsterdam (AMS3)** — O'zbekistonga eng yaqin va tez.
 5. Authentication: **SSH key** (tavsiya) yoki parol.
 6. Hostname: `nur-erp` → **Create Droplet**.
 7. Droplet IP manzilini eslab qoling (masalan `164.92.xx.xx`).
 
 ---
 
-## 4. Domenni serverga yo'naltirish (DNS)
+## 3. Domenni serverga yo'naltirish (DNS)
 
 Domeningiz boshqaruv panelida (yoki DigitalOcean → Networking → Domains) **A record** qo'shing:
 
@@ -98,7 +78,7 @@ DNS tarqalishi 5–30 daqiqa olishi mumkin.
 
 ---
 
-## 5. Serverga ulanib, kerakli dasturlarni o'rnatish
+## 4. Serverga ulanib, kerakli dasturlarni o'rnatish
 
 Kompyuteringiz terminalidan serverга kiring:
 
@@ -131,7 +111,7 @@ ufw --force enable
 
 ---
 
-## 6. Loyihani serverga olish
+## 5. Loyihani serverga olish
 
 ```bash
 cd /opt
@@ -143,7 +123,7 @@ cd NUR-Project
 
 ---
 
-## 7. `.env.prod` faylini yaratish (parollar shu yerda)
+## 6. `.env.prod` faylini yaratish (parollar shu yerda)
 
 ```bash
 cp .env.prod.example .env.prod
@@ -153,20 +133,18 @@ nano .env.prod
 Quyidagilarni to'ldiring:
 
 - **`DOMAIN`** → `erp.nurtechno.uz`
-- **`DATABASE_URL`** → 2-qadamdagi connection string, LEKIN:
-  - boshini `postgresql://` dan **`postgresql+asyncpg://`** ga o'zgartiring
-  - oxiridagi **`?sslmode=require`** ni olib tashlang
-  - natija: `postgresql+asyncpg://doadmin:PAROL@db-nur-...ondigitalocean.com:25060/nur_erp`
+- **`POSTGRES_PASSWORD`** → kuchli parol. Yaratish: `openssl rand -hex 16`
+- **`DATABASE_URL`** → yuqoridagi parol bilan **bir xil** bo'lsin:
+  `postgresql+asyncpg://postgres:O'SHA_PAROL@postgres:5432/nur_erp`
+  (`@postgres` — bu compose ichidagi baza konteyner nomi, o'zgartirmang.)
 - **`SECRET_KEY`** → kuchli tasodifiy satr. Yaratish: `openssl rand -hex 32`
 - **`INIT_ADMIN_EMAIL` / `INIT_ADMIN_PASSWORD`** → birinchi admin login (parolni o'zgartiring).
 
 Saqlash: `Ctrl+O`, `Enter`, keyin `Ctrl+X`.
 
-> **Muhim:** Managed DB sahifasida **Trusted Sources** bo'limiga droplet'ingizni qo'shing (yoki "All resources"). Aks holda backend bazaga ulana olmaydi.
-
 ---
 
-## 8. Ishga tushirish 🚀
+## 7. Ishga tushirish 🚀
 
 ```bash
 docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
@@ -179,6 +157,7 @@ docker compose -f docker-compose.prod.yml logs -f
 ```
 
 Quyidagilarni ko'rsangiz tayyor:
+- postgres: `database system is ready to accept connections`
 - backend: `[init] Seeding DB...` → `Starting uvicorn` → `Application startup complete`
 - caddy: sertifikat olgani haqida xabar (`certificate obtained`)
 
@@ -189,7 +168,7 @@ API hujjatlar: `https://erp.nurtechno.uz/api/docs`
 
 ---
 
-## 9. Tekshirish
+## 8. Tekshirish
 
 ```bash
 # Konteynerlar holati
@@ -220,7 +199,7 @@ docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
 # Loglar (faqat backend)
 docker compose -f docker-compose.prod.yml logs -f backend
 
-# To'xtatish
+# To'xtatish (baza saqlanib qoladi)
 docker compose -f docker-compose.prod.yml down
 
 # Qayta ishga tushirish
@@ -230,12 +209,51 @@ docker compose -f docker-compose.prod.yml restart
 docker system prune -f
 ```
 
+> ⚠️ **`docker compose down -v` ishlatMANG** — `-v` bayrog'i volume'larni, ya'ni
+> **butun bazani o'chiradi**. Oddiy `down` bazani saqlab qoladi.
+
+---
+
+## Backup (MUHIM — baza droplet ichida bo'lgani uchun)
+
+Managed DB'dan voz kechganimiz uchun backup'ni o'zimiz sozlaymiz. Bu ERP ma'lumotlari
+(buyurtma, moliya) uchun shart. Serverda quyidagi backup skriptini yarating:
+
+```bash
+mkdir -p /opt/backups
+cat > /opt/backup-db.sh <<'EOF'
+#!/bin/bash
+# Har kuni bazani dump qiladi, 14 kundan eski nusxalarni o'chiradi.
+STAMP=$(date +%F_%H%M)
+docker exec nur-postgres pg_dump -U postgres nur_erp | gzip > /opt/backups/nur_erp_$STAMP.sql.gz
+find /opt/backups -name "*.sql.gz" -mtime +14 -delete
+EOF
+chmod +x /opt/backup-db.sh
+```
+
+Har kuni soat 03:00 da avtomatik ishlashi uchun cron qo'shing:
+
+```bash
+(crontab -l 2>/dev/null; echo "0 3 * * * /opt/backup-db.sh") | crontab -
+```
+
+> Yanada xavfsiz: `/opt/backups` ni vaqti-vaqti bilan DigitalOcean Spaces yoki
+> boshqa kompyuterga ko'chirib turing — droplet butunlay o'chsa ham nusxa qoladi.
+
+**Tiklash (restore):**
+```bash
+gunzip < /opt/backups/nur_erp_2026-06-03_0300.sql.gz | docker exec -i nur-postgres psql -U postgres nur_erp
+```
+
+> Qo'shimcha himoya: DigitalOcean Droplet sahifasida **Backups** ($1.2/oy ~ haftalik
+> snapshot) ni ham yoqsa bo'ladi — butun serverning nusxasi.
+
 ---
 
 ## Muammolar (troubleshooting)
 
 - **Sayt ochilmayapti / SSL xatosi** → DNS hali tarqalmagan bo'lishi mumkin. `dig erp.nurtechno.uz` bilan IP to'g'ri ko'rsatayotganini tekshiring. Caddy loglarini ko'ring.
-- **Backend bazaga ulanmayapti** → Managed DB → **Trusted Sources** ga droplet qo'shilganini, `DATABASE_URL` da `+asyncpg` borligini va `?sslmode=require` olib tashlanganini tekshiring.
+- **Backend bazaga ulanmayapti** → `.env.prod` da `POSTGRES_PASSWORD` va `DATABASE_URL` dagi parol **bir xil** ekanini, `DATABASE_URL` da `+asyncpg` va `@postgres:5432` borligini tekshiring. `logs -f postgres` ko'ring.
 - **502 Bad Gateway** → backend hali ishga tushmagan yoki seed xato bergan. `logs -f backend` ko'ring.
 - **Frontend "Network Error"** → frontend `/api/v1` nisbiy yo'ldan foydalanadi; Caddy `/api/*` ni backendga uzatayotganini tekshiring.
 
@@ -245,4 +263,4 @@ docker system prune -f
 
 - Birinchi kirgandan so'ng admin parolini ilovada o'zgartiring.
 - `root` o'rniga oddiy `sudo` user yarating va SSH'ni faqat key bilan qoldiring.
-- Managed DB allaqachon kunlik backup qiladi — qo'shimcha sozlash shart emas.
+- **Backup'ni albatta yoqing** (yuqoridagi bo'lim) — baza serverda bo'lgani uchun bu sizning zimmangizda.
