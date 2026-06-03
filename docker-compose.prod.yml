@@ -1,0 +1,88 @@
+# NUR Project — Docker Compose (PRODUCTION)
+# Ishga tushirish:  docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+# To'xtatish:       docker compose -f docker-compose.prod.yml down
+# Loglar:           docker compose -f docker-compose.prod.yml logs -f backend
+#
+# Bu fayl dev'dagi docker-compose.yml dan farq qiladi:
+#   - manba kodi volume orqali ulanmaydi (image ichiga "baked"), --reload yo'q
+#   - frontend nginx orqali tayyor build'ni beradi (Vite dev server emas)
+#   - Caddy reverse-proxy avtomatik HTTPS (Let's Encrypt) o'rnatadi
+#   - baza tashqi DigitalOcean Managed Postgres (DATABASE_URL .env.prod dan)
+name: nur-erp-prod
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: nur-backend
+    restart: unless-stopped
+    env_file: .env.prod
+    environment:
+      APP_ENV: production
+      DEBUG: "false"
+    volumes:
+      - backend_uploads:/app/uploads
+    expose:
+      - "8000"          # faqat ichki tarmoq — tashqariga ochilmaydi
+    # Tablalarni yaratadi + super-admin seed qiladi, so'ng uvicorn (reload'siz)
+    command: >
+      sh -c "
+        echo '[init] Seeding DB...' &&
+        python -m scripts.seed &&
+        echo '[init] Starting uvicorn (prod)...' &&
+        uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
+      "
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    container_name: nur-frontend
+    restart: unless-stopped
+    expose:
+      - "80"            # faqat ichki tarmoq
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: nur-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      # .env.prod ichidagi DOMAIN qiymati Caddyfile'ga uzatiladi
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - backend
+      - frontend
+
+  # --- IXTIYORIY: bazani alohida Managed DB o'rniga shu droplet ichida ---
+  # Agar "baza ham droplet ichida bo'lsin" desangiz, quyidagini oching va
+  # .env.prod dagi DATABASE_URL ni  postgresql+asyncpg://postgres:PAROL@postgres:5432/nur_erp  ga o'zgartiring.
+  #
+  # postgres:
+  #   image: postgres:16-alpine
+  #   container_name: nur-postgres
+  #   restart: unless-stopped
+  #   environment:
+  #     POSTGRES_USER: postgres
+  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+  #     POSTGRES_DB: nur_erp
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U postgres -d nur_erp"]
+  #     interval: 5s
+  #     timeout: 5s
+  #     retries: 10
+
+volumes:
+  backend_uploads:
+  caddy_data:
+  caddy_config:
+  # postgres_data:   # yuqoridagi postgres'ni ochsangiz, buni ham oching

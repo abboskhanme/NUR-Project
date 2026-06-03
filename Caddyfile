@@ -1,0 +1,18 @@
+# NUR Project — Caddy reverse proxy + avtomatik HTTPS (Let's Encrypt).
+# {$DOMAIN} qiymati .env.prod fayldan keladi (masalan: erp.nurtechno.uz).
+# Caddy domen uchun SSL sertifikatni o'zi oladi va yangilab turadi.
+
+{$DOMAIN} {
+    encode gzip
+
+    # Backend API — /api/* va /health backendga
+    @api path /api/* /health
+    handle @api {
+        reverse_proxy backend:8000
+    }
+
+    # Qolgan hamma narsa (React SPA) frontend nginx'ga
+    handle {
+        reverse_proxy frontend:80
+    }
+}
