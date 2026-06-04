@@ -1,8 +1,8 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { ChevronsUp, ChevronUp, ChevronDown, ListOrdered } from 'lucide-react';
+import { ChevronsUp, ChevronUp, ChevronDown, ListOrdered, Search } from 'lucide-react';
 
 import { api } from '@/api/client';
 import Card from '@/components/ui/Card';
@@ -14,7 +14,7 @@ interface ProductMini { product_type?: string; model?: string | null; name?: str
 interface Item { product?: ProductMini | null; bunker_direction?: string | null; quantity: number; }
 interface QueueOrder {
   id: string; code: string; status: string; order_date: string; position: number;
-  customer?: { full_name: string; region?: string | null } | null;
+  customer?: { full_name: string; phone?: string; region?: string | null } | null;
   items: Item[];
   items_total_uzs: string; balance_uzs: string;
 }
@@ -36,6 +36,7 @@ function itemSummary(o: QueueOrder): string {
 export default function QueuePage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const [search, setSearch] = useState('');
 
   const { data, isLoading } = useQuery<QueueOrder[]>({
     queryKey: ['orders', 'queue'],
@@ -43,11 +44,25 @@ export default function QueuePage() {
   });
   const queue = data ?? [];
 
-  const QUEUE_LIMIT = 25;
+  // Limit yo'q — navbatdagi va tayyor bo'lgan buyurtmalarning barchasi ko'rsatiladi
   const allPending = useMemo(() => queue.filter((o) => o.status === 'new'), [queue]);
-  const pending = useMemo(() => allPending.slice(0, QUEUE_LIMIT), [allPending]);
-  const pendingHidden = Math.max(0, allPending.length - QUEUE_LIMIT);
   const ready = useMemo(() => queue.filter((o) => o.status === 'ready'), [queue]);
+
+  // Qidiruv — FAQAT navbatda turganlar (new) ichidan: kod, mijoz, telefon, viloyat, mahsulot
+  const searching = search.trim().length > 0;
+  const pendingShown = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return allPending;
+    const qDigits = q.replace(/\D/g, '');
+    return allPending.filter((o) => {
+      if (o.code.toLowerCase().includes(q)) return true;
+      if (o.customer?.full_name?.toLowerCase().includes(q)) return true;
+      if (o.customer?.region?.toLowerCase().includes(q)) return true;
+      if (qDigits && (o.customer?.phone ?? '').replace(/\D/g, '').includes(qDigits)) return true;
+      if (itemSummary(o).toLowerCase().includes(q)) return true;
+      return false;
+    });
+  }, [allPending, search]);
 
   async function move(id: string, action: 'top' | 'up' | 'down', e: React.MouseEvent) {
     e.stopPropagation();
@@ -81,8 +96,9 @@ export default function QueuePage() {
               <tr key={o.id} onClick={() => navigate(`/orders/${o.id}`)}
                   className="border-b border-black/5 hover:bg-black/5 cursor-pointer">
                 <td className="py-2 pr-3">
+                  {/* Serverdan kelgan pozitsiya — sotuv jadvalidagi "Navbat" raqami bilan bir xil */}
                   <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-primary/10 text-primary font-bold text-xs">
-                    {idx + 1}
+                    {o.position || idx + 1}
                   </span>
                 </td>
                 <td className="py-2 pr-3 font-medium">{o.code}</td>
@@ -122,12 +138,27 @@ export default function QueuePage() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold">Navbat</h1>
-        <p className="text-sm text-ink-soft">
-          Ishlab chiqarish navbati — yuqorida turgan buyurtmalar oldin bajariladi.
-          Shoshilinch buyurtmani strelka tugmalari bilan yuqoriga ko'taring.
-        </p>
+      <div className="flex items-end justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">Navbat</h1>
+          <p className="text-sm text-ink-soft">
+            Ishlab chiqarish navbati — yuqorida turgan buyurtmalar oldin bajariladi.
+            Shoshilinch buyurtmani strelka tugmalari bilan yuqoriga ko'taring.
+          </p>
+        </div>
+        {/* Qidiruv — faqat navbatda turganlar ichidan */}
+        <div className="flex items-center gap-2 w-full sm:w-72 bg-white border border-black/10 rounded-button px-3 py-1.5">
+          <Search size={16} className="text-ink/40 shrink-0" />
+          <input
+            placeholder="Navbatdan qidirish..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="bg-transparent outline-none flex-1 text-sm min-w-0"
+          />
+          {searching && (
+            <button onClick={() => setSearch('')} className="text-ink/40 hover:text-ink text-xs shrink-0">✕</button>
+          )}
+        </div>
       </div>
 
       {isLoading ? (
@@ -142,13 +173,17 @@ export default function QueuePage() {
         </Card>
       ) : (
         <>
-          <Card title={`Navbatda (${allPending.length})`}>
+          <Card title={searching
+            ? `Navbatda — qidiruv natijasi (${pendingShown.length} / ${allPending.length})`
+            : `Navbatda (${allPending.length})`}>
             {allPending.length === 0
               ? <EmptyState title="Navbatda buyurtma yo'q" description="Yangi buyurtmalar shu yerda ko'rinadi" />
-              : renderTable(pending, true)}
-            {pendingHidden > 0 && (
-              <p className="text-xs text-ink-soft mt-3 text-center">
-                Eng oldindagi {QUEUE_LIMIT} ta ko'rsatilyapti — yana {pendingHidden} ta navbatda.
+              : pendingShown.length === 0
+                ? <EmptyState title="Topilmadi" description="Qidiruv bo'yicha navbatda buyurtma topilmadi" />
+                : renderTable(pendingShown, !searching)}
+            {searching && pendingShown.length > 0 && (
+              <p className="text-xs text-ink-soft mt-3">
+                Qidiruv rejimida tartibni o'zgartirish tugmalari yashiriladi — raqam buyurtmaning haqiqiy navbat o'rni.
               </p>
             )}
           </Card>

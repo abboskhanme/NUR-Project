@@ -156,6 +156,8 @@ class OrderOut(ORMBase):
     paid_uzs: Decimal = Decimal(0)
     balance_uzs: Decimal = Decimal(0)
     created_at: datetime
+    # Navbat raqami — faqat aktiv (new/ready) buyurtmalar uchun, boshqalarda None
+    queue_position: Optional[int] = None
 
 
 class OrderStatusChange(BaseModel):

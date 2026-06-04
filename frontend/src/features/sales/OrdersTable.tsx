@@ -21,6 +21,7 @@ interface OrderItem {
 }
 export interface OrderFull {
   id: string; code: string; status: string; order_date: string; delivered_at?: string | null;
+  queue_position?: number | null;
   exchange_rate: string;
   delivery_address?: string | null;
   customer?: { id: string; full_name: string; phone: string; region?: string | null; address?: string | null } | null;
@@ -64,8 +65,9 @@ export default function OrdersTable({
 }) {
   return (
     <div className="overflow-x-auto -mx-2">
-      <table className="text-sm border-collapse table-fixed w-[1930px]">
+      <table className="text-sm border-collapse table-fixed w-[2000px]">
         <colgroup>
+          <col style={{ width: 70 }} />{/* Navbat */}
           <col style={{ width: 140 }} />{/* Buyurtma */}
           <col style={{ width: 140 }} />{/* Yetkazilgan */}
           <col style={{ width: 170 }} />{/* Mijoz */}
@@ -84,6 +86,7 @@ export default function OrdersTable({
         </colgroup>
         <thead className="text-left text-ink-soft border-b border-black/10">
           <tr className="[&>th]:py-2 [&>th]:px-2 [&>th]:font-medium [&>th]:whitespace-nowrap">
+            <th>Navbat</th>
             <th>Buyurtma</th>
             <th>Yetkazilgan</th>
             <th>Mijoz</th>
@@ -199,6 +202,17 @@ function Row({
 
   return (
     <tr className={'border-b border-black/5 ' + (saving ? 'opacity-60' : '')}>
+      {/* Navbat raqami — faqat aktiv (new/ready) buyurtmalar uchun */}
+      <td className={cell + ' text-center'}>
+        {o.queue_position ? (
+          <span className="inline-flex items-center justify-center min-w-[28px] px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold"
+                title={`Navbatda ${o.queue_position}-o'rinda`}>
+            №{o.queue_position}
+          </span>
+        ) : (
+          <span className="text-ink-soft">—</span>
+        )}
+      </td>
       {/* Sanalar */}
       <td className={cell}>
         <input type="date" defaultValue={o.order_date} className={inp}

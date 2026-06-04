@@ -5,12 +5,14 @@ from decimal import Decimal
 from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.dependencies import CurrentUser
 from app.db.session import get_db
+from app.models.customer import Customer
+from app.models.finance import Account, FinanceCategory, FinanceTransaction
 from app.models.order import Order, OrderItem, Payment
 from app.models.product import Inventory
 from app.schemas.common import Page
@@ -18,6 +20,7 @@ from app.schemas.order import (
     OrderCreate, OrderOut, OrderStatusChange, OrderUpdate,
     PaymentIn, PaymentOut, SalesSummary, QueueItemOut, QueueMove,
 )
+from app.services.finance_service import apply_transaction
 from app.services.order_service import generate_order_code, is_valid_transition
 
 router = APIRouter()
@@ -75,7 +78,21 @@ def _apply_filters(q, current, status, salesperson_id, customer_id, date_from, d
     if date_to:
         q = q.where(Order.order_date <= date_to)
     if search:
-        q = q.where(Order.code.ilike(f"%{search}%"))
+        # Kod, mijoz ismi va telefon raqami bo'yicha qidiruv.
+        # Telefon uchun ikkala tomondan ham bo'shliq/+/- belgilarini olib tashlab solishtiramiz,
+        # shunda "907008090" ham, "+998 90 700 80 90" ham topiladi.
+        s = f"%{search.strip()}%"
+
+        def _norm(col):
+            return func.replace(func.replace(func.replace(
+                func.coalesce(col, ""), " ", ""), "-", ""), "+", "")
+
+        conds = [Order.code.ilike(s), Customer.full_name.ilike(s)]
+        digits = "".join(ch for ch in search if ch.isdigit())
+        if digits:
+            conds.append(_norm(Customer.phone).like(f"%{digits}%"))
+            conds.append(_norm(Customer.phone2).like(f"%{digits}%"))
+        q = q.outerjoin(Customer, Order.customer_id == Customer.id).where(or_(*conds))
     return q
 
 
@@ -95,8 +112,24 @@ async def list_orders(
     res = await db.execute(q.order_by(Order.order_date.desc(), Order.created_at.desc())
                             .offset((page - 1) * page_size).limit(page_size))
     items = res.scalars().unique().all()
-    return Page[OrderOut](items=[OrderOut.model_validate(o) for o in items],
-                          total=total, page=page, page_size=page_size)
+
+    # Navbat pozitsiyalari: FAQAT "new" (navbatda) statusdagi buyurtmalar uchun.
+    # "Tayyor bo'ldi" va boshqa statuslar navbatda hisoblanmaydi.
+    pos_map: dict[uuid.UUID, int] = {}
+    if any(o.status == "new" for o in items):
+        qq = select(Order.id).where(Order.status == "new")
+        if _own_only(current):
+            qq = qq.where(Order.salesperson_id == current.id)
+        qq = qq.order_by(Order.priority.desc(), Order.order_date.asc(), Order.created_at.asc())
+        queue_ids = (await db.execute(qq)).scalars().all()
+        pos_map = {oid: i for i, oid in enumerate(queue_ids, start=1)}
+
+    out = []
+    for o in items:
+        m = OrderOut.model_validate(o)
+        m.queue_position = pos_map.get(o.id)
+        out.append(m)
+    return Page[OrderOut](items=out, total=total, page=page, page_size=page_size)
 
 
 @router.get("/summary", response_model=SalesSummary)
@@ -165,15 +198,25 @@ async def _load_queue(db: AsyncSession, current) -> list[Order]:
     return list(res.scalars().unique().all())
 
 
-@router.get("/queue", response_model=list[QueueItemOut])
-async def order_queue(db: Annotated[AsyncSession, Depends(get_db)], current: CurrentUser):
-    orders = await _load_queue(db, current)
+def _queue_out(orders: list[Order]) -> list[QueueItemOut]:
+    """Navbat raqami FAQAT "new" statusdagilar uchun beriladi —
+    sotuv jadvalidagi queue_position bilan bir xil.
+    "Tayyor bo'ldi" buyurtmalar navbatda hisoblanmaydi (position = 0)."""
     out = []
-    for pos, o in enumerate(orders, start=1):
+    n = 0
+    for o in orders:
         item = QueueItemOut.model_validate(o)
-        item.position = pos
+        if o.status == "new":
+            n += 1
+            item.position = n
+            item.queue_position = n
         out.append(item)
     return out
+
+
+@router.get("/queue", response_model=list[QueueItemOut])
+async def order_queue(db: Annotated[AsyncSession, Depends(get_db)], current: CurrentUser):
+    return _queue_out(await _load_queue(db, current))
 
 
 @router.post("/{order_id}/queue-move", response_model=list[QueueItemOut])
@@ -202,13 +245,7 @@ async def queue_move(order_id: uuid.UUID, payload: QueueMove, current: CurrentUs
     for pos, o in enumerate(group):
         o.priority = n - pos
     await db.commit()
-    orders = await _load_queue(db, current)
-    out = []
-    for pos, o in enumerate(orders, start=1):
-        item = QueueItemOut.model_validate(o)
-        item.position = pos
-        out.append(item)
-    return out
+    return _queue_out(await _load_queue(db, current))
 
 
 @router.post("", response_model=OrderOut, status_code=201)
@@ -320,8 +357,48 @@ async def add_payment(order_id: uuid.UUID, payload: PaymentIn, user: CurrentUser
             data["amount_uzs_equiv"] = data["amount"]
         elif o.exchange_rate:
             data["amount_uzs_equiv"] = data["amount"] * o.exchange_rate
+    # To'lov qoldiqdan oshib ketmasligi kerak
+    equiv = Decimal(str(data.get("amount_uzs_equiv") or data["amount"]))
+    if equiv > o.balance_uzs:
+        raise HTTPException(
+            400, f"To'lov qoldiqdan oshib ketdi — qoldiq: {o.balance_uzs:,.0f} so'm".replace(",", " "))
     p = Payment(order_id=order_id, created_by_id=user.id, **data)
     db.add(p)
+    await db.flush()
+
+    # ---- Moliya: avtomatik kirim tranzaksiyasi (qaysi valyutada bo'lsa ham) ----
+    currency = data.get("currency") or "UZS"
+    # Kategoriya: "Buyurtma to'lovi" (yo'q bo'lsa yaratiladi)
+    cat = (await db.execute(
+        select(FinanceCategory).where(FinanceCategory.code == "order_payment")
+    )).scalar_one_or_none()
+    if not cat:
+        cat = FinanceCategory(name="Buyurtma to'lovi", kind="income", code="order_payment")
+        db.add(cat)
+        await db.flush()
+    # Valyutaga mos operatsion hisobvaraq
+    acc = (await db.execute(
+        select(Account).where(Account.currency == currency,
+                              Account.ledger == "operational").limit(1)
+    )).scalar_one_or_none()
+    method_labels = {"cash": "naqd", "card": "karta", "transfer": "o'tkazma"}
+    tx = FinanceTransaction(
+        date=data.get("date") or date.today(),
+        type="income",
+        category_id=cat.id,
+        amount=data["amount"],
+        currency=currency,
+        # USD to'lovda UZS ekvivalentini ham saqlaymiz
+        amount_other_curr=(data.get("amount_uzs_equiv") or Decimal(0)) if currency == "USD" else Decimal(0),
+        account_id=acc.id if acc else None,
+        related_order_id=order_id,
+        note=f"Buyurtma {o.code} — to'lov ({method_labels.get(data.get('method', ''), data.get('method') or '—')})",
+        created_by_id=user.id,
+    )
+    db.add(tx)
+    await db.flush()
+    await apply_transaction(db, tx)  # hisobvaraq balansiga qo'shiladi
+
     await db.commit()
     await db.refresh(p)
     return p
@@ -343,5 +420,18 @@ async def delete_payment(order_id: uuid.UUID, payment_id: uuid.UUID, _: CurrentU
     p = res.scalar_one_or_none()
     if not p:
         raise HTTPException(404, "To'lov topilmadi")
+
+    # Moliyadagi mos kirim tranzaksiyasini ham qaytaramiz (balans tiklanadi)
+    tx = (await db.execute(select(FinanceTransaction).where(
+        FinanceTransaction.related_order_id == order_id,
+        FinanceTransaction.type == "income",
+        FinanceTransaction.amount == p.amount,
+        FinanceTransaction.currency == (p.currency or "UZS"),
+        FinanceTransaction.date == p.date,
+    ).limit(1))).scalar_one_or_none()
+    if tx:
+        await apply_transaction(db, tx, reverse=True)
+        await db.delete(tx)
+
     await db.delete(p)
     await db.commit()

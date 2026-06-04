@@ -4,6 +4,14 @@ import { X } from 'lucide-react';
 
 import { api } from '@/api/client';
 import PhoneInput from '@/components/ui/PhoneInput';
+import Select from '@/components/ui/Select';
+import { CENTRAL_ASIA, regionsOf } from '@/lib/centralAsia';
+
+const TWEMOJI_BASE = 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg';
+const flagIcon = (codes: string) => (
+  <img src={`${TWEMOJI_BASE}/${codes}.svg`} alt="" loading="lazy"
+       className="w-[22px] h-4 rounded-sm object-cover shrink-0" />
+);
 
 export interface CustomerFull {
   id: string;
@@ -105,11 +113,28 @@ export default function CustomerModal({
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="label">Davlat</label>
-              <input className="input" value={country} onChange={(e) => setCountry(e.target.value)} />
+              <Select
+                value={country}
+                onChange={(v) => { setCountry(v); setRegion(''); }}
+                options={CENTRAL_ASIA.map((c) => ({
+                  value: c.value, label: c.label, icon: flagIcon(c.flagCodes),
+                }))}
+              />
             </div>
             <div>
               <label className="label">Viloyat</label>
-              <input className="input" value={region} onChange={(e) => setRegion(e.target.value)} />
+              <Select
+                value={region}
+                onChange={setRegion}
+                allowEmpty
+                placeholder="—"
+                options={[
+                  // Tahrirlashda eski qiymat ro'yxatda bo'lmasa ham yo'qolmasin
+                  ...(region && !regionsOf(country).includes(region)
+                    ? [{ value: region, label: region }] : []),
+                  ...regionsOf(country).map((r) => ({ value: r, label: r })),
+                ]}
+              />
             </div>
             <div>
               <label className="label">Shahar / tuman</label>

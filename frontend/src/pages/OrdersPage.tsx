@@ -64,14 +64,18 @@ export default function OrdersPage() {
   // KPI sarlavhasidagi davr nomi: tanlangan oy + yil (yoki butun yil)
   const periodLabel = month === 0 ? `${year}` : `${MONTHS[month - 1]} ${year}`;
 
+  // Qidiruv yozilganda oy/yil va status filtrlari e'tiborga olinmaydi —
+  // barcha buyurtmalar ichidan qidiriladi (qidirilayotgan buyurtma boshqa oyda bo'lishi mumkin)
+  const searching = search.trim().length > 0;
+
   const { data, isLoading } = useQuery({
     queryKey: ['orders', search, statusFilter, dateFrom, dateTo],
     queryFn: () => api.get('/orders', {
       params: {
-        search: search || undefined,
-        status: statusFilter || undefined,
-        date_from: dateFrom || undefined,
-        date_to: dateTo || undefined,
+        search: search.trim() || undefined,
+        status: searching ? undefined : (statusFilter || undefined),
+        date_from: searching ? undefined : (dateFrom || undefined),
+        date_to: searching ? undefined : (dateTo || undefined),
         page_size: 100,
       },
     }).then((r) => r.data),
@@ -88,10 +92,10 @@ export default function OrdersPage() {
     queryKey: ['orders', 'summary', search, statusFilter, dateFrom, dateTo],
     queryFn: () => api.get('/orders/summary', {
       params: {
-        search: search || undefined,
-        status: statusFilter || undefined,
-        date_from: dateFrom || undefined,
-        date_to: dateTo || undefined,
+        search: search.trim() || undefined,
+        status: searching ? undefined : (statusFilter || undefined),
+        date_from: searching ? undefined : (dateFrom || undefined),
+        date_to: searching ? undefined : (dateTo || undefined),
       },
     }).then((r) => r.data),
   });
@@ -126,7 +130,7 @@ export default function OrdersPage() {
         <div className="flex flex-wrap gap-3 mb-4">
           <div className="flex items-center gap-2 flex-1 min-w-[200px] bg-white border border-black/10 rounded-button px-3 py-1.5">
             <Search size={16} className="text-ink/40" />
-            <input placeholder="Kod bo'yicha qidirish..." value={search}
+            <input placeholder="Kod, mijoz ismi yoki telefon bo'yicha qidirish..." value={search}
                    onChange={(e) => setSearch(e.target.value)}
                    className="bg-transparent outline-none flex-1 text-sm" />
           </div>

@@ -6,6 +6,8 @@ import { Search, UserPlus, Check, X } from 'lucide-react';
 import { api } from '@/api/client';
 import PhoneInput from '@/components/ui/PhoneInput';
 import { formatPhone } from '@/lib/format';
+import Select from '@/components/ui/Select';
+import { regionsOf } from '@/lib/centralAsia';
 
 export interface CustomerLite {
   id: string;
@@ -138,7 +140,14 @@ export default function CustomerPicker({
           <div className="text-sm font-medium flex items-center gap-1.5"><UserPlus size={15} className="text-primary" /> Yangi mijoz</div>
           <input className="input" placeholder="Ism familiya *" value={name} onChange={(e) => setName(e.target.value)} />
           <PhoneInput value={phone} onChange={setPhone} />
-          <input className="input" placeholder="Viloyat" value={region} onChange={(e) => setRegion(e.target.value)} />
+          <Select
+            value={region}
+            onChange={setRegion}
+            allowEmpty
+            emptyLabel="Viloyat —"
+            placeholder="Viloyat"
+            options={regionsOf('Uzbekistan').map((r) => ({ value: r, label: r }))}
+          />
           <div className="flex justify-end gap-2 pt-1">
             <button type="button" onClick={() => setCreating(false)} className="btn-ghost text-sm py-1.5">Bekor</button>
             <button type="button" onClick={handleCreate} disabled={saving} className="btn-primary text-sm py-1.5">
