@@ -8,6 +8,22 @@ import Card from '@/components/ui/Card';
 import EmptyState from '@/components/ui/EmptyState';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import RoleModal, { RoleRow } from './RoleModal';
+import { MODULES } from '@/lib/permissions';
+
+/** Rol ruxsatlarining qisqa xulosasi: To'liq / N modul / — */
+function permSummary(r: RoleRow): string {
+  if (r.name === 'super_admin') return "To'liq";
+  const raw: any = r.permissions || {};
+  const items: string[] = Array.isArray(raw) ? raw : raw.permissions ?? [];
+  if (items.includes('*') || items.includes('*:*')) return "To'liq";
+  const mods = new Set<string>();
+  for (const p of items) {
+    const m = String(p).split(':')[0];
+    if (m === '*') return `${MODULES.length} modul`;
+    if (m) mods.add(m);
+  }
+  return mods.size ? `${mods.size} modul` : '—';
+}
 
 export default function RolesSection() {
   const qc = useQueryClient();
@@ -64,6 +80,7 @@ export default function RolesSection() {
                 <tr>
                   <th className="py-2 pr-3">Nomi</th>
                   <th className="py-2 pr-3">Tavsif</th>
+                  <th className="py-2 pr-3">Ruxsatlar</th>
                   <th className="py-2 pr-3 text-right">Amallar</th>
                 </tr>
               </thead>
@@ -84,6 +101,20 @@ export default function RolesSection() {
                         </div>
                       </td>
                       <td className="py-2 pr-3 text-ink/70">{r.description || '—'}</td>
+                      <td className="py-2 pr-3">
+                        <span
+                          className={
+                            'text-xs px-2 py-0.5 rounded-full ' +
+                            (permSummary(r) === "To'liq"
+                              ? 'bg-success/10 text-success'
+                              : permSummary(r) === '—'
+                                ? 'bg-black/5 text-ink/50'
+                                : 'bg-primary/10 text-primary')
+                          }
+                        >
+                          {permSummary(r)}
+                        </span>
+                      </td>
                       <td className="py-2 pr-3">
                         <div className="flex items-center justify-end gap-1">
                           <button

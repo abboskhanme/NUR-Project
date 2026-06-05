@@ -7,6 +7,7 @@ import {
 } from 'recharts';
 
 import { api } from '@/api/client';
+import { usePermissions } from '@/lib/permissions';
 import BalanceCard from '@/components/ui/BalanceCard';
 import Card from '@/components/ui/Card';
 import { formatUZS, formatUSD } from '@/lib/format';
@@ -27,19 +28,27 @@ const compact = (n: number) => {
 };
 
 export default function DashboardPage() {
+  // Ruxsatga qarab bo'limlar: moliya bloklari faqat finance, qolgani reports
+  const { canModule } = usePermissions();
+  const canFinance = canModule('finance');
+  const canReports = canModule('reports');
+
   const balance = useQuery<BalanceSummary>({
     queryKey: ['balance-summary'],
     queryFn: () => api.get('/finance/balance-summary').then((r) => r.data),
+    enabled: canFinance,
   });
 
   const dash = useQuery<DashboardData>({
     queryKey: ['dashboard'],
     queryFn: () => api.get('/reports/dashboard').then((r) => r.data),
+    enabled: canReports,
   });
 
   const incomeExpense = useQuery<{ weeks: WeekBucket[] }>({
     queryKey: ['dashboard-income-expense'],
     queryFn: () => api.get('/reports/sales/income-expense').then((r) => r.data),
+    enabled: canReports,
   });
 
   const kpi = dash.data?.kpi;
@@ -52,7 +61,16 @@ export default function DashboardPage() {
         <p className="text-sm text-ink-soft">NUR TECHNO GROUP — joriy holat</p>
       </div>
 
+      {!canFinance && !canReports && (
+        <Card title="Xush kelibsiz">
+          <p className="text-sm text-ink-soft">
+            Sizga ajratilgan bo'limlar chap menyuda ko'rsatilgan.
+          </p>
+        </Card>
+      )}
+
       {/* Moliya balanslari */}
+      {canFinance && (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <BalanceCard
           title="UZS balans"
@@ -73,8 +91,11 @@ export default function DashboardPage() {
           accent="warning"
         />
       </div>
+      )}
 
       {/* Oylik KPI */}
+      {canReports && (
+      <>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <BalanceCard
           title="Buyurtmalar (oy)"
@@ -137,6 +158,8 @@ export default function DashboardPage() {
       <Card title="So'nggi buyurtmalar">
         <RecentOrdersList orders={dash.data?.recent_orders} />
       </Card>
+      </>
+      )}
     </div>
   );
 }

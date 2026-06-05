@@ -9,7 +9,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import and_, select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import CurrentUser, require_roles
+from app.core.dependencies import CurrentUser
+from app.core.permissions import module_guard
 from app.db.session import get_db
 from app.models.finance import Account, ExchangeRate, FinanceCategory, FinanceTransaction
 from app.models.hr import Employee, SalaryAdvance
@@ -26,7 +27,7 @@ from app.services.finance_service import (
     apply_transaction, current_balances, ensure_today_rate, month_summary,
 )
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(module_guard("finance", read_exempt=("/exchange-rates",)))])
 
 
 # ---- Accounts ----
@@ -36,8 +37,7 @@ async def list_accounts(db: Annotated[AsyncSession, Depends(get_db)], _: Current
     return [AccountOut.model_validate(a) for a in res.scalars().all()]
 
 
-@router.post("/accounts", response_model=AccountOut, status_code=201,
-             dependencies=[Depends(require_roles("super_admin", "finance_manager"))])
+@router.post("/accounts", response_model=AccountOut, status_code=201)
 async def create_account(payload: AccountCreate, db: Annotated[AsyncSession, Depends(get_db)]):
     a = Account(**payload.model_dump())
     db.add(a)
@@ -46,8 +46,7 @@ async def create_account(payload: AccountCreate, db: Annotated[AsyncSession, Dep
     return a
 
 
-@router.delete("/accounts/{account_id}", status_code=204,
-               dependencies=[Depends(require_roles("super_admin", "finance_manager"))])
+@router.delete("/accounts/{account_id}", status_code=204)
 async def delete_account(account_id: uuid.UUID, db: Annotated[AsyncSession, Depends(get_db)]):
     res = await db.execute(select(Account).where(Account.id == account_id))
     acc = res.scalar_one_or_none()
@@ -74,8 +73,7 @@ async def list_categories(db: Annotated[AsyncSession, Depends(get_db)], _: Curre
     return [CategoryOut.model_validate(c) for c in res.scalars().all()]
 
 
-@router.post("/categories", response_model=CategoryOut, status_code=201,
-             dependencies=[Depends(require_roles("super_admin", "finance_manager"))])
+@router.post("/categories", response_model=CategoryOut, status_code=201)
 async def create_category(payload: CategoryCreate, db: Annotated[AsyncSession, Depends(get_db)]):
     c = FinanceCategory(**payload.model_dump())
     db.add(c)
@@ -84,8 +82,7 @@ async def create_category(payload: CategoryCreate, db: Annotated[AsyncSession, D
     return c
 
 
-@router.delete("/categories/{category_id}", status_code=204,
-               dependencies=[Depends(require_roles("super_admin", "finance_manager"))])
+@router.delete("/categories/{category_id}", status_code=204)
 async def delete_category(category_id: uuid.UUID, db: Annotated[AsyncSession, Depends(get_db)]):
     res = await db.execute(select(FinanceCategory).where(FinanceCategory.id == category_id))
     cat = res.scalar_one_or_none()
@@ -150,8 +147,7 @@ async def list_transactions(
     return Page[TransactionOut](items=items, total=total, page=page, page_size=page_size)
 
 
-@router.post("/transactions", response_model=TransactionOut, status_code=201,
-             dependencies=[Depends(require_roles("super_admin", "finance_manager"))])
+@router.post("/transactions", response_model=TransactionOut, status_code=201)
 async def create_transaction(payload: TransactionCreate, user: CurrentUser,
                              db: Annotated[AsyncSession, Depends(get_db)]):
     if payload.type not in ("income", "expense"):
@@ -168,8 +164,7 @@ async def create_transaction(payload: TransactionCreate, user: CurrentUser,
     return tx
 
 
-@router.delete("/transactions/{tx_id}", status_code=204,
-               dependencies=[Depends(require_roles("super_admin", "finance_manager"))])
+@router.delete("/transactions/{tx_id}", status_code=204)
 async def delete_transaction(tx_id: uuid.UUID, db: Annotated[AsyncSession, Depends(get_db)]):
     res = await db.execute(select(FinanceTransaction).where(FinanceTransaction.id == tx_id))
     tx = res.scalar_one_or_none()
@@ -188,8 +183,7 @@ async def finance_summary(db: Annotated[AsyncSession, Depends(get_db)], _: Curre
 
 
 # ---- Employee payments (avans / oylik) ----
-@router.post("/employee-payments", response_model=TransactionOut, status_code=201,
-             dependencies=[Depends(require_roles("super_admin", "finance_manager"))])
+@router.post("/employee-payments", response_model=TransactionOut, status_code=201)
 async def create_employee_payment(payload: EmployeePaymentIn, user: CurrentUser,
                                   db: Annotated[AsyncSession, Depends(get_db)]):
     """Moliyachi xodimga avans yoki oylik to'laydi.
@@ -285,8 +279,7 @@ async def latest_rate(db: Annotated[AsyncSession, Depends(get_db)], _: CurrentUs
     return rate
 
 
-@router.post("/exchange-rates", response_model=ExchangeRateOut, status_code=201,
-             dependencies=[Depends(require_roles("super_admin", "finance_manager"))])
+@router.post("/exchange-rates", response_model=ExchangeRateOut, status_code=201)
 async def set_rate(payload: ExchangeRateBase, db: Annotated[AsyncSession, Depends(get_db)]):
     # Upsert
     res = await db.execute(select(ExchangeRate).where(ExchangeRate.date == payload.date))

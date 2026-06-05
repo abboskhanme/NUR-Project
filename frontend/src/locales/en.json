@@ -56,5 +56,27 @@
     "rejected": "Rejected",
     "cancelled": "Cancelled",
     "all": "All statuses"
+  },
+  "perm": {
+    "title": "Permissions",
+    "fullAccess": "Full access to all modules",
+    "module": "Module",
+    "quick": "Quick select",
+    "none": "None",
+    "view": "View",
+    "full": "Full",
+    "hint": "If a module is unchecked, it is hidden from the menu and the API is closed.",
+    "superAdminNote": "super_admin always has full access.",
+    "verbs": {
+      "read": "View",
+      "write": "Edit",
+      "delete": "Delete",
+      "approve": "Approve",
+      "export": "Export"
+    },
+    "allEnabled": "All modules — full access",
+    "allEnabledLong": "All actions are enabled for every module.",
+    "activeCount": "{{count}} modules granted",
+    "fullAccessHint": "When enabled, the matrix below is ignored."
   }
 }

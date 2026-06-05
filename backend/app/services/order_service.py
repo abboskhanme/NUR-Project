@@ -11,7 +11,9 @@ from app.models.order import Order, OrderItem
 # Soddalashtirilgan holatlar: Navbatda → Tayyor bo'ldi → Yetkazildi; istalgan
 # faol holatdan Rad etildi.
 VALID_TRANSITIONS = {
-    "new": {"ready", "rejected"},
+    # To'liq to'langan buyurtma "Tayyor" bosqichini chetlab to'g'ridan-to'g'ri
+    # yetkazilishi ham mumkin (new -> delivered).
+    "new": {"ready", "delivered", "rejected"},
     "ready": {"delivered", "rejected"},
     "delivered": set(),
     "rejected": set(),

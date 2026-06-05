@@ -14,10 +14,12 @@ class OrderItemIn(BaseModel):
     product_id: uuid.UUID
     serial_id: Optional[str] = None
     bunker_direction: Optional[str] = None
-    quantity: int = 1
-    unit_price_usd: Decimal = Decimal(0)
-    unit_price_uzs: Decimal = Decimal(0)
-    discount: Decimal = Decimal(0)
+    quantity: int = Field(default=1, ge=1)
+    unit_price_usd: Decimal = Field(default=Decimal(0), ge=0)
+    unit_price_uzs: Decimal = Field(default=Decimal(0), ge=0)
+    # Chegirma manfiy bo'lishi mumkin emas; yuqori chegara route'da tekshiriladi
+    # (narx * soni dan oshmasligi kerak)
+    discount: Decimal = Field(default=Decimal(0), ge=0)
 
 
 class ProductMini(ORMBase):

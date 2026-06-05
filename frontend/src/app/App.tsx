@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { api } from '@/api/client';
 import { useAuthStore } from '@/stores/auth';
+import { usePermissions } from '@/lib/permissions';
 
 import LoginPage from '@/pages/LoginPage';
 import AppLayout from '@/components/layout/AppLayout';
@@ -24,6 +25,13 @@ import UsersPage from '@/pages/UsersPage';
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const token = useAuthStore((s) => s.accessToken);
   if (!token) return <Navigate to="/login" replace />;
+  return <>{children}</>;
+}
+
+/** Modulga ruxsati yo'q foydalanuvchini bosh sahifaga qaytaradi. */
+function RequireModule({ module, children }: { module: string; children: React.ReactNode }) {
+  const { canModule } = usePermissions();
+  if (!canModule(module)) return <Navigate to="/" replace />;
   return <>{children}</>;
 }
 
@@ -57,20 +65,20 @@ export default function App() {
         }
       >
         <Route index element={<DashboardPage />} />
-        <Route path="orders" element={<OrdersPage />} />
-        <Route path="orders/:orderId" element={<OrderDetailPage />} />
-        <Route path="queue" element={<QueuePage />} />
-        <Route path="customers" element={<CustomersPage />} />
-        <Route path="customers/:customerId" element={<CustomerDetailPage />} />
-        <Route path="products" element={<ProductsPage />} />
-        <Route path="service" element={<ServicePage />} />
-        <Route path="finance" element={<FinancePage />} />
-        <Route path="hr" element={<HRPage />} />
-        <Route path="hr/:employeeId" element={<EmployeeDetailPage />} />
-        <Route path="supply" element={<SupplyPage />} />
-        <Route path="reports" element={<ReportsPage />} />
+        <Route path="orders" element={<RequireModule module="orders"><OrdersPage /></RequireModule>} />
+        <Route path="orders/:orderId" element={<RequireModule module="orders"><OrderDetailPage /></RequireModule>} />
+        <Route path="queue" element={<RequireModule module="orders"><QueuePage /></RequireModule>} />
+        <Route path="customers" element={<RequireModule module="customers"><CustomersPage /></RequireModule>} />
+        <Route path="customers/:customerId" element={<RequireModule module="customers"><CustomerDetailPage /></RequireModule>} />
+        <Route path="products" element={<RequireModule module="products"><ProductsPage /></RequireModule>} />
+        <Route path="service" element={<RequireModule module="service"><ServicePage /></RequireModule>} />
+        <Route path="finance" element={<RequireModule module="finance"><FinancePage /></RequireModule>} />
+        <Route path="hr" element={<RequireModule module="hr"><HRPage /></RequireModule>} />
+        <Route path="hr/:employeeId" element={<RequireModule module="hr"><EmployeeDetailPage /></RequireModule>} />
+        <Route path="supply" element={<RequireModule module="supply"><SupplyPage /></RequireModule>} />
+        <Route path="reports" element={<RequireModule module="reports"><ReportsPage /></RequireModule>} />
         <Route path="settings" element={<SettingsPage />} />
-        <Route path="users" element={<UsersPage />} />
+        <Route path="users" element={<RequireModule module="users"><UsersPage /></RequireModule>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

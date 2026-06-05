@@ -9,7 +9,7 @@ import { api } from '@/api/client';
 import Card from '@/components/ui/Card';
 import EmptyState from '@/components/ui/EmptyState';
 import ConfirmModal from '@/components/ui/ConfirmModal';
-import { useAuthStore } from '@/stores/auth';
+import { usePermissions } from '@/lib/permissions';
 
 import UserAvatar from '@/features/users/UserAvatar';
 import UserModal, { UserRow } from '@/features/users/UserModal';
@@ -25,8 +25,8 @@ interface Role {
 type Tab = 'users' | 'roles' | 'archive';
 
 export default function UsersPage() {
-  const me = useAuthStore((s) => s.user);
-  const isAdmin = !!me?.is_superadmin || (me?.roles ?? []).some((r) => r.name === 'super_admin');
+  const { user: me, canModule } = usePermissions();
+  const isAdmin = canModule('users');
   const qc = useQueryClient();
 
   const [tab, setTab] = useState<Tab>('users');
@@ -73,7 +73,7 @@ export default function UsersPage() {
   if (!isAdmin) {
     return (
       <div className="p-8">
-        <EmptyState title="Ruxsat yo'q" description="Bu sahifaga faqat super-adminlar kira oladi." />
+        <EmptyState title="Ruxsat yo'q" description="Bu sahifani ko'rish uchun ruxsatingiz yetarli emas." />
       </div>
     );
   }

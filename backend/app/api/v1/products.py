@@ -7,6 +7,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import CurrentUser
+from app.core.permissions import module_guard
 from app.db.session import get_db
 from app.models.order import OrderItem
 from app.models.product import Inventory, Product
@@ -16,7 +17,7 @@ from app.schemas.product import (
     ProductCreate, ProductOut, ProductUpdate,
 )
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(module_guard("products"))])
 
 
 # ---- Products ----

@@ -153,6 +153,15 @@ export default function OrderModal({
     if (items.length === 0) { toast.error('Kamida bitta mahsulot qo\'shing'); return; }
     if (items.some((it) => !it.product_id)) { toast.error('Mahsulotni tanlang'); return; }
     if (items.some((it) => isMainItem(it) && !it.bunker_direction)) { toast.error('Bunker tomonini tanlang'); return; }
+    // Chegirma mahsulot summasidan (narx * soni) oshmasligi kerak
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
+      const subtotal = num(it.unit_price_usd) * rateNum * (it.quantity || 1);
+      if (num(it.discount) > subtotal) {
+        toast.error(`Chegirma mahsulot summasidan oshib ketdi (${i + 1}-qator)`);
+        return;
+      }
+    }
 
     // Asosiy (kotyol) va qo'shimcha mahsulotlarni ajratamiz.
     // Qoida: 1 kotyol = 1 buyurtma; qo'shimcha mahsulotlar faqat birinchi buyurtmaga.
@@ -296,7 +305,8 @@ export default function OrderModal({
                            title="Dona narxi (USD) — mahsulotdan olinadi, faqat chegirma orqali o'zgartiriladi" />
                     <input type="text" inputMode="numeric" className="input col-span-2 text-right" placeholder="0"
                            value={fmtInt(it.discount)}
-                           onChange={(e) => updateRow(idx, { discount: onlyDigits(e.target.value) })} title="Chegirma (UZS)" />
+                           onChange={(e) => updateRow(idx, { discount: onlyDigits(e.target.value) })} title="Chegirma (UZS)"
+                           style={rowTotal(it) < 0 ? { borderColor: '#E74C3C', color: '#E74C3C' } : undefined} />
                     <button type="button" onClick={() => removeRow(idx)} className="col-span-1 p-1 rounded hover:bg-danger/10 text-danger justify-self-end">
                       <Trash2 size={15} />
                     </button>

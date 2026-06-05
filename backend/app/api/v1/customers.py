@@ -7,13 +7,14 @@ from sqlalchemy import or_, select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import CurrentUser
+from app.core.permissions import module_guard
 from app.db.session import get_db
 from app.models.customer import Customer
 from app.models.order import Order
 from app.schemas.common import Page
 from app.schemas.customer import CustomerCreate, CustomerOut, CustomerUpdate
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(module_guard("customers"))])
 
 
 @router.get("", response_model=Page[CustomerOut])

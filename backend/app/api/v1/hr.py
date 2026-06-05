@@ -9,7 +9,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import and_, select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import CurrentUser, require_roles
+from app.core.dependencies import CurrentUser
+from app.core.permissions import module_guard
 from app.db.session import get_db
 from app.models.hr import (
     Attendance, Department, Employee, PayrollItem, PayrollRun, Position,
@@ -27,7 +28,7 @@ from app.schemas.hr import (
     SalaryRateCreate, SalaryRateOut,
 )
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(module_guard("hr"))])
 
 
 async def _rate_on(db: AsyncSession, emp: Employee, on_date: date):
@@ -106,8 +107,7 @@ async def list_departments(db: Annotated[AsyncSession, Depends(get_db)], _: Curr
     return [DepartmentOut.model_validate(d) for d in res.scalars().all()]
 
 
-@router.post("/departments", response_model=DepartmentOut, status_code=201,
-             dependencies=[Depends(require_roles("super_admin", "hr_manager"))])
+@router.post("/departments", response_model=DepartmentOut, status_code=201)
 async def create_department(payload: DepartmentCreate, db: Annotated[AsyncSession, Depends(get_db)]):
     exists = await db.execute(select(Department).where(Department.name == payload.name))
     if exists.scalar_one_or_none():
@@ -119,8 +119,7 @@ async def create_department(payload: DepartmentCreate, db: Annotated[AsyncSessio
     return d
 
 
-@router.patch("/departments/{department_id}", response_model=DepartmentOut,
-              dependencies=[Depends(require_roles("super_admin", "hr_manager"))])
+@router.patch("/departments/{department_id}", response_model=DepartmentOut)
 async def update_department(department_id: uuid.UUID, payload: DepartmentUpdate,
                             db: Annotated[AsyncSession, Depends(get_db)]):
     res = await db.execute(select(Department).where(Department.id == department_id))
@@ -134,8 +133,7 @@ async def update_department(department_id: uuid.UUID, payload: DepartmentUpdate,
     return d
 
 
-@router.delete("/departments/{department_id}", status_code=204,
-               dependencies=[Depends(require_roles("super_admin", "hr_manager"))])
+@router.delete("/departments/{department_id}", status_code=204)
 async def delete_department(department_id: uuid.UUID, db: Annotated[AsyncSession, Depends(get_db)]):
     res = await db.execute(select(Department).where(Department.id == department_id))
     d = res.scalar_one_or_none()
@@ -152,8 +150,7 @@ async def list_positions(db: Annotated[AsyncSession, Depends(get_db)], _: Curren
     return [PositionOut.model_validate(p) for p in res.scalars().all()]
 
 
-@router.post("/positions", response_model=PositionOut, status_code=201,
-             dependencies=[Depends(require_roles("super_admin", "hr_manager"))])
+@router.post("/positions", response_model=PositionOut, status_code=201)
 async def create_position(payload: PositionCreate, db: Annotated[AsyncSession, Depends(get_db)]):
     exists = await db.execute(select(Position).where(Position.name == payload.name))
     if exists.scalar_one_or_none():
@@ -165,8 +162,7 @@ async def create_position(payload: PositionCreate, db: Annotated[AsyncSession, D
     return p
 
 
-@router.patch("/positions/{position_id}", response_model=PositionOut,
-              dependencies=[Depends(require_roles("super_admin", "hr_manager"))])
+@router.patch("/positions/{position_id}", response_model=PositionOut)
 async def update_position(position_id: uuid.UUID, payload: PositionUpdate,
                           db: Annotated[AsyncSession, Depends(get_db)]):
     res = await db.execute(select(Position).where(Position.id == position_id))
@@ -180,8 +176,7 @@ async def update_position(position_id: uuid.UUID, payload: PositionUpdate,
     return p
 
 
-@router.delete("/positions/{position_id}", status_code=204,
-               dependencies=[Depends(require_roles("super_admin", "hr_manager"))])
+@router.delete("/positions/{position_id}", status_code=204)
 async def delete_position(position_id: uuid.UUID, db: Annotated[AsyncSession, Depends(get_db)]):
     res = await db.execute(select(Position).where(Position.id == position_id))
     p = res.scalar_one_or_none()
@@ -217,8 +212,7 @@ async def list_employees(
     )
 
 
-@router.post("/employees", response_model=EmployeeOut, status_code=201,
-             dependencies=[Depends(require_roles("super_admin", "hr_manager"))])
+@router.post("/employees", response_model=EmployeeOut, status_code=201)
 async def create_employee(payload: EmployeeCreate, db: Annotated[AsyncSession, Depends(get_db)]):
     data = payload.model_dump()
     # Ish boshlagan sana ko'rsatilmasa — bugundan hisoblanadi
@@ -305,8 +299,7 @@ async def list_salary_rates(employee_id: uuid.UUID,
     return [SalaryRateOut.model_validate(r) for r in res.scalars().all()]
 
 
-@router.post("/employees/{employee_id}/salary-rates", response_model=SalaryRateOut, status_code=201,
-             dependencies=[Depends(require_roles("super_admin", "hr_manager"))])
+@router.post("/employees/{employee_id}/salary-rates", response_model=SalaryRateOut, status_code=201)
 async def add_salary_rate(employee_id: uuid.UUID, payload: SalaryRateCreate, user: CurrentUser,
                           db: Annotated[AsyncSession, Depends(get_db)]):
     emp_res = await db.execute(select(Employee).where(Employee.id == employee_id))
@@ -327,8 +320,7 @@ async def add_salary_rate(employee_id: uuid.UUID, payload: SalaryRateCreate, use
     return rate
 
 
-@router.patch("/employees/{employee_id}", response_model=EmployeeOut,
-              dependencies=[Depends(require_roles("super_admin", "hr_manager"))])
+@router.patch("/employees/{employee_id}", response_model=EmployeeOut)
 async def update_employee(employee_id: uuid.UUID, payload: EmployeeUpdate,
                           user: CurrentUser,
                           db: Annotated[AsyncSession, Depends(get_db)]):
@@ -377,8 +369,7 @@ async def list_attendance(
     return [AttendanceOut.model_validate(a) for a in res.scalars().all()]
 
 
-@router.post("/attendance/batch", response_model=list[AttendanceOut],
-             dependencies=[Depends(require_roles("super_admin", "hr_manager"))])
+@router.post("/attendance/batch", response_model=list[AttendanceOut])
 async def upsert_attendance_batch(payload: AttendanceBatchIn, user: CurrentUser,
                                   db: Annotated[AsyncSession, Depends(get_db)]):
     out = []
@@ -447,8 +438,7 @@ async def list_advances(
     return [SalaryAdvanceOut.model_validate(a) for a in res.scalars().all()]
 
 
-@router.post("/advances", response_model=SalaryAdvanceOut, status_code=201,
-             dependencies=[Depends(require_roles("super_admin", "hr_manager", "finance_manager"))])
+@router.post("/advances", response_model=SalaryAdvanceOut, status_code=201)
 async def create_advance(payload: SalaryAdvanceIn, user: CurrentUser,
                          db: Annotated[AsyncSession, Depends(get_db)]):
     adv = SalaryAdvance(created_by_id=user.id, **payload.model_dump())
@@ -459,8 +449,7 @@ async def create_advance(payload: SalaryAdvanceIn, user: CurrentUser,
 
 
 # ---- Payroll ----
-@router.post("/payroll/runs", response_model=PayrollRunOut, status_code=201,
-             dependencies=[Depends(require_roles("super_admin", "hr_manager"))])
+@router.post("/payroll/runs", response_model=PayrollRunOut, status_code=201)
 async def create_payroll_run(payload: PayrollRunIn, user: CurrentUser,
                              db: Annotated[AsyncSession, Depends(get_db)]):
     run = PayrollRun(created_by_id=user.id, **payload.model_dump())

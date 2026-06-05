@@ -56,5 +56,27 @@
     "rejected": "Rad etilgan",
     "cancelled": "Bekor qilingan",
     "all": "Barcha statuslar"
+  },
+  "perm": {
+    "title": "Ruxsatlar",
+    "fullAccess": "Barcha modullarga to'liq ruxsat",
+    "module": "Modul",
+    "quick": "Tezkor tanlov",
+    "none": "Yo'q",
+    "view": "Ko'rish",
+    "full": "To'liq",
+    "hint": "Modul belgilanmagan bo'lsa — u rol egasiga menyuda ko'rinmaydi va API yopiq bo'ladi.",
+    "superAdminNote": "super_admin har doim to'liq ruxsatga ega.",
+    "verbs": {
+      "read": "Ko'rish",
+      "write": "Tahrirlash",
+      "delete": "O'chirish",
+      "approve": "Tasdiqlash",
+      "export": "Eksport"
+    },
+    "allEnabled": "Barcha modullar — to'liq ruxsat",
+    "allEnabledLong": "Barcha modullar uchun barcha amallar yoqilgan.",
+    "activeCount": "{{count}} ta modulga ruxsat berilgan",
+    "fullAccessHint": "Yoqilsa, quyidagi matritsa inobatga olinmaydi."
   }
 }

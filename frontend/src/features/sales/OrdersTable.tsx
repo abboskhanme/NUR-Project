@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { usePermissions } from '@/lib/permissions';
 import toast from 'react-hot-toast';
 import { ExternalLink, Plus } from 'lucide-react';
 
 import { api } from '@/api/client';
-import { formatUZS, formatPhone } from '@/lib/format';
+import { formatUZS, formatPhone, formatDate } from '@/lib/format';
+import { CellDate, CellSelect } from '@/components/ui/TablePickers';
 
 export interface ProductOpt {
   id: string; product_type?: string; model?: string | null; name?: string | null;
@@ -23,6 +25,7 @@ export interface OrderFull {
   id: string; code: string; status: string; order_date: string; delivered_at?: string | null;
   queue_position?: number | null;
   exchange_rate: string;
+  inventory_id?: string | null;
   delivery_address?: string | null;
   customer?: { id: string; full_name: string; phone: string; region?: string | null; address?: string | null } | null;
   items: OrderItem[];
@@ -120,6 +123,7 @@ function Row({
   o: OrderFull; products: ProductOpt[]; onChanged: () => void; onPay: (id: string) => void;
 }) {
   const navigate = useNavigate();
+  const { can } = usePermissions();
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState(o.status);
   useEffect(() => setStatus(o.status), [o.status]);
@@ -128,6 +132,8 @@ function Row({
   const main: OrderItem | undefined = o.items[mainIdx];
   const isAdditionalMain = main?.product?.product_type === 'additional';
   const balance = num(o.balance_uzs);
+  // Yetkazilgan buyurtma to'liq qulflanadi — hech bir maydon tahrirlanmaydi
+  const locked = o.status === 'delivered';
 
   async function patchOrder(body: Record<string, unknown>) {
     setSaving(true);
@@ -178,14 +184,23 @@ function Row({
     }
   }
 
-  function onStatusChange(next: string) {
+  async function onStatusChange(next: string) {
     if (next === 'delivered' && balance > 0) {
       toast.error("Buyurtma to'liq to'lanmagan");
       setStatus(o.status);
       return;
     }
     setStatus(next);
-    patchOrder({ status: next });
+    setSaving(true);
+    try {
+      await api.patch(`/orders/${o.id}`, { status: next });
+      onChanged();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || 'Xatolik');
+      setStatus(o.status); // backend rad etdi — eski holatga qaytaramiz
+    } finally {
+      setSaving(false);
+    }
   }
 
   // onBlur: faqat o'zgargan bo'lsa saqlaymiz
@@ -194,11 +209,23 @@ function Row({
       const v = key === 'quantity'
         ? (parseInt(e.target.value, 10) || 1)
         : num(e.target.value.replace(/\s/g, '')); // probellarni olib tashlab raqamga aylantiramiz
-      if (v !== num(orig)) saveMain({ [key]: v });
+      if (v === num(orig)) return;
+      if (key === 'discount' && main) {
+        // Chegirma mahsulot summasidan (narx * soni) oshmasligi kerak
+        const subtotal = num(main.unit_price_uzs) * (main.quantity || 1);
+        if (v < 0 || v > subtotal) {
+          toast.error("Chegirma mahsulot summasidan oshib ketdi");
+          e.target.value = fmtInt(orig); // eski qiymatga qaytaramiz
+          return;
+        }
+      }
+      saveMain({ [key]: v });
     };
 
   const cell = 'px-2 py-1 align-middle whitespace-nowrap';
   const inp = 'w-full bg-transparent border border-transparent hover:border-black/10 focus:border-primary rounded px-1 py-0.5 outline-none';
+  // Qulflangan katak — input bilan bir xil ichki joylashuv (padding/border), shunda qatorlar tekis turadi
+  const ro = 'block px-1 py-0.5 border border-transparent truncate';
 
   return (
     <tr className={'border-b border-black/5 ' + (saving ? 'opacity-60' : '')}>
@@ -215,18 +242,26 @@ function Row({
       </td>
       {/* Sanalar */}
       <td className={cell}>
-        <input type="date" defaultValue={o.order_date} className={inp}
-               onChange={(e) => e.target.value && e.target.value !== o.order_date && patchOrder({ order_date: e.target.value })} />
+        {locked ? <span className={ro}>{formatDate(o.order_date)}</span> : (
+          <CellDate value={o.order_date} clearable={false} triggerClassName={inp}
+                    onChange={(iso) => iso && iso !== o.order_date && patchOrder({ order_date: iso })} />
+        )}
       </td>
       <td className={cell}>
-        <input type="date" defaultValue={o.delivered_at ?? ''} className={inp}
-               onChange={(e) => e.target.value !== (o.delivered_at ?? '') && patchOrder({ delivered_at: e.target.value || null })} />
+        {locked ? <span className={ro}>{o.delivered_at ? formatDate(o.delivered_at) : '—'}</span> : (
+          <CellDate value={o.delivered_at ?? ''} triggerClassName={inp}
+                    onChange={(iso) => iso !== (o.delivered_at ?? '') && patchOrder({ delivered_at: iso || null })} />
+        )}
       </td>
 
       {/* Mijoz */}
       <td className={cell}>
-        <input defaultValue={o.customer?.full_name ?? ''} className={inp}
-               onBlur={(e) => e.target.value !== (o.customer?.full_name ?? '') && patchCustomer({ full_name: e.target.value })} />
+        {locked ? (
+          <span className={ro} title={o.customer?.full_name ?? ''}>{o.customer?.full_name ?? '—'}</span>
+        ) : (
+          <input defaultValue={o.customer?.full_name ?? ''} className={inp}
+                 onBlur={(e) => e.target.value !== (o.customer?.full_name ?? '') && patchCustomer({ full_name: e.target.value })} />
+        )}
       </td>
       {/* Telefon — faqat ko'rish uchun, tahrirlanmaydi */}
       <td className={cell + ' text-ink-soft'} title="Telefon raqami (tahrirlanmaydi)">
@@ -238,6 +273,7 @@ function Row({
         {(() => {
           const hasDelivery = !!(o.delivery_address && o.delivery_address.trim());
           const shown = hasDelivery ? o.delivery_address! : (o.customer?.address ?? '');
+          if (locked) return <span className={ro} title={shown}>{shown || '—'}</span>;
           return (
             <input
               key={hasDelivery ? 'delivery' : 'customer'}
@@ -257,26 +293,45 @@ function Row({
 
       {/* Mahsulot */}
       <td className={cell}>
-        <select className={inp} value={main?.product_id ?? ''}
-                onChange={(e) => {
-                  const p = products.find((pp) => pp.id === e.target.value);
-                  saveMain({ product_id: e.target.value, bunker_direction: p?.product_type === 'additional' ? null : (main?.bunker_direction ?? null) });
-                }}>
-          {products.map((p) => (
-            <option key={p.id} value={p.id}>{p.display_name ?? p.model ?? p.name ?? '—'}</option>
-          ))}
-        </select>
+        {locked ? (
+          <span className={ro}
+                title={main?.product ? (main.product.display_name ?? main.product.model ?? main.product.name ?? '') : ''}>
+            {main?.product ? (main.product.display_name ?? main.product.model ?? main.product.name ?? '—') : '—'}
+          </span>
+        ) : (
+          <CellSelect
+            value={main?.product_id ?? ''}
+            triggerClassName={inp}
+            options={products.map((p) => ({ value: p.id, label: p.display_name ?? p.model ?? p.name ?? '—' }))}
+            onChange={(v) => {
+              const p = products.find((pp) => pp.id === v);
+              // Mahsulot almashganda narx YANGI mahsulotdan olinadi,
+              // eski serial tozalanadi va sklad rezervi bo'shatiladi
+              // (ular eski mahsulotga tegishli edi).
+              const items = itemsWith({
+                product_id: v,
+                unit_price_usd: num(p?.base_price_usd),
+                serial_id: null,
+                bunker_direction: p?.product_type === 'additional' ? null : (main?.bunker_direction ?? null),
+              });
+              patchOrder(o.inventory_id ? { items, inventory_id: null } : { items });
+            }}
+          />
+        )}
       </td>
       <td className={cell}>
         {isAdditionalMain ? (
           <span className="text-ink-soft">—</span>
+        ) : locked ? (
+          <span className={ro}>{main?.bunker_direction === 'right' ? "O'NG" : main?.bunker_direction === 'left' ? 'CHAP' : '—'}</span>
         ) : (
-          <select className={inp} value={main?.bunker_direction ?? ''}
-                  onChange={(e) => saveMain({ bunker_direction: e.target.value || null })}>
-            <option value="">—</option>
-            <option value="right">O'NG</option>
-            <option value="left">CHAP</option>
-          </select>
+          <CellSelect
+            value={main?.bunker_direction ?? ''}
+            triggerClassName={inp}
+            allowEmpty
+            options={[{ value: 'right', label: "O'NG" }, { value: 'left', label: 'CHAP' }]}
+            onChange={(v) => saveMain({ bunker_direction: v || null })}
+          />
         )}
       </td>
 
@@ -285,14 +340,18 @@ function Row({
         {num(main?.unit_price_usd)}
       </td>
       <td className={cell + ' text-right'}>
-        <input type="number" min={1} defaultValue={main?.quantity ?? 1}
-               className={inp + ' text-right'} onBlur={blurNum(main?.quantity ?? 1, 'quantity')} />
+        {locked ? <span className={ro}>{main?.quantity ?? 1}</span> : (
+          <input type="number" min={1} defaultValue={main?.quantity ?? 1}
+                 className={inp + ' text-right'} onBlur={blurNum(main?.quantity ?? 1, 'quantity')} />
+        )}
       </td>
       <td className={cell + ' text-right'}>
-        <input type="text" inputMode="numeric" defaultValue={fmtInt(main?.discount)} placeholder="0"
-               className={inp + ' text-right'}
-               onChange={(e) => { e.target.value = fmtInt(e.target.value); }}
-               onBlur={blurNum(main?.discount ?? 0, 'discount')} />
+        {locked ? <span className={ro}>{fmtInt(main?.discount) || '0'}</span> : (
+          <input type="text" inputMode="numeric" defaultValue={fmtInt(main?.discount)} placeholder="0"
+                 className={inp + ' text-right'}
+                 onChange={(e) => { e.target.value = fmtInt(e.target.value); }}
+                 onBlur={blurNum(main?.discount ?? 0, 'discount')} />
+        )}
       </td>
 
       {/* Hisob */}
@@ -300,8 +359,8 @@ function Row({
       <td className={cell + ' text-right text-success'}>
         <span className="inline-flex items-center gap-1 justify-end">
           {formatUZS(o.paid_uzs)}
-          {balance > 0 && (
-            <button onClick={() => onPay(o.id)} className="p-0.5 rounded hover:bg-primary/10 text-primary" title="To'lov qo'shish">
+          {balance > 0 && can('finance:write') && (
+            <button onClick={() => onPay(o.id)} className="p-0.5 rounded hover:bg-primary/10 text-primary" title="To'lov qo'shish (moliya)">
               <Plus size={13} />
             </button>
           )}
@@ -313,13 +372,22 @@ function Row({
 
       {/* Status */}
       <td className={cell}>
-        <select
-          value={status}
-          onChange={(e) => onStatusChange(e.target.value)}
-          className={'rounded-full px-2.5 py-1 text-xs font-medium border-0 outline-none cursor-pointer ' +
-            (STATUS_STYLES[status] ?? 'bg-gray-100 text-gray-700')}>
-          {STATUS_OPTIONS.map((st) => <option key={st.value} value={st.value}>{st.label}</option>)}
-        </select>
+        {locked ? (
+          <span className={'inline-block rounded-full px-2.5 py-1 text-xs font-medium ' +
+            (STATUS_STYLES[status] ?? 'bg-gray-100 text-gray-700')}
+                title="Yetkazilgan buyurtma o'zgartirilmaydi">
+            {STATUS_OPTIONS.find((st) => st.value === status)?.label ?? status}
+          </span>
+        ) : (
+          <CellSelect
+            value={status}
+            onChange={onStatusChange}
+            options={STATUS_OPTIONS}
+            triggerClassName={'rounded-full px-2.5 py-1 text-xs font-medium cursor-pointer ' +
+              (STATUS_STYLES[status] ?? 'bg-gray-100 text-gray-700')}
+            valueClassName="text-xs font-medium"
+          />
+        )}
       </td>
 
       <td className={cell}>

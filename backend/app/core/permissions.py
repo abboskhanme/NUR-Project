@@ -4,6 +4,7 @@ QO'SHIB BORISH:
   - Yangi modul: MODULES ro'yxatiga nom qo'shing (masalan 'warehouse').
   - Yangi verb: VERBS ro'yxatiga qo'shing (masalan 'export').
   - Endpoint'da: Depends(require_permission('warehouse:write'))
+  - Router darajasida: APIRouter(dependencies=[Depends(module_guard('warehouse'))])
   - Frontend'da: {can('warehouse:write') && <Button />}
   - Hech qanday migration yoki tarmoq o'zgartirish kerak emas.
 
@@ -20,7 +21,7 @@ from __future__ import annotations
 
 from typing import Iterable, Set
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 
 from app.core.dependencies import CurrentUser
 from app.models.user import User
@@ -139,6 +140,57 @@ def require_all_permissions(*perms: str):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Ushbu amal uchun barcha quyidagilar kerak: {', '.join(perms)}",
+        )
+    return _check
+
+
+# HTTP metod -> verb xaritasi
+_METHOD_VERB: dict[str, str] = {
+    "GET": "read",
+    "HEAD": "read",
+    "OPTIONS": "read",
+    "POST": "write",
+    "PUT": "write",
+    "PATCH": "write",
+    "DELETE": "delete",
+}
+
+
+def module_guard(module: str, read_exempt: tuple[str, ...] = (), exempt: tuple[str, ...] = ()):
+    """Router darajasidagi modul qo'riqchisi — HTTP metodga qarab verb tanlaydi.
+
+    GET/HEAD -> module:read (modul ichida istalgan ruxsat bo'lsa ham o'tadi)
+    POST/PATCH/PUT -> module:write
+    DELETE -> module:delete
+
+    `read_exempt` — GET so'rovlarda tekshiruvsiz o'tadigan path bo'laklari
+    (masalan, valyuta kursini hamma o'qiy olishi uchun "/exchange-rates").
+
+    Misol:
+        router = APIRouter(dependencies=[Depends(module_guard("orders"))])
+    """
+    async def _check(request: Request, user: CurrentUser) -> User:
+        path = request.url.path
+        # To'liq istisno — bu path'lar o'z route-darajasidagi tekshiruviga ega
+        # (masalan, buyurtma to'lovlari finance ruxsati bilan boshqariladi)
+        if any(part in path for part in exempt):
+            return user
+
+        verb = _METHOD_VERB.get(request.method, "write")
+
+        if verb == "read":
+            if any(part in path for part in read_exempt):
+                return user
+            # Modulda istalgan ruxsati bor foydalanuvchi ro'yxatlarni ko'ra oladi
+            if any(has_permission(user, f"{module}:{v}") for v in VERBS):
+                return user
+        else:
+            if has_permission(user, f"{module}:{verb}"):
+                return user
+
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Ushbu bo'lim uchun ruxsat yo'q ({module}:{verb})",
         )
     return _check
 

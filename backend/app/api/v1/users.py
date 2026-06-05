@@ -8,7 +8,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import CurrentUser, require_roles
-from app.core.permissions import require_permission  # Yangi permission tizimi
+from app.core.permissions import has_permission, require_permission  # Yangi permission tizimi
 from app.core.security import hash_password, normalize_phone, phone_digits
 from app.db.session import get_db
 from app.models.hr import Employee, Position
@@ -38,6 +38,12 @@ def _ensure_superadmin(user: User) -> None:
     if any(r.name == "super_admin" for r in (user.roles or [])):
         return
     raise HTTPException(status_code=403, detail="Faqat super-admin uchun")
+
+
+def _ensure_users_perm(user: User, verb: str) -> None:
+    """users moduli bo'yicha permission tekshiruvi (super-admin avtomatik o'tadi)."""
+    if not has_permission(user, f"users:{verb}"):
+        raise HTTPException(status_code=403, detail=f"Ruxsat yo'q (users:{verb})")
 
 
 async def _find_or_create_position(db: AsyncSession, name: str | None) -> uuid.UUID | None:
@@ -129,6 +135,7 @@ async def list_users(
     q: str | None = Query(None, description="Telefon yoki ism bo'yicha qidiruv"),
     is_active: bool | None = Query(None, description="Aktivlar (true) yoki arxiv (false)"),
 ):
+    _ensure_users_perm(current, "read")
     stmt = select(User)
     count_stmt = select(func.count(User.id))
     if q:
@@ -161,7 +168,10 @@ async def create_user(
     db: Annotated[AsyncSession, Depends(get_db)],
     current: CurrentUser,
 ):
-    _ensure_superadmin(current)
+    _ensure_users_perm(current, "write")
+    # super_admin rolini faqat super-adminning o'zi bera oladi (privilege escalation'dan himoya)
+    if payload.role_names and "super_admin" in payload.role_names:
+        _ensure_superadmin(current)
     new_phone = normalize_phone(payload.phone)
     if not new_phone:
         raise HTTPException(status_code=422, detail="Telefon raqam noto'g'ri")
@@ -199,7 +209,12 @@ async def update_user(
     db: Annotated[AsyncSession, Depends(get_db)],
     current: CurrentUser,
 ):
-    _ensure_superadmin(current)
+    _ensure_users_perm(current, "write")
+    # super_admin huquqini berish/olish faqat super-admin uchun
+    if getattr(payload, "is_superadmin", None) is not None or (
+        payload.role_names is not None and "super_admin" in payload.role_names
+    ):
+        _ensure_superadmin(current)
     res = await db.execute(select(User).where(User.id == user_id))
     user = res.scalar_one_or_none()
     if not user:
@@ -249,7 +264,7 @@ async def delete_user(
     current: CurrentUser,
 ):
     """Soft delete — foydalanuvchi arxivga ko'chadi (is_active=False)."""
-    _ensure_superadmin(current)
+    _ensure_users_perm(current, "delete")
     if str(current.id) == str(user_id):
         raise HTTPException(400, "O'zingizni arxivga ko'chira olmaysiz")
     res = await db.execute(select(User).where(User.id == user_id))
@@ -270,7 +285,7 @@ async def restore_user(
     current: CurrentUser,
 ):
     """Arxivdan tiklash — is_active=True."""
-    _ensure_superadmin(current)
+    _ensure_users_perm(current, "write")
     res = await db.execute(select(User).where(User.id == user_id))
     user = res.scalar_one_or_none()
     if not user:

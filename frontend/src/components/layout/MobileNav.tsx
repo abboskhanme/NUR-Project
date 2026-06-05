@@ -2,16 +2,18 @@ import { NavLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ShoppingCart, ListOrdered, Wrench, Wallet, UserSquare2 } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { usePermissions } from '@/lib/permissions';
 
 export default function MobileNav() {
   const { t } = useTranslation();
+  const { canModule } = usePermissions();
   const items = [
-    { to: '/orders', label: t('nav.sales'), icon: ShoppingCart },
-    { to: '/queue', label: t('nav.queue'), icon: ListOrdered },
-    { to: '/service', label: t('nav.service'), icon: Wrench },
-    { to: '/finance', label: t('nav.finance'), icon: Wallet },
-    { to: '/hr', label: t('nav.hr'), icon: UserSquare2 },
-  ];
+    { to: '/orders', label: t('nav.sales'), icon: ShoppingCart, module: 'orders' },
+    { to: '/queue', label: t('nav.queue'), icon: ListOrdered, module: 'orders' },
+    { to: '/service', label: t('nav.service'), icon: Wrench, module: 'service' },
+    { to: '/finance', label: t('nav.finance'), icon: Wallet, module: 'finance' },
+    { to: '/hr', label: t('nav.hr'), icon: UserSquare2, module: 'hr' },
+  ].filter((it) => canModule(it.module));
 
   return (
     <nav className="md:hidden fixed bottom-0 inset-x-0 z-20 bg-card border-t border-black/5 h-16 flex items-center justify-around">

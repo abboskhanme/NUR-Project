@@ -26,6 +26,7 @@ from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import CurrentUser
+from app.core.permissions import module_guard
 from app.db.session import get_db
 from app.models.customer import Customer
 from app.models.finance import FinanceCategory, FinanceTransaction
@@ -35,7 +36,7 @@ from app.models.service import ServiceTicket
 from app.models.supply import GoodsReceipt, Item, Vendor
 from app.models.user import User
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(module_guard("reports"))])
 
 
 # --------------------------------------------------------------------------- #

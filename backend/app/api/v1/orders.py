@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.dependencies import CurrentUser
+from app.core.permissions import module_guard, require_permission
 from app.db.session import get_db
 from app.models.customer import Customer
 from app.models.finance import Account, FinanceCategory, FinanceTransaction
@@ -23,7 +24,7 @@ from app.schemas.order import (
 from app.services.finance_service import apply_transaction
 from app.services.order_service import generate_order_code, is_valid_transition
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(module_guard("orders", exempt=("/payments",)))])
 
 # Navbatdagi (hali yopilmagan) buyurtma statuslari
 ACTIVE_QUEUE_STATUSES = ("new", "ready")
@@ -42,6 +43,20 @@ def _own_only(current) -> bool:
 
 def _item_total(it) -> Decimal:
     return (it.unit_price_uzs or Decimal(0)) * (it.quantity or 1) - (it.discount or Decimal(0))
+
+
+def _check_discount(price_uzs: Decimal, qty: int, discount: Decimal, idx: int = 0) -> None:
+    """Chegirma mahsulot summasidan (narx * soni) oshmasligi kerak."""
+    discount = discount or Decimal(0)
+    if discount < 0:
+        raise HTTPException(422, "Chegirma manfiy bo'lishi mumkin emas")
+    subtotal = (price_uzs or Decimal(0)) * (qty or 1)
+    if discount > subtotal:
+        raise HTTPException(
+            422,
+            f"Chegirma mahsulot summasidan oshib ketdi ({idx + 1}-qator): "
+            f"chegirma {discount:,.0f} so'm, mahsulot summasi {subtotal:,.0f} so'm",
+        )
 
 
 async def _set_inventory_status(db: AsyncSession, inventory_id: Optional[uuid.UUID], status: str):
@@ -254,6 +269,9 @@ async def create_order(payload: OrderCreate, user: CurrentUser,
     code = await generate_order_code(db)
     order = Order(code=code, salesperson_id=user.id, status="new",
                   **payload.model_dump(exclude={"items"}))
+    for _i, _it in enumerate(payload.items):
+        _check_discount(_it.unit_price_uzs, _it.quantity, _it.discount, _i)
+
     for it in payload.items:
         order.items.append(OrderItem(
             product_id=it.product_id, serial_id=it.serial_id,
@@ -288,6 +306,13 @@ async def update_order(order_id: uuid.UUID, payload: OrderUpdate, _: CurrentUser
 
     data = payload.model_dump(exclude_unset=True)
     new_items = data.pop("items", None)
+    # Status o'zgarishi maxsus ishlanadi (delivered_at, inventar, tranzitsiya)
+    new_status = data.pop("status", None)
+
+    # Yetkazilgan buyurtmani o'zgartirib bo'lmaydi — summalar va inventar
+    # allaqachon yakunlangan. (Rad etilganlar hozircha ochiq qoladi.)
+    if o.status in ("delivered", "cancelled"):
+        raise HTTPException(400, "Yetkazilgan buyurtmani o'zgartirib bo'lmaydi")
 
     if "inventory_id" in data and data["inventory_id"] != o.inventory_id:
         if o.inventory_id:
@@ -299,6 +324,12 @@ async def update_order(order_id: uuid.UUID, payload: OrderUpdate, _: CurrentUser
         setattr(o, k, v)
 
     if new_items is not None:
+        for _i, _it in enumerate(new_items):
+            _check_discount(
+                _it.get("unit_price_uzs") or Decimal(0),
+                _it.get("quantity", 1) or 1,
+                _it.get("discount") or Decimal(0), _i,
+            )
         o.items.clear()
         for it in new_items:
             qty = it.get("quantity", 1) or 1
@@ -310,6 +341,22 @@ async def update_order(order_id: uuid.UUID, payload: OrderUpdate, _: CurrentUser
                 unit_price_uzs=it.get("unit_price_uzs") or Decimal(0),
                 discount=it.get("discount") or Decimal(0), total_uzs=total_uzs,
             ))
+
+    # Status o'zgarishi — /status endpointi bilan bir xil qoidalar:
+    # tranzitsiya tekshiruvi, to'liq to'lov sharti, delivered_at avtomatik yoziladi
+    if new_status and new_status != o.status:
+        if not is_valid_transition(o.status, new_status):
+            raise HTTPException(400, f"O'tish ruxsat etilmaydi: {o.status} -> {new_status}")
+        if new_status == "delivered" and o.balance_uzs > 0:
+            raise HTTPException(400, "Buyurtma to'liq to'lanmagan — avval qoldiq to'lovni yoping")
+        o.status = new_status
+        if new_status == "delivered":
+            # Yetkazilgan sana avtomatik — bugungi kun (agar oldindan berilmagan bo'lsa)
+            if not o.delivered_at:
+                o.delivered_at = date.today()
+            await _set_inventory_status(db, o.inventory_id, "sold")
+        if new_status == "rejected":
+            await _set_inventory_status(db, o.inventory_id, "available")
 
     await db.commit()
     res = await db.execute(_order_query().where(Order.id == order_id))
@@ -341,7 +388,8 @@ async def change_status(order_id: uuid.UUID, payload: OrderStatusChange,
     return res.scalar_one()
 
 
-@router.post("/{order_id}/payments", response_model=PaymentOut, status_code=201)
+@router.post("/{order_id}/payments", response_model=PaymentOut, status_code=201,
+             dependencies=[Depends(require_permission("finance:write"))])
 async def add_payment(order_id: uuid.UUID, payload: PaymentIn, user: CurrentUser,
                       db: Annotated[AsyncSession, Depends(get_db)]):
     res = await db.execute(select(Order).where(Order.id == order_id))
@@ -404,7 +452,8 @@ async def add_payment(order_id: uuid.UUID, payload: PaymentIn, user: CurrentUser
     return p
 
 
-@router.get("/{order_id}/payments", response_model=list[PaymentOut])
+@router.get("/{order_id}/payments", response_model=list[PaymentOut],
+            dependencies=[Depends(require_permission("orders:read", "finance:read"))])
 async def list_payments(order_id: uuid.UUID, _: CurrentUser,
                         db: Annotated[AsyncSession, Depends(get_db)]):
     res = await db.execute(select(Payment).where(Payment.order_id == order_id)
@@ -412,7 +461,8 @@ async def list_payments(order_id: uuid.UUID, _: CurrentUser,
     return [PaymentOut.model_validate(p) for p in res.scalars().all()]
 
 
-@router.delete("/{order_id}/payments/{payment_id}", status_code=204)
+@router.delete("/{order_id}/payments/{payment_id}", status_code=204,
+               dependencies=[Depends(require_permission("finance:delete"))])
 async def delete_payment(order_id: uuid.UUID, payment_id: uuid.UUID, _: CurrentUser,
                          db: Annotated[AsyncSession, Depends(get_db)]):
     res = await db.execute(select(Payment).where(
@@ -420,6 +470,11 @@ async def delete_payment(order_id: uuid.UUID, payment_id: uuid.UUID, _: CurrentU
     p = res.scalar_one_or_none()
     if not p:
         raise HTTPException(404, "To'lov topilmadi")
+
+    # Yetkazilgan buyurtmaning to'lovini o'chirib bo'lmaydi
+    o = (await db.execute(select(Order).where(Order.id == order_id))).scalar_one_or_none()
+    if o and o.status == "delivered":
+        raise HTTPException(400, "Yetkazilgan buyurtma to'lovini o'chirib bo'lmaydi")
 
     # Moliyadagi mos kirim tranzaksiyasini ham qaytaramiz (balans tiklanadi)
     tx = (await db.execute(select(FinanceTransaction).where(
@@ -435,3 +490,4 @@ async def delete_payment(order_id: uuid.UUID, payment_id: uuid.UUID, _: CurrentU
 
     await db.delete(p)
     await db.commit()
+

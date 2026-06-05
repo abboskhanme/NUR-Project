@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 
 import { api } from '@/api/client';
+import { usePermissions } from '@/lib/permissions';
 import Card from '@/components/ui/Card';
 import StatusBadge from '@/components/ui/StatusBadge';
 import ConfirmModal from '@/components/ui/ConfirmModal';
@@ -41,6 +42,7 @@ interface OrderDetail {
 const NEXT_STATUS: Record<string, Array<{ value: string; label: string; danger?: boolean }>> = {
   new: [
     { value: 'ready', label: 'Tayyor bo\'ldi' },
+    { value: 'delivered', label: 'Yetkazildi' },
     { value: 'rejected', label: 'Rad etish', danger: true },
   ],
   ready: [
@@ -57,6 +59,7 @@ export default function OrderDetailPage() {
   const { orderId } = useParams<{ orderId: string }>();
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const { can } = usePermissions();
   const [editing, setEditing] = useState(false);
   const [addingPayment, setAddingPayment] = useState(false);
   const [confirm, setConfirm] = useState<{
@@ -128,6 +131,8 @@ export default function OrderDetailPage() {
 
   const nexts = NEXT_STATUS[o.status] ?? [];
   const balance = parseFloat(o.balance_uzs || '0');
+  // Yetkazilgan buyurtma to'liq qulflanadi — tahrirlash va to'lov amallari yo'q
+  const locked = o.status === 'delivered';
 
   const w = computeWarranty(o.delivered_at);
   const wm = WARRANTY_META[w.status];
@@ -160,7 +165,9 @@ export default function OrderDetailPage() {
               </span>
             </div>
           </div>
-          <button onClick={() => setEditing(true)} className="btn-ghost"><Pencil size={15} /> Tahrirlash</button>
+          {!locked && (
+            <button onClick={() => setEditing(true)} className="btn-ghost"><Pencil size={15} /> Tahrirlash</button>
+          )}
         </div>
 
         {/* Status workflow */}
@@ -271,9 +278,11 @@ export default function OrderDetailPage() {
 
       {/* Payments */}
       <Card title="To'lovlar" action={
-        balance > 0
-          ? <button onClick={() => setAddingPayment(true)} className="btn-primary text-sm py-1.5"><Plus size={15} /> To'lov</button>
-          : <span className="text-xs text-success font-medium">To'liq to'langan</span>
+        balance <= 0
+          ? <span className="text-xs text-success font-medium">To'liq to'langan</span>
+          : can('finance:write')
+            ? <button onClick={() => setAddingPayment(true)} className="btn-primary text-sm py-1.5"><Plus size={15} /> To'lov</button>
+            : <span className="text-xs text-ink-soft">To'lovni moliya bo'limi kiritadi</span>
       }>
         {o.payments.length === 0 ? (
           <div className="text-sm text-ink-soft">To'lovlar yo'q</div>
@@ -298,9 +307,11 @@ export default function OrderDetailPage() {
                   <td className="py-2 pr-3">{p.method ? (METHOD_LABEL[p.method] ?? p.method) : '—'}</td>
                   <td className="py-2 pr-3 text-ink-soft">{p.note || '—'}</td>
                   <td className="py-2 pr-3 text-right">
-                    <button onClick={() => askDeletePayment(p.id)} className="p-1 rounded hover:bg-danger/10 text-danger">
-                      <Trash2 size={14} />
-                    </button>
+                    {!locked && can('finance:delete') && (
+                      <button onClick={() => askDeletePayment(p.id)} className="p-1 rounded hover:bg-danger/10 text-danger">
+                        <Trash2 size={14} />
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}

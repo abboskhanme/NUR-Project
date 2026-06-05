@@ -67,6 +67,14 @@ export function hasPermission(
   return false;
 }
 
+/** Modulda kamida bitta ruxsat bormi (sidebar/sahifa ko'rinishi uchun). */
+export function hasModuleAccess(
+  user: { is_superadmin?: boolean; roles?: { name: string; permissions?: any }[] } | null,
+  module: string,
+): boolean {
+  return VERBS.some((v) => hasPermission(user, `${module}:${v}`));
+}
+
 /** React hook — auth store'dan user oladi va helper'lar qaytaradi. */
 export function usePermissions() {
   const user = useAuthStore((s) => s.user);
@@ -86,6 +94,8 @@ export function usePermissions() {
       canAny: (...perms: string[]) => perms.some((p) => hasPermission(user, p)),
       /** Barchasi majburiy */
       canAll: (...perms: string[]) => perms.every((p) => hasPermission(user, p)),
+      /** Modulga umuman kirish bormi (kamida bitta verb) */
+      canModule: (module: string) => hasModuleAccess(user, module),
     };
   }, [user]);
 }

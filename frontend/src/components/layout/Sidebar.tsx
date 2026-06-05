@@ -7,32 +7,30 @@ import {
 } from 'lucide-react';
 
 import { useUIStore } from '@/stores/ui';
-import { useAuthStore } from '@/stores/auth';
+import { usePermissions } from '@/lib/permissions';
 import { cn } from '@/lib/cn';
 
 export default function Sidebar() {
   const { t } = useTranslation();
   const collapsed = useUIStore((s) => s.sidebarCollapsed);
   const toggle = useUIStore((s) => s.toggleSidebar);
-  const user = useAuthStore((s) => s.user);
-  const isAdmin = !!user?.is_superadmin || (user?.roles ?? []).some((r) => r.name === 'super_admin');
+  const { canModule } = usePermissions();
 
+  // module: ruxsat tekshiriladigan modul (yo'q bo'lsa — hammaga ko'rinadi)
   const items = [
     { to: '/', label: t('nav.dashboard'), icon: LayoutDashboard, exact: true },
-    { to: '/orders', label: t('nav.sales'), icon: ShoppingCart },
-    { to: '/queue', label: t('nav.queue', { defaultValue: 'Navbat' }), icon: ListOrdered },
-    { to: '/customers', label: t('nav.customers'), icon: Users },
-    { to: '/products', label: t('nav.products'), icon: Package },
-    { to: '/service', label: t('nav.service'), icon: Wrench },
-    { to: '/finance', label: t('nav.finance'), icon: Wallet },
-    { to: '/hr', label: t('nav.hr'), icon: UserSquare2 },
-    { to: '/supply', label: t('nav.supply'), icon: Truck },
-    { to: '/reports', label: t('nav.reports'), icon: BarChart3 },
-    ...(isAdmin
-      ? [{ to: '/users', label: t('nav.users', { defaultValue: 'Foydalanuvchilar' }), icon: ShieldCheck }]
-      : []),
+    { to: '/orders', label: t('nav.sales'), icon: ShoppingCart, module: 'orders' },
+    { to: '/queue', label: t('nav.queue', { defaultValue: 'Navbat' }), icon: ListOrdered, module: 'orders' },
+    { to: '/customers', label: t('nav.customers'), icon: Users, module: 'customers' },
+    { to: '/products', label: t('nav.products'), icon: Package, module: 'products' },
+    { to: '/service', label: t('nav.service'), icon: Wrench, module: 'service' },
+    { to: '/finance', label: t('nav.finance'), icon: Wallet, module: 'finance' },
+    { to: '/hr', label: t('nav.hr'), icon: UserSquare2, module: 'hr' },
+    { to: '/supply', label: t('nav.supply'), icon: Truck, module: 'supply' },
+    { to: '/reports', label: t('nav.reports'), icon: BarChart3, module: 'reports' },
+    { to: '/users', label: t('nav.users', { defaultValue: 'Foydalanuvchilar' }), icon: ShieldCheck, module: 'users' },
     { to: '/settings', label: t('nav.settings'), icon: Settings },
-  ];
+  ].filter((it) => !it.module || canModule(it.module));
 
   return (
     <aside className="h-screen sticky top-0 bg-card border-r border-black/5 flex flex-col">

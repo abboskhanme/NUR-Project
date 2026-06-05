@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.dependencies import CurrentUser
+from app.core.permissions import module_guard
 from app.db.session import get_db
 from app.models.order import Order, OrderItem
 from app.models.service import ServiceCategory, ServiceTicket, ServiceVisit
@@ -19,7 +20,7 @@ from app.schemas.service import (
 )
 from app.services.warranty_service import calculate_warranty
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(module_guard("service"))])
 
 
 def _gen_code(year: int, n: int) -> str:

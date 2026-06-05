@@ -13,7 +13,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import CurrentUser
-from app.core.permissions import require_permission
+from app.core.permissions import module_guard, require_permission
 from app.db.session import get_db
 from app.models.supply import (
     GoodsReceipt, Item, StockMovement, Vendor, VendorPayment,
@@ -30,7 +30,7 @@ from app.schemas.supply import (
     VendorPaymentIn, VendorPaymentOut,
 )
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(module_guard("supply"))])
 
 ZERO = Decimal(0)
 
