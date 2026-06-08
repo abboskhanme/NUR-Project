@@ -147,4 +147,4 @@ Production uchun alohida `docker-compose.prod.yml` kerak bo'ladi:
 - SSL (Let's Encrypt)
 - Secrets `.env` faylda emas, balki Docker secrets'da
 
-Bu fayl keyinroq qo'shiladi (deploy bosqich
+Bu fayl keyinroq qo'shiladi (deploy bosqichida).

@@ -83,4 +83,7 @@ services:
       - frontend
 
 volumes:
-  postgres_data:       # baza shu volume'da saqlanadi
+  postgres_data:       # baza shu volume'da saqlanadi — `down` da ham yo'qolmaydi
+  backend_uploads:
+  caddy_data:
+  caddy_config:
