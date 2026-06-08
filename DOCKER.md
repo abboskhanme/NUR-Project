@@ -91,7 +91,7 @@ docker compose exec backend bash
 ```
 
 Ichida:
-- `python -m scripts.seed` — qayta seed
+- `alembic upgrade head` — sxema migratsiyasi
 - `alembic revision --autogenerate -m "msg"` — yangi migratsiya
 
 ### Yangi npm package qo'shish
@@ -147,4 +147,4 @@ Production uchun alohida `docker-compose.prod.yml` kerak bo'ladi:
 - SSL (Let's Encrypt)
 - Secrets `.env` faylda emas, balki Docker secrets'da
 
-Bu fayl keyinroq qo'shiladi (deploy bosqichida).
+Bu fayl keyinroq qo'shiladi (deploy bosqich

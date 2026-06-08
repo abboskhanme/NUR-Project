@@ -46,11 +46,11 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    # Tablalarni yaratadi + super-admin seed qiladi, so'ng uvicorn (reload'siz)
+    # Seed olib tashlangan — baza tayyor, har startda hech narsa qo'shilmaydi.
+    # Faqat uvicorn ishga tushadi (reload'siz). Sxema o'zgarsa, ustunni qo'lda
+    # psql/ALTER bilan qo'llang (yoki alembic migratsiyasini ishlating).
     command: >
       sh -c "
-        echo '[init] Seeding DB...' &&
-        python -m scripts.seed &&
         echo '[init] Starting uvicorn (prod)...' &&
         uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
       "
@@ -83,7 +83,4 @@ services:
       - frontend
 
 volumes:
-  postgres_data:       # baza shu volume'da saqlanadi — `down` da ham yo'qolmaydi
-  backend_uploads:
-  caddy_data:
-  caddy_config:
+  postgres_data:       # baza shu volume'da saqlanadi
