@@ -20,7 +20,7 @@ interface ProductMini {
 interface OrderItem {
   id: string; product_id: string; product?: ProductMini | null;
   bunker_direction?: string | null; quantity: number;
-  unit_price_usd: string; unit_price_uzs: string; discount: string; serial_id?: string | null;
+  unit_price_usd: string; unit_price_uzs: string; discount_usd: string; discount: string; serial_id?: string | null;
 }
 export interface OrderFull {
   id: string; code: string; status: string; order_date: string; delivered_at?: string | null;
@@ -52,12 +52,9 @@ const STATUS_STYLES: Record<string, string> = {
 const num = (s: string | number | null | undefined) => {
   const n = parseFloat(String(s ?? '')); return Number.isNaN(n) ? 0 : n;
 };
-const onlyDigits = (s: string | number | null | undefined) =>
-  String(s ?? '').replace(/\D/g, '').replace(/^0+/, '');
-const fmtInt = (s: string | number | null | undefined) => {
-  const d = onlyDigits(s);
-  return d ? d.replace(/\B(?=(\d{3})+(?!\d))/g, ' ') : '';
-};
+// Dollar summasi uchun — raqam va bitta o'nlik nuqta
+const decStr = (s: string | number | null | undefined) =>
+  String(s ?? '').replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1');
 
 export default function OrdersTable({
   orders, products, onChanged, onPay,
@@ -160,7 +157,7 @@ function Row({
         quantity: it.quantity,
         unit_price_usd: num(it.unit_price_usd),
         unit_price_uzs: num(it.unit_price_uzs),
-        discount: num(it.discount),
+        discount_usd: num(it.discount_usd),
       };
       if (i !== mainIdx) return base;
       const merged: any = { ...base, ...overrides };
@@ -212,12 +209,15 @@ function Row({
         : num(e.target.value.replace(/\s/g, ''));
       if (v === num(orig)) return;
       if (key === 'discount' && main) {
-        const subtotal = num(main.unit_price_uzs) * (main.quantity || 1);
-        if (v < 0 || v > subtotal) {
+        // chegirma dollarda — narx ($) × soni dan oshmasligi kerak
+        const subtotalUsd = num(main.unit_price_usd) * (main.quantity || 1);
+        if (v < 0 || v > subtotalUsd) {
           toast.error(t('sales.discountExceedsRow'));
-          e.target.value = fmtInt(orig);
+          e.target.value = String(num(orig));
           return;
         }
+        saveMain({ discount_usd: v });
+        return;
       }
       saveMain({ [key]: v });
     };
@@ -350,11 +350,11 @@ function Row({
         )}
       </td>
       <td className={cell + ' text-right'}>
-        {locked ? <span className={ro}>{fmtInt(main?.discount) || '0'}</span> : (
-          <input type="text" inputMode="numeric" defaultValue={fmtInt(main?.discount)} placeholder="0"
+        {locked ? <span className={ro}>{num(main?.discount_usd) ? '$' + num(main?.discount_usd) : '$0'}</span> : (
+          <input type="text" inputMode="decimal" defaultValue={num(main?.discount_usd) || ''} placeholder="$ 0"
                  className={inp + ' text-right'}
-                 onChange={(e) => { e.target.value = fmtInt(e.target.value); }}
-                 onBlur={blurNum(main?.discount ?? 0, 'discount')} />
+                 onChange={(e) => { e.target.value = decStr(e.target.value); }}
+                 onBlur={blurNum(main?.discount_usd ?? 0, 'discount')} />
         )}
       </td>
 

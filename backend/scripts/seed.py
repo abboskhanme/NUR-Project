@@ -201,14 +201,16 @@ async def _seed_orders(db):
             qty = rng.choice([1, 1, 1, 2])
             usd = (prod.base_price_usd or Decimal(0)) + Decimal(rng.choice([0, 50, 100, 150]))
             uzs = (usd * rate).quantize(Decimal("1"))
-            discount = Decimal(rng.choice([0, 0, 0, 500000, 1000000]))
+            # Chegirma dollarda kiritiladi; UZS ekvivalenti kurs orqali hisoblanadi
+            discount_usd = Decimal(rng.choice([0, 0, 0, 50, 100]))
+            discount = (discount_usd * rate).quantize(Decimal("1"))
             line = uzs * qty - discount
             total += line
             order.items.append(OrderItem(
                 product_id=prod.id,
                 bunker_direction=rng.choice(["right", "left"]),
                 quantity=qty, unit_price_usd=usd, unit_price_uzs=uzs,
-                discount=discount, total_uzs=line,
+                discount_usd=discount_usd, discount=discount, total_uzs=line,
             ))
 
         if status == "delivered":

@@ -18,7 +18,7 @@ interface ItemRow {
   bunker_direction: string;
   quantity: number;
   unit_price_usd: string;
-  discount: string;
+  discount: string; // chegirma DOLLARDA
 }
 
 export interface OrderEditData {
@@ -29,19 +29,16 @@ export interface OrderEditData {
   exchange_rate: string;
   delivery_address?: string | null;
   note?: string | null;
-  items: Array<{ product_id: string; bunker_direction?: string | null; quantity: number; unit_price_usd: string; discount: string }>;
+  items: Array<{ product_id: string; bunker_direction?: string | null; quantity: number; unit_price_usd: string; discount_usd?: string; discount?: string }>;
 }
 
 const today = () => new Date().toISOString().slice(0, 10);
 const num = (s: string | number | null | undefined) => {
   const n = parseFloat(String(s ?? '')); return Number.isNaN(n) ? 0 : n;
 };
-const onlyDigits = (s: string | number | null | undefined) =>
-  String(s ?? '').replace(/\D/g, '').replace(/^0+/, '');
-const fmtInt = (s: string | number | null | undefined) => {
-  const d = onlyDigits(s);
-  return d ? d.replace(/\B(?=(\d{3})+(?!\d))/g, ' ') : '';
-};
+// Dollar summasi uchun — raqam va bitta nuqta (o'nlik) ruxsat etiladi
+const decStr = (s: string | number | null | undefined) =>
+  String(s ?? '').replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1');
 
 export default function OrderModal({
   order,
@@ -64,7 +61,7 @@ export default function OrderModal({
     order?.items?.map((i) => ({
       product_id: i.product_id, bunker_direction: i.bunker_direction ?? '',
       quantity: i.quantity,
-      unit_price_usd: String(num(i.unit_price_usd)), discount: String(num(i.discount)),
+      unit_price_usd: String(num(i.unit_price_usd)), discount: String(num(i.discount_usd)),
     })) ?? [],
   );
   const [saving, setSaving] = useState(false);
@@ -108,7 +105,8 @@ export default function OrderModal({
 
   function rowTotal(it: ItemRow): number {
     const uzs = num(it.unit_price_usd) * rateNum;
-    return uzs * (it.quantity || 1) - num(it.discount);
+    // chegirma dollarda — UZS jamiga aylantirib ayiramiz
+    return uzs * (it.quantity || 1) - num(it.discount) * rateNum;
   }
   const grandTotal = useMemo(() => items.reduce((s, it) => s + rowTotal(it), 0), [items, rateNum]);
 
@@ -137,14 +135,14 @@ export default function OrderModal({
     return p?.product_type !== 'additional';
   }
 
-  function buildItem(it: ItemRow, qty: number, discount: number) {
+  function buildItem(it: ItemRow, qty: number, discountUsd: number) {
     return {
       product_id: it.product_id,
       bunker_direction: isMainItem(it) ? (it.bunker_direction || null) : null,
       quantity: qty,
       unit_price_usd: num(it.unit_price_usd),
       unit_price_uzs: num(it.unit_price_usd) * rateNum,
-      discount,
+      discount_usd: discountUsd,
     };
   }
 
@@ -155,8 +153,9 @@ export default function OrderModal({
     if (items.some((it) => isMainItem(it) && !it.bunker_direction)) { toast.error(t('sales.errNoBunker')); return; }
     for (let i = 0; i < items.length; i++) {
       const it = items[i];
-      const subtotal = num(it.unit_price_usd) * rateNum * (it.quantity || 1);
-      if (num(it.discount) > subtotal) {
+      // chegirma ($) mahsulot summasidan ($ × soni) oshmasligi kerak
+      const subtotalUsd = num(it.unit_price_usd) * (it.quantity || 1);
+      if (num(it.discount) > subtotalUsd) {
         toast.error(t('sales.errDiscountExceeds', { row: i + 1 }));
         return;
       }
@@ -265,7 +264,7 @@ export default function OrderModal({
                   <div className="col-span-2">{t('sales.colBunker')}</div>
                   <div className="col-span-2">{t('sales.colItemQtyShort')}</div>
                   <div className="col-span-2">{t('sales.colPriceUsdShort')}</div>
-                  <div className="col-span-2">{t('sales.colDiscountUzs')}</div>
+                  <div className="col-span-2">{t('sales.colDiscountUsd')}</div>
                   <div className="col-span-1" />
                 </div>
                 {items.map((it, idx) => (
@@ -299,9 +298,9 @@ export default function OrderModal({
                            className="input col-span-2 bg-black/5 text-ink-soft cursor-not-allowed"
                            placeholder="$ narx" value={it.unit_price_usd}
                            title={t('sales.priceReadOnly')} />
-                    <input type="text" inputMode="numeric" className="input col-span-2 text-right" placeholder="0"
-                           value={fmtInt(it.discount)}
-                           onChange={(e) => updateRow(idx, { discount: onlyDigits(e.target.value) })} title={t('sales.colDiscountUzs')}
+                    <input type="text" inputMode="decimal" className="input col-span-2 text-right" placeholder="$ 0"
+                           value={it.discount}
+                           onChange={(e) => updateRow(idx, { discount: decStr(e.target.value) })} title={t('sales.colDiscountUsd')}
                            style={rowTotal(it) < 0 ? { borderColor: '#E74C3C', color: '#E74C3C' } : undefined} />
                     <button type="button" onClick={() => removeRow(idx)} className="col-span-1 p-1 rounded hover:bg-danger/10 text-danger justify-self-end">
                       <Trash2 size={15} />

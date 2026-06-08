@@ -21,7 +21,7 @@ interface ProductMini { id: string; product_type?: string; model?: string | null
 interface Item {
   id: string; product_id: string; product?: ProductMini | null;
   bunker_direction?: string | null;
-  quantity: number; unit_price_usd: string; unit_price_uzs: string; discount: string; total_uzs: string;
+  quantity: number; unit_price_usd: string; unit_price_uzs: string; discount_usd: string; discount: string; total_uzs: string;
 }
 
 interface Payment {
@@ -282,7 +282,7 @@ export default function OrderDetailPage() {
                     </td>
                     <td className="py-2 pr-3 text-center">{it.quantity}</td>
                     <td className="py-2 pr-3 text-right">{formatUSD(it.unit_price_usd)}</td>
-                    <td className="py-2 pr-3 text-right">{formatUZS(it.discount)}</td>
+                    <td className="py-2 pr-3 text-right">{formatUSD(it.discount_usd)}</td>
                     <td className="py-2 pr-3 text-right font-medium">{formatUZS(it.total_uzs)}</td>
                   </tr>
                 ))}

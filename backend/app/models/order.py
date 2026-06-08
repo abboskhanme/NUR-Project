@@ -103,7 +103,10 @@ class OrderItem(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     quantity: Mapped[int] = mapped_column(default=1)
     unit_price_usd: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=0)
     unit_price_uzs: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
-    discount: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=0)
+    # Chegirma dollarda kiritiladi (asosiy manba). discount — UZS ekvivalenti
+    # (discount_usd × order.exchange_rate), jami/hisobotlar UZS'da ishlashi uchun.
+    discount_usd: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=0)
+    discount: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
     total_uzs: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
 
     order: Mapped[Order] = relationship(back_populates="items")

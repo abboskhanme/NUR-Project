@@ -17,8 +17,11 @@ class OrderItemIn(BaseModel):
     quantity: int = Field(default=1, ge=1)
     unit_price_usd: Decimal = Field(default=Decimal(0), ge=0)
     unit_price_uzs: Decimal = Field(default=Decimal(0), ge=0)
-    # Chegirma manfiy bo'lishi mumkin emas; yuqori chegara route'da tekshiriladi
-    # (narx * soni dan oshmasligi kerak)
+    # Chegirma DOLLARDA kiritiladi (asosiy manba). UZS ekvivalenti backend'da
+    # discount_usd × exchange_rate orqali hisoblanadi. Manfiy bo'lishi mumkin emas;
+    # yuqori chegara route'da tekshiriladi (narx $ × soni dan oshmasligi kerak).
+    discount_usd: Decimal = Field(default=Decimal(0), ge=0)
+    # Eski klientlar uchun (UZS chegirma) — qabul qilinadi, lekin backend qayta hisoblaydi
     discount: Decimal = Field(default=Decimal(0), ge=0)
 
 
@@ -51,7 +54,8 @@ class OrderItemOut(ORMBase):
     quantity: int
     unit_price_usd: Decimal
     unit_price_uzs: Decimal
-    discount: Decimal
+    discount_usd: Decimal = Decimal(0)
+    discount: Decimal  # UZS ekvivalenti
     total_uzs: Decimal
     product: Optional[ProductMini] = None
 

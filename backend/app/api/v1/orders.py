@@ -41,21 +41,22 @@ def _own_only(current) -> bool:
     return bool(role_perms.get("own_orders_only"))
 
 
-def _item_total(it) -> Decimal:
-    return (it.unit_price_uzs or Decimal(0)) * (it.quantity or 1) - (it.discount or Decimal(0))
+def _discount_uzs(discount_usd: Decimal, rate: Decimal) -> Decimal:
+    """Chegirmaning UZS ekvivalenti — dollar chegirma × valyuta kursi."""
+    return (discount_usd or Decimal(0)) * (rate or Decimal(0))
 
 
-def _check_discount(price_uzs: Decimal, qty: int, discount: Decimal, idx: int = 0) -> None:
-    """Chegirma mahsulot summasidan (narx * soni) oshmasligi kerak."""
-    discount = discount or Decimal(0)
-    if discount < 0:
+def _check_discount(price_usd: Decimal, qty: int, discount_usd: Decimal, idx: int = 0) -> None:
+    """Chegirma ($) mahsulot summasidan ($ × soni) oshmasligi kerak."""
+    discount_usd = discount_usd or Decimal(0)
+    if discount_usd < 0:
         raise HTTPException(422, "Chegirma manfiy bo'lishi mumkin emas")
-    subtotal = (price_uzs or Decimal(0)) * (qty or 1)
-    if discount > subtotal:
+    subtotal = (price_usd or Decimal(0)) * (qty or 1)
+    if discount_usd > subtotal:
         raise HTTPException(
             422,
             f"Chegirma mahsulot summasidan oshib ketdi ({idx + 1}-qator): "
-            f"chegirma {discount:,.0f} so'm, mahsulot summasi {subtotal:,.0f} so'm",
+            f"chegirma ${discount_usd:,.2f}, mahsulot summasi ${subtotal:,.2f}",
         )
 
 
@@ -269,15 +270,18 @@ async def create_order(payload: OrderCreate, user: CurrentUser,
     code = await generate_order_code(db)
     order = Order(code=code, salesperson_id=user.id, status="new",
                   **payload.model_dump(exclude={"items"}))
+    rate = order.exchange_rate or Decimal(0)
     for _i, _it in enumerate(payload.items):
-        _check_discount(_it.unit_price_uzs, _it.quantity, _it.discount, _i)
+        _check_discount(_it.unit_price_usd, _it.quantity, _it.discount_usd, _i)
 
     for it in payload.items:
+        disc_uzs = _discount_uzs(it.discount_usd, rate)
+        total_uzs = (it.unit_price_uzs or Decimal(0)) * (it.quantity or 1) - disc_uzs
         order.items.append(OrderItem(
             product_id=it.product_id, serial_id=it.serial_id,
             bunker_direction=it.bunker_direction, quantity=it.quantity,
             unit_price_usd=it.unit_price_usd, unit_price_uzs=it.unit_price_uzs,
-            discount=it.discount, total_uzs=_item_total(it),
+            discount_usd=it.discount_usd, discount=disc_uzs, total_uzs=total_uzs,
         ))
     await _set_inventory_status(db, order.inventory_id, "reserved")
     db.add(order)
@@ -324,22 +328,25 @@ async def update_order(order_id: uuid.UUID, payload: OrderUpdate, _: CurrentUser
         setattr(o, k, v)
 
     if new_items is not None:
+        rate = o.exchange_rate or Decimal(0)
         for _i, _it in enumerate(new_items):
             _check_discount(
-                _it.get("unit_price_uzs") or Decimal(0),
+                _it.get("unit_price_usd") or Decimal(0),
                 _it.get("quantity", 1) or 1,
-                _it.get("discount") or Decimal(0), _i,
+                _it.get("discount_usd") or Decimal(0), _i,
             )
         o.items.clear()
         for it in new_items:
             qty = it.get("quantity", 1) or 1
-            total_uzs = (it.get("unit_price_uzs") or Decimal(0)) * qty - (it.get("discount") or Decimal(0))
+            disc_uzs = _discount_uzs(it.get("discount_usd") or Decimal(0), rate)
+            total_uzs = (it.get("unit_price_uzs") or Decimal(0)) * qty - disc_uzs
             o.items.append(OrderItem(
                 product_id=it["product_id"], serial_id=it.get("serial_id"),
                 bunker_direction=it.get("bunker_direction"), quantity=qty,
                 unit_price_usd=it.get("unit_price_usd") or Decimal(0),
                 unit_price_uzs=it.get("unit_price_uzs") or Decimal(0),
-                discount=it.get("discount") or Decimal(0), total_uzs=total_uzs,
+                discount_usd=it.get("discount_usd") or Decimal(0),
+                discount=disc_uzs, total_uzs=total_uzs,
             ))
 
     # Status o'zgarishi — /status endpointi bilan bir xil qoidalar:
