@@ -1,0 +1,134 @@
+{
+  "title": "Reports",
+  "tabs": {
+    "sales": "Sales",
+    "finance": "Finance",
+    "service": "Service",
+    "supply": "Supply"
+  },
+  "presets": {
+    "this_month": "This month",
+    "last_month": "Last month",
+    "last_30": "30 days",
+    "last_90": "90 days",
+    "this_year": "This year"
+  },
+  "granularity": {
+    "day": "Daily",
+    "month": "Monthly"
+  },
+  "table": {
+    "loading": "Loading…",
+    "exportCsv": "CSV",
+    "total": "Total"
+  },
+  "sales": {
+    "kpi": {
+      "orders": "Orders",
+      "delivered": "Delivered",
+      "rejected": "Rejected",
+      "totalAmount": "Total amount",
+      "avgCheck": "Avg. order value"
+    },
+    "cards": {
+      "revenueTrend": "Revenue trend",
+      "byModel": "Sales by model",
+      "byRegion": "Sales by region",
+      "bySeller": "By seller",
+      "byStatus": "Status breakdown"
+    },
+    "cols": {
+      "model": "Model",
+      "count": "Count",
+      "amount": "Amount",
+      "region": "Region",
+      "order": "Order",
+      "seller": "Seller",
+      "status": "Status"
+    },
+    "empty": {
+      "noSeller": "No seller assigned"
+    },
+    "chart": {
+      "count": "Count",
+      "countUnit": "{{count}} pcs"
+    }
+  },
+  "finance": {
+    "kpi": {
+      "income": "Income",
+      "expense": "Expense",
+      "netProfit": "Net profit",
+      "margin": "Margin"
+    },
+    "cards": {
+      "pnlChart": "Income / Expense / Profit",
+      "expenseByCategory": "Expenses — by category",
+      "expenseDetail": "Expense breakdown"
+    },
+    "chart": {
+      "income": "Income",
+      "expense": "Expense",
+      "netProfit": "Net profit",
+      "noExpense": "No expenses"
+    },
+    "cols": {
+      "category": "Category",
+      "amount": "Amount"
+    }
+  },
+  "service": {
+    "kpi": {
+      "total": "Total requests",
+      "new": "New",
+      "completed": "Completed",
+      "inWarranty": "Under warranty",
+      "clientRevenue": "Client payments"
+    },
+    "cards": {
+      "byStatus": "By status",
+      "warrantyChart": "Under warranty / out of warranty",
+      "byCategory": "Requests by category"
+    },
+    "chart": {
+      "inWarranty": "Under warranty",
+      "outWarranty": "Out of warranty",
+      "noRequests": "No requests",
+      "countUnit": "{{count}} pcs"
+    },
+    "cols": {
+      "category": "Category",
+      "count": "Count"
+    },
+    "status": {
+      "new": "New",
+      "scheduled": "Scheduled",
+      "completed": "Completed",
+      "cancelled": "Cancelled"
+    }
+  },
+  "supply": {
+    "kpi": {
+      "receiptsTotal": "Receipts (period)",
+      "receiptsPaid": "Paid",
+      "debtTotal": "Total debt",
+      "lowStockCount": "Low stock"
+    },
+    "cards": {
+      "topDebts": "Top debts",
+      "lowStock": "Low stock items"
+    },
+    "chart": {
+      "noDebt": "No debts ✓",
+      "allStockOk": "All items in stock ✓"
+    },
+    "cols": {
+      "product": "Product",
+      "stock": "Stock",
+      "minQty": "Minimum",
+      "vendor": "Vendor",
+      "debt": "Debt"
+    },
+    "countUnit": "{{count}} pcs"
+  }
+}

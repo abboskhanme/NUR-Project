@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 
 import { api } from '@/api/client';
 import Card from '@/components/ui/Card';
@@ -14,14 +15,10 @@ interface Advance {
   note?: string | null;
 }
 
-const MONTHS = [
-  'Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun',
-  'Iyul', 'Avgust', 'Sentyabr', 'Oktyabr', 'Noyabr', 'Dekabr',
-];
-
 export default function AdvancesCard({ employeeId }: { employeeId: string }) {
+  const { t } = useTranslation();
   const nowYear = new Date().getFullYear();
-  const [filterMonth, setFilterMonth] = useState(0); // 0 = barchasi, 1-12
+  const [filterMonth, setFilterMonth] = useState(0); // 0 = all, 1-12
   const [filterYear, setFilterYear] = useState(nowYear);
 
   const { data, isLoading } = useQuery<Advance[]>({
@@ -41,18 +38,18 @@ export default function AdvancesCard({ employeeId }: { employeeId: string }) {
   const total = items.reduce((s, a) => s + (parseFloat(a.amount) || 0), 0);
 
   return (
-    <Card title="Avans / oylik to'lovlari">
-      {/* Oy bo'yicha filter */}
+    <Card title={t('hr.advances.title')}>
+      {/* Month filter */}
       <div className="flex items-center gap-2 flex-wrap mb-3">
-        <span className="text-sm text-ink-soft">Oy:</span>
+        <span className="text-sm text-ink-soft">{t('hr.advances.filterLabel')}</span>
         <select
           className="input !w-36"
           value={filterMonth}
           onChange={(e) => setFilterMonth(Number(e.target.value))}
         >
-          <option value={0}>Barchasi</option>
-          {MONTHS.map((m, i) => (
-            <option key={i} value={i + 1}>{m}</option>
+          <option value={0}>{t('common.all')}</option>
+          {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+            <option key={m} value={m}>{t(`hr.months.${m}`)}</option>
           ))}
         </select>
         {filterMonth > 0 && (
@@ -68,7 +65,7 @@ export default function AdvancesCard({ employeeId }: { employeeId: string }) {
         )}
         {items.length > 0 && (
           <span className="ml-auto text-sm text-ink-soft">
-            Jami: <span className="font-semibold text-ink">{formatUZS(total)}</span>
+            {t('hr.advances.total')} <span className="font-semibold text-ink">{formatUZS(total)}</span>
           </span>
         )}
       </div>
@@ -80,15 +77,15 @@ export default function AdvancesCard({ employeeId }: { employeeId: string }) {
           ))}
         </div>
       ) : items.length === 0 ? (
-        <EmptyState title="To'lov yo'q" description="Hozircha avans yoki oylik to'lanmagan." />
+        <EmptyState title={t('hr.advances.emptyTitle')} description={t('hr.advances.emptyDesc')} />
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="text-left text-ink-soft border-b border-black/5">
               <tr>
-                <th className="py-2 pr-4">Sana</th>
-                <th className="py-2 pl-6 pr-8 text-right">Summa</th>
-                <th className="py-2 pl-6 w-full">Izoh</th>
+                <th className="py-2 pr-4">{t('hr.advances.colDate')}</th>
+                <th className="py-2 pl-6 pr-8 text-right">{t('hr.advances.colAmount')}</th>
+                <th className="py-2 pl-6 w-full">{t('hr.advances.colNote')}</th>
               </tr>
             </thead>
             <tbody>

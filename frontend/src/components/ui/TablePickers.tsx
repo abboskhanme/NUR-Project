@@ -1,5 +1,6 @@
 import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useTranslation } from 'react-i18next';
 import { Check, ChevronDown, ChevronLeft, ChevronRight, Search } from 'lucide-react';
 
 /**
@@ -10,9 +11,8 @@ import { Check, ChevronDown, ChevronLeft, ChevronRight, Search } from 'lucide-re
  * jadvalning overflow-x-auto konteyneri uni kesib qo'ymaydi.
  */
 
-const MONTHS = ['Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun',
-  'Iyul', 'Avgust', 'Sentyabr', 'Oktyabr', 'Noyabr', 'Dekabr'];
-const WEEKDAYS = ['Du', 'Se', 'Ch', 'Pa', 'Ju', 'Sh', 'Ya'];
+const MONTH_KEYS = ['0','1','2','3','4','5','6','7','8','9','10','11'] as const;
+const WEEKDAY_KEYS = ['0','1','2','3','4','5','6'] as const;
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const todayIso = () => {
@@ -44,7 +44,6 @@ function Popover({ anchorRef, onClose, width, children }: {
     else s.top = r.bottom + 4;
     setStyle(s);
 
-    // Sahifa/jadval scroll bo'lsa popover joyidan siljib qolmasin — yopamiz
     const onScroll = (e: Event) => {
       if (popRef.current && e.target instanceof Node && popRef.current.contains(e.target)) return;
       onClose();
@@ -87,6 +86,7 @@ export function CellSelect({
   valueClassName?: string;
   hideChevron?: boolean;
 }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const btnRef = useRef<HTMLButtonElement>(null);
@@ -119,7 +119,8 @@ export function CellSelect({
             <div className="flex items-center gap-2 px-3 py-2 border-b border-black/5">
               <Search size={14} className="text-ink/40 shrink-0" />
               <input autoFocus value={query} onChange={(e) => setQuery(e.target.value)}
-                     placeholder="Qidirish..." className="w-full bg-transparent outline-none text-sm" />
+                     placeholder={t('ui.tablePickers.searchPlaceholder')}
+                     className="w-full bg-transparent outline-none text-sm" />
             </div>
           )}
           <div className="max-h-60 overflow-y-auto p-1">
@@ -132,7 +133,7 @@ export function CellSelect({
               </button>
             )}
             {filtered.length === 0 ? (
-              <p className="px-3 py-3 text-sm text-ink-soft text-center">Topilmadi</p>
+              <p className="px-3 py-3 text-sm text-ink-soft text-center">{t('ui.tablePickers.notFound')}</p>
             ) : filtered.map((o) => {
               const active = o.value === value;
               return (
@@ -153,7 +154,7 @@ export function CellSelect({
 
 // ---------- CellDate ----------
 export function CellDate({
-  value, onChange, clearable = true, placeholder = 'kun.oy.yil', triggerClassName = '',
+  value, onChange, clearable = true, placeholder, triggerClassName = '',
 }: {
   value: string;                       // ISO yyyy-mm-dd yoki ''
   onChange: (iso: string) => void;
@@ -161,6 +162,12 @@ export function CellDate({
   placeholder?: string;
   triggerClassName?: string;
 }) {
+  const { t } = useTranslation();
+  const resolvedPlaceholder = placeholder ?? t('ui.tablePickers.datePlaceholder');
+
+  const MONTHS = MONTH_KEYS.map((k) => t(`ui.calendar.months.${k}`));
+  const WEEKDAYS = WEEKDAY_KEYS.map((k) => t(`ui.calendar.weekdays.${k}`));
+
   const [open, setOpen] = useState(false);
   const btnRef = useRef<HTMLButtonElement>(null);
   const base = value ? new Date(value + 'T00:00:00') : new Date();
@@ -182,7 +189,7 @@ export function CellDate({
     setOpen(false);
   }
 
-  const firstWd = (new Date(vy, vm, 1).getDay() + 6) % 7; // Dushanba = 0
+  const firstWd = (new Date(vy, vm, 1).getDay() + 6) % 7; // Monday = 0
   const daysIn = new Date(vy, vm + 1, 0).getDate();
   const tIso = todayIso();
 
@@ -191,13 +198,13 @@ export function CellDate({
       <button ref={btnRef} type="button" onClick={() => setOpen((o) => !o)}
               className={triggerClassName + ' text-left'}>
         <span className={'truncate ' + (value ? '' : 'text-ink/35')}>
-          {value ? isoToDisplay(value) : placeholder}
+          {value ? isoToDisplay(value) : resolvedPlaceholder}
         </span>
       </button>
       {open && (
         <Popover anchorRef={btnRef} onClose={() => setOpen(false)} width={252}>
           <div className="p-2.5 select-none">
-            {/* Oy navigatsiyasi */}
+            {/* Month navigation */}
             <div className="flex items-center justify-between mb-1.5">
               <button type="button" onClick={() => nav(-1)}
                       className="p-1.5 rounded-lg hover:bg-black/5 text-ink/60"><ChevronLeft size={15} /></button>
@@ -205,13 +212,13 @@ export function CellDate({
               <button type="button" onClick={() => nav(1)}
                       className="p-1.5 rounded-lg hover:bg-black/5 text-ink/60"><ChevronRight size={15} /></button>
             </div>
-            {/* Hafta kunlari */}
+            {/* Weekday headers */}
             <div className="grid grid-cols-7 mb-0.5">
-              {WEEKDAYS.map((w) => (
-                <span key={w} className="text-center text-[11px] font-medium text-ink/40 py-1">{w}</span>
+              {WEEKDAYS.map((w, i) => (
+                <span key={i} className="text-center text-[11px] font-medium text-ink/40 py-1">{w}</span>
               ))}
             </div>
-            {/* Kunlar */}
+            {/* Days */}
             <div className="grid grid-cols-7 gap-y-0.5">
               {Array.from({ length: firstWd }).map((_, i) => <span key={'b' + i} />)}
               {Array.from({ length: daysIn }).map((_, i) => {
@@ -230,14 +237,18 @@ export function CellDate({
                 );
               })}
             </div>
-            {/* Pastki amallar */}
+            {/* Bottom actions */}
             <div className="flex items-center justify-between mt-2 pt-2 border-t border-black/5">
               {clearable && value ? (
                 <button type="button" onClick={() => { onChange(''); setOpen(false); }}
-                        className="text-xs text-ink/50 hover:text-danger px-1.5 py-1 rounded">Tozalash</button>
+                        className="text-xs text-ink/50 hover:text-danger px-1.5 py-1 rounded">
+                  {t('ui.tablePickers.clearDate')}
+                </button>
               ) : <span />}
               <button type="button" onClick={() => { onChange(todayIso()); setOpen(false); }}
-                      className="text-xs text-primary font-medium px-1.5 py-1 rounded hover:bg-primary/10">Bugun</button>
+                      className="text-xs text-primary font-medium px-1.5 py-1 rounded hover:bg-primary/10">
+                {t('ui.tablePickers.today')}
+              </button>
             </div>
           </div>
         </Popover>

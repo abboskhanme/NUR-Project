@@ -1,11 +1,12 @@
 """Authentication endpoints: login, refresh, logout, current user."""
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import CurrentUser
+from app.core.limiter import LOGIN_RATE_LIMIT, limiter
 from app.core.security import (
     create_access_token,
     create_refresh_token,
@@ -35,7 +36,12 @@ router = APIRouter()
 
 
 @router.post("/login", response_model=LoginResponse, summary="Login (telefon raqam + parol)")
-async def login(payload: LoginRequest, db: Annotated[AsyncSession, Depends(get_db)]):
+@limiter.limit(LOGIN_RATE_LIMIT)
+async def login(
+    request: Request,
+    payload: LoginRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
     # Format/bo'shliqdan qat'i nazar — faqat raqamlar bo'yicha solishtiramiz
     digits = phone_digits(payload.phone)
     res = await db.execute(
@@ -51,8 +57,8 @@ async def login(payload: LoginRequest, db: Annotated[AsyncSession, Depends(get_d
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Akkount o'chirilgan")
 
     return LoginResponse(
-        access_token=create_access_token(user.id),
-        refresh_token=create_refresh_token(user.id),
+        access_token=create_access_token(user.id, user.token_version),
+        refresh_token=create_refresh_token(user.id, user.token_version),
         user=UserOut.model_validate(user),
     )
 
@@ -64,27 +70,33 @@ async def refresh(payload: RefreshRequest, db: Annotated[AsyncSession, Depends(g
         if data.get("type") != "refresh":
             raise ValueError("Wrong token type")
         user_id = data["sub"]
-    except (ValueError, KeyError) as e:
+        token_ver = data.get("ver", 0)
+    except (ValueError, KeyError):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Refresh token noto'g'ri: {e}",
+            detail="Refresh token noto'g'ri yoki muddati o'tgan",
         )
 
     res = await db.execute(select(User).where(User.id == user_id))
     user = res.scalar_one_or_none()
     if not user or not user.is_active:
         raise HTTPException(status_code=401, detail="Foydalanuvchi topilmadi")
+    # Bekor qilingan refresh token (logout/parol almashtirish)
+    if token_ver != user.token_version:
+        raise HTTPException(status_code=401, detail="Refresh token bekor qilingan")
 
     return TokenResponse(
-        access_token=create_access_token(user.id),
-        refresh_token=create_refresh_token(user.id),
+        access_token=create_access_token(user.id, user.token_version),
+        refresh_token=create_refresh_token(user.id, user.token_version),
     )
 
 
-@router.post("/logout", summary="Logout (client-side token discard)")
-async def logout(user: CurrentUser):
-    # In stateless JWT, just instruct client to drop tokens.
-    # For blacklist, store refresh tokens in Redis and check on refresh.
+@router.post("/logout", summary="Logout — barcha eski tokenlarni bekor qiladi")
+async def logout(user: CurrentUser, db: Annotated[AsyncSession, Depends(get_db)]):
+    # token_version oshiriladi — shu foydalanuvchining oldingi access/refresh
+    # tokenlari darhol yaroqsiz bo'ladi (Redis kerak emas).
+    user.token_version = (user.token_version or 0) + 1
+    await db.commit()
     return {"detail": "Tizimdan chiqildi"}
 
 
@@ -131,8 +143,16 @@ async def change_password(
     if not verify_password(payload.old_password, user.password_hash):
         raise HTTPException(status_code=400, detail="Eski parol noto'g'ri")
     user.password_hash = hash_password(payload.new_password)
+    # Parol almashgach barcha eski tokenlarni bekor qilamiz, joriy sessiyaga
+    # esa yangi tokenlar qaytaramiz (boshqa qurilmalardagi sessiyalar uziladi).
+    user.token_version = (user.token_version or 0) + 1
     await db.commit()
-    return {"detail": "Parol yangilandi"}
+    await db.refresh(user)
+    return {
+        "detail": "Parol yangilandi",
+        "access_token": create_access_token(user.id, user.token_version),
+        "refresh_token": create_refresh_token(user.id, user.token_version),
+    }
 
 
 @router.post("/me/avatar", response_model=UserOut)

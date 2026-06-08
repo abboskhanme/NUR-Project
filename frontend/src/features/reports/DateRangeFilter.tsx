@@ -1,16 +1,11 @@
+import { useTranslation } from 'react-i18next';
 import DateInput from '@/components/ui/DateInput';
 import type { DateRange } from './types';
 
 /** Tayyor davr presetlari. */
 type Preset = 'this_month' | 'last_month' | 'last_30' | 'last_90' | 'this_year';
 
-const PRESETS: Array<{ key: Preset; label: string }> = [
-  { key: 'this_month', label: 'Joriy oy' },
-  { key: 'last_month', label: "O'tgan oy" },
-  { key: 'last_30', label: '30 kun' },
-  { key: 'last_90', label: '90 kun' },
-  { key: 'this_year', label: 'Joriy yil' },
-];
+const PRESET_KEYS: Preset[] = ['this_month', 'last_month', 'last_30', 'last_90', 'this_year'];
 
 const iso = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -41,20 +36,22 @@ interface Props {
 }
 
 export default function DateRangeFilter({ range, onChange, activePreset, onPreset }: Props) {
+  const { t } = useTranslation();
+
   return (
     <div className="flex flex-wrap items-center gap-2">
       <div className="flex flex-wrap gap-1.5">
-        {PRESETS.map((p) => (
+        {PRESET_KEYS.map((key) => (
           <button
-            key={p.key}
-            onClick={() => onPreset?.(p.key)}
+            key={key}
+            onClick={() => onPreset?.(key)}
             className={`px-3 py-1.5 rounded-button text-sm border transition ${
-              activePreset === p.key
+              activePreset === key
                 ? 'bg-primary text-white border-primary'
                 : 'bg-white text-ink border-black/10 hover:border-primary/40'
             }`}
           >
-            {p.label}
+            {t(`reports.presets.${key}`)}
           </button>
         ))}
       </div>

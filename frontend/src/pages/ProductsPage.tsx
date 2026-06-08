@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
 
@@ -15,18 +16,19 @@ interface Product extends ProductFull {
   created_at: string;
 }
 
-const TABS: Array<{ key: ProductType; label: string; hint: string }> = [
-  { key: 'main', label: 'Asosiy (kotyollar)', hint: 'Isitish kotyollari' },
-  { key: 'additional', label: 'Qo\'shimcha mahsulotlar', hint: 'Turba, defizor va boshqalar' },
-];
-
 export default function ProductsPage() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [tab, setTab] = useState<ProductType>('main');
   const [editing, setEditing] = useState<Product | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [toDelete, setToDelete] = useState<Product | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  const TABS: Array<{ key: ProductType; label: string; hint: string }> = [
+    { key: 'main', label: t('products.tabs.main'), hint: t('products.tabs.mainHint') },
+    { key: 'additional', label: t('products.tabs.additional'), hint: t('products.tabs.additionalHint') },
+  ];
 
   const { data, isLoading } = useQuery({
     queryKey: ['products', tab],
@@ -35,7 +37,6 @@ export default function ProductsPage() {
   });
   const items: Product[] = data?.items ?? [];
 
-  // Asosiy mahsulotlarni o'lcham (kvm) bo'yicha guruhlash
   const sizeGroups = useMemo(() => {
     const map = new Map<number | null, Product[]>();
     for (const p of items) {
@@ -62,11 +63,11 @@ export default function ProductsPage() {
     setDeleting(true);
     try {
       await api.delete(`/products/${toDelete.id}`);
-      toast.success('O\'chirildi');
+      toast.success(t('products.toastDeleted'));
       setToDelete(null);
       refresh();
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || 'Xatolik');
+      toast.error(e?.response?.data?.detail || t('products.toastError'));
     } finally {
       setDeleting(false);
     }
@@ -76,25 +77,25 @@ export default function ProductsPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold">Mahsulot katalogi</h1>
+          <h1 className="text-2xl font-bold">{t('products.title')}</h1>
           <p className="text-sm text-ink-soft">{active.hint}</p>
         </div>
         <button className="btn-primary" onClick={openCreate}>
-          <Plus size={16} /> {tab === 'main' ? 'Yangi kotyol' : 'Yangi mahsulot'}
+          <Plus size={16} /> {tab === 'main' ? t('products.addMain') : t('products.addAdditional')}
         </button>
       </div>
 
       {/* Tabs */}
       <div className="flex gap-1 border-b border-black/5">
-        {TABS.map((t) => (
-          <button key={t.key} onClick={() => setTab(t.key)}
+        {TABS.map((tabItem) => (
+          <button key={tabItem.key} onClick={() => setTab(tabItem.key)}
             className={
               'px-4 py-2 text-sm font-medium -mb-px border-b-2 transition-colors ' +
-              (tab === t.key
+              (tab === tabItem.key
                 ? 'border-primary text-primary'
                 : 'border-transparent text-ink-soft hover:text-ink')
             }>
-            {t.label}
+            {tabItem.label}
           </button>
         ))}
       </div>
@@ -106,13 +107,15 @@ export default function ProductsPage() {
           ))}
         </div>
       ) : items.length === 0 ? (
-        <EmptyState title="Mahsulotlar yo'q" />
+        <EmptyState title={t('products.empty')} />
       ) : tab === 'main' ? (
         <div className="space-y-6">
           {sizeGroups.map(({ kvm, rows }) => (
             <section key={kvm ?? 'none'}>
               <div className="flex items-center gap-2 mb-2">
-                <h2 className="text-sm font-bold text-ink">{kvm ? `${kvm} kvm` : 'O\'lchamsiz'}</h2>
+                <h2 className="text-sm font-bold text-ink">
+                  {kvm ? `${kvm} ${t('products.sizeUnit')}` : t('products.noSize')}
+                </h2>
                 <span className="badge bg-primary/10 text-primary">{rows.length}</span>
                 <div className="flex-1 h-px bg-black/5" />
               </div>
@@ -124,7 +127,12 @@ export default function ProductsPage() {
                         <div className="text-base font-semibold leading-tight">{p.model}</div>
                         <div className="text-lg font-bold text-primary mt-1">{formatUSD(p.base_price_usd)}</div>
                       </div>
-                      <RowActions onEdit={() => openEdit(p)} onDelete={() => setToDelete(p)} />
+                      <RowActions
+                        onEdit={() => openEdit(p)}
+                        onDelete={() => setToDelete(p)}
+                        editTooltip={t('products.editTooltip')}
+                        deleteTooltip={t('products.deleteTooltip')}
+                      />
                     </div>
                   </Card>
                 ))}
@@ -137,9 +145,9 @@ export default function ProductsPage() {
           <table className="w-full text-sm">
             <thead className="bg-black/[0.03] text-ink-soft text-left">
               <tr>
-                <th className="px-4 py-2 font-medium">Nomi</th>
-                <th className="px-4 py-2 font-medium">Birlik</th>
-                <th className="px-4 py-2 font-medium text-right">Narx</th>
+                <th className="px-4 py-2 font-medium">{t('products.table.name')}</th>
+                <th className="px-4 py-2 font-medium">{t('products.table.unit')}</th>
+                <th className="px-4 py-2 font-medium text-right">{t('products.table.price')}</th>
                 <th className="px-4 py-2 w-20"></th>
               </tr>
             </thead>
@@ -150,7 +158,12 @@ export default function ProductsPage() {
                   <td className="px-4 py-2 text-ink-soft">{p.unit || '—'}</td>
                   <td className="px-4 py-2 text-right font-semibold text-primary">{formatUSD(p.base_price_usd)}</td>
                   <td className="px-4 py-2">
-                    <RowActions onEdit={() => openEdit(p)} onDelete={() => setToDelete(p)} />
+                    <RowActions
+                      onEdit={() => openEdit(p)}
+                      onDelete={() => setToDelete(p)}
+                      editTooltip={t('products.editTooltip')}
+                      deleteTooltip={t('products.deleteTooltip')}
+                    />
                   </td>
                 </tr>
               ))}
@@ -170,13 +183,12 @@ export default function ProductsPage() {
 
       <ConfirmModal
         open={toDelete !== null}
-        title="Mahsulotni o'chirish"
+        title={t('products.deleteTitle')}
         message={
-          <>O'chirilsinmi: <b>{toDelete?.display_name}</b>? Agar buyurtmalarda ishlatilgan bo'lsa,
-          o'chirilmaydi — arxivga o'tkaziladi.</>
+          <>{t('products.deleteMessage', { name: toDelete?.display_name ?? '' })}</>
         }
         loading={deleting}
-        confirmText="O'chirish"
+        confirmText={t('actions.delete')}
         onConfirm={confirmDelete}
         onCancel={() => setToDelete(null)}
       />
@@ -184,13 +196,23 @@ export default function ProductsPage() {
   );
 }
 
-function RowActions({ onEdit, onDelete }: { onEdit: () => void; onDelete: () => void }) {
+function RowActions({
+  onEdit,
+  onDelete,
+  editTooltip,
+  deleteTooltip,
+}: {
+  onEdit: () => void;
+  onDelete: () => void;
+  editTooltip: string;
+  deleteTooltip: string;
+}) {
   return (
     <div className="flex items-center gap-1">
-      <button onClick={onEdit} className="p-1.5 rounded hover:bg-black/5 text-ink-soft" title="Tahrirlash">
+      <button onClick={onEdit} className="p-1.5 rounded hover:bg-black/5 text-ink-soft" title={editTooltip}>
         <Pencil size={15} />
       </button>
-      <button onClick={onDelete} className="p-1.5 rounded hover:bg-danger/10 text-danger" title="O'chirish">
+      <button onClick={onDelete} className="p-1.5 rounded hover:bg-danger/10 text-danger" title={deleteTooltip}>
         <Trash2 size={15} />
       </button>
     </div>

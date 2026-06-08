@@ -1,10 +1,12 @@
 import { Bell, LogOut } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/stores/auth';
 import UserAvatar from '@/features/users/UserAvatar';
 import LanguageSwitcher from '@/components/ui/LanguageSwitcher';
 
 export default function TopBar() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
@@ -16,12 +18,12 @@ export default function TopBar() {
 
   return (
     <header className="sticky top-0 z-10 h-16 bg-card border-b border-black/5 flex items-center justify-between px-4 md:px-6">
-      <div className="font-medium text-ink text-sm md:text-base truncate">NUR TECHNO GROUP</div>
+      <div className="font-medium text-ink text-sm md:text-base truncate">{t('ui.companyName')}</div>
 
       <div className="flex items-center gap-2">
         <LanguageSwitcher />
 
-        <button className="p-2 rounded-button hover:bg-black/5 text-ink/70 relative" title="Bildirishnomalar">
+        <button className="p-2 rounded-button hover:bg-black/5 text-ink/70 relative" title={t('ui.notifications')}>
           <Bell size={18} />
         </button>
 
@@ -35,7 +37,7 @@ export default function TopBar() {
             <div className="font-medium text-ink">{user?.full_name}</div>
             <div className="text-ink-soft truncate max-w-[140px]">{user?.phone}</div>
           </div>
-          <button onClick={onLogout} className="p-2 rounded-button hover:bg-black/5 text-ink/60" title="Chiqish">
+          <button onClick={onLogout} className="p-2 rounded-button hover:bg-black/5 text-ink/60" title={t('nav.logout')}>
             <LogOut size={18} />
           </button>
         </div>

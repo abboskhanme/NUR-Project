@@ -1,17 +1,19 @@
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 import StatusBadge from '@/components/ui/StatusBadge';
 import { formatDate } from '@/lib/format';
 import type { RecentOrder } from './types';
 
 export default function RecentOrdersList({ orders }: { orders?: RecentOrder[] }) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
 
   if (!orders) {
-    return <div className="text-sm text-ink-soft py-4">Yuklanmoqda…</div>;
+    return <div className="text-sm text-ink-soft py-4">{t('dashboard.recentOrders.loading')}</div>;
   }
   if (orders.length === 0) {
-    return <div className="text-sm text-ink-soft py-4">— hozircha bo'sh —</div>;
+    return <div className="text-sm text-ink-soft py-4">{t('dashboard.recentOrders.empty')}</div>;
   }
 
   return (

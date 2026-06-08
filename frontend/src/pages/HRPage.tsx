@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { Plus, Search, Pencil, Building2, HardHat, Briefcase, BadgeCheck, ChevronRight } from 'lucide-react';
 
 import { api } from '@/api/client';
@@ -12,12 +13,8 @@ import PositionsSection from '@/features/hr/PositionsSection';
 
 type Tab = 'office' | 'worker' | 'positions';
 
-const STATUS_LABEL: Record<string, string> = {
-  active: 'Faol',
-  terminated: 'Ishdan ketgan',
-};
-
 export default function HRPage() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>('office');
@@ -54,28 +51,25 @@ export default function HRPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold">Xodimlar (HR)</h1>
-          <p className="text-sm text-ink-soft">
-            Ofis xodimlari, oddiy ishchilar va lavozimlar bazasi
-          </p>
+          <h1 className="text-2xl font-bold">{t('hr.title')}</h1>
+          <p className="text-sm text-ink-soft">{t('hr.subtitle')}</p>
         </div>
         {tab === 'worker' && (
           <button onClick={() => setShowCreate(true)} className="btn-primary">
-            <Plus size={16} /> Yangi ishchi
+            <Plus size={16} /> {t('hr.newWorker')}
           </button>
         )}
       </div>
 
-      {/* Tabs */}
       <div className="flex gap-1 border-b border-black/5 overflow-x-auto">
         <TabButton active={tab === 'office'} onClick={() => setTab('office')} icon={<Building2 size={16} />}>
-          Ofis xodimlari
+          {t('hr.tabs.office')}
         </TabButton>
         <TabButton active={tab === 'worker'} onClick={() => setTab('worker')} icon={<HardHat size={16} />}>
-          Oddiy ishchilar
+          {t('hr.tabs.worker')}
         </TabButton>
         <TabButton active={tab === 'positions'} onClick={() => setTab('positions')} icon={<Briefcase size={16} />}>
-          Lavozimlar
+          {t('hr.tabs.positions')}
         </TabButton>
       </div>
 
@@ -87,7 +81,7 @@ export default function HRPage() {
             <div className="flex items-center gap-2 flex-1 min-w-[200px] bg-white border border-black/10 rounded-button px-3 py-1.5">
               <Search size={16} className="text-ink/40" />
               <input
-                placeholder="Ism bo'yicha qidirish..."
+                placeholder={t('hr.searchByName')}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="bg-transparent outline-none flex-1 text-sm"
@@ -98,15 +92,15 @@ export default function HRPage() {
               value={status}
               onChange={(e) => setStatus(e.target.value)}
             >
-              <option value="active">Faol</option>
-              <option value="terminated">Ishdan ketgan</option>
-              <option value="">Barchasi</option>
+              <option value="active">{t('hr.status.active')}</option>
+              <option value="terminated">{t('hr.status.terminated')}</option>
+              <option value="">{t('common.all')}</option>
             </select>
           </div>
 
           {tab === 'office' && (
             <p className="text-xs text-ink-soft mb-3">
-              Ofis xodimlari <span className="font-medium">Foydalanuvchilar</span> bo'limidan avtomatik qo'shiladi.
+              {t('hr.officeAutoSyncPlain')}
             </p>
           )}
 
@@ -118,26 +112,22 @@ export default function HRPage() {
             </div>
           ) : items.length === 0 ? (
             <EmptyState
-              title={tab === 'office' ? 'Ofis xodimlari yo\'q' : 'Ishchilar yo\'q'}
-              description={
-                tab === 'office'
-                  ? "Foydalanuvchilar bo'limidan akkount yarating — bu yerda paydo bo'ladi."
-                  : "Yuqoridagi \"Yangi ishchi\" tugmasi orqali qo'shing."
-              }
+              title={tab === 'office' ? t('hr.empty.officeTitle') : t('hr.empty.workerTitle')}
+              description={tab === 'office' ? t('hr.empty.officeDesc') : t('hr.empty.workerDesc')}
             />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="text-left text-ink-soft border-b border-black/5">
                   <tr>
-                    <th className="py-2 pr-3">Ism familiya</th>
-                    <th className="py-2 pr-3">Tug'ilgan sana</th>
-                    <th className="py-2 pr-3">Telefon</th>
-                    <th className="py-2 pr-3">Qo'shimcha tel.</th>
-                    <th className="py-2 pr-3">Lavozim</th>
-                    <th className="py-2 pr-3">Manzil</th>
-                    <th className="py-2 pr-3">Status</th>
-                    <th className="py-2 pr-3 text-right">Amallar</th>
+                    <th className="py-2 pr-3">{t('hr.table.fullName')}</th>
+                    <th className="py-2 pr-3">{t('hr.table.birthDate')}</th>
+                    <th className="py-2 pr-3">{t('hr.table.phone')}</th>
+                    <th className="py-2 pr-3">{t('hr.table.secondaryPhone')}</th>
+                    <th className="py-2 pr-3">{t('hr.table.position')}</th>
+                    <th className="py-2 pr-3">{t('hr.table.address')}</th>
+                    <th className="py-2 pr-3">{t('hr.table.status')}</th>
+                    <th className="py-2 pr-3 text-right">{t('hr.table.actions')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -151,7 +141,7 @@ export default function HRPage() {
                         <div className="flex items-center gap-1.5">
                           {e.full_name}
                           {e.has_account && (
-                            <span title="Tizim foydalanuvchisi">
+                            <span title={t('hr.tooltip.systemUser')}>
                               <BadgeCheck size={14} className="text-primary" />
                             </span>
                           )}
@@ -166,17 +156,17 @@ export default function HRPage() {
                       </td>
                       <td className="py-2 pr-3">
                         {e.status === 'active' ? (
-                          <span className="badge bg-success/10 text-success">Faol</span>
+                          <span className="badge bg-success/10 text-success">{t('hr.status.active')}</span>
                         ) : (
                           <span className="badge bg-gray-100 text-gray-700">
-                            {STATUS_LABEL[e.status] ?? e.status}
+                            {t(`hr.status.${e.status}`, { defaultValue: e.status })}
                           </span>
                         )}
                       </td>
                       <td className="py-2 pr-3">
                         <div className="flex items-center justify-end gap-1">
                           <button
-                            title="Tahrirlash"
+                            title={t('hr.tooltip.edit')}
                             onClick={(ev) => { ev.stopPropagation(); setEditEmp(e); }}
                             className="p-1.5 rounded hover:bg-black/10 text-ink/60"
                           >

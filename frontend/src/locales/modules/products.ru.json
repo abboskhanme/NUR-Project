@@ -1,0 +1,48 @@
+{
+  "title": "Каталог товаров",
+  "tabs": {
+    "main": "Основные (котлы)",
+    "mainHint": "Отопительные котлы",
+    "additional": "Дополнительные товары",
+    "additionalHint": "Трубы, дефизоры и прочее"
+  },
+  "addMain": "Новый котёл",
+  "addAdditional": "Новый товар",
+  "noSize": "Без размера",
+  "sizeUnit": "м²",
+  "empty": "Товары отсутствуют",
+  "table": {
+    "name": "Название",
+    "unit": "Ед. изм.",
+    "price": "Цена"
+  },
+  "deleteTitle": "Удаление товара",
+  "deleteMessage": "Удалить: {{name}}? Если товар используется в заказах, он будет архивирован, а не удалён.",
+  "toastDeleted": "Удалено",
+  "toastError": "Ошибка",
+  "modal": {
+    "createMain": "Новый котёл",
+    "createAdditional": "Новый доп. товар",
+    "editMain": "Редактирование — котёл",
+    "editAdditional": "Редактирование — доп. товар",
+    "modelLabel": "Модель *",
+    "modelPlaceholder": "PREMIUM 3 / ULTRA ...",
+    "kvmLabel": "Площадь (м²)",
+    "kvmPlaceholder": "200",
+    "nameLabel": "Название товара *",
+    "namePlaceholder": "Труба, дефизор ...",
+    "unitLabel": "Единица измерения",
+    "priceLabel": "Цена (USD)",
+    "pricePlaceholder": "0",
+    "descriptionLabel": "Примечание",
+    "directionHint": "Направление (правое/левое) выбирается при оформлении заказа — на цену не влияет.",
+    "modelRequired": "Модель обязательна",
+    "nameRequired": "Название товара обязательно",
+    "toastAdded": "Товар добавлен",
+    "toastUpdated": "Обновлено",
+    "toastError": "Ошибка",
+    "saving": "Сохранение..."
+  },
+  "editTooltip": "Редактировать",
+  "deleteTooltip": "Удалить"
+}

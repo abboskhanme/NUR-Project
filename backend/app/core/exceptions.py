@@ -32,3 +32,11 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
         status_code=500,
         content={"detail": "Ichki server xatoligi", "type": type(exc).__name__},
     )
+
+
+async def rate_limit_handler(request: Request, exc: Exception) -> JSONResponse:
+    """slowapi RateLimitExceeded uchun foydalanuvchiga tushunarli javob."""
+    return JSONResponse(
+        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        content={"detail": "Juda ko'p so'rov. Birozdan so'ng qayta urinib ko'ring."},
+    )

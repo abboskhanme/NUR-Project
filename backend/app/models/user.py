@@ -47,6 +47,10 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     is_superadmin: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
 
+    # Token bekor qilish hisoblagichi — logout/parol almashtirishda oshiriladi.
+    # Eski tokenlarda `ver` mos kelmasa, ular yaroqsiz hisoblanadi.
+    token_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
+
     # Telegram
     telegram_chat_id: Mapped[Optional[str]] = mapped_column(String(50))
 

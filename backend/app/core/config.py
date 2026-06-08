@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     # App
     APP_NAME: str = "NUR Project"
     APP_ENV: str = "development"
-    DEBUG: bool = True
+    DEBUG: bool = False
     API_V1_PREFIX: str = "/api/v1"
 
     # Server
@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/nur_erp"
 
     # JWT
-    SECRET_KEY: str = "change-me"
+    SECRET_KEY: str = "change-me"  # MAJBURIY: production'da .env orqali almashtiring
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
@@ -54,9 +54,40 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = "./uploads"
     MAX_UPLOAD_SIZE_MB: int = 20
 
+    INSECURE_SECRET_DEFAULT: str = "change-me"
+
     @property
     def ALLOWED_ORIGINS(self) -> List[str]:
         return [o.strip() for o in self.ALLOWED_ORIGINS_STR.split(",") if o.strip()]
+
+    @property
+    def is_production(self) -> bool:
+        return self.APP_ENV.lower() in {"production", "prod"}
+
+    def validate_security(self) -> list[str]:
+        """Xavfsizlik sozlamalarini tekshiradi.
+
+        Production'da xavfli sozlama topilsa xato ko'tariladi; aks holda
+        ogohlantirishlar ro'yxati qaytariladi (lifespan'da log qilinadi).
+        """
+        problems: list[str] = []
+        if self.SECRET_KEY == self.INSECURE_SECRET_DEFAULT or len(self.SECRET_KEY) < 32:
+            problems.append(
+                "SECRET_KEY xavfsiz emas — kamida 32 belgilik tasodifiy qiymat o'rnating "
+                "(masalan: `python -c \"import secrets; print(secrets.token_urlsafe(48))\"`)."
+            )
+        if self.is_production and self.DEBUG:
+            problems.append("Production'da DEBUG=True bo'lishi mumkin emas.")
+        if self.is_production and "*" in self.ALLOWED_ORIGINS:
+            problems.append("Production'da CORS '*' (barcha origin) ruxsat etilmaydi.")
+        if self.is_production and self.INIT_ADMIN_PASSWORD == "Admin@12345":
+            problems.append("Production'da standart admin paroli o'zgartirilishi shart.")
+
+        if self.is_production and problems:
+            raise RuntimeError(
+                "Xavfsizlik konfiguratsiyasi xatosi (production):\n - " + "\n - ".join(problems)
+            )
+        return problems
 
 
 @lru_cache

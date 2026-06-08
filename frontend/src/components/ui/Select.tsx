@@ -1,4 +1,5 @@
 import { ReactNode, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Check, ChevronDown, Search } from 'lucide-react';
 
 export interface SelectOption {
@@ -31,6 +32,7 @@ export default function Select({
   disabled?: boolean;
   className?: string;
 }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
 
@@ -69,7 +71,6 @@ export default function Select({
 
       {open && (
         <>
-          {/* Tashqariga bosilganda yopish */}
           <div className="fixed inset-0 z-30" onClick={() => { setOpen(false); setQuery(''); }} />
           <div className="absolute z-40 mt-1.5 w-full min-w-[200px] bg-card border border-black/10 rounded-xl shadow-xl overflow-hidden">
             {searchable && (
@@ -78,7 +79,7 @@ export default function Select({
                 <input
                   autoFocus
                   className="w-full bg-transparent outline-none text-sm"
-                  placeholder="Qidirish..."
+                  placeholder={t('ui.select.searchPlaceholder')}
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                 />
@@ -94,7 +95,7 @@ export default function Select({
                 </button>
               )}
               {filtered.length === 0 ? (
-                <p className="px-3 py-3 text-sm text-ink-soft text-center">Topilmadi</p>
+                <p className="px-3 py-3 text-sm text-ink-soft text-center">{t('ui.select.notFound')}</p>
               ) : (
                 filtered.map((o) => {
                   const active = o.value === value;

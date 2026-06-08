@@ -1,0 +1,124 @@
+{
+  "title": "Service",
+  "subtitle": "Warranty and technical service for sold products",
+  "newTicket": "New Ticket",
+  "categories": "Categories",
+  "ticket": "Ticket",
+  "filter": {
+    "all": "All",
+    "new": "New",
+    "scheduled": "Scheduled",
+    "completed": "Completed",
+    "cancelled": "Cancelled"
+  },
+  "kpi": {
+    "open": "Open Tickets",
+    "new": "New",
+    "scheduledNext7": "Next 7 Days (scheduled)",
+    "warrantyOpen": "Open Under Warranty"
+  },
+  "table": {
+    "code": "Code",
+    "customer": "Customer",
+    "problem": "Problem",
+    "visitDate": "Visit Date",
+    "warranty": "Warranty",
+    "status": "Status"
+  },
+  "search": {
+    "placeholder": "Code or problem…"
+  },
+  "empty": {
+    "title": "No service tickets",
+    "description": "Add your first ticket using the \"New Ticket\" button"
+  },
+  "warranty": {
+    "inWarranty": "Under Warranty",
+    "noWarranty": "None",
+    "activeFull_short": "Year 1 — free",
+    "activeFull_long": "Year 1 warranty — labor and parts free",
+    "activeServiceOnly_short": "Years 2–3 — labor only",
+    "activeServiceOnly_long": "Years 2–3 warranty — labor only free, parts at customer expense",
+    "expired_short": "Warranty expired",
+    "expired_long": "Warranty period expired — service and parts at customer expense",
+    "notDelivered_short": "Not delivered",
+    "notDelivered_long": "Product not yet delivered — warranty has not started",
+    "daysLeft": "· {{count}} days left",
+    "wmetaActiveFull": "Year 1 — fully free (labor + parts)",
+    "wmetaActiveServiceOnly": "Years 2–3 — labor only free, parts at customer expense",
+    "wmetaExpired": "Warranty expired — everything at customer expense",
+    "wmetaNotDelivered": "Product not yet delivered"
+  },
+  "form": {
+    "title": "New Service Ticket",
+    "customer": "Customer",
+    "customerPlaceholder": "Search by name or phone…",
+    "orderLabel": "Select Order",
+    "orderLabelHint": "(warranty is per this order)",
+    "noOrders": "No orders found for this customer.",
+    "delivered": "Delivered:",
+    "problem": "Problem",
+    "problemOptional": "(category selected — optional)",
+    "problemPlaceholder": "Describe the customer's problem…",
+    "category": "Category",
+    "categoryNone": "— Not selected —",
+    "noCategoriesHint": "No categories — add them in the \"Categories\" section.",
+    "visitDate": "Visit Date",
+    "visitTime": "Time",
+    "addressLabel": "Address",
+    "addressHint": "(no address on the order)",
+    "addressPlaceholder": "Visit address",
+    "submit": "Create Ticket",
+    "saving": "Saving…"
+  },
+  "toast": {
+    "ticketCreated": "Ticket created",
+    "saved": "Saved",
+    "scheduled": "Scheduled",
+    "completed": "Marked as completed",
+    "cancelled": "Cancelled",
+    "noteAdded": "Note added",
+    "categoryAdded": "Category added",
+    "errorGeneric": "An error occurred",
+    "errorCustomer": "Please select a customer",
+    "errorOrder": "Please select an order",
+    "errorProblem": "Enter a problem or select a category",
+    "errorAddress": "Please enter an address",
+    "errorNote": "Please write a note"
+  },
+  "detail": {
+    "problem": "Problem",
+    "opened": "Opened:",
+    "visitDate": "Visit Date",
+    "visitTime": "Time",
+    "resolution": "Resolution (was the problem solved?)",
+    "resolutionPlaceholder": "What was done, was it resolved…",
+    "cost": "Service cost (UZS, optional)",
+    "save": "Save",
+    "notesTitle": "Notes Journal",
+    "noNotes": "No notes yet.",
+    "newNotePlaceholder": "Add a new note…",
+    "closedAt": "Closed:",
+    "costLabel": "· Cost:",
+    "deliveredNote": "— delivered",
+    "schedule": "Schedule",
+    "markCompleted": "Completed",
+    "markCancelled": "Cancel",
+    "reja": "Planned:"
+  },
+  "categoryModal": {
+    "title": "Service Categories",
+    "description": "Add frequently occurring problem/service types — they will be available for selection when creating a ticket.",
+    "inputPlaceholder": "New category name…",
+    "add": "Add",
+    "noCategories": "No categories yet.",
+    "deleteTitle": "Delete",
+    "done": "Done"
+  },
+  "status": {
+    "new": "New",
+    "scheduled": "Scheduled",
+    "completed": "Completed",
+    "cancelled": "Cancelled"
+  }
+}

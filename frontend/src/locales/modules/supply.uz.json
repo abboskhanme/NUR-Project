@@ -1,0 +1,166 @@
+{
+  "title": "Ta'minot",
+  "subtitle": "Taminotchilar, mahsulotlar va qarzlar",
+  "supplierSubtitle": "Mening mahsulotlarim",
+
+  "buttons": {
+    "payDebt": "Qarz to'lash",
+    "newItem": "Yangi mahsulot",
+    "newReceipt": "Yangi kirim",
+    "issueItem": "Chiqim qilish",
+    "payFull": "To'liq qarzni qo'yish ({{amount}})"
+  },
+
+  "kpi": {
+    "totalDebt": "Umumiy qarz",
+    "totalReceived": "Jami kirim (qiymat)",
+    "stockValue": "Ombor qiymati",
+    "lowStock": "Kam qolgan mahsulot",
+    "lowStockValue": "{{count}} ta"
+  },
+
+  "vendors": {
+    "all": "Barchasi",
+    "emptyHint": "Taminotchilar Foydalanuvchilar bo'limida «Taminotchi» roli bilan qo'shiladi",
+    "debtInfo": "{{count}} mahsulot · {{low}} kam · qarz: {{debt}}"
+  },
+
+  "tabs": {
+    "items": "Mahsulotlar",
+    "receipts": "Kirimlar / Qarzlar"
+  },
+
+  "items": {
+    "empty": "Mahsulotlar yo'q",
+    "emptyDesc": "Yangi mahsulot qo'shing",
+    "emptyDescReadonly": "Hozircha bo'sh",
+    "colName": "Nomi",
+    "colUnit": "Birlik",
+    "colUnitPrice": "Birlik narxi",
+    "colStock": "Qoldiq",
+    "colMin": "Minimum",
+    "colStatus": "Holat",
+    "colActions": "Amallar",
+    "statusLow": "Kam",
+    "statusOk": "OK",
+    "titleIssue": "Chiqim",
+    "titleEdit": "Tahrirlash",
+    "titleDelete": "O'chirish"
+  },
+
+  "receipts": {
+    "empty": "Kirimlar yo'q",
+    "emptyDesc": "«Yangi kirim» orqali qo'shing",
+    "colDate": "Sana",
+    "colVendor": "Taminotchi",
+    "colItem": "Mahsulot",
+    "colQty": "Miqdor",
+    "colTotal": "Summa",
+    "colDebt": "Qarz",
+    "colStatus": "Holat",
+    "statusOpen": "Qarz",
+    "statusPartial": "Qisman",
+    "statusPaid": "To'langan"
+  },
+
+  "deleteItem": {
+    "title": "Mahsulotni o'chirish",
+    "message": "«{{name}}» o'chirilsinmi?"
+  },
+
+  "toast": {
+    "itemDeleted": "O'chirildi",
+    "error": "Xatolik",
+    "saving": "Saqlanmoqda…"
+  },
+
+  "itemModal": {
+    "titleNew": "Yangi mahsulot",
+    "titleEdit": "Mahsulotni tahrirlash",
+    "labelName": "Nomi *",
+    "placeholderName": "Masalan: Profil truba 40x40",
+    "labelVendor": "Taminotchi",
+    "optionNone": "— Tanlanmagan —",
+    "labelUnit": "O'lchov birligi",
+    "labelUnitPrice": "Birlik narxi (so'm)",
+    "labelInitialStock": "Boshlang'ich qoldiq",
+    "labelMinQty": "Minimum qoldiq",
+    "hintLowStock": "Qoldiq minimumdan past tushganda «Kam» belgisi va bildirishnoma chiqadi.",
+    "labelNote": "Izoh",
+    "nameRequired": "Nomini kiriting",
+    "savedNew": "Mahsulot qo'shildi",
+    "savedEdit": "Yangilandi",
+    "saving": "Saqlanmoqda…"
+  },
+
+  "vendorModal": {
+    "titleNew": "Yangi taminotchi",
+    "titleEdit": "Taminotchini tahrirlash",
+    "labelName": "Nomi *",
+    "placeholderName": "Masalan: Umid Tokir",
+    "labelPhone": "Telefon",
+    "labelLoginAccount": "Login akkaunt",
+    "optionNotLinked": "— Bog'lanmagan —",
+    "labelAddress": "Manzil",
+    "labelNote": "Izoh",
+    "labelActive": "Faol",
+    "nameRequired": "Nomini kiriting",
+    "savedNew": "Taminotchi qo'shildi",
+    "savedEdit": "Yangilandi",
+    "saving": "Saqlanmoqda…"
+  },
+
+  "receiptModal": {
+    "title": "Yangi kirim",
+    "labelVendor": "Taminotchi *",
+    "optionSelect": "— Tanlang —",
+    "labelDate": "Sana",
+    "labelItem": "Mahsulot *",
+    "labelQty": "Miqdor *",
+    "labelQtyWithUnit": "Miqdor * ({{unit}})",
+    "labelUnitPrice": "Birlik narxi (so'm)",
+    "labelPaid": "Hozir to'lanadi (ixtiyoriy)",
+    "hintPaid": "Bo'sh qoldirsangiz — to'liq qarzga yoziladi.",
+    "labelNote": "Izoh",
+    "totalLabel": "Umumiy summa",
+    "debtLabel": "Shundan qarz",
+    "vendorRequired": "Taminotchini tanlang",
+    "itemRequired": "Mahsulotni tanlang",
+    "qtyRequired": "Miqdorni kiriting",
+    "saved": "Kirim saqlandi",
+    "saving": "Saqlanmoqda…"
+  },
+
+  "paymentModal": {
+    "title": "Qarz to'lash",
+    "labelVendor": "Taminotchi *",
+    "optionSelect": "— Tanlang —",
+    "labelCurrentDebt": "Joriy qarz",
+    "labelDate": "Sana",
+    "labelAmount": "Summa *",
+    "labelNote": "Izoh",
+    "hintAutoSettle": "To'lov eng eski qarzlardan boshlab avtomatik so'ndiriladi.",
+    "vendorRequired": "Taminotchini tanlang",
+    "amountRequired": "Summani kiriting",
+    "saved": "Qarz to'lovi saqlandi",
+    "saving": "Saqlanmoqda…",
+    "pay": "To'lash"
+  },
+
+  "issueModal": {
+    "title": "Ombordan chiqim",
+    "currentStock": "joriy qoldiq {{qty}} {{unit}}",
+    "labelQty": "Chiqim miqdori ({{unit}}) *",
+    "labelNote": "Izoh",
+    "placeholderNote": "Masalan: ishlab chiqarishga berildi",
+    "qtyRequired": "Miqdorni kiriting",
+    "notEnoughStock": "Omborda yetarli zaxira yo'q",
+    "saved": "Chiqim saqlandi",
+    "saving": "Saqlanmoqda…",
+    "submit": "Chiqim qilish"
+  },
+
+  "cancel": "Bekor",
+  "save": "Saqlash",
+  "error": "Xatolik"
+}

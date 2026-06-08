@@ -1,16 +1,7 @@
-// Buyurtma statuslari uchun yagona manba: o'zbekcha nomlar va grafik ranglari.
-
-export const ORDER_STATUS_LABELS: Record<string, string> = {
-  new: 'Navbatda',
-  ready: "Tayyor bo'ldi",
-  delivered: 'Yetkazildi',
-  rejected: 'Rad etildi',
-  // legacy
-  confirmed: 'Tasdiqlangan',
-  in_production: 'Ishlab chiqarishda',
-  paid: "To'langan",
-  cancelled: 'Bekor qilingan',
-};
+// Buyurtma statuslari uchun yagona manba: i18n kalitlari va grafik ranglari.
+// Label'lar chaqiruv paytida joriy tilda olinadi (i18n.t) — til almashganda
+// komponent qayta render bo'lganda yangi til qo'llanadi.
+import i18n from '@/locales/i18n';
 
 export const ORDER_STATUS_COLORS: Record<string, string> = {
   new: '#2980B9',
@@ -24,16 +15,13 @@ export const ORDER_STATUS_COLORS: Record<string, string> = {
 };
 
 export function orderStatusLabel(status: string): string {
-  return ORDER_STATUS_LABELS[status] ?? status;
+  return i18n.t(`status.${status}`, { defaultValue: status });
 }
 
 export function orderStatusColor(status: string): string {
   return ORDER_STATUS_COLORS[status] ?? '#95A5A6';
 }
 
-export const SERVICE_STATUS_LABELS: Record<string, string> = {
-  new: 'Yangi',
-  scheduled: 'Rejalashtirilgan',
-  completed: 'Bajarilgan',
-  cancelled: 'Bekor qilingan',
-};
+export function serviceStatusLabel(status: string): string {
+  return i18n.t(`service.status.${status}`, { defaultValue: status });
+}

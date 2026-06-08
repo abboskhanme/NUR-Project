@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell,
 } from 'recharts';
@@ -15,6 +16,7 @@ type LowStock = { name: string; unit: string; stock_qty: number; min_qty: number
 type Debt = { vendor: string; debt_uzs: number };
 
 export default function SupplyReport({ range }: { range: DateRange }) {
+  const { t } = useTranslation();
   const sum = useQuery<SupplySummary>({
     queryKey: ['rep-supply', range],
     queryFn: () => api.get('/reports/supply/summary', {
@@ -25,26 +27,26 @@ export default function SupplyReport({ range }: { range: DateRange }) {
   const d = sum.data;
 
   const lowCols: Column<LowStock>[] = [
-    { key: 'name', label: 'Tovar' },
-    { key: 'stock_qty', label: 'Qoldiq', align: 'right', render: (r) => `${r.stock_qty} ${r.unit}` },
-    { key: 'min_qty', label: 'Minimal', align: 'right', render: (r) => `${r.min_qty} ${r.unit}` },
+    { key: 'name', label: t('reports.supply.cols.product') },
+    { key: 'stock_qty', label: t('reports.supply.cols.stock'), align: 'right', render: (r) => `${r.stock_qty} ${r.unit}` },
+    { key: 'min_qty', label: t('reports.supply.cols.minQty'), align: 'right', render: (r) => `${r.min_qty} ${r.unit}` },
   ];
   const debtCols: Column<Debt>[] = [
-    { key: 'vendor', label: "Ta'minotchi" },
-    { key: 'debt_uzs', label: 'Qarz', align: 'right', render: (r) => formatUZS(r.debt_uzs) },
+    { key: 'vendor', label: t('reports.supply.cols.vendor') },
+    { key: 'debt_uzs', label: t('reports.supply.cols.debt'), align: 'right', render: (r) => formatUZS(r.debt_uzs) },
   ];
 
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatTile label="Kirim (davr)" value={d ? formatUZS(d.receipts_total_uzs) : '—'} tone="primary" />
-        <StatTile label="To'langan" value={d ? formatUZS(d.receipts_paid_uzs) : '—'} tone="success" />
-        <StatTile label="Umumiy qarz" value={d ? formatUZS(d.debt_total_uzs) : '—'} tone="danger" />
-        <StatTile label="Kam qolgan" value={d ? `${d.low_stock_count} ta` : '—'} tone="warning" />
+        <StatTile label={t('reports.supply.kpi.receiptsTotal')} value={d ? formatUZS(d.receipts_total_uzs) : '—'} tone="primary" />
+        <StatTile label={t('reports.supply.kpi.receiptsPaid')} value={d ? formatUZS(d.receipts_paid_uzs) : '—'} tone="success" />
+        <StatTile label={t('reports.supply.kpi.debtTotal')} value={d ? formatUZS(d.debt_total_uzs) : '—'} tone="danger" />
+        <StatTile label={t('reports.supply.kpi.lowStockCount')} value={d ? t('reports.supply.countUnit', { count: d.low_stock_count }) : '—'} tone="warning" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card title="Eng katta qarzlar">
+        <Card title={t('reports.supply.cards.topDebts')}>
           {d && d.top_debts.length > 0 ? (
             <>
               <ResponsiveContainer width="100%" height={Math.max(180, d.top_debts.length * 34)}>
@@ -64,17 +66,17 @@ export default function SupplyReport({ range }: { range: DateRange }) {
               </div>
             </>
           ) : (
-            <div className="text-sm text-ink-soft py-12 text-center">Qarz yo'q ✓</div>
+            <div className="text-sm text-ink-soft py-12 text-center">{t('reports.supply.chart.noDebt')}</div>
           )}
         </Card>
 
-        <Card title="Kam qolgan tovarlar">
+        <Card title={t('reports.supply.cards.lowStock')}>
           {d && d.low_stock.length > 0 ? (
             <ReportTable rows={d.low_stock} columns={lowCols} filename="kam-qoldiq" />
           ) : (
             <div className="flex flex-col items-center justify-center py-12 text-center text-ink-soft text-sm">
               <AlertTriangle size={24} className="mb-2 opacity-40" />
-              Barcha tovarlar yetarli ✓
+              {t('reports.supply.chart.allStockOk')}
             </div>
           )}
         </Card>

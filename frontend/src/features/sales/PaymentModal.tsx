@@ -1,19 +1,20 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import { X } from 'lucide-react';
 
 import { api } from '@/api/client';
 import { formatUZS } from '@/lib/format';
 
-const METHODS = [
-  { value: 'cash', label: 'Naqd' },
-  { value: 'card', label: 'Karta' },
-  { value: 'transfer', label: 'O\'tkazma' },
+// Payment method keys — resolved with t() at render time
+const METHOD_KEYS = [
+  { value: 'cash', labelKey: 'sales.methodCash' },
+  { value: 'card', labelKey: 'sales.methodCard' },
+  { value: 'transfer', labelKey: 'sales.methodTransfer' },
 ];
 
 const today = () => new Date().toISOString().slice(0, 10);
 
-// Yozilayotganda mingliklarni bo'shliq bilan ajratib ko'rsatamiz: 2000000 -> "2 000 000"
 function formatAmount(s: string): string {
   const cleaned = s.replace(/[^\d.]/g, '');
   const firstDot = cleaned.indexOf('.');
@@ -33,15 +34,14 @@ export default function PaymentModal({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const { t } = useTranslation();
   const [date, setDate] = useState(today());
   const [amount, setAmount] = useState('');
   const [currency, setCurrency] = useState('UZS');
   const [method, setMethod] = useState('cash');
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
-  // Buyurtma qoldig'i va kursi — limitni tekshirish uchun
   const [order, setOrder] = useState<{ balance_uzs: string; exchange_rate: string } | null>(null);
-  // "To'liq to'lash" bosilganmi — saqlashda aniq UZS ekvivalentini yuborish uchun
   const [isFull, setIsFull] = useState(false);
 
   useEffect(() => {
@@ -57,7 +57,6 @@ export default function PaymentModal({
   const balance = order ? Math.max(0, parseFloat(order.balance_uzs) || 0) : null;
   const rate = order ? parseFloat(order.exchange_rate) || 0 : 0;
   const amtNum = parseFloat(amount.replace(/[^\d.]/g, '')) || 0;
-  // Kiritilgan summaning UZS ekvivalenti
   const amtUzs = currency === 'USD' ? amtNum * rate : amtNum;
   const exceeds = balance != null && !isFull && amtUzs > balance + 0.01;
 
@@ -72,23 +71,22 @@ export default function PaymentModal({
 
   async function handleSave() {
     const amt = parseFloat(amount.replace(/[^\d.]/g, ''));
-    if (!amt || amt <= 0) { toast.error('To\'g\'ri summa kiriting'); return; }
+    if (!amt || amt <= 0) { toast.error(t('sales.errInvalidAmount')); return; }
     if (exceeds) {
-      toast.error(`To'lov qoldiqdan oshib ketdi — qoldiq: ${formatUZS(balance!)}`);
+      toast.error(t('sales.errExceedsBalance', { amount: formatUZS(balance!) }));
       return;
     }
     setSaving(true);
     try {
       await api.post(`/orders/${orderId}/payments`, {
         date, amount: amt, currency, method, note: note || null,
-        // To'liq to'lashda UZS ekvivalenti aniq qoldiqqa teng bo'ladi (kurs yaxlitlash xatosiz)
         ...(isFull && balance != null ? { amount_uzs_equiv: balance } : {}),
       });
-      toast.success('To\'lov qo\'shildi');
+      toast.success(t('sales.paymentAdded'));
       onSaved();
       onClose();
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || 'Xatolik');
+      toast.error(e?.response?.data?.detail || t('common.error'));
     } finally {
       setSaving(false);
     }
@@ -99,17 +97,17 @@ export default function PaymentModal({
       <div className="bg-card rounded-lg shadow-xl w-full max-w-md overflow-hidden flex flex-col"
            onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3 border-b border-black/5">
-          <h3 className="font-semibold">To'lov qo'shish</h3>
+          <h3 className="font-semibold">{t('sales.payModalTitle')}</h3>
           <button onClick={onClose} className="p-1 rounded hover:bg-black/5"><X size={18} /></button>
         </div>
         <div className="p-5 space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="label">Sana</label>
+              <label className="label">{t('sales.labelPayDate')}</label>
               <input type="date" className="input" value={date} onChange={(e) => setDate(e.target.value)} />
             </div>
             <div>
-              <label className="label">Valyuta</label>
+              <label className="label">{t('sales.labelPayCurrency')}</label>
               <select className="input" value={currency}
                       onChange={(e) => { setCurrency(e.target.value); setIsFull(false); setAmount(''); }}>
                 <option value="UZS">UZS</option>
@@ -118,43 +116,43 @@ export default function PaymentModal({
             </div>
           </div>
           <div>
-            <label className="label">Summa *</label>
+            <label className="label">{t('sales.labelPayAmount')}</label>
             <input type="text" inputMode="decimal"
                    className={'input ' + (exceeds ? '!border-danger' : '')} placeholder="0"
                    value={amount}
                    onChange={(e) => { setAmount(formatAmount(e.target.value)); setIsFull(false); }} />
             <div className="flex items-center justify-between mt-1">
               <span className="text-xs text-ink-soft">
-                {balance != null ? <>Qoldiq: <b>{formatUZS(balance)}</b></> : ' '}
+                {balance != null ? <>{t('sales.remainingBalance')} <b>{formatUZS(balance)}</b></> : ' '}
               </span>
               {balance != null && balance > 0 && (
                 <button type="button" onClick={payFull}
                         className="text-xs font-medium text-primary hover:underline">
-                  To'liq to'lash
+                  {t('sales.payFull')}
                 </button>
               )}
             </div>
             {exceeds && (
               <p className="text-xs text-danger mt-0.5">
-                Summa qoldiqdan oshib ketdi — maksimal {formatUZS(balance!)}
+                {t('sales.exceedsBalance', { amount: formatUZS(balance!) })}
               </p>
             )}
           </div>
           <div>
-            <label className="label">To'lov usuli</label>
+            <label className="label">{t('sales.labelPayMethod')}</label>
             <select className="input" value={method} onChange={(e) => setMethod(e.target.value)}>
-              {METHODS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+              {METHOD_KEYS.map((m) => <option key={m.value} value={m.value}>{t(m.labelKey)}</option>)}
             </select>
           </div>
           <div>
-            <label className="label">Izoh</label>
+            <label className="label">{t('sales.labelPayNote')}</label>
             <textarea className="input min-h-[56px]" value={note} onChange={(e) => setNote(e.target.value)} />
           </div>
         </div>
         <div className="px-5 py-3 border-t border-black/5 flex justify-end gap-2">
-          <button onClick={onClose} className="px-3 py-1.5 text-sm rounded-button hover:bg-black/5">Bekor</button>
+          <button onClick={onClose} className="px-3 py-1.5 text-sm rounded-button hover:bg-black/5">{t('sales.cancelBtnShort')}</button>
           <button onClick={handleSave} disabled={saving || exceeds} className="btn-primary disabled:opacity-50">
-            {saving ? 'Saqlanmoqda...' : 'Saqlash'}
+            {saving ? t('sales.saving') : t('actions.save')}
           </button>
         </div>
       </div>

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ChevronDown } from 'lucide-react';
 
 export interface Country {
@@ -66,7 +67,6 @@ function stripDial(value: string, country: Country): string {
 function Flag({ country, size = 20 }: { country: Country; size?: number }) {
   const [err, setErr] = useState(false);
   if (err) {
-    // Twemoji yuklanmasa — rangli badge fallback
     return (
       <span
         className="inline-flex items-center justify-center rounded-sm bg-primary/10 text-primary text-[9px] font-bold leading-none shrink-0"
@@ -105,6 +105,7 @@ export default function PhoneInput({
   defaultCountry?: string;
   id?: string;
 }) {
+  const { t } = useTranslation();
   const [country, setCountry] = useState<Country>(() => {
     if (value) return detectCountry(value);
     if (defaultCountry) {
@@ -161,7 +162,7 @@ export default function PhoneInput({
           onClick={() => !disabled && setOpen((o) => !o)}
           disabled={disabled}
           className="input flex items-center gap-2 !py-2 hover:bg-black/[0.03] disabled:opacity-60"
-          aria-label="Davlat"
+          aria-label={t('ui.countrySelector')}
         >
           <Flag country={country} size={18} />
           <span className="text-sm font-medium">{country.code}</span>
@@ -188,7 +189,9 @@ export default function PhoneInput({
                   >
                     <Flag country={c} size={18} />
                     <span className="font-medium w-6">{c.code}</span>
-                    <span className="text-ink/80 truncate flex-1">{c.name}</span>
+                    <span className="text-ink/80 truncate flex-1">
+                      {t(`ui.countries.${c.code}`, { defaultValue: c.name })}
+                    </span>
                     <span className="text-ink-soft text-xs">{c.dialCode}</span>
                   </button>
                 );

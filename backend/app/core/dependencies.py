@@ -27,6 +27,7 @@ async def get_current_user(
         payload = decode_token(token)
         user_id = payload.get("sub")
         token_type = payload.get("type")
+        token_ver = payload.get("ver", 0)
         if user_id is None or token_type != "access":
             raise creds_exc
     except ValueError:
@@ -35,6 +36,9 @@ async def get_current_user(
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if user is None or not user.is_active:
+        raise creds_exc
+    # Token bekor qilingan bo'lsa (logout/parol almashtirish) — rad etamiz
+    if token_ver != user.token_version:
         raise creds_exc
     return user
 

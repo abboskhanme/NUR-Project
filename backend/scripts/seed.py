@@ -11,6 +11,7 @@ Ma'lumotni o'zgartirish uchun faqat sample_data.json'ni tahrirlang — kodga teg
 """
 import asyncio
 import json
+import os
 import random
 from datetime import date, time, timedelta
 from decimal import Decimal
@@ -36,6 +37,11 @@ from app.models.user import Role, User
 # Namunaviy ma'lumotlar fayli — products / customers / employees shu yerdan
 # ---------------------------------------------------------------------------
 SAMPLE_DATA_PATH = Path(__file__).parent / "sample_data.json"
+
+# Namunaviy (demo) ma'lumotlarni seed qilishni yoqish/o'chirish.
+# Default: O'CHIQ — faqat mahsulot katalogi + tizim konfiguratsiyasi seed qilinadi.
+# Demo (mijoz/buyurtma/xodim/taminotchi) kerak bo'lsa: SEED_DEMO=true
+SEED_DEMO = os.getenv("SEED_DEMO", "false").lower() in ("1", "true", "yes", "on")
 
 
 def _load_sample_data() -> dict:
@@ -412,6 +418,9 @@ async def _ensure_user_schema():
         # 5) email index/ustunini olib tashlaymiz
         "DROP INDEX IF EXISTS ix_users_email",
         "ALTER TABLE users DROP COLUMN IF EXISTS email",
+        # 6) token_version — logout/parol almashtirishda tokenlarni bekor qilish
+        #    (migration 20260606_01 bilan bir xil; create_all eski jadvalni ALTER qilmaydi)
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS token_version INTEGER NOT NULL DEFAULT 0",
     ]
     for sql in stmts:
         try:
@@ -479,10 +488,11 @@ async def seed():
             print(f"[+] Created super admin: {settings.INIT_ADMIN_PHONE} / {settings.INIT_ADMIN_PASSWORD}")
 
         # Taminotchilar — login akkaunt (supplier roli) + bog'langan vendor yozuvi
+        # (NAMUNAVIY — faqat SEED_DEMO=true bo'lganda)
         supplier_role = (await db.execute(
             select(Role).where(Role.name == "supplier")
         )).scalar_one_or_none()
-        for s in SUPPLIERS:
+        for s in (SUPPLIERS if SEED_DEMO else []):
             u = (await db.execute(select(User).where(User.phone == s["phone"]))).scalar_one_or_none()
             if not u:
                 u = User(
@@ -587,15 +597,21 @@ async def seed():
                     base_price_usd=_dec(p.get("base_price_usd")), status="active",
                 ))
 
-        # Namunaviy mijozlar
-        await _seed_customers(db)
+        # ---- NAMUNAVIY (demo) ma'lumotlar — faqat SEED_DEMO=true bo'lganda ----
+        # Mahsulot katalogi va tizim konfiguratsiyasi yuqorida doim seed qilinadi;
+        # quyidagilar (mijoz/buyurtma/xodim) esa demo bo'lib, default O'CHIQ.
+        if SEED_DEMO:
+            # Namunaviy mijozlar
+            await _seed_customers(db)
 
-        # Namunaviy buyurtmalar (mijoz va mahsulotlar flush qilingach)
-        await db.flush()
-        await _seed_orders(db)
+            # Namunaviy buyurtmalar (mijoz va mahsulotlar flush qilingach)
+            await db.flush()
+            await _seed_orders(db)
 
-        # HR — namunaviy ofis va ishchi xodimlar
-        await _seed_hr_samples(db)
+            # HR — namunaviy ofis va ishchi xodimlar
+            await _seed_hr_samples(db)
+        else:
+            print("[i] SEED_DEMO o'chiq — namunaviy mijoz/buyurtma/xodim/taminotchi seed qilinmadi")
 
         await db.commit()
         print("[OK] Seed completed.")

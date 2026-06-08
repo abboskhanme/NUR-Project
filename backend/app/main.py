@@ -4,15 +4,21 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 from app.api.v1 import api_router
 from app.core.config import settings
-from app.core.exceptions import global_exception_handler
+from app.core.exceptions import global_exception_handler, rate_limit_handler
+from app.core.limiter import limiter
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info(f"[{settings.APP_NAME}] starting in {settings.APP_ENV} mode")
+    # Xavfsizlik sozlamalarini tekshirish (production'da xato ko'taradi)
+    for warning in settings.validate_security():
+        logger.warning(f"[security] {warning}")
     yield
     logger.info(f"[{settings.APP_NAME}] shutting down")
 
@@ -27,13 +33,18 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS
+# Rate limiting (slowapi)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, rate_limit_handler)
+app.add_middleware(SlowAPIMiddleware)
+
+# CORS — aniq metod/header ro'yxati (wildcard emas)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"],
 )
 
 # Global exception handler (only outside of debug)

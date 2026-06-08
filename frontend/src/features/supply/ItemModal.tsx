@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import { X } from 'lucide-react';
 
@@ -16,10 +17,11 @@ export default function ItemModal({
 }: {
   item?: ItemLite | null;
   vendors: VendorLite[];
-  fixedVendorId?: string;   // taminotchi rejimida — vendor tanlash yashiriladi
+  fixedVendorId?: string;
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const { t } = useTranslation();
   const editing = !!item;
   const [name, setName] = useState(item?.name ?? '');
   const [vendorId, setVendorId] = useState(item?.vendor_id ?? fixedVendorId ?? '');
@@ -37,7 +39,7 @@ export default function ItemModal({
   }, [onClose]);
 
   async function handleSave() {
-    if (!name.trim()) { toast.error('Nomini kiriting'); return; }
+    if (!name.trim()) { toast.error(t('supply.itemModal.nameRequired')); return; }
     setSaving(true);
     try {
       const body: any = {
@@ -53,11 +55,11 @@ export default function ItemModal({
         body.stock_qty = toNum(stock);
         await api.post('/supply/items', body);
       }
-      toast.success(editing ? 'Yangilandi' : 'Mahsulot qo\'shildi');
+      toast.success(editing ? t('supply.itemModal.savedEdit') : t('supply.itemModal.savedNew'));
       onSaved();
       onClose();
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || 'Xatolik');
+      toast.error(e?.response?.data?.detail || t('supply.error'));
     } finally {
       setSaving(false);
     }
@@ -68,22 +70,24 @@ export default function ItemModal({
       <div className="bg-card rounded-lg shadow-xl w-full max-w-md flex flex-col"
            onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3 border-b border-black/5">
-          <h3 className="font-semibold">{editing ? 'Mahsulotni tahrirlash' : 'Yangi mahsulot'}</h3>
+          <h3 className="font-semibold">
+            {editing ? t('supply.itemModal.titleEdit') : t('supply.itemModal.titleNew')}
+          </h3>
           <button onClick={onClose} className="p-1 rounded hover:bg-black/5"><X size={18} /></button>
         </div>
 
         <div className="p-5 space-y-3">
           <div>
-            <label className="label">Nomi *</label>
+            <label className="label">{t('supply.itemModal.labelName')}</label>
             <input className="input" value={name} onChange={(e) => setName(e.target.value)}
-                   placeholder="Masalan: Profil truba 40x40" />
+                   placeholder={t('supply.itemModal.placeholderName')} />
           </div>
 
           {!fixedVendorId && (
             <div>
-              <label className="label">Taminotchi</label>
+              <label className="label">{t('supply.itemModal.labelVendor')}</label>
               <select className="input" value={vendorId} onChange={(e) => setVendorId(e.target.value)}>
-                <option value="">— Tanlanmagan —</option>
+                <option value="">{t('supply.itemModal.optionNone')}</option>
                 {vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
               </select>
             </div>
@@ -91,13 +95,13 @@ export default function ItemModal({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="label">O'lchov birligi</label>
+              <label className="label">{t('supply.itemModal.labelUnit')}</label>
               <select className="input" value={unit} onChange={(e) => setUnit(e.target.value)}>
                 {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
               </select>
             </div>
             <div>
-              <label className="label">Birlik narxi (so'm)</label>
+              <label className="label">{t('supply.itemModal.labelUnitPrice')}</label>
               <input className="input" inputMode="decimal" value={unitPrice}
                      onChange={(e) => setUnitPrice(formatAmount(e.target.value))} placeholder="0" />
             </div>
@@ -106,31 +110,33 @@ export default function ItemModal({
           <div className="grid grid-cols-2 gap-3">
             {!editing && (
               <div>
-                <label className="label">Boshlang'ich qoldiq</label>
+                <label className="label">{t('supply.itemModal.labelInitialStock')}</label>
                 <input className="input" inputMode="decimal" value={stock}
                        onChange={(e) => setStock(e.target.value)} placeholder="0" />
               </div>
             )}
             <div>
-              <label className="label">Minimum qoldiq</label>
+              <label className="label">{t('supply.itemModal.labelMinQty')}</label>
               <input className="input" inputMode="decimal" value={minQty}
                      onChange={(e) => setMinQty(e.target.value)} placeholder="0" />
             </div>
           </div>
           <p className="text-xs text-ink-soft">
-            Qoldiq minimumdan past tushganda «Kam» belgisi va bildirishnoma chiqadi.
+            {t('supply.itemModal.hintLowStock')}
           </p>
 
           <div>
-            <label className="label">Izoh</label>
+            <label className="label">{t('supply.itemModal.labelNote')}</label>
             <textarea className="input min-h-[48px]" value={note} onChange={(e) => setNote(e.target.value)} />
           </div>
         </div>
 
         <div className="px-5 py-3 border-t border-black/5 flex justify-end gap-2">
-          <button onClick={onClose} className="px-3 py-1.5 text-sm rounded-button hover:bg-black/5">Bekor</button>
+          <button onClick={onClose} className="px-3 py-1.5 text-sm rounded-button hover:bg-black/5">
+            {t('supply.cancel')}
+          </button>
           <button onClick={handleSave} disabled={saving} className="btn-primary disabled:opacity-50">
-            {saving ? 'Saqlanmoqda…' : 'Saqlash'}
+            {saving ? t('supply.itemModal.saving') : t('supply.save')}
           </button>
         </div>
       </div>

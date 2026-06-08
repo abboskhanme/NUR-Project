@@ -1,0 +1,124 @@
+{
+  "title": "Сервисное обслуживание",
+  "subtitle": "Гарантия и техническое обслуживание проданных товаров",
+  "newTicket": "Новая заявка",
+  "categories": "Категории",
+  "ticket": "Заявка",
+  "filter": {
+    "all": "Все",
+    "new": "Новые",
+    "scheduled": "Запланированные",
+    "completed": "Выполненные",
+    "cancelled": "Отменённые"
+  },
+  "kpi": {
+    "open": "Открытые заявки",
+    "new": "Новые",
+    "scheduledNext7": "Ближайшие 7 дней (план)",
+    "warrantyOpen": "Открытые по гарантии"
+  },
+  "table": {
+    "code": "Код",
+    "customer": "Клиент",
+    "problem": "Проблема",
+    "visitDate": "Дата выезда",
+    "warranty": "Гарантия",
+    "status": "Статус"
+  },
+  "search": {
+    "placeholder": "Код или проблема…"
+  },
+  "empty": {
+    "title": "Нет сервисных заявок",
+    "description": "Добавьте первую заявку через кнопку «Новая заявка»"
+  },
+  "warranty": {
+    "inWarranty": "На гарантии",
+    "noWarranty": "Нет",
+    "activeFull_short": "1 год — бесплатно",
+    "activeFull_long": "1 год гарантии — работа и запчасти бесплатно",
+    "activeServiceOnly_short": "2–3 года — только работа",
+    "activeServiceOnly_long": "2–3 года гарантии — только работа бесплатно, запчасти за счёт клиента",
+    "expired_short": "Гарантия истекла",
+    "expired_long": "Гарантийный срок истёк — услуги и запчасти за счёт клиента",
+    "notDelivered_short": "Не доставлено",
+    "notDelivered_long": "Товар ещё не доставлен — гарантия не началась",
+    "daysLeft": "· осталось {{count}} дн.",
+    "wmetaActiveFull": "1 год — полностью бесплатно (работа + запчасти)",
+    "wmetaActiveServiceOnly": "2–3 года — только работа бесплатно, запчасти за счёт клиента",
+    "wmetaExpired": "Гарантия истекла — всё за счёт клиента",
+    "wmetaNotDelivered": "Товар ещё не доставлен"
+  },
+  "form": {
+    "title": "Новая сервисная заявка",
+    "customer": "Клиент",
+    "customerPlaceholder": "Поиск по имени или телефону…",
+    "orderLabel": "Выберите заказ",
+    "orderLabelHint": "(гарантия по этому заказу)",
+    "noOrders": "У этого клиента нет заказов.",
+    "delivered": "Доставлено:",
+    "problem": "Проблема",
+    "problemOptional": "(выбрана категория — необязательно)",
+    "problemPlaceholder": "Опишите проблему клиента…",
+    "category": "Категория",
+    "categoryNone": "— Не выбрано —",
+    "noCategoriesHint": "Категорий нет — добавьте в разделе «Категории».",
+    "visitDate": "Дата выезда",
+    "visitTime": "Время",
+    "addressLabel": "Адрес",
+    "addressHint": "(адрес не указан в заказе)",
+    "addressPlaceholder": "Адрес выезда",
+    "submit": "Создать заявку",
+    "saving": "Сохранение…"
+  },
+  "toast": {
+    "ticketCreated": "Заявка создана",
+    "saved": "Сохранено",
+    "scheduled": "Запланировано",
+    "completed": "Отмечено как выполненное",
+    "cancelled": "Отменено",
+    "noteAdded": "Комментарий добавлен",
+    "categoryAdded": "Категория добавлена",
+    "errorGeneric": "Произошла ошибка",
+    "errorCustomer": "Выберите клиента",
+    "errorOrder": "Выберите заказ",
+    "errorProblem": "Опишите проблему или выберите категорию",
+    "errorAddress": "Введите адрес",
+    "errorNote": "Напишите комментарий"
+  },
+  "detail": {
+    "problem": "Проблема",
+    "opened": "Открыто:",
+    "visitDate": "Дата выезда",
+    "visitTime": "Время",
+    "resolution": "Решение (проблема устранена?)",
+    "resolutionPlaceholder": "Что сделано, решено ли…",
+    "cost": "Стоимость сервиса (сум, необязательно)",
+    "save": "Сохранить",
+    "notesTitle": "Журнал комментариев",
+    "noNotes": "Комментариев пока нет.",
+    "newNotePlaceholder": "Добавить комментарий…",
+    "closedAt": "Закрыто:",
+    "costLabel": "· Стоимость:",
+    "deliveredNote": "— доставлено",
+    "schedule": "Запланировать",
+    "markCompleted": "Выполнено",
+    "markCancelled": "Отменить",
+    "reja": "План:"
+  },
+  "categoryModal": {
+    "title": "Категории сервиса",
+    "description": "Добавьте часто встречающиеся типы проблем/услуг — при создании заявки они будут доступны для выбора.",
+    "inputPlaceholder": "Название новой категории…",
+    "add": "Добавить",
+    "noCategories": "Категорий пока нет.",
+    "deleteTitle": "Удалить",
+    "done": "Готово"
+  },
+  "status": {
+    "new": "Новая",
+    "scheduled": "Запланирована",
+    "completed": "Выполнена",
+    "cancelled": "Отменена"
+  }
+}

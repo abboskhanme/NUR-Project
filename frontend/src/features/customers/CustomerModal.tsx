@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import { X } from 'lucide-react';
 
@@ -35,6 +36,7 @@ export default function CustomerModal({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const { t } = useTranslation();
   const isCreate = customer === null;
 
   const [fullName, setFullName] = useState(customer?.full_name ?? '');
@@ -54,8 +56,14 @@ export default function CustomerModal({
   }, [onClose]);
 
   async function handleSave() {
-    if (!fullName.trim()) { toast.error('Ism-familiya majburiy'); return; }
-    if (!phone.trim()) { toast.error('Telefon majburiy'); return; }
+    if (!fullName.trim()) {
+      toast.error(t('customers.modal.fullNameRequired'));
+      return;
+    }
+    if (!phone.trim()) {
+      toast.error(t('customers.modal.phoneRequired'));
+      return;
+    }
     setSaving(true);
     const body: Record<string, unknown> = {
       full_name: fullName.trim(),
@@ -70,15 +78,15 @@ export default function CustomerModal({
     try {
       if (isCreate) {
         await api.post('/customers', body);
-        toast.success('Mijoz qo\'shildi');
+        toast.success(t('customers.modal.toastAdded'));
       } else {
         await api.patch(`/customers/${customer!.id}`, body);
-        toast.success('Yangilandi');
+        toast.success(t('customers.modal.toastUpdated'));
       }
       onSaved();
       onClose();
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || 'Xatolik');
+      toast.error(e?.response?.data?.detail || t('customers.modal.toastError'));
     } finally {
       setSaving(false);
     }
@@ -89,30 +97,34 @@ export default function CustomerModal({
       <div className="bg-card rounded-lg shadow-xl w-full max-w-xl max-h-[92vh] overflow-hidden flex flex-col"
            onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3 border-b border-black/5 shrink-0">
-          <h3 className="font-semibold">{isCreate ? 'Yangi mijoz' : 'Mijozni tahrirlash'}</h3>
-          <button onClick={onClose} className="p-1 rounded hover:bg-black/5"><X size={18} /></button>
+          <h3 className="font-semibold">
+            {isCreate ? t('customers.modal.createTitle') : t('customers.modal.editTitle')}
+          </h3>
+          <button onClick={onClose} className="p-1 rounded hover:bg-black/5" aria-label={t('common.close')}>
+            <X size={18} />
+          </button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
           <div>
-            <label className="label">Ism familiya *</label>
+            <label className="label">{t('customers.modal.fullNameLabel')}</label>
             <input className="input" value={fullName} onChange={(e) => setFullName(e.target.value)} />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="label">Telefon *</label>
+              <label className="label">{t('customers.modal.phoneLabel')}</label>
               <PhoneInput value={phone} onChange={setPhone} />
             </div>
             <div>
-              <label className="label">Qo'shimcha telefon</label>
+              <label className="label">{t('customers.modal.phone2Label')}</label>
               <PhoneInput value={phone2} onChange={setPhone2} />
             </div>
           </div>
 
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="label">Davlat</label>
+              <label className="label">{t('customers.modal.countryLabel')}</label>
               <Select
                 value={country}
                 onChange={(v) => { setCountry(v); setRegion(''); }}
@@ -122,14 +134,13 @@ export default function CustomerModal({
               />
             </div>
             <div>
-              <label className="label">Viloyat</label>
+              <label className="label">{t('customers.modal.regionLabel')}</label>
               <Select
                 value={region}
                 onChange={setRegion}
                 allowEmpty
                 placeholder="—"
                 options={[
-                  // Tahrirlashda eski qiymat ro'yxatda bo'lmasa ham yo'qolmasin
                   ...(region && !regionsOf(country).includes(region)
                     ? [{ value: region, label: region }] : []),
                   ...regionsOf(country).map((r) => ({ value: r, label: r })),
@@ -137,26 +148,28 @@ export default function CustomerModal({
               />
             </div>
             <div>
-              <label className="label">Shahar / tuman</label>
+              <label className="label">{t('customers.modal.cityLabel')}</label>
               <input className="input" value={city} onChange={(e) => setCity(e.target.value)} />
             </div>
           </div>
 
           <div>
-            <label className="label">Manzil</label>
+            <label className="label">{t('customers.modal.addressLabel')}</label>
             <textarea className="input min-h-[56px]" value={address} onChange={(e) => setAddress(e.target.value)} />
           </div>
 
           <div>
-            <label className="label">Izoh</label>
+            <label className="label">{t('customers.modal.noteLabel')}</label>
             <textarea className="input min-h-[56px]" value={note} onChange={(e) => setNote(e.target.value)} />
           </div>
         </div>
 
         <div className="px-5 py-3 border-t border-black/5 flex justify-end gap-2 shrink-0">
-          <button onClick={onClose} className="px-3 py-1.5 text-sm rounded-button hover:bg-black/5">Bekor qilish</button>
+          <button onClick={onClose} className="px-3 py-1.5 text-sm rounded-button hover:bg-black/5">
+            {t('actions.cancel')}
+          </button>
           <button onClick={handleSave} disabled={saving} className="btn-primary disabled:opacity-50">
-            {saving ? 'Saqlanmoqda...' : 'Saqlash'}
+            {saving ? t('customers.modal.saving') : t('actions.save')}
           </button>
         </div>
       </div>

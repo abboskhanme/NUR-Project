@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import {
   Wallet, ShoppingCart, TrendingUp, TrendingDown, PackageCheck, Banknote,
 } from 'lucide-react';
@@ -28,7 +29,7 @@ const compact = (n: number) => {
 };
 
 export default function DashboardPage() {
-  // Ruxsatga qarab bo'limlar: moliya bloklari faqat finance, qolgani reports
+  const { t } = useTranslation();
   const { canModule } = usePermissions();
   const canFinance = canModule('finance');
   const canReports = canModule('reports');
@@ -57,14 +58,14 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Bosh sahifa</h1>
-        <p className="text-sm text-ink-soft">NUR TECHNO GROUP — joriy holat</p>
+        <h1 className="text-2xl font-bold">{t('dashboard.title')}</h1>
+        <p className="text-sm text-ink-soft">{t('dashboard.subtitle')}</p>
       </div>
 
       {!canFinance && !canReports && (
-        <Card title="Xush kelibsiz">
+        <Card title={t('dashboard.welcome')}>
           <p className="text-sm text-ink-soft">
-            Sizga ajratilgan bo'limlar chap menyuda ko'rsatilgan.
+            {t('dashboard.welcomeDesc')}
           </p>
         </Card>
       )}
@@ -73,19 +74,19 @@ export default function DashboardPage() {
       {canFinance && (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <BalanceCard
-          title="UZS balans"
+          title={t('dashboard.balance.uzs')}
           value={formatUZS(balance.data?.uzs ?? 0)}
           icon={<Wallet size={18} />}
           accent="primary"
         />
         <BalanceCard
-          title="USD balans"
+          title={t('dashboard.balance.usd')}
           value={formatUSD(balance.data?.usd ?? 0)}
           icon={<Wallet size={18} />}
           accent="success"
         />
         <BalanceCard
-          title="G'azna (naqd USD)"
+          title={t('dashboard.balance.gazna')}
           value={formatUSD(balance.data?.gazna ?? 0)}
           icon={<Banknote size={18} />}
           accent="warning"
@@ -98,25 +99,25 @@ export default function DashboardPage() {
       <>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <BalanceCard
-          title="Buyurtmalar (oy)"
+          title={t('dashboard.kpi.ordersMonth')}
           value={String(kpi?.orders_total ?? '—')}
           icon={<ShoppingCart size={18} />}
         />
         <BalanceCard
-          title="Yetkazilgan (oy)"
+          title={t('dashboard.kpi.deliveredMonth')}
           value={String(kpi?.orders_delivered ?? '—')}
           icon={<PackageCheck size={18} />}
           accent="success"
         />
         <BalanceCard
-          title="Tushum (oy)"
+          title={t('dashboard.kpi.revenueMonth')}
           value={formatUZS(kpi?.revenue_uzs ?? 0)}
           icon={<TrendingUp size={18} />}
           accent="primary"
-          trend={growth != null ? { value: growth, label: "o'tgan oyga nisbatan" } : undefined}
+          trend={growth != null ? { value: growth, label: t('dashboard.kpi.vsLastMonth') } : undefined}
         />
         <BalanceCard
-          title="Chiqim (oy)"
+          title={t('dashboard.kpi.expenseMonth')}
           value={formatUZS(kpi?.expense_uzs ?? 0)}
           icon={<TrendingDown size={18} />}
           accent="warning"
@@ -125,17 +126,17 @@ export default function DashboardPage() {
 
       {/* Grafiklar */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <Card title="Tushum dinamikasi (14 kun)" className="lg:col-span-2">
+        <Card title={t('dashboard.cards.revenueTrend')} className="lg:col-span-2">
           <RevenueArea points={dash.data?.revenue_sparkline} />
         </Card>
 
-        <Card title="Buyurtmalar holati (oy)">
+        <Card title={t('dashboard.cards.statusBreakdown')}>
           <StatusDonut data={dash.data?.status_breakdown} />
         </Card>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <Card title="Kirim vs Chiqim (joriy oy)" className="lg:col-span-2">
+        <Card title={t('dashboard.cards.incomeVsExpense')} className="lg:col-span-2">
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={incomeExpense.data?.weeks ?? []}>
               <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
@@ -143,19 +144,19 @@ export default function DashboardPage() {
               <YAxis tickFormatter={compact} fontSize={11} width={56} />
               <Tooltip formatter={(v: number) => formatUZS(v)} />
               <Legend />
-              <Bar dataKey="income" name="Kirim" fill="#27AE60" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="expense" name="Chiqim" fill="#E74C3C" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="income" name={t('dashboard.chart.income')} fill="#27AE60" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="expense" name={t('dashboard.chart.expense')} fill="#E74C3C" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </Card>
 
-        <Card title="Eslatmalar">
+        <Card title={t('dashboard.cards.alerts')}>
           <AlertList alerts={dash.data?.alerts} />
         </Card>
       </div>
 
       {/* So'nggi buyurtmalar */}
-      <Card title="So'nggi buyurtmalar">
+      <Card title={t('dashboard.cards.recentOrders')}>
         <RecentOrdersList orders={dash.data?.recent_orders} />
       </Card>
       </>

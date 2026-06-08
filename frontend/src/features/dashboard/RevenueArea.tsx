@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from 'recharts';
@@ -19,9 +20,11 @@ const compact = (n: number) => {
 };
 
 export default function RevenueArea({ points, height = 250 }: { points?: Point[]; height?: number }) {
-  if (!points) return <div className="text-sm text-ink-soft py-12 text-center">Yuklanmoqda…</div>;
+  const { t } = useTranslation();
+
+  if (!points) return <div className="text-sm text-ink-soft py-12 text-center">{t('dashboard.revenue.loading')}</div>;
   if (points.every((p) => p.total_uzs === 0)) {
-    return <div className="text-sm text-ink-soft py-12 text-center">Bu davrda tushum yo'q</div>;
+    return <div className="text-sm text-ink-soft py-12 text-center">{t('dashboard.revenue.noData')}</div>;
   }
 
   return (
@@ -37,7 +40,7 @@ export default function RevenueArea({ points, height = 250 }: { points?: Point[]
         <XAxis dataKey="date" tickFormatter={shortDate} fontSize={11} tickMargin={6} />
         <YAxis tickFormatter={compact} fontSize={11} width={56} />
         <Tooltip
-          formatter={(v: number) => [formatUZS(v), 'Tushum']}
+          formatter={(v: number) => [formatUZS(v), t('dashboard.revenue.tooltipLabel')]}
           labelFormatter={(l) => shortDate(String(l))}
         />
         <Area

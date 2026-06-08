@@ -1,0 +1,166 @@
+{
+  "title": "Снабжение",
+  "subtitle": "Поставщики, товары и долги",
+  "supplierSubtitle": "Мои товары",
+
+  "buttons": {
+    "payDebt": "Погасить долг",
+    "newItem": "Новый товар",
+    "newReceipt": "Новое поступление",
+    "issueItem": "Списать",
+    "payFull": "Погасить весь долг ({{amount}})"
+  },
+
+  "kpi": {
+    "totalDebt": "Общий долг",
+    "totalReceived": "Итого поступлений (стоимость)",
+    "stockValue": "Стоимость склада",
+    "lowStock": "Товаров на исходе",
+    "lowStockValue": "{{count}} шт."
+  },
+
+  "vendors": {
+    "all": "Все",
+    "emptyHint": "Поставщики добавляются в разделе «Пользователи» с ролью «Поставщик»",
+    "debtInfo": "{{count}} товаров · {{low}} мало · долг: {{debt}}"
+  },
+
+  "tabs": {
+    "items": "Товары",
+    "receipts": "Поступления / Долги"
+  },
+
+  "items": {
+    "empty": "Товаров нет",
+    "emptyDesc": "Добавьте новый товар",
+    "emptyDescReadonly": "Пока пусто",
+    "colName": "Название",
+    "colUnit": "Ед. изм.",
+    "colUnitPrice": "Цена за ед.",
+    "colStock": "Остаток",
+    "colMin": "Минимум",
+    "colStatus": "Статус",
+    "colActions": "Действия",
+    "statusLow": "Мало",
+    "statusOk": "ОК",
+    "titleIssue": "Списание",
+    "titleEdit": "Редактировать",
+    "titleDelete": "Удалить"
+  },
+
+  "receipts": {
+    "empty": "Поступлений нет",
+    "emptyDesc": "Добавьте через «Новое поступление»",
+    "colDate": "Дата",
+    "colVendor": "Поставщик",
+    "colItem": "Товар",
+    "colQty": "Количество",
+    "colTotal": "Сумма",
+    "colDebt": "Долг",
+    "colStatus": "Статус",
+    "statusOpen": "Долг",
+    "statusPartial": "Частично",
+    "statusPaid": "Оплачено"
+  },
+
+  "deleteItem": {
+    "title": "Удаление товара",
+    "message": "Удалить «{{name}}»?"
+  },
+
+  "toast": {
+    "itemDeleted": "Удалено",
+    "error": "Ошибка",
+    "saving": "Сохранение…"
+  },
+
+  "itemModal": {
+    "titleNew": "Новый товар",
+    "titleEdit": "Редактирование товара",
+    "labelName": "Название *",
+    "placeholderName": "Например: Профиль труба 40x40",
+    "labelVendor": "Поставщик",
+    "optionNone": "— Не выбран —",
+    "labelUnit": "Единица измерения",
+    "labelUnitPrice": "Цена за единицу (сум)",
+    "labelInitialStock": "Начальный остаток",
+    "labelMinQty": "Минимальный остаток",
+    "hintLowStock": "При снижении ниже минимума появится метка «Мало» и уведомление.",
+    "labelNote": "Примечание",
+    "nameRequired": "Введите название",
+    "savedNew": "Товар добавлен",
+    "savedEdit": "Обновлено",
+    "saving": "Сохранение…"
+  },
+
+  "vendorModal": {
+    "titleNew": "Новый поставщик",
+    "titleEdit": "Редактирование поставщика",
+    "labelName": "Название *",
+    "placeholderName": "Например: Умид Токир",
+    "labelPhone": "Телефон",
+    "labelLoginAccount": "Аккаунт для входа",
+    "optionNotLinked": "— Не привязан —",
+    "labelAddress": "Адрес",
+    "labelNote": "Примечание",
+    "labelActive": "Активен",
+    "nameRequired": "Введите название",
+    "savedNew": "Поставщик добавлен",
+    "savedEdit": "Обновлено",
+    "saving": "Сохранение…"
+  },
+
+  "receiptModal": {
+    "title": "Новое поступление",
+    "labelVendor": "Поставщик *",
+    "optionSelect": "— Выберите —",
+    "labelDate": "Дата",
+    "labelItem": "Товар *",
+    "labelQty": "Количество *",
+    "labelQtyWithUnit": "Количество * ({{unit}})",
+    "labelUnitPrice": "Цена за единицу (сум)",
+    "labelPaid": "Оплачено сейчас (необязательно)",
+    "hintPaid": "Если оставить пустым — записывается как полный долг.",
+    "labelNote": "Примечание",
+    "totalLabel": "Итого",
+    "debtLabel": "Из них долг",
+    "vendorRequired": "Выберите поставщика",
+    "itemRequired": "Выберите товар",
+    "qtyRequired": "Введите количество",
+    "saved": "Поступление сохранено",
+    "saving": "Сохранение…"
+  },
+
+  "paymentModal": {
+    "title": "Погашение долга",
+    "labelVendor": "Поставщик *",
+    "optionSelect": "— Выберите —",
+    "labelCurrentDebt": "Текущий долг",
+    "labelDate": "Дата",
+    "labelAmount": "Сумма *",
+    "labelNote": "Примечание",
+    "hintAutoSettle": "Оплата автоматически списывается с самых старых долгов.",
+    "vendorRequired": "Выберите поставщика",
+    "amountRequired": "Введите сумму",
+    "saved": "Платёж сохранён",
+    "saving": "Сохранение…",
+    "pay": "Погасить"
+  },
+
+  "issueModal": {
+    "title": "Списание со склада",
+    "currentStock": "текущий остаток {{qty}} {{unit}}",
+    "labelQty": "Количество для списания ({{unit}}) *",
+    "labelNote": "Примечание",
+    "placeholderNote": "Например: передано в производство",
+    "qtyRequired": "Введите количество",
+    "notEnoughStock": "Недостаточно запасов на складе",
+    "saved": "Списание сохранено",
+    "saving": "Сохранение…",
+    "submit": "Списать"
+  },
+
+  "cancel": "Отмена",
+  "save": "Сохранить",
+  "error": "Ошибка"
+}

@@ -1,5 +1,6 @@
 import { ReactNode, useMemo, useState } from 'react';
 import { ArrowUpDown, ArrowUp, ArrowDown, Download } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 import { exportCSV } from '@/lib/export';
 
@@ -7,9 +8,7 @@ export interface Column<T> {
   key: string;
   label: string;
   align?: 'left' | 'right' | 'center';
-  /** Jadvalda ko'rsatish uchun render funksiyasi. */
   render?: (row: T) => ReactNode;
-  /** Saralash va CSV uchun xom qiymat. */
   value?: (row: T) => string | number;
   sortable?: boolean;
 }
@@ -19,15 +18,17 @@ interface Props<T> {
   columns: Column<T>[];
   filename?: string;
   emptyText?: string;
-  /** Jami qatori ko'rsatish uchun: ustun kaliti -> yig'indi render. */
   footer?: ReactNode;
 }
 
 export default function ReportTable<T extends object>({
-  rows, columns, filename, emptyText = "Ma'lumot yo'q", footer,
+  rows, columns, filename, emptyText, footer,
 }: Props<T>) {
+  const { t } = useTranslation();
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+
+  const resolvedEmptyText = emptyText ?? t('common.noData');
 
   const valueOf = (row: T, col: Column<T>): string | number =>
     col.value ? col.value(row) : ((row as Record<string, unknown>)[col.key] as string | number);
@@ -82,7 +83,7 @@ export default function ReportTable<T extends object>({
             disabled={!sorted || sorted.length === 0}
             className="inline-flex items-center gap-1.5 text-sm text-primary hover:text-primary-700 disabled:opacity-40"
           >
-            <Download size={15} /> CSV
+            <Download size={15} /> {t('reports.table.exportCsv')}
           </button>
         </div>
       )}
@@ -110,10 +111,10 @@ export default function ReportTable<T extends object>({
           </thead>
           <tbody>
             {!sorted && (
-              <tr><td colSpan={columns.length} className="py-8 text-center text-ink-soft">Yuklanmoqda…</td></tr>
+              <tr><td colSpan={columns.length} className="py-8 text-center text-ink-soft">{t('reports.table.loading')}</td></tr>
             )}
             {sorted && sorted.length === 0 && (
-              <tr><td colSpan={columns.length} className="py-8 text-center text-ink-soft">{emptyText}</td></tr>
+              <tr><td colSpan={columns.length} className="py-8 text-center text-ink-soft">{resolvedEmptyText}</td></tr>
             )}
             {sorted?.map((row, i) => (
               <tr key={i} className="border-b border-black/5 hover:bg-primary/5">

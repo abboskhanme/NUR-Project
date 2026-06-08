@@ -1,0 +1,48 @@
+{
+  "title": "Mahsulot katalogi",
+  "tabs": {
+    "main": "Asosiy (kotyollar)",
+    "mainHint": "Isitish kotyollari",
+    "additional": "Qo'shimcha mahsulotlar",
+    "additionalHint": "Turba, defizor va boshqalar"
+  },
+  "addMain": "Yangi kotyol",
+  "addAdditional": "Yangi mahsulot",
+  "noSize": "O'lchamsiz",
+  "sizeUnit": "kvm",
+  "empty": "Mahsulotlar yo'q",
+  "table": {
+    "name": "Nomi",
+    "unit": "Birlik",
+    "price": "Narx"
+  },
+  "deleteTitle": "Mahsulotni o'chirish",
+  "deleteMessage": "O'chirilsinmi: {{name}}? Agar buyurtmalarda ishlatilgan bo'lsa, o'chirilmaydi — arxivga o'tkaziladi.",
+  "toastDeleted": "O'chirildi",
+  "toastError": "Xatolik",
+  "modal": {
+    "createMain": "Yangi kotyol",
+    "createAdditional": "Yangi qo'shimcha mahsulot",
+    "editMain": "Tahrirlash — kotyol",
+    "editAdditional": "Tahrirlash — qo'shimcha mahsulot",
+    "modelLabel": "Model *",
+    "modelPlaceholder": "PREMIUM 3 / ULTRA ...",
+    "kvmLabel": "Kvadratura (kvm)",
+    "kvmPlaceholder": "200",
+    "nameLabel": "Mahsulot nomi *",
+    "namePlaceholder": "Turba, defizor ...",
+    "unitLabel": "O'lchov birligi",
+    "priceLabel": "Narx (USD)",
+    "pricePlaceholder": "0",
+    "descriptionLabel": "Izoh",
+    "directionHint": "Yo'nalish (o'ng/chap) buyurtma qilishda tanlanadi — narxga ta'sir qilmaydi.",
+    "modelRequired": "Model majburiy",
+    "nameRequired": "Mahsulot nomi majburiy",
+    "toastAdded": "Mahsulot qo'shildi",
+    "toastUpdated": "Yangilandi",
+    "toastError": "Xatolik",
+    "saving": "Saqlanmoqda..."
+  },
+  "editTooltip": "Tahrirlash",
+  "deleteTooltip": "O'chirish"
+}

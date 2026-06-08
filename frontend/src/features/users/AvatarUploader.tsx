@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import { Camera, Trash2 } from 'lucide-react';
 import { api } from '@/api/client';
@@ -16,6 +17,7 @@ export default function AvatarUploader({
   endpoint: string;
   onChanged?: (u: any) => void;
 }) {
+  const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [bust, setBust] = useState<number>(Date.now());
@@ -23,11 +25,11 @@ export default function AvatarUploader({
 
   async function onFile(file: File) {
     if (!file.type.startsWith('image/')) {
-      toast.error('Faqat rasm fayli');
+      toast.error(t('ui.avatar.onlyImage'));
       return;
     }
     if (file.size > 2 * 1024 * 1024) {
-      toast.error("Rasm 2 MB dan kichik bo'lishi kerak");
+      toast.error(t('ui.avatar.tooLarge'));
       return;
     }
     setBusy(true);
@@ -37,11 +39,11 @@ export default function AvatarUploader({
       const { data } = await api.post(endpoint, form, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
-      toast.success('Rasm yuklandi');
+      toast.success(t('ui.avatar.uploaded'));
       setBust(Date.now());
       onChanged?.(data);
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || 'Yuklashda xatolik');
+      toast.error(e?.response?.data?.detail || t('ui.avatar.uploadError'));
     } finally {
       setBusy(false);
     }
@@ -51,11 +53,11 @@ export default function AvatarUploader({
     setBusy(true);
     try {
       await api.delete(endpoint);
-      toast.success("Avatar o'chirildi");
+      toast.success(t('ui.avatar.deleted'));
       setBust(Date.now());
       onChanged?.({ ...user, avatar_url: null });
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || 'Xatolik');
+      toast.error(e?.response?.data?.detail || t('common.error'));
     } finally {
       setBusy(false);
       setAskDelete(false);
@@ -80,7 +82,7 @@ export default function AvatarUploader({
             disabled={busy}
             className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-button border border-black/10 hover:bg-black/5 disabled:opacity-50"
           >
-            <Camera size={14} /> Rasm yuklash
+            <Camera size={14} /> {t('ui.avatar.upload')}
           </button>
           {user.avatar_url && (
             <button
@@ -89,10 +91,10 @@ export default function AvatarUploader({
               disabled={busy}
               className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-button text-danger hover:bg-danger/5 disabled:opacity-50"
             >
-              <Trash2 size={14} /> O'chirish
+              <Trash2 size={14} /> {t('ui.avatar.delete')}
             </button>
           )}
-          <p className="text-xs text-ink-soft">PNG/JPEG/WEBP, &lt;2MB</p>
+          <p className="text-xs text-ink-soft">{t('ui.avatar.hint')}</p>
         </div>
         <input
           ref={inputRef}
@@ -109,9 +111,9 @@ export default function AvatarUploader({
 
       <ConfirmModal
         open={askDelete}
-        title="Avatarni o'chirish"
-        message="Profil rasmini o'chirishni tasdiqlaysizmi?"
-        confirmText="Ha, o'chirish"
+        title={t('ui.avatar.deleteTitle')}
+        message={t('ui.avatar.deleteMessage')}
+        confirmText={t('ui.avatar.deleteConfirm')}
         variant="danger"
         loading={busy}
         onConfirm={doDelete}

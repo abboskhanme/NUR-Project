@@ -1,0 +1,19 @@
+{
+  "title": "Sozlamalar",
+  "avatarCard": "Profil rasmi",
+  "profileCard": "Profil",
+  "phoneLabel": "Telefon raqam (login)",
+  "phoneHint": "Bu raqam tizimga kirish uchun ishlatiladi.",
+  "fullNameLabel": "To'liq ism",
+  "saveBtn": "Saqlash",
+  "savingBtn": "Saqlanmoqda...",
+  "phoneRequired": "Login telefon raqami bo'sh bo'lishi mumkin emas",
+  "profileSaved": "Profil yangilandi",
+  "changePasswordCard": "Parolni o'zgartirish",
+  "oldPasswordLabel": "Eski parol",
+  "newPasswordLabel": "Yangi parol",
+  "newPasswordPlaceholder": "kamida 8 ta belgi",
+  "changeBtn": "O'zgartirish",
+  "changingBtn": "Yangilanmoqda...",
+  "passwordSaved": "Parol yangilandi"
+}

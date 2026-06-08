@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import { api } from '@/api/client';
 import Card from '@/components/ui/Card';
@@ -7,10 +8,11 @@ import { useAuthStore } from '@/stores/auth';
 import AvatarUploader from '@/features/users/AvatarUploader';
 
 export default function SettingsPage() {
+  const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
   const setUser = useAuthStore((s) => s.setUser);
+  const setTokens = useAuthStore((s) => s.setTokens);
 
-  // Original qiymatlar — o'zgarganligini tekshirish uchun
   const origFullName = user?.full_name ?? '';
   const origPhone = user?.phone ?? '';
 
@@ -22,7 +24,6 @@ export default function SettingsPage() {
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingPwd, setSavingPwd] = useState(false);
 
-  // Profil o'zgarganmi?
   const profileChanged = useMemo(
     () =>
       fullName.trim() !== origFullName.trim() ||
@@ -30,22 +31,21 @@ export default function SettingsPage() {
     [fullName, phone, origFullName, origPhone],
   );
 
-  // Parol formasi to'liqmi?
   const passwordReady = oldPwd.length > 0 && newPwd.length >= 8;
 
   async function saveProfile() {
     if (!profileChanged) return;
     if (!phone.trim()) {
-      toast.error('Login telefon raqami bo\'sh bo\'lishi mumkin emas');
+      toast.error(t('settings.phoneRequired'));
       return;
     }
     setSavingProfile(true);
     try {
       const { data } = await api.patch('/auth/me', { full_name: fullName, phone });
       setUser(data);
-      toast.success('Profil yangilandi');
+      toast.success(t('settings.profileSaved'));
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || 'Xato');
+      toast.error(e?.response?.data?.detail || t('common.error'));
     } finally {
       setSavingProfile(false);
     }
@@ -55,12 +55,18 @@ export default function SettingsPage() {
     if (!passwordReady) return;
     setSavingPwd(true);
     try {
-      await api.patch('/auth/me/password', { old_password: oldPwd, new_password: newPwd });
-      toast.success('Parol yangilandi');
+      const { data } = await api.patch('/auth/me/password', {
+        old_password: oldPwd,
+        new_password: newPwd,
+      });
+      if (data?.access_token && data?.refresh_token) {
+        setTokens(data.access_token, data.refresh_token);
+      }
+      toast.success(t('settings.passwordSaved'));
       setOldPwd('');
       setNewPwd('');
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || 'Xato');
+      toast.error(e?.response?.data?.detail || t('common.error'));
     } finally {
       setSavingPwd(false);
     }
@@ -68,9 +74,9 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-4 max-w-3xl">
-      <h1 className="text-2xl font-bold">Sozlamalar</h1>
+      <h1 className="text-2xl font-bold">{t('settings.title')}</h1>
 
-      <Card title="Profil rasmi">
+      <Card title={t('settings.avatarCard')}>
         {user && (
           <AvatarUploader
             user={user}
@@ -84,17 +90,17 @@ export default function SettingsPage() {
         )}
       </Card>
 
-      <Card title="Profil">
+      <Card title={t('settings.profileCard')}>
         <div className="space-y-3">
           <div>
-            <label className="label">Telefon raqam (login)</label>
+            <label className="label">{t('settings.phoneLabel')}</label>
             <PhoneInput value={phone} onChange={setPhone} defaultCountry="UZ" />
             <p className="mt-1 text-xs text-ink-soft">
-              Bu raqam tizimga kirish uchun ishlatiladi.
+              {t('settings.phoneHint')}
             </p>
           </div>
           <div>
-            <label className="label">To'liq ism</label>
+            <label className="label">{t('settings.fullNameLabel')}</label>
             <input
               className="input"
               value={fullName}
@@ -106,15 +112,15 @@ export default function SettingsPage() {
             onClick={saveProfile}
             disabled={!profileChanged || savingProfile}
           >
-            {savingProfile ? 'Saqlanmoqda...' : 'Saqlash'}
+            {savingProfile ? t('settings.savingBtn') : t('settings.saveBtn')}
           </button>
         </div>
       </Card>
 
-      <Card title="Parolni o'zgartirish">
+      <Card title={t('settings.changePasswordCard')}>
         <div className="space-y-3">
           <div>
-            <label className="label">Eski parol</label>
+            <label className="label">{t('settings.oldPasswordLabel')}</label>
             <input
               type="password"
               className="input"
@@ -124,13 +130,13 @@ export default function SettingsPage() {
             />
           </div>
           <div>
-            <label className="label">Yangi parol</label>
+            <label className="label">{t('settings.newPasswordLabel')}</label>
             <input
               type="password"
               className="input"
               value={newPwd}
               onChange={(e) => setNewPwd(e.target.value)}
-              placeholder="kamida 8 ta belgi"
+              placeholder={t('settings.newPasswordPlaceholder')}
               autoComplete="new-password"
             />
           </div>
@@ -139,7 +145,7 @@ export default function SettingsPage() {
             onClick={changePassword}
             disabled={!passwordReady || savingPwd}
           >
-            {savingPwd ? 'Yangilanmoqda...' : "O'zgartirish"}
+            {savingPwd ? t('settings.changingBtn') : t('settings.changeBtn')}
           </button>
         </div>
       </Card>

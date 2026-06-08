@@ -107,7 +107,6 @@ export default function RoleModal({
         next.delete(key);
       } else {
         next.add(key);
-        // yozish/o'chirish/tasdiqlash uchun ko'rish ham kerak
         if (v !== 'read') next.add(`${m}:read`);
       }
       return next;
@@ -136,7 +135,7 @@ export default function RoleModal({
 
   async function save() {
     if (name.trim().length < 2) {
-      toast.error("Nom kamida 2 ta belgi bo'lishi kerak");
+      toast.error(t('users.roles.nameMinLength'));
       return;
     }
     setSaving(true);
@@ -148,15 +147,15 @@ export default function RoleModal({
     try {
       if (isCreate) {
         await api.post('/users/roles', payload);
-        toast.success('Rol yaratildi');
+        toast.success(t('users.roles.createdSuccess'));
       } else {
         await api.patch(`/users/roles/${role!.id}`, payload);
-        toast.success('Yangilandi');
+        toast.success(t('common.updated'));
       }
       onSaved();
       onClose();
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || 'Xatolik');
+      toast.error(e?.response?.data?.detail || t('common.error'));
     } finally {
       setSaving(false);
     }
@@ -189,7 +188,7 @@ export default function RoleModal({
             </div>
             <div>
               <h3 className="font-semibold leading-tight">
-                {isCreate ? 'Yangi rol' : 'Rolni tahrirlash'}
+                {isCreate ? t('users.roles.newTitle') : t('users.roles.editTitle')}
               </h3>
               <p className="text-xs text-ink-soft">
                 {full || isSuperAdminRole
@@ -211,33 +210,33 @@ export default function RoleModal({
 
         {/* Body */}
         <div className="px-6 py-5 space-y-5 overflow-y-auto">
-          {/* Nomi / Tavsif */}
+          {/* Name / Description */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="label">Nomi *</label>
+              <label className="label">{t('users.roles.nameLabel')}</label>
               <input
                 className="input"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="masalan: warehouse_manager"
+                placeholder={t('users.roles.namePlaceholder')}
                 disabled={isSuperAdminRole}
               />
               <p className="text-[11px] text-ink-soft mt-1">
-                Lotin harflari, raqam va pastki chiziq (snake_case).
+                {t('users.roles.nameHint')}
               </p>
             </div>
             <div>
-              <label className="label">Tavsif</label>
+              <label className="label">{t('users.roles.descLabel')}</label>
               <input
                 className="input"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Foydalanuvchilarga ko'rinadigan tushuntirish"
+                placeholder={t('users.roles.descPlaceholder')}
               />
             </div>
           </div>
 
-          {/* To'liq ruxsat switch */}
+          {/* Full access switch */}
           <div className="flex items-center justify-between gap-4 rounded-xl border border-black/[0.06] bg-black/[0.02] px-4 py-3.5">
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-8 h-8 rounded-lg bg-warning/15 text-warning flex items-center justify-center shrink-0">
@@ -279,7 +278,7 @@ export default function RoleModal({
             </button>
           </div>
 
-          {/* Matritsa yoki to'liq-ruxsat banneri */}
+          {/* Matrix or full-access banner */}
           {full || isSuperAdminRole ? (
             <div className="flex items-center gap-3 rounded-xl bg-success/10 text-success px-4 py-3.5 text-sm font-medium">
               <Check size={16} strokeWidth={3} />
@@ -322,7 +321,7 @@ export default function RoleModal({
                             (idx !== MODULES.length - 1 ? '[&>td]:border-b [&>td]:border-black/[0.05]' : '')
                           }
                         >
-                          {/* Modul nomi */}
+                          {/* Module name */}
                           <td className="py-2 pl-4 pr-2 whitespace-nowrap">
                             <div className="flex items-center gap-2.5">
                               <div
@@ -371,7 +370,7 @@ export default function RoleModal({
                             </div>
                           </td>
 
-                          {/* Verb checkboxlari */}
+                          {/* Verb checkboxes */}
                           {VERBS.map((v) => {
                             const on = perms.has(`${m}:${v}`);
                             return (
@@ -423,14 +422,14 @@ export default function RoleModal({
             onClick={onClose}
             className="px-4 py-2 text-sm font-medium rounded-button border border-black/10 text-ink/70 hover:bg-black/5 hover:text-ink transition-colors"
           >
-            Bekor qilish
+            {t('actions.cancel')}
           </button>
           <button
             onClick={save}
             disabled={saving}
             className="btn-primary disabled:opacity-50 transition-opacity"
           >
-            {saving ? 'Saqlanmoqda…' : 'Saqlash'}
+            {saving ? t('users.roles.saving') : t('actions.save')}
           </button>
         </div>
       </div>

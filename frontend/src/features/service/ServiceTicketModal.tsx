@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { X, Search, Check, Package } from 'lucide-react';
@@ -18,6 +19,7 @@ interface Category { id: string; name: string }
 export default function ServiceTicketModal({
   onClose, onSaved,
 }: { onClose: () => void; onSaved: () => void }) {
+  const { t } = useTranslation();
   const [search, setSearch] = useState('');
   const [debounced, setDebounced] = useState('');
   const [customer, setCustomer] = useState<Customer | null>(null);
@@ -30,8 +32,8 @@ export default function ServiceTicketModal({
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    const t = setTimeout(() => setDebounced(search.trim()), 300);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setDebounced(search.trim()), 300);
+    return () => clearTimeout(timer);
   }, [search]);
 
   useEffect(() => {
@@ -46,7 +48,6 @@ export default function ServiceTicketModal({
     enabled: !customer && debounced.length >= 1,
   });
 
-  // Servis endpointi — sotuvchi cheklovisiz mijozning barcha buyurtmalarini qaytaradi
   const ordersQ = useQuery<Order[]>({
     queryKey: ['svc-cust-orders', customer?.id],
     queryFn: () => api.get('/service/orders', {
@@ -64,7 +65,6 @@ export default function ServiceTicketModal({
 
   const scheduledAt = useMemo(() => (date ? `${date}T${time || '09:00'}:00` : null), [date, time]);
 
-  // Tanlangan buyurtmada manzil bo'lmasa — qo'lda so'raymiz
   const orderHasAddress = !!(order?.delivery_address && order.delivery_address.trim());
   const needAddress = !!order && !orderHasAddress;
 
@@ -75,26 +75,47 @@ export default function ServiceTicketModal({
     setAddress('');
   }
 
+  // Warranty label helpers — resolved at render time via t()
+  function warrantyShort(status: string): string {
+    const key = `service.warranty.${
+      status === 'active_full' ? 'activeFull_short'
+      : status === 'active_service_only' ? 'activeServiceOnly_short'
+      : status === 'expired' ? 'expired_short'
+      : 'notDelivered_short'
+    }`;
+    return t(key);
+  }
+
+  function warrantyLong(status: string): string {
+    const key = `service.warranty.${
+      status === 'active_full' ? 'activeFull_long'
+      : status === 'active_service_only' ? 'activeServiceOnly_long'
+      : status === 'expired' ? 'expired_long'
+      : 'notDelivered_long'
+    }`;
+    return t(key);
+  }
+
   async function handleSave() {
-    if (!customer) { toast.error('Mijozni tanlang'); return; }
-    if (!order) { toast.error('Buyurtmani tanlang'); return; }
-    if (!problem.trim() && !category) { toast.error('Muammo yozing yoki toifani tanlang'); return; }
-    if (needAddress && !address.trim()) { toast.error('Manzilni kiriting'); return; }
+    if (!customer) { toast.error(t('service.toast.errorCustomer')); return; }
+    if (!order) { toast.error(t('service.toast.errorOrder')); return; }
+    if (!problem.trim() && !category) { toast.error(t('service.toast.errorProblem')); return; }
+    if (needAddress && !address.trim()) { toast.error(t('service.toast.errorAddress')); return; }
     setSaving(true);
     try {
       await api.post('/service/tickets', {
         customer_id: customer.id,
         order_id: order.id,
-        problem: problem.trim() || category,  // bo'sh bo'lsa toifa nomi muammo sifatida
+        problem: problem.trim() || category,
         category: category || null,
         scheduled_at: scheduledAt,
-        address: needAddress ? address.trim() : null,  // bor bo'lsa backend buyurtmadan oladi
+        address: needAddress ? address.trim() : null,
       });
-      toast.success('Ariza yaratildi');
+      toast.success(t('service.toast.ticketCreated'));
       onSaved();
       onClose();
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || 'Xatolik yuz berdi');
+      toast.error(e?.response?.data?.detail || t('service.toast.errorGeneric'));
     } finally {
       setSaving(false);
     }
@@ -107,19 +128,19 @@ export default function ServiceTicketModal({
       <div className="bg-card rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto flex flex-col"
            onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3 border-b border-black/5 sticky top-0 bg-card z-10">
-          <h3 className="font-semibold">Yangi servis arizasi</h3>
+          <h3 className="font-semibold">{t('service.form.title')}</h3>
           <button onClick={onClose} className="p-1 rounded hover:bg-black/5"><X size={18} /></button>
         </div>
 
         <div className="p-5 space-y-4">
-          {/* 1. Mijoz qidiruv */}
+          {/* 1. Customer search */}
           <div>
-            <label className="label">Mijoz *</label>
+            <label className="label">{t('service.form.customer')} *</label>
             <div className="relative">
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft" />
               <input
                 className="input pl-9"
-                placeholder="Ism yoki telefon bo'yicha qidiring…"
+                placeholder={t('service.form.customerPlaceholder')}
                 value={search}
                 onChange={(e) => { setSearch(e.target.value); setCustomer(null); setOrder(null); }}
               />
@@ -142,17 +163,20 @@ export default function ServiceTicketModal({
             )}
           </div>
 
-          {/* 2. Buyurtmani tanlash (kafolat shu bo'yicha) */}
+          {/* 2. Order selection */}
           {customer && (
             <div>
-              <label className="label">Buyurtmani tanlang * <span className="text-ink-soft font-normal">(kafolat shu zakaz bo'yicha)</span></label>
+              <label className="label">
+                {t('service.form.orderLabel')} *{' '}
+                <span className="text-ink-soft font-normal">{t('service.form.orderLabelHint')}</span>
+              </label>
               {ordersQ.isLoading ? (
                 <div className="space-y-1.5">
                   {Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-12 rounded-button bg-black/5 animate-pulse" />)}
                 </div>
               ) : orders.length === 0 ? (
                 <div className="text-sm text-ink-soft bg-black/[0.03] rounded-button p-3">
-                  Bu mijozda buyurtma topilmadi.
+                  {t('service.form.noOrders')}
                 </div>
               ) : (
                 <div className="max-h-52 overflow-y-auto border border-black/10 rounded-button divide-y divide-black/5">
@@ -171,10 +195,14 @@ export default function ServiceTicketModal({
                               <span className="font-medium">{o.code}</span>
                               {o.product_summary && <span> — {o.product_summary}</span>}
                             </span>
-                            {o.delivered_at && <span className="block text-xs text-ink-soft">Yetkazildi: {formatDate(o.delivered_at)}</span>}
+                            {o.delivered_at && (
+                              <span className="block text-xs text-ink-soft">
+                                {t('service.form.delivered')} {formatDate(o.delivered_at)}
+                              </span>
+                            )}
                           </span>
                         </span>
-                        <span className={`badge shrink-0 ${meta.cls}`}>{meta.short}</span>
+                        <span className={`badge shrink-0 ${meta.cls}`}>{warrantyShort(w.status)}</span>
                       </button>
                     );
                   })}
@@ -183,57 +211,65 @@ export default function ServiceTicketModal({
             </div>
           )}
 
-          {/* Tanlangan buyurtma kafolati */}
+          {/* Selected order warranty */}
           {selW && (
             <div className={`rounded-button p-3 text-sm font-medium ${WARRANTY_META[selW.status].cls}`}>
-              {WARRANTY_META[selW.status].long}
-              {selW.status === 'active_full' && selW.daysYear1 > 0 && ` · ${selW.daysYear1} kun qoldi`}
-              {selW.status === 'active_service_only' && selW.daysYear3 > 0 && ` · ${selW.daysYear3} kun qoldi`}
+              {warrantyLong(selW.status)}
+              {selW.status === 'active_full' && selW.daysYear1 > 0 && (
+                <> {t('service.warranty.daysLeft', { count: selW.daysYear1 })}</>
+              )}
+              {selW.status === 'active_service_only' && selW.daysYear3 > 0 && (
+                <> {t('service.warranty.daysLeft', { count: selW.daysYear3 })}</>
+              )}
             </div>
           )}
 
-          {/* 3. Muammo */}
+          {/* 3. Problem */}
           {order && (
             <>
               <div>
                 <label className="label">
-                  Muammo {category
-                    ? <span className="text-ink-soft font-normal">(toifa tanlangan — ixtiyoriy)</span>
+                  {t('service.form.problem')}{' '}
+                  {category
+                    ? <span className="text-ink-soft font-normal">{t('service.form.problemOptional')}</span>
                     : '*'}
                 </label>
-                <textarea className="input min-h-[72px]" placeholder="Mijoz aytgan muammoni yozing…"
+                <textarea className="input min-h-[72px]" placeholder={t('service.form.problemPlaceholder')}
                           value={problem} onChange={(e) => setProblem(e.target.value)} />
               </div>
 
-              {/* Toifa dropdown */}
+              {/* Category dropdown */}
               <div>
-                <label className="label">Toifa</label>
+                <label className="label">{t('service.form.category')}</label>
                 <select className="input" value={category} onChange={(e) => setCategory(e.target.value)}>
-                  <option value="">— Tanlanmagan —</option>
+                  <option value="">{t('service.form.categoryNone')}</option>
                   {categories.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
                 </select>
                 {categories.length === 0 && (
-                  <div className="text-xs text-ink-soft mt-1">Toifalar yo'q — “Toifalar” bo'limidan qo'shing.</div>
+                  <div className="text-xs text-ink-soft mt-1">{t('service.form.noCategoriesHint')}</div>
                 )}
               </div>
 
-              {/* 4. Tashrif sanasi */}
+              {/* 4. Visit date */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="label">Borish sanasi</label>
+                  <label className="label">{t('service.form.visitDate')}</label>
                   <DateInput value={date} onChange={setDate} />
                 </div>
                 <div>
-                  <label className="label">Vaqti</label>
+                  <label className="label">{t('service.form.visitTime')}</label>
                   <input type="time" className="input" value={time} onChange={(e) => setTime(e.target.value)} />
                 </div>
               </div>
 
-              {/* Manzil — faqat buyurtmada manzil bo'lmasa */}
+              {/* Address — only if order has no address */}
               {needAddress && (
                 <div>
-                  <label className="label">Manzil * <span className="text-ink-soft font-normal">(buyurtmada manzil ko'rsatilmagan)</span></label>
-                  <input className="input" placeholder="Borish manzili" value={address}
+                  <label className="label">
+                    {t('service.form.addressLabel')} *{' '}
+                    <span className="text-ink-soft font-normal">{t('service.form.addressHint')}</span>
+                  </label>
+                  <input className="input" placeholder={t('service.form.addressPlaceholder')} value={address}
                          onChange={(e) => setAddress(e.target.value)} />
                 </div>
               )}
@@ -242,9 +278,11 @@ export default function ServiceTicketModal({
         </div>
 
         <div className="px-5 py-3 border-t border-black/5 flex justify-end gap-2 sticky bottom-0 bg-card">
-          <button onClick={onClose} className="px-3 py-1.5 text-sm rounded-button hover:bg-black/5">Bekor</button>
+          <button onClick={onClose} className="px-3 py-1.5 text-sm rounded-button hover:bg-black/5">
+            {t('actions.cancel')}
+          </button>
           <button onClick={handleSave} disabled={saving || !order} className="btn-primary disabled:opacity-50">
-            {saving ? 'Saqlanmoqda…' : 'Ariza yaratish'}
+            {saving ? t('service.form.saving') : t('service.form.submit')}
           </button>
         </div>
       </div>

@@ -1,0 +1,117 @@
+{
+  "title": "Finance",
+  "subtitle": "Cash register & transactions",
+  "newTransaction": "New transaction",
+  "tabs": {
+    "overview": "Overview",
+    "categories": "Categories",
+    "rates": "Exchange rates"
+  },
+  "balance": {
+    "uzs": "UZS Balance",
+    "usd": "USD Balance",
+    "gazna": "Treasury (USD)"
+  },
+  "period": "Period",
+  "months": {
+    "1": "January",
+    "2": "February",
+    "3": "March",
+    "4": "April",
+    "5": "May",
+    "6": "June",
+    "7": "July",
+    "8": "August",
+    "9": "September",
+    "10": "October",
+    "11": "November",
+    "12": "December"
+  },
+  "kpi": {
+    "incomeUZS": "Income (UZS)",
+    "expenseUZS": "Expense (UZS)",
+    "incomeUSD": "Income (USD)",
+    "expenseUSD": "Expense (USD)"
+  },
+  "transactions": {
+    "title": "Transactions",
+    "empty": "No transactions",
+    "emptyDesc": "Add a new transaction",
+    "colDate": "Date",
+    "colType": "Type",
+    "colCategory": "Category",
+    "colAmount": "Amount",
+    "colNote": "Note"
+  },
+  "filter": {
+    "all": "All",
+    "income": "Income",
+    "expense": "Expense"
+  },
+  "type": {
+    "income": "Income",
+    "expense": "Expense",
+    "employee": "Employee"
+  },
+  "categories": {
+    "incomeTitle": "Income categories",
+    "expenseTitle": "Expense categories",
+    "empty": "No categories",
+    "newTitle": "New category",
+    "kindLabel": "Type",
+    "nameLabel": "Name *",
+    "namePlaceholder": "E.g.: Transport",
+    "addedSuccess": "Category added",
+    "nameRequired": "Enter a name",
+    "deleteTitle": "Delete category",
+    "deleteMessage": "Category \"{{name}}\" will be deleted. Continue?"
+  },
+  "rates": {
+    "latestRate": "Latest rate (1 USD)",
+    "historyTitle": "Rate history",
+    "addButton": "Add rate",
+    "empty": "No exchange rate data",
+    "colDate": "Date",
+    "colRate": "1 USD = UZS",
+    "colSource": "Source",
+    "sourceCbu": "Central bank",
+    "sourceManual": "Manual",
+    "modalTitle": "Set exchange rate",
+    "dateLabel": "Date",
+    "rateLabel": "1 USD = ? UZS *",
+    "ratePlaceholder": "12800",
+    "rateRequired": "Enter a valid rate",
+    "savedSuccess": "Rate saved"
+  },
+  "txModal": {
+    "title": "New transaction",
+    "dateLabel": "Date",
+    "categoryLabel": "Category",
+    "categoryNone": "— Not set —",
+    "amountLabel": "Amount *",
+    "currencyLabel": "Currency",
+    "gaznaLabel": "To treasury (cash dollar reserve)",
+    "noteLabel": "Note",
+    "savedSuccess": "Transaction saved",
+    "amountRequired": "Enter a valid amount",
+    "deleteTitle": "Delete transaction",
+    "deleteMessage": "This transaction will be deleted and the balance will be restored. Continue?"
+  },
+  "empPayment": {
+    "employeeLabel": "Employee *",
+    "employeeRequired": "Select an employee",
+    "advance": "Advance",
+    "salary": "Salary",
+    "monthLabel": "Month",
+    "yearLabel": "Year",
+    "advanceAmountLabel": "Advance amount *",
+    "netDueLabel": "Net salary due",
+    "noBalance": "No balance for this month",
+    "noBalanceError": "No net salary due",
+    "savedSuccess": "Payment saved",
+    "notePlaceholderSalary": "Salary payment",
+    "notePlaceholderAdvance": "Advance"
+  },
+  "saving": "Saving…",
+  "error": "Error"
+}

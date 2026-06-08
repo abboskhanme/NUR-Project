@@ -1,5 +1,6 @@
 import { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   ShieldCheck, Wrench, CalendarClock, PackageMinus, HandCoins, ListOrdered,
 } from 'lucide-react';
@@ -9,7 +10,7 @@ import type { DashboardAlerts } from './types';
 
 interface AlertRow {
   icon: ReactNode;
-  label: string;
+  labelKey: string;
   value: string;
   tone: 'warning' | 'danger' | 'primary';
   to?: string;
@@ -17,45 +18,46 @@ interface AlertRow {
 }
 
 export default function AlertList({ alerts }: { alerts?: DashboardAlerts }) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const a = alerts;
 
   const rows: AlertRow[] = [
     {
       icon: <ShieldCheck size={16} />,
-      label: 'Kafolat tugaydi (30 kun)',
-      value: a ? `${a.warranty_expiring} ta` : '—',
+      labelKey: 'dashboard.alerts.warrantyExpiring',
+      value: a ? t('dashboard.alerts.countUnit', { count: a.warranty_expiring }) : '—',
       tone: 'warning',
       to: '/service',
       show: !a || a.warranty_expiring > 0,
     },
     {
       icon: <Wrench size={16} />,
-      label: 'Yangi servis arizalari',
-      value: a ? `${a.service_new} ta` : '—',
+      labelKey: 'dashboard.alerts.serviceNew',
+      value: a ? t('dashboard.alerts.countUnit', { count: a.service_new }) : '—',
       tone: 'warning',
       to: '/service',
       show: !a || a.service_new > 0,
     },
     {
       icon: <CalendarClock size={16} />,
-      label: 'Rejalashtirilgan tashriflar',
-      value: a ? `${a.service_scheduled} ta` : '—',
+      labelKey: 'dashboard.alerts.serviceScheduled',
+      value: a ? t('dashboard.alerts.countUnit', { count: a.service_scheduled }) : '—',
       tone: 'primary',
       to: '/service',
       show: !a || a.service_scheduled > 0,
     },
     {
       icon: <PackageMinus size={16} />,
-      label: 'Kam qolgan tovarlar',
-      value: a ? `${a.low_stock} ta` : '—',
+      labelKey: 'dashboard.alerts.lowStock',
+      value: a ? t('dashboard.alerts.countUnit', { count: a.low_stock }) : '—',
       tone: 'danger',
       to: '/supply',
       show: !a || a.low_stock > 0,
     },
     {
       icon: <HandCoins size={16} />,
-      label: "Ta'minotchilarga qarz",
+      labelKey: 'dashboard.alerts.vendorDebt',
       value: a ? formatUZS(a.vendor_debt_uzs) : '—',
       tone: 'danger',
       to: '/supply',
@@ -63,8 +65,8 @@ export default function AlertList({ alerts }: { alerts?: DashboardAlerts }) {
     },
     {
       icon: <ListOrdered size={16} />,
-      label: 'Navbatdagi buyurtmalar',
-      value: a ? `${a.queue_count} ta` : '—',
+      labelKey: 'dashboard.alerts.queueCount',
+      value: a ? t('dashboard.alerts.countUnit', { count: a.queue_count }) : '—',
       tone: 'primary',
       to: '/queue',
       show: !a || a.queue_count > 0,
@@ -74,11 +76,11 @@ export default function AlertList({ alerts }: { alerts?: DashboardAlerts }) {
   const visible = rows.filter((r) => r.show);
 
   if (a && visible.length === 0) {
-    return <div className="text-sm text-ink-soft py-4 text-center">Faol eslatmalar yo'q ✓</div>;
+    return <div className="text-sm text-ink-soft py-4 text-center">{t('dashboard.alerts.noAlerts')}</div>;
   }
 
-  const toneClass = (t: AlertRow['tone']) =>
-    t === 'danger' ? 'text-danger' : t === 'warning' ? 'text-warning' : 'text-primary';
+  const toneClass = (tone: AlertRow['tone']) =>
+    tone === 'danger' ? 'text-danger' : tone === 'warning' ? 'text-warning' : 'text-primary';
 
   return (
     <div className="space-y-1">
@@ -90,7 +92,7 @@ export default function AlertList({ alerts }: { alerts?: DashboardAlerts }) {
         >
           <span className={`flex items-center gap-2 ${toneClass(r.tone)}`}>
             {r.icon}
-            <span className="text-ink">{r.label}</span>
+            <span className="text-ink">{t(r.labelKey)}</span>
           </span>
           <span className={`font-semibold ${toneClass(r.tone)}`}>{r.value}</span>
         </button>

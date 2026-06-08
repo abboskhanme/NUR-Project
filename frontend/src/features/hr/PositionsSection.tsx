@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
+import { useTranslation } from 'react-i18next';
 import { Plus, Trash2, Briefcase, Pencil, Check, X } from 'lucide-react';
 
 import { api } from '@/api/client';
@@ -14,6 +15,7 @@ interface Position {
 }
 
 export default function PositionsSection() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [name, setName] = useState('');
   const [adding, setAdding] = useState(false);
@@ -34,11 +36,11 @@ export default function PositionsSection() {
     setAdding(true);
     try {
       await api.post('/hr/positions', { name: name.trim() });
-      toast.success('Lavozim qo\'shildi');
+      toast.success(t('hr.positions.added'));
       setName('');
       qc.invalidateQueries({ queryKey: ['hr', 'positions'] });
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || 'Xatolik');
+      toast.error(e?.response?.data?.detail || t('hr.modal.errorGeneric'));
     } finally {
       setAdding(false);
     }
@@ -59,12 +61,12 @@ export default function PositionsSection() {
     setSavingEdit(true);
     try {
       await api.patch(`/hr/positions/${editId}`, { name: editName.trim() });
-      toast.success('Lavozim yangilandi');
+      toast.success(t('hr.positions.updated'));
       qc.invalidateQueries({ queryKey: ['hr', 'positions'] });
       qc.invalidateQueries({ queryKey: ['employees'] });
       cancelEdit();
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || 'Xatolik');
+      toast.error(e?.response?.data?.detail || t('hr.modal.errorGeneric'));
     } finally {
       setSavingEdit(false);
     }
@@ -75,11 +77,11 @@ export default function PositionsSection() {
     setDeleting(true);
     try {
       await api.delete(`/hr/positions/${toDelete.id}`);
-      toast.success('Lavozim o\'chirildi');
+      toast.success(t('hr.positions.deleted'));
       qc.invalidateQueries({ queryKey: ['hr', 'positions'] });
       setToDelete(null);
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || 'Xatolik');
+      toast.error(e?.response?.data?.detail || t('hr.modal.errorGeneric'));
     } finally {
       setDeleting(false);
     }
@@ -89,17 +91,17 @@ export default function PositionsSection() {
     <Card>
       <div className="flex items-end gap-2 mb-4">
         <div className="flex-1">
-          <label className="label">Yangi lavozim nomi</label>
+          <label className="label">{t('hr.positions.newLabel')}</label>
           <input
             className="input"
             value={name}
-            placeholder="Masalan: Sotuv menejeri"
+            placeholder={t('hr.positions.placeholder')}
             onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
           />
         </div>
         <button onClick={handleAdd} disabled={adding || !name.trim()} className="btn-primary disabled:opacity-50">
-          <Plus size={16} /> Qo'shish
+          <Plus size={16} /> {t('hr.positions.add')}
         </button>
       </div>
 
@@ -110,7 +112,7 @@ export default function PositionsSection() {
           ))}
         </div>
       ) : positions.length === 0 ? (
-        <EmptyState title="Lavozimlar yo'q" description="Birinchi lavozimni yuqorida qo'shing." />
+        <EmptyState title={t('hr.positions.emptyTitle')} description={t('hr.positions.emptyDesc')} />
       ) : (
         <div className="border border-black/10 rounded-button divide-y divide-black/5">
           {positions.map((p) => (
@@ -132,14 +134,14 @@ export default function PositionsSection() {
                       onClick={handleEditSave}
                       disabled={savingEdit || !editName.trim()}
                       className="p-1.5 rounded hover:bg-success/10 text-success disabled:opacity-40"
-                      title="Saqlash"
+                      title={t('hr.positions.saveTitle')}
                     >
                       <Check size={16} />
                     </button>
                     <button
                       onClick={cancelEdit}
                       className="p-1.5 rounded hover:bg-black/5 text-ink/60"
-                      title="Bekor qilish"
+                      title={t('hr.positions.cancelTitle')}
                     >
                       <X size={16} />
                     </button>
@@ -155,14 +157,14 @@ export default function PositionsSection() {
                     <button
                       onClick={() => startEdit(p)}
                       className="p-1.5 rounded hover:bg-black/5 text-ink/60"
-                      title="Tahrirlash"
+                      title={t('hr.positions.editTitle')}
                     >
                       <Pencil size={15} />
                     </button>
                     <button
                       onClick={() => setToDelete(p)}
                       className="p-1.5 rounded hover:bg-danger/10 text-danger"
-                      title="O'chirish"
+                      title={t('hr.positions.deleteActionTitle')}
                     >
                       <Trash2 size={15} />
                     </button>
@@ -176,14 +178,9 @@ export default function PositionsSection() {
 
       <ConfirmModal
         open={!!toDelete}
-        title="Lavozimni o'chirish"
-        message={
-          <>
-            <span className="font-medium">{toDelete?.name}</span> lavozimini o'chirasizmi?
-            Bu lavozimga biriktirilgan xodimlarda lavozim bo'sh qoladi.
-          </>
-        }
-        confirmText="Ha, o'chirish"
+        title={t('hr.positions.deleteTitle')}
+        message={t('hr.positions.deleteMsg', { name: toDelete?.name ?? '' })}
+        confirmText={t('hr.positions.deleteConfirm')}
         variant="danger"
         loading={deleting}
         onConfirm={handleDelete}

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import { X } from 'lucide-react';
 
@@ -36,6 +37,7 @@ export default function ProductModal({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const { t } = useTranslation();
   const isCreate = product === null;
   const type: ProductType = product?.product_type ?? defaultType;
 
@@ -54,8 +56,14 @@ export default function ProductModal({
   }, [onClose]);
 
   async function handleSave() {
-    if (type === 'main' && !model.trim()) { toast.error('Model majburiy'); return; }
-    if (type === 'additional' && !name.trim()) { toast.error('Mahsulot nomi majburiy'); return; }
+    if (type === 'main' && !model.trim()) {
+      toast.error(t('products.modal.modelRequired'));
+      return;
+    }
+    if (type === 'additional' && !name.trim()) {
+      toast.error(t('products.modal.nameRequired'));
+      return;
+    }
 
     const body: Record<string, unknown> = {
       product_type: type,
@@ -78,56 +86,58 @@ export default function ProductModal({
     try {
       if (isCreate) {
         await api.post('/products', body);
-        toast.success('Mahsulot qo\'shildi');
+        toast.success(t('products.modal.toastAdded'));
       } else {
         await api.patch(`/products/${product!.id}`, body);
-        toast.success('Yangilandi');
+        toast.success(t('products.modal.toastUpdated'));
       }
       onSaved();
       onClose();
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || 'Xatolik');
+      toast.error(e?.response?.data?.detail || t('products.modal.toastError'));
     } finally {
       setSaving(false);
     }
   }
 
-  const titleType = type === 'main' ? 'kotyol' : 'qo\'shimcha mahsulot';
+  const modalTitle = isCreate
+    ? (type === 'main' ? t('products.modal.createMain') : t('products.modal.createAdditional'))
+    : (type === 'main' ? t('products.modal.editMain') : t('products.modal.editAdditional'));
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div className="bg-card rounded-lg shadow-xl w-full max-w-lg max-h-[92vh] overflow-hidden flex flex-col"
            onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3 border-b border-black/5 shrink-0">
-          <h3 className="font-semibold">
-            {isCreate ? `Yangi ${titleType}` : `Tahrirlash — ${titleType}`}
-          </h3>
-          <button onClick={onClose} className="p-1 rounded hover:bg-black/5"><X size={18} /></button>
+          <h3 className="font-semibold">{modalTitle}</h3>
+          <button onClick={onClose} className="p-1 rounded hover:bg-black/5" aria-label={t('common.close')}>
+            <X size={18} />
+          </button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
           {type === 'main' ? (
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="label">Model *</label>
-                <input className="input" placeholder="PREMIUM 3 / ULTRA ..." value={model}
+                <label className="label">{t('products.modal.modelLabel')}</label>
+                <input className="input" placeholder={t('products.modal.modelPlaceholder')} value={model}
                        onChange={(e) => setModel(e.target.value)} />
               </div>
               <div>
-                <label className="label">Kvadratura (kvm)</label>
-                <input type="number" min={0} className="input" placeholder="200" value={kvm}
+                <label className="label">{t('products.modal.kvmLabel')}</label>
+                <input type="number" min={0} className="input" placeholder={t('products.modal.kvmPlaceholder')} value={kvm}
                        onChange={(e) => setKvm(e.target.value)} />
               </div>
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2">
-                <label className="label">Mahsulot nomi *</label>
-                <input className="input" placeholder="Turba, defizor ..." value={name}
+                <label className="label">{t('products.modal.nameLabel')}</label>
+                <input className="input" placeholder={t('products.modal.namePlaceholder')} value={name}
                        onChange={(e) => setName(e.target.value)} />
               </div>
               <div>
-                <label className="label">O'lchov birligi</label>
+                <label className="label">{t('products.modal.unitLabel')}</label>
                 <select className="input" value={unit} onChange={(e) => setUnit(e.target.value)}>
                   {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
                 </select>
@@ -136,28 +146,31 @@ export default function ProductModal({
           )}
 
           <div>
-            <label className="label">Narx (USD)</label>
-            <input type="text" inputMode="decimal" className="input" placeholder="0" value={price}
+            <label className="label">{t('products.modal.priceLabel')}</label>
+            <input type="text" inputMode="decimal" className="input" placeholder={t('products.modal.pricePlaceholder')}
+                   value={price}
                    onChange={(e) => setPrice(e.target.value.replace(/[^\d.]/g, ''))} />
           </div>
 
           <div>
-            <label className="label">Izoh</label>
+            <label className="label">{t('products.modal.descriptionLabel')}</label>
             <textarea className="input min-h-[56px]" value={description}
                       onChange={(e) => setDescription(e.target.value)} />
           </div>
 
           {type === 'main' && (
             <p className="text-xs text-ink-soft">
-              Yo'nalish (o'ng/chap) buyurtma qilishda tanlanadi — narxga ta'sir qilmaydi.
+              {t('products.modal.directionHint')}
             </p>
           )}
         </div>
 
         <div className="px-5 py-3 border-t border-black/5 flex justify-end gap-2 shrink-0">
-          <button onClick={onClose} className="px-3 py-1.5 text-sm rounded-button hover:bg-black/5">Bekor qilish</button>
+          <button onClick={onClose} className="px-3 py-1.5 text-sm rounded-button hover:bg-black/5">
+            {t('actions.cancel')}
+          </button>
           <button onClick={handleSave} disabled={saving} className="btn-primary disabled:opacity-50">
-            {saving ? 'Saqlanmoqda...' : 'Saqlash'}
+            {saving ? t('products.modal.saving') : t('actions.save')}
           </button>
         </div>
       </div>

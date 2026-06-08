@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import { Search, Undo2, Trash2, Archive as ArchiveIcon } from 'lucide-react';
 
@@ -11,6 +12,7 @@ import UserAvatar from './UserAvatar';
 import { UserRow } from './UserModal';
 
 export default function ArchiveSection() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [search, setSearch] = useState('');
   const [restoreUser, setRestoreUser] = useState<UserRow | null>(null);
@@ -32,11 +34,11 @@ export default function ArchiveSection() {
     setBusy(true);
     try {
       await api.post(`/users/${restoreUser.id}/restore`);
-      toast.success("Foydalanuvchi tiklandi");
+      toast.success(t('users.archive.restoredSuccess'));
       qc.invalidateQueries({ queryKey: ['users'] });
       setRestoreUser(null);
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || 'Xatolik');
+      toast.error(e?.response?.data?.detail || t('common.error'));
     } finally {
       setBusy(false);
     }
@@ -47,11 +49,11 @@ export default function ArchiveSection() {
     setBusy(true);
     try {
       await api.delete(`/users/${purgeUser.id}/permanent`);
-      toast.success("Butunlay o'chirildi");
+      toast.success(t('users.archive.purgedSuccess'));
       qc.invalidateQueries({ queryKey: ['users'] });
       setPurgeUser(null);
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || 'Xatolik');
+      toast.error(e?.response?.data?.detail || t('common.error'));
     } finally {
       setBusy(false);
     }
@@ -62,14 +64,14 @@ export default function ArchiveSection() {
       <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
         <div className="flex items-center gap-2 text-sm text-ink-soft">
           <ArchiveIcon size={16} />
-          <span>Nofaol qilingan foydalanuvchilar. Tiklash yoki butunlay o'chirish mumkin.</span>
+          <span>{t('users.archive.info')}</span>
         </div>
       </div>
 
       <div className="flex items-center gap-2 mb-4 bg-white border border-black/10 rounded-button px-3 py-1.5">
         <Search size={16} className="text-ink/40" />
         <input
-          placeholder="Telefon yoki ism bo'yicha qidirish..."
+          placeholder={t('users.search')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="bg-transparent outline-none flex-1 text-sm"
@@ -84,19 +86,19 @@ export default function ArchiveSection() {
         </div>
       ) : items.length === 0 ? (
         <EmptyState
-          title="Arxiv bo'sh"
-          description="Bu yerda nofaol qilingan foydalanuvchilar ko'rinadi."
+          title={t('users.archive.empty')}
+          description={t('users.archive.emptyDesc')}
         />
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="text-left text-ink-soft border-b border-black/5">
               <tr>
-                <th className="py-2 pr-3">Foydalanuvchi</th>
-                <th className="py-2 pr-3">Telefon (login)</th>
-                <th className="py-2 pr-3">Lavozim</th>
-                <th className="py-2 pr-3">Rollar</th>
-                <th className="py-2 pr-3 text-right">Amallar</th>
+                <th className="py-2 pr-3">{t('users.table.user')}</th>
+                <th className="py-2 pr-3">{t('users.table.phoneLogin')}</th>
+                <th className="py-2 pr-3">{t('users.table.position')}</th>
+                <th className="py-2 pr-3">{t('users.table.roles')}</th>
+                <th className="py-2 pr-3 text-right">{t('users.table.actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -122,14 +124,14 @@ export default function ArchiveSection() {
                   <td className="py-2 pr-3">
                     <div className="flex items-center justify-end gap-1">
                       <button
-                        title="Tiklash"
+                        title={t('users.archive.restoreTooltip')}
                         onClick={() => setRestoreUser(u)}
                         className="p-1.5 rounded hover:bg-success/10 text-success"
                       >
                         <Undo2 size={16} />
                       </button>
                       <button
-                        title="Butunlay o'chirish"
+                        title={t('users.archive.purgeTooltip')}
                         onClick={() => setPurgeUser(u)}
                         className="p-1.5 rounded hover:bg-danger/10 text-danger"
                       >
@@ -146,14 +148,14 @@ export default function ArchiveSection() {
 
       <ConfirmModal
         open={!!restoreUser}
-        title="Foydalanuvchini tiklash"
+        title={t('users.archive.restoreModal.title')}
         message={
           <>
             <span className="font-medium">{restoreUser?.full_name}</span> ({restoreUser?.phone})
-            ni qayta aktivlashtirishni tasdiqlaysizmi? Foydalanuvchi yana tizimga kira oladi.
+            {' '}{t('users.archive.restoreModal.message')}
           </>
         }
-        confirmText="Ha, tiklash"
+        confirmText={t('users.archive.restoreModal.confirm')}
         variant="primary"
         loading={busy}
         onConfirm={doRestore}
@@ -162,15 +164,15 @@ export default function ArchiveSection() {
 
       <ConfirmModal
         open={!!purgeUser}
-        title="Butunlay o'chirish"
+        title={t('users.archive.purgeModal.title')}
         message={
           <>
             <span className="font-medium">{purgeUser?.full_name}</span> ({purgeUser?.phone})
-            ni butunlay o'chirib tashlashni tasdiqlaysizmi?<br />
-            <span className="text-danger font-medium">Bu amalni qaytarib bo'lmaydi!</span> Avatar, rol biriktirmalari ham o'chiriladi.
+            {' '}{t('users.archive.purgeModal.message')}<br />
+            <span className="text-danger font-medium">{t('users.archive.purgeModal.irreversible')}</span>
           </>
         }
-        confirmText="Ha, butunlay o'chirish"
+        confirmText={t('users.archive.purgeModal.confirm')}
         variant="danger"
         loading={busy}
         onConfirm={doPurge}

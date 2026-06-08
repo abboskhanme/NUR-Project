@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell,
 } from 'recharts';
@@ -15,6 +16,7 @@ const COLORS = ['#E74C3C', '#F39C12', '#8E44AD', '#2980B9', '#16A085', '#1E3A5F'
 type CatRow = { category: string; amount: number };
 
 export default function FinanceReport({ range }: { range: DateRange }) {
+  const { t } = useTranslation();
   const pnl = useQuery<PnlData>({
     queryKey: ['rep-pnl', range],
     queryFn: () => api.get('/reports/finance/pnl', {
@@ -23,8 +25,8 @@ export default function FinanceReport({ range }: { range: DateRange }) {
   });
 
   const cols: Column<CatRow>[] = [
-    { key: 'category', label: 'Kategoriya' },
-    { key: 'amount', label: 'Summa', align: 'right', render: (r) => formatUZS(r.amount) },
+    { key: 'category', label: t('reports.finance.cols.category') },
+    { key: 'amount', label: t('reports.finance.cols.amount'), align: 'right', render: (r) => formatUZS(r.amount) },
   ];
 
   const cats = pnl.data?.expense_by_category ?? [];
@@ -33,20 +35,20 @@ export default function FinanceReport({ range }: { range: DateRange }) {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatTile label="Kirim" value={pnl.data ? formatUZS(pnl.data.income) : '—'} tone="success" />
-        <StatTile label="Chiqim" value={pnl.data ? formatUZS(pnl.data.expense) : '—'} tone="danger" />
-        <StatTile label="Sof foyda" value={pnl.data ? formatUZS(pnl.data.net) : '—'}
+        <StatTile label={t('reports.finance.kpi.income')} value={pnl.data ? formatUZS(pnl.data.income) : '—'} tone="success" />
+        <StatTile label={t('reports.finance.kpi.expense')} value={pnl.data ? formatUZS(pnl.data.expense) : '—'} tone="danger" />
+        <StatTile label={t('reports.finance.kpi.netProfit')} value={pnl.data ? formatUZS(pnl.data.net) : '—'}
           tone={pnl.data && pnl.data.net >= 0 ? 'primary' : 'warning'} />
-        <StatTile label="Marja" value={pnl.data?.margin_pct != null ? `${pnl.data.margin_pct}%` : '—'} />
+        <StatTile label={t('reports.finance.kpi.margin')} value={pnl.data?.margin_pct != null ? `${pnl.data.margin_pct}%` : '—'} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card title="Kirim / Chiqim / Foyda">
+        <Card title={t('reports.finance.cards.pnlChart')}>
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={[
-              { name: 'Kirim', value: pnl.data?.income ?? 0, fill: '#27AE60' },
-              { name: 'Chiqim', value: pnl.data?.expense ?? 0, fill: '#E74C3C' },
-              { name: 'Sof foyda', value: pnl.data?.net ?? 0, fill: '#1E3A5F' },
+              { name: t('reports.finance.chart.income'), value: pnl.data?.income ?? 0, fill: '#27AE60' },
+              { name: t('reports.finance.chart.expense'), value: pnl.data?.expense ?? 0, fill: '#E74C3C' },
+              { name: t('reports.finance.chart.netProfit'), value: pnl.data?.net ?? 0, fill: '#1E3A5F' },
             ]}>
               <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
               <XAxis dataKey="name" fontSize={12} />
@@ -60,7 +62,7 @@ export default function FinanceReport({ range }: { range: DateRange }) {
           </ResponsiveContainer>
         </Card>
 
-        <Card title="Chiqimlar — kategoriya bo'yicha">
+        <Card title={t('reports.finance.cards.expenseByCategory')}>
           {cats.length > 0 ? (
             <ResponsiveContainer width="100%" height={260}>
               <BarChart data={cats} layout="vertical" margin={{ left: 24 }}>
@@ -75,19 +77,19 @@ export default function FinanceReport({ range }: { range: DateRange }) {
               </BarChart>
             </ResponsiveContainer>
           ) : (
-            <div className="text-sm text-ink-soft py-12 text-center">Chiqim yo'q</div>
+            <div className="text-sm text-ink-soft py-12 text-center">{t('reports.finance.chart.noExpense')}</div>
           )}
         </Card>
       </div>
 
-      <Card title="Chiqimlar tafsiloti">
+      <Card title={t('reports.finance.cards.expenseDetail')}>
         <ReportTable
           rows={pnl.data?.expense_by_category}
           columns={cols}
           filename="chiqimlar-kategoriya"
           footer={
             <>
-              <td className="py-2 px-2">Jami</td>
+              <td className="py-2 px-2">{t('reports.table.total')}</td>
               <td className="py-2 px-2 text-right">{formatUZS(totalExp)}</td>
             </>
           }

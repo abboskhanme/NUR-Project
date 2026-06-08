@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import { Plus, Pencil, Trash2, Shield } from 'lucide-react';
 
@@ -10,22 +11,26 @@ import ConfirmModal from '@/components/ui/ConfirmModal';
 import RoleModal, { RoleRow } from './RoleModal';
 import { MODULES } from '@/lib/permissions';
 
-/** Rol ruxsatlarining qisqa xulosasi: To'liq / N modul / — */
-function permSummary(r: RoleRow): string {
-  if (r.name === 'super_admin') return "To'liq";
-  const raw: any = r.permissions || {};
-  const items: string[] = Array.isArray(raw) ? raw : raw.permissions ?? [];
-  if (items.includes('*') || items.includes('*:*')) return "To'liq";
-  const mods = new Set<string>();
-  for (const p of items) {
-    const m = String(p).split(':')[0];
-    if (m === '*') return `${MODULES.length} modul`;
-    if (m) mods.add(m);
-  }
-  return mods.size ? `${mods.size} modul` : '—';
+/** Rol ruxsatlarining qisqa xulosasi */
+function usePermSummary() {
+  const { t } = useTranslation();
+  return function permSummary(r: RoleRow): string {
+    if (r.name === 'super_admin') return t('users.roles.permFull');
+    const raw: any = r.permissions || {};
+    const items: string[] = Array.isArray(raw) ? raw : raw.permissions ?? [];
+    if (items.includes('*') || items.includes('*:*')) return t('users.roles.permFull');
+    const mods = new Set<string>();
+    for (const p of items) {
+      const m = String(p).split(':')[0];
+      if (m === '*') return t('users.roles.permModule', { count: MODULES.length });
+      if (m) mods.add(m);
+    }
+    return mods.size ? t('users.roles.permModule', { count: mods.size }) : '—';
+  };
 }
 
 export default function RolesSection() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [editRole, setEditRole] = useState<RoleRow | null>(null);
   const [showCreate, setShowCreate] = useState(false);
@@ -38,18 +43,19 @@ export default function RolesSection() {
   });
 
   const roles = rolesQ.data ?? [];
+  const permSummary = usePermSummary();
 
   async function handleDelete() {
     if (!deleteRole) return;
     setDeleting(true);
     try {
       await api.delete(`/users/roles/${deleteRole.id}`);
-      toast.success("Rol o'chirildi");
+      toast.success(t('users.roles.deletedSuccess'));
       qc.invalidateQueries({ queryKey: ['roles'] });
       qc.invalidateQueries({ queryKey: ['users'] });
       setDeleteRole(null);
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || 'Xatolik');
+      toast.error(e?.response?.data?.detail || t('common.error'));
     } finally {
       setDeleting(false);
     }
@@ -58,10 +64,10 @@ export default function RolesSection() {
   return (
     <div className="space-y-4">
       <Card
-        title="Tizim rollari"
+        title={t('users.roles.title')}
         action={
           <button onClick={() => setShowCreate(true)} className="btn-primary">
-            <Plus size={16} /> Yangi rol
+            <Plus size={16} /> {t('users.roles.newRole')}
           </button>
         }
       >
@@ -72,21 +78,22 @@ export default function RolesSection() {
             ))}
           </div>
         ) : roles.length === 0 ? (
-          <EmptyState title="Rollar yo'q" />
+          <EmptyState title={t('users.roles.noRoles')} />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="text-left text-ink-soft border-b border-black/5">
                 <tr>
-                  <th className="py-2 pr-3">Nomi</th>
-                  <th className="py-2 pr-3">Tavsif</th>
-                  <th className="py-2 pr-3">Ruxsatlar</th>
-                  <th className="py-2 pr-3 text-right">Amallar</th>
+                  <th className="py-2 pr-3">{t('users.roles.colName')}</th>
+                  <th className="py-2 pr-3">{t('users.roles.colDesc')}</th>
+                  <th className="py-2 pr-3">{t('users.roles.colPerms')}</th>
+                  <th className="py-2 pr-3 text-right">{t('users.roles.colActions')}</th>
                 </tr>
               </thead>
               <tbody>
                 {roles.map((r) => {
                   const isCore = r.name === 'super_admin';
+                  const summary = permSummary(r);
                   return (
                     <tr key={r.id} className="border-b border-black/5 hover:bg-black/5">
                       <td className="py-2 pr-3">
@@ -95,7 +102,7 @@ export default function RolesSection() {
                           <span className="font-medium">{r.name}</span>
                           {isCore && (
                             <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">
-                              tizim
+                              {t('users.roles.systemBadge')}
                             </span>
                           )}
                         </div>
@@ -105,27 +112,27 @@ export default function RolesSection() {
                         <span
                           className={
                             'text-xs px-2 py-0.5 rounded-full ' +
-                            (permSummary(r) === "To'liq"
+                            (summary === t('users.roles.permFull')
                               ? 'bg-success/10 text-success'
-                              : permSummary(r) === '—'
+                              : summary === '—'
                                 ? 'bg-black/5 text-ink/50'
                                 : 'bg-primary/10 text-primary')
                           }
                         >
-                          {permSummary(r)}
+                          {summary}
                         </span>
                       </td>
                       <td className="py-2 pr-3">
                         <div className="flex items-center justify-end gap-1">
                           <button
-                            title="Tahrirlash"
+                            title={t('actions.edit')}
                             onClick={() => setEditRole(r)}
                             className="p-1.5 rounded hover:bg-black/5 text-ink/60"
                           >
                             <Pencil size={16} />
                           </button>
                           <button
-                            title={isCore ? "Tizim rolini o'chirib bo'lmaydi" : "O'chirish"}
+                            title={isCore ? t('users.roles.coreRoleTooltip') : t('actions.delete')}
                             onClick={() => !isCore && setDeleteRole(r)}
                             disabled={isCore}
                             className="p-1.5 rounded hover:bg-danger/10 text-danger disabled:opacity-30 disabled:cursor-not-allowed"
@@ -156,14 +163,13 @@ export default function RolesSection() {
 
       <ConfirmModal
         open={!!deleteRole}
-        title="Rolni o'chirish"
+        title={t('users.roles.deleteTitle')}
         message={
           <>
-            <span className="font-medium">{deleteRole?.name}</span> rolini o'chirishni
-            tasdiqlaysizmi? Bu rolga biriktirilgan foydalanuvchilardan rol olib tashlanadi.
+            <span className="font-medium">{deleteRole?.name}</span> {t('users.roles.deleteMessage')}
           </>
         }
-        confirmText="Ha, o'chirish"
+        confirmText={t('users.roles.deleteConfirm')}
         variant="danger"
         loading={deleting}
         onConfirm={handleDelete}

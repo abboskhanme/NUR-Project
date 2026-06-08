@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import {
   Plus, Search, Pencil, Trash2, ShieldCheck, Users as UsersIcon, Archive,
@@ -25,6 +26,7 @@ interface Role {
 type Tab = 'users' | 'roles' | 'archive';
 
 export default function UsersPage() {
+  const { t } = useTranslation();
   const { user: me, canModule } = usePermissions();
   const isAdmin = canModule('users');
   const qc = useQueryClient();
@@ -36,7 +38,6 @@ export default function UsersPage() {
   const [deleteUser, setDeleteUser] = useState<UserRow | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  // Faqat aktiv foydalanuvchilar
   const usersQ = useQuery({
     queryKey: ['users', 'active', search],
     queryFn: () =>
@@ -60,11 +61,11 @@ export default function UsersPage() {
     setDeleting(true);
     try {
       await api.delete(`/users/${deleteUser.id}`);
-      toast.success("Foydalanuvchi arxivga ko'chirildi");
+      toast.success(t('users.archivedSuccess'));
       qc.invalidateQueries({ queryKey: ['users'] });
       setDeleteUser(null);
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || 'Xatolik');
+      toast.error(e?.response?.data?.detail || t('common.error'));
     } finally {
       setDeleting(false);
     }
@@ -73,7 +74,7 @@ export default function UsersPage() {
   if (!isAdmin) {
     return (
       <div className="p-8">
-        <EmptyState title="Ruxsat yo'q" description="Bu sahifani ko'rish uchun ruxsatingiz yetarli emas." />
+        <EmptyState title={t('users.noAccess')} description={t('users.noAccessDesc')} />
       </div>
     );
   }
@@ -84,15 +85,15 @@ export default function UsersPage() {
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <ShieldCheck size={22} className="text-primary" />
-            Foydalanuvchilar
+            {t('users.title')}
           </h1>
           <p className="text-sm text-ink-soft">
-            Akkountlar, rollar va arxivni boshqarish
+            {t('users.subtitle')}
           </p>
         </div>
         {tab === 'users' && (
           <button onClick={() => setShowCreate(true)} className="btn-primary">
-            <Plus size={16} /> Yangi foydalanuvchi
+            <Plus size={16} /> {t('users.newUser')}
           </button>
         )}
       </div>
@@ -100,13 +101,13 @@ export default function UsersPage() {
       {/* Tabs */}
       <div className="flex gap-1 border-b border-black/5 overflow-x-auto">
         <TabButton active={tab === 'users'} onClick={() => setTab('users')} icon={<UsersIcon size={16} />}>
-          Foydalanuvchilar
+          {t('users.tabs.users')}
         </TabButton>
         <TabButton active={tab === 'roles'} onClick={() => setTab('roles')} icon={<ShieldCheck size={16} />}>
-          Rollar
+          {t('users.tabs.roles')}
         </TabButton>
         <TabButton active={tab === 'archive'} onClick={() => setTab('archive')} icon={<Archive size={16} />}>
-          Arxiv
+          {t('users.tabs.archive')}
         </TabButton>
       </div>
 
@@ -115,7 +116,7 @@ export default function UsersPage() {
           <div className="flex items-center gap-2 mb-4 bg-white border border-black/10 rounded-button px-3 py-1.5">
             <Search size={16} className="text-ink/40" />
             <input
-              placeholder="Telefon yoki ism bo'yicha qidirish..."
+              placeholder={t('users.search')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="bg-transparent outline-none flex-1 text-sm"
@@ -129,17 +130,17 @@ export default function UsersPage() {
               ))}
             </div>
           ) : items.length === 0 ? (
-            <EmptyState title="Foydalanuvchilar yo'q" />
+            <EmptyState title={t('users.noUsers')} />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="text-left text-ink-soft border-b border-black/5">
                   <tr>
-                    <th className="py-2 pr-3">Foydalanuvchi</th>
-                    <th className="py-2 pr-3">Telefon (login)</th>
-                    <th className="py-2 pr-3">Lavozim</th>
-                    <th className="py-2 pr-3">Rollar</th>
-                    <th className="py-2 pr-3 text-right">Amallar</th>
+                    <th className="py-2 pr-3">{t('users.table.user')}</th>
+                    <th className="py-2 pr-3">{t('users.table.phoneLogin')}</th>
+                    <th className="py-2 pr-3">{t('users.table.position')}</th>
+                    <th className="py-2 pr-3">{t('users.table.roles')}</th>
+                    <th className="py-2 pr-3 text-right">{t('users.table.actions')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -173,14 +174,14 @@ export default function UsersPage() {
                       <td className="py-2 pr-3">
                         <div className="flex items-center justify-end gap-1">
                           <button
-                            title="Tahrirlash"
+                            title={t('actions.edit')}
                             onClick={() => setEditUser(u)}
                             className="p-1.5 rounded hover:bg-black/5 text-ink/60"
                           >
                             <Pencil size={16} />
                           </button>
                           <button
-                            title={u.id === me?.id ? "O'zingizni arxivga ko'chira olmaysiz" : "Arxivga ko'chirish"}
+                            title={u.id === me?.id ? t('users.selfArchiveTooltip') : t('users.archiveTooltip')}
                             onClick={() => u.id !== me?.id && setDeleteUser(u)}
                             disabled={u.id === me?.id}
                             className="p-1.5 rounded hover:bg-danger/10 text-danger disabled:opacity-30 disabled:cursor-not-allowed"
@@ -215,14 +216,14 @@ export default function UsersPage() {
 
       <ConfirmModal
         open={!!deleteUser}
-        title="Arxivga ko'chirish"
+        title={t('users.archiveModal.title')}
         message={
           <>
             <span className="font-medium">{deleteUser?.full_name}</span> ({deleteUser?.phone})
-            ni arxivga ko'chirishni tasdiqlaysizmi? Foydalanuvchi nofaol qilinadi, ma'lumotlari saqlanadi. Arxivdan tiklash mumkin.
+            {' '}{t('users.archiveModal.message')}
           </>
         }
-        confirmText="Ha, arxivga ko'chirish"
+        confirmText={t('users.archiveModal.confirm')}
         variant="danger"
         loading={deleting}
         onConfirm={handleArchive}

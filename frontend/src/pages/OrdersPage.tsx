@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { Plus, Search, ShoppingCart, Wallet, AlertCircle, CalendarClock } from 'lucide-react';
 
 import { api } from '@/api/client';
@@ -21,32 +22,31 @@ interface Summary {
   month_paid: string;
 }
 
-const STATUS_OPTIONS = [
-  { value: 'new', label: 'Navbatda' },
-  { value: 'ready', label: 'Tayyor bo\'ldi' },
-  { value: 'delivered', label: 'Yetkazildi' },
-  { value: 'rejected', label: 'Rad etildi' },
+// Status option keys — resolved with t() at render time so language switching works live
+const STATUS_OPTION_KEYS = [
+  { value: 'new', labelKey: 'sales.statusNew' },
+  { value: 'ready', labelKey: 'sales.statusReady' },
+  { value: 'delivered', labelKey: 'sales.statusDelivered' },
+  { value: 'rejected', labelKey: 'sales.statusRejected' },
 ];
 
-// Oy nomlari (1-12). month === 0 => butun yil
-const MONTHS = [
-  'Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun',
-  'Iyul', 'Avgust', 'Sentabr', 'Oktabr', 'Noyabr', 'Dekabr',
-];
+// Month keys (1-12)
+const MONTH_NUMS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const;
+
 const pad2 = (n: number) => String(n).padStart(2, '0');
 
 export default function OrdersPage() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const now = new Date();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  // Default: joriy oy va yil. month: 1-12, 0 = butun yil
+  // Default: current month and year. month: 1-12, 0 = full year
   const [month, setMonth] = useState<number>(now.getMonth() + 1);
   const [year, setYear] = useState<number>(now.getFullYear());
   const [showCreate, setShowCreate] = useState(false);
   const [payingId, setPayingId] = useState<string | null>(null);
 
-  // Tanlangan oy/yildan sana oralig'ini hisoblaymiz (backend date_from/date_to kutadi)
   const { dateFrom, dateTo } = useMemo(() => {
     if (month === 0) {
       return { dateFrom: `${year}-01-01`, dateTo: `${year}-12-31` };
@@ -58,14 +58,13 @@ export default function OrdersPage() {
     };
   }, [month, year]);
 
-  // Yil ro'yxati: joriy yildan 4 yil orqaga
   const YEARS = Array.from({ length: 5 }, (_, i) => now.getFullYear() - i);
 
-  // KPI sarlavhasidagi davr nomi: tanlangan oy + yil (yoki butun yil)
-  const periodLabel = month === 0 ? `${year}` : `${MONTHS[month - 1]} ${year}`;
+  const periodLabel =
+    month === 0
+      ? `${year}`
+      : `${t(`sales.months.${month}`)} ${year}`;
 
-  // Qidiruv yozilganda oy/yil va status filtrlari e'tiborga olinmaydi —
-  // barcha buyurtmalar ichidan qidiriladi (qidirilayotgan buyurtma boshqa oyda bo'lishi mumkin)
   const searching = search.trim().length > 0;
 
   const { data, isLoading } = useQuery({
@@ -109,20 +108,20 @@ export default function OrdersPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold">Buyurtmalar</h1>
-          <p className="text-sm text-ink-soft">Sotuv bo'limi — barcha buyurtmalar</p>
+          <h1 className="text-2xl font-bold">{t('sales.pageTitle')}</h1>
+          <p className="text-sm text-ink-soft">{t('sales.pageSubtitle')}</p>
         </div>
         <button className="btn-primary" onClick={() => setShowCreate(true)}>
-          <Plus size={16} /> Yangi buyurtma
+          <Plus size={16} /> {t('sales.modalCreateTitle')}
         </button>
       </div>
 
-      {/* KPI cards — tanlangan davr (oy/yil) bo'yicha */}
+      {/* KPI cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Kpi icon={<ShoppingCart size={18} />} label={`Buyurtma · ${periodLabel}`} value={s ? String(s.total_orders) : '—'} />
-        <Kpi icon={<Wallet size={18} />} label={`Savdo · ${periodLabel}`} value={s ? formatUZS(s.revenue_total) : '—'} accent="text-ink" />
-        <Kpi icon={<CalendarClock size={18} />} label={`To'langan · ${periodLabel}`} value={s ? formatUZS(s.paid_total) : '—'} accent="text-success" />
-        <Kpi icon={<AlertCircle size={18} />} label={`Qoldiq · ${periodLabel}`}
+        <Kpi icon={<ShoppingCart size={18} />} label={t('sales.kpiOrders', { period: periodLabel })} value={s ? String(s.total_orders) : '—'} />
+        <Kpi icon={<Wallet size={18} />} label={t('sales.kpiRevenue', { period: periodLabel })} value={s ? formatUZS(s.revenue_total) : '—'} accent="text-ink" />
+        <Kpi icon={<CalendarClock size={18} />} label={t('sales.kpiPaid', { period: periodLabel })} value={s ? formatUZS(s.paid_total) : '—'} accent="text-success" />
+        <Kpi icon={<AlertCircle size={18} />} label={t('sales.kpiBalance', { period: periodLabel })}
              value={s ? formatUZS(s.outstanding_total) : '—'} accent="text-danger" />
       </div>
 
@@ -130,19 +129,19 @@ export default function OrdersPage() {
         <div className="flex flex-wrap gap-3 mb-4">
           <div className="flex items-center gap-2 flex-1 min-w-[200px] bg-white border border-black/10 rounded-button px-3 py-1.5">
             <Search size={16} className="text-ink/40" />
-            <input placeholder="Kod, mijoz ismi yoki telefon bo'yicha qidirish..." value={search}
+            <input placeholder={t('sales.searchPlaceholder')} value={search}
                    onChange={(e) => setSearch(e.target.value)}
                    className="bg-transparent outline-none flex-1 text-sm" />
           </div>
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="input max-w-[190px]">
-            <option value="">Barcha statuslar</option>
-            {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            <option value="">{t('sales.statusAll')}</option>
+            {STATUS_OPTION_KEYS.map((o) => <option key={o.value} value={o.value}>{t(o.labelKey)}</option>)}
           </select>
-          <select value={month} onChange={(e) => setMonth(Number(e.target.value))} className="input max-w-[150px]" title="Oy">
-            <option value={0}>Butun yil</option>
-            {MONTHS.map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
+          <select value={month} onChange={(e) => setMonth(Number(e.target.value))} className="input max-w-[150px]" title={t('sales.monthTooltip')}>
+            <option value={0}>{t('sales.allYear')}</option>
+            {MONTH_NUMS.map((m) => <option key={m} value={m}>{t(`sales.months.${m}`)}</option>)}
           </select>
-          <select value={year} onChange={(e) => setYear(Number(e.target.value))} className="input max-w-[110px]" title="Yil">
+          <select value={year} onChange={(e) => setYear(Number(e.target.value))} className="input max-w-[110px]" title={t('sales.yearTooltip')}>
             {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
           </select>
         </div>
@@ -152,11 +151,11 @@ export default function OrdersPage() {
             {Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-12 rounded-button bg-black/5 animate-pulse" />)}
           </div>
         ) : orders.length === 0 ? (
-          <EmptyState title="Buyurtmalar yo'q" description="'Yangi buyurtma' tugmasi orqali yarating" />
+          <EmptyState title={t('sales.ordersEmpty')} description={t('sales.ordersEmptyDesc')} />
         ) : (
           <>
             <p className="text-xs text-ink-soft mb-2">
-              Kataklarni bevosita tahrirlash mumkin — o'zgartirish avtomatik saqlanadi. To'liq ko'rish uchun qator oxiridagi tugmani bosing.
+              {t('sales.inlineEditHint')}
             </p>
             <OrdersTable orders={orders} products={products} onChanged={refresh} onPay={setPayingId} />
           </>

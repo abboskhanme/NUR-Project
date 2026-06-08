@@ -340,6 +340,8 @@ async def admin_reset_password(
     if not user:
         raise HTTPException(404, "Foydalanuvchi topilmadi")
     user.password_hash = hash_password(payload.new_password)
+    # Parol reset qilingach foydalanuvchining barcha sessiyalari uziladi
+    user.token_version = (user.token_version or 0) + 1
     await db.commit()
     return {"detail": "Parol yangilandi"}
 

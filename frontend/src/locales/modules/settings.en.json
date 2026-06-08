@@ -1,0 +1,19 @@
+{
+  "title": "Settings",
+  "avatarCard": "Profile photo",
+  "profileCard": "Profile",
+  "phoneLabel": "Phone (login)",
+  "phoneHint": "This number is used to log in to the system.",
+  "fullNameLabel": "Full name",
+  "saveBtn": "Save",
+  "savingBtn": "Saving...",
+  "phoneRequired": "Login phone number cannot be empty",
+  "profileSaved": "Profile updated",
+  "changePasswordCard": "Change password",
+  "oldPasswordLabel": "Old password",
+  "newPasswordLabel": "New password",
+  "newPasswordPlaceholder": "at least 8 characters",
+  "changeBtn": "Change",
+  "changingBtn": "Updating...",
+  "passwordSaved": "Password updated"
+}
