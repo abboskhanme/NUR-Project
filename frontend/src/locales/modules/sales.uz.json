@@ -185,5 +185,12 @@
   "moveTop": "Eng yuqoriga",
   "moveUp": "Yuqoriga",
   "moveDown": "Pastga",
-  "daysRemaining": "kun qoldi"
+  "daysRemaining": "kun qoldi",
+  "addToQueue": "Navbatga o'tkazish",
+  "removeFromQueue": "Navbatdan chiqarish",
+  "addToQueueTitle": "Navbatga o'tkazish",
+  "pickupDateLabel": "Chiqib ketish (olib ketish) sanasi",
+  "toQueueConfirm": "Navbatga qo'shish",
+  "queueAdded": "Navbatga qo'shildi",
+  "colPickup": "Chiqib ketish"
 }

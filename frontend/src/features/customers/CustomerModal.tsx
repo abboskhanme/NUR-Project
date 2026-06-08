@@ -25,6 +25,7 @@ export interface CustomerFull {
   address?: string | null;
   source?: string | null;
   note?: string | null;
+  is_dealer?: boolean;
 }
 
 export default function CustomerModal({
@@ -47,6 +48,7 @@ export default function CustomerModal({
   const [city, setCity] = useState(customer?.city ?? '');
   const [address, setAddress] = useState(customer?.address ?? '');
   const [note, setNote] = useState(customer?.note ?? '');
+  const [isDealer, setIsDealer] = useState(customer?.is_dealer ?? false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -74,6 +76,7 @@ export default function CustomerModal({
       city: city.trim() || null,
       address: address.trim() || null,
       note: note.trim() || null,
+      is_dealer: isDealer,
     };
     try {
       if (isCreate) {
@@ -162,6 +165,12 @@ export default function CustomerModal({
             <label className="label">{t('customers.modal.noteLabel')}</label>
             <textarea className="input min-h-[56px]" value={note} onChange={(e) => setNote(e.target.value)} />
           </div>
+
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input type="checkbox" className="h-4 w-4 accent-primary"
+                   checked={isDealer} onChange={(e) => setIsDealer(e.target.checked)} />
+            <span className="text-sm">{t('customers.modal.dealerLabel')}</span>
+          </label>
         </div>
 
         <div className="px-5 py-3 border-t border-black/5 flex justify-end gap-2 shrink-0">

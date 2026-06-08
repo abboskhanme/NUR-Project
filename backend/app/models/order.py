@@ -40,6 +40,13 @@ class Order(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     # Navbat ustuvorligi — yuqori qiymat navbatda oldinroq turadi
     priority: Mapped[int] = mapped_column(default=0, index=True)
 
+    # Navbat: buyurtma sotuvdan navbatga tugma bilan o'tkaziladi (avtomatik emas)
+    in_queue: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false", nullable=False, index=True
+    )
+    # Rejalashtirilgan chiqib-ketish (olib ketish) sanasi — navbatdagilar uchun
+    pickup_date: Mapped[Optional[date]] = mapped_column(Date, index=True)
+
     # Inventory linkage (optional — pick a unique unit from SKLAD KATYOL)
     inventory_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("inventory.id", ondelete="SET NULL")

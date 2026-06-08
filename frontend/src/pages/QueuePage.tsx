@@ -14,7 +14,7 @@ import { formatDate, formatUZS } from '@/lib/format';
 interface ProductMini { product_type?: string; model?: string | null; name?: string | null; kvm?: number | null; display_name?: string; }
 interface Item { product?: ProductMini | null; bunker_direction?: string | null; quantity: number; }
 interface QueueOrder {
-  id: string; code: string; status: string; order_date: string; position: number;
+  id: string; code: string; status: string; order_date: string; pickup_date?: string | null; position: number;
   customer?: { full_name: string; phone?: string; region?: string | null } | null;
   items: Item[];
   items_total_uzs: string; balance_uzs: string;
@@ -50,8 +50,8 @@ export default function QueuePage() {
   });
   const queue = data ?? [];
 
-  const allPending = useMemo(() => queue.filter((o) => o.status === 'new'), [queue]);
-  const ready = useMemo(() => queue.filter((o) => o.status === 'ready'), [queue]);
+  // Navbat = in_queue bo'lgan BARCHA buyurtmalar (status new/ready dan qat'i nazar)
+  const allPending = queue;
 
   const searching = search.trim().length > 0;
   const pendingShown = useMemo(() => {
@@ -90,6 +90,7 @@ export default function QueuePage() {
               <th className="py-2 pr-3">{t('sales.colCustomer')}</th>
               <th className="py-2 pr-3">{t('sales.sectionItems')}</th>
               <th className="py-2 pr-3">{t('common.date')}</th>
+              <th className="py-2 pr-3">{t('sales.colPickup')}</th>
               <th className="py-2 pr-3 text-right">{t('common.amount')}</th>
               <th className="py-2 pr-3">{t('common.status')}</th>
               {reorderable && <th className="py-2 pr-3 text-right">{t('sales.colQueue')}</th>}
@@ -111,6 +112,7 @@ export default function QueuePage() {
                 </td>
                 <td className="py-2 pr-3 max-w-[220px] truncate" title={itemSummary(o, dirRight, dirLeft)}>{itemSummary(o, dirRight, dirLeft)}</td>
                 <td className="py-2 pr-3">{formatDate(o.order_date)}</td>
+                <td className="py-2 pr-3">{o.pickup_date ? formatDate(o.pickup_date) : '—'}</td>
                 <td className="py-2 pr-3 text-right">{formatUZS(o.items_total_uzs)}</td>
                 <td className="py-2 pr-3"><StatusBadge status={o.status} /></td>
                 {reorderable && (
@@ -186,13 +188,6 @@ export default function QueuePage() {
               </p>
             )}
           </Card>
-
-          {ready.length > 0 && (
-            <Card title={t('sales.readySection', { count: ready.length })}>
-              <p className="text-xs text-ink-soft mb-3">{t('sales.readyDesc')}</p>
-              {renderTable(ready, false)}
-            </Card>
-          )}
         </>
       )}
 

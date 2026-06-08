@@ -30,7 +30,7 @@ interface Payment {
 }
 interface OrderDetail {
   id: string; code: string; status: string; order_date: string; delivered_at?: string | null;
-  customer?: { id: string; full_name: string; phone: string; region?: string | null; city?: string | null; address?: string | null } | null;
+  customer?: { id: string; full_name: string; phone: string; region?: string | null; city?: string | null; address?: string | null; is_dealer?: boolean } | null;
   inventory?: { id: string; unique_id: string; status: string } | null;
   area_m2?: number | null; bunker_direction?: string | null; delivery_address?: string | null;
   exchange_rate: string; payment_type?: string | null; note?: string | null;
@@ -138,6 +138,7 @@ export default function OrderDetailPage() {
 
   const nexts = NEXT_STATUS_KEYS[o.status] ?? [];
   const balance = parseFloat(o.balance_uzs || '0');
+  const isDealer = !!o.customer?.is_dealer; // diller — to'lovsiz yetkazishga ruxsat
   const locked = o.status === 'delivered';
 
   const w = computeWarranty(o.delivered_at);
@@ -193,7 +194,7 @@ export default function OrderDetailPage() {
           <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-black/5">
             {nexts.map((n) => {
               const label = t(n.labelKey);
-              const blockedDeliver = n.value === 'delivered' && balance > 0;
+              const blockedDeliver = n.value === 'delivered' && balance > 0 && !isDealer;
               return (
                 <button key={n.value}
                         disabled={blockedDeliver}
@@ -204,7 +205,7 @@ export default function OrderDetailPage() {
                 </button>
               );
             })}
-            {nexts.some((n) => n.value === 'delivered') && balance > 0 && (
+            {nexts.some((n) => n.value === 'delivered') && balance > 0 && !isDealer && (
               <span className="text-xs text-danger self-center">
                 {t('sales.blockedDeliverHint', { amount: formatUZS(o.balance_uzs) })}
               </span>
@@ -230,7 +231,7 @@ export default function OrderDetailPage() {
         >
           {o.customer ? (
             <div className="space-y-1.5 text-sm">
-              <div className="flex items-center gap-2 font-medium"><User size={14} className="text-ink/40" /> {o.customer.full_name}</div>
+              <div className="flex items-center gap-2 font-medium"><User size={14} className="text-ink/40" /> {o.customer.full_name}{o.customer.is_dealer && <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-700">{t('customers.dealerShort')}</span>}</div>
               <div className="flex items-center gap-2"><Phone size={14} className="text-ink/40" /> {formatPhone(o.customer.phone)}</div>
               <div className="flex items-center gap-2"><MapPin size={14} className="text-ink/40" />
                 {[o.customer.region, o.customer.city].filter(Boolean).join(', ') || '—'}

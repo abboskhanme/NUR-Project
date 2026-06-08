@@ -185,5 +185,12 @@
   "moveTop": "Move to top",
   "moveUp": "Move up",
   "moveDown": "Move down",
-  "daysRemaining": "days remaining"
+  "daysRemaining": "days remaining",
+  "addToQueue": "Move to queue",
+  "removeFromQueue": "Remove from queue",
+  "addToQueueTitle": "Move to queue",
+  "pickupDateLabel": "Pickup (departure) date",
+  "toQueueConfirm": "Add to queue",
+  "queueAdded": "Added to queue",
+  "colPickup": "Pickup date"
 }

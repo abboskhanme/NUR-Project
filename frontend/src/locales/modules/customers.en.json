@@ -46,11 +46,13 @@
     "cityLabel": "City / district",
     "addressLabel": "Address",
     "noteLabel": "Note",
+    "dealerLabel": "Dealer (delivery allowed without full payment)",
     "fullNameRequired": "Full name is required",
     "phoneRequired": "Phone is required",
     "toastAdded": "Customer added",
     "toastUpdated": "Updated",
     "toastError": "Error",
     "saving": "Saving..."
-  }
+  },
+  "dealerShort": "Dealer"
 }

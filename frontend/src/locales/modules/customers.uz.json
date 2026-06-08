@@ -46,11 +46,13 @@
     "cityLabel": "Shahar / tuman",
     "addressLabel": "Manzil",
     "noteLabel": "Izoh",
+    "dealerLabel": "Diller mijoz (to'lovsiz yetkazishga ruxsat)",
     "fullNameRequired": "Ism-familiya majburiy",
     "phoneRequired": "Telefon majburiy",
     "toastAdded": "Mijoz qo'shildi",
     "toastUpdated": "Yangilandi",
     "toastError": "Xatolik",
     "saving": "Saqlanmoqda..."
-  }
+  },
+  "dealerShort": "Diller"
 }

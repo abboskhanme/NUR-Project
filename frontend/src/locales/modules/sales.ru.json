@@ -185,5 +185,12 @@
   "moveTop": "В начало",
   "moveUp": "Вверх",
   "moveDown": "Вниз",
-  "daysRemaining": "дней осталось"
+  "daysRemaining": "дней осталось",
+  "addToQueue": "В очередь",
+  "removeFromQueue": "Убрать из очереди",
+  "addToQueueTitle": "Добавить в очередь",
+  "pickupDateLabel": "Дата выдачи (самовывоза)",
+  "toQueueConfirm": "Добавить в очередь",
+  "queueAdded": "Добавлено в очередь",
+  "colPickup": "Дата выдачи"
 }

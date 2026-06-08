@@ -19,7 +19,7 @@ from app.models.product import Inventory
 from app.schemas.common import Page
 from app.schemas.order import (
     OrderCreate, OrderOut, OrderStatusChange, OrderUpdate,
-    PaymentIn, PaymentOut, SalesSummary, QueueItemOut, QueueMove,
+    PaymentIn, PaymentOut, SalesSummary, QueueItemOut, QueueMove,    QueueAdd,
 )
 from app.services.finance_service import apply_transaction
 from app.services.order_service import generate_order_code, is_valid_transition
@@ -132,11 +132,13 @@ async def list_orders(
     # Navbat pozitsiyalari: FAQAT "new" (navbatda) statusdagi buyurtmalar uchun.
     # "Tayyor bo'ldi" va boshqa statuslar navbatda hisoblanmaydi.
     pos_map: dict[uuid.UUID, int] = {}
-    if any(o.status == "new" for o in items):
-        qq = select(Order.id).where(Order.status == "new")
+    if any(o.in_queue for o in items):
+        qq = select(Order.id).where(Order.in_queue.is_(True)).where(
+            Order.status.notin_(("delivered", "rejected")))
         if _own_only(current):
             qq = qq.where(Order.salesperson_id == current.id)
-        qq = qq.order_by(Order.priority.desc(), Order.order_date.asc(), Order.created_at.asc())
+        qq = qq.order_by(Order.priority.desc(), Order.pickup_date.asc().nulls_last(),
+                         Order.order_date.asc(), Order.created_at.asc())
         queue_ids = (await db.execute(qq)).scalars().all()
         pos_map = {oid: i for i, oid in enumerate(queue_ids, start=1)}
 
@@ -206,10 +208,12 @@ async def sales_summary(
 
 # ---- Queue (Navbat) ----  (declared before /{order_id})
 async def _load_queue(db: AsyncSession, current) -> list[Order]:
-    q = _order_query().where(Order.status.in_(ACTIVE_QUEUE_STATUSES))
+    q = _order_query().where(Order.in_queue.is_(True)).where(
+        Order.status.notin_(("delivered", "rejected")))
     if _own_only(current):
         q = q.where(Order.salesperson_id == current.id)
-    q = q.order_by(Order.priority.desc(), Order.order_date.asc(), Order.created_at.asc())
+    q = q.order_by(Order.priority.desc(), Order.pickup_date.asc().nulls_last(),
+                   Order.order_date.asc(), Order.created_at.asc())
     res = await db.execute(q)
     return list(res.scalars().unique().all())
 
@@ -222,10 +226,9 @@ def _queue_out(orders: list[Order]) -> list[QueueItemOut]:
     n = 0
     for o in orders:
         item = QueueItemOut.model_validate(o)
-        if o.status == "new":
-            n += 1
-            item.position = n
-            item.queue_position = n
+        n += 1
+        item.position = n
+        item.queue_position = n
         out.append(item)
     return out
 
@@ -243,9 +246,8 @@ async def queue_move(order_id: uuid.UUID, payload: QueueMove, current: CurrentUs
     if order_id not in ids:
         raise HTTPException(404, "Buyurtma navbatda topilmadi")
     target = orders[ids.index(order_id)]
-    # Ko'chirish faqat bir xil statusdagilar (masalan "new") orasida bo'ladi —
-    # "ready" buyurtmalar alohida ro'yxat sifatida ko'rsatiladi.
-    group = [o for o in orders if o.status == target.status]
+    # Navbatdagilar yagona ro'yxat — barchasi orasida ko'chiriladi.
+    group = list(orders)
     gidx = group.index(target)
     if payload.action == "up" and gidx > 0:
         group[gidx - 1], group[gidx] = group[gidx], group[gidx - 1]
@@ -262,6 +264,39 @@ async def queue_move(order_id: uuid.UUID, payload: QueueMove, current: CurrentUs
         o.priority = n - pos
     await db.commit()
     return _queue_out(await _load_queue(db, current))
+
+
+@router.post("/{order_id}/to-queue", response_model=OrderOut)
+async def add_to_queue(order_id: uuid.UUID, payload: QueueAdd, current: CurrentUser,
+                       db: Annotated[AsyncSession, Depends(get_db)]):
+    """Buyurtmani sotuvdan navbatga o'tkazish (chiqib-ketish sanasi bilan)."""
+    res = await db.execute(_order_query().where(Order.id == order_id))
+    o = res.scalar_one_or_none()
+    if not o:
+        raise HTTPException(404, "Buyurtma topilmadi")
+    if o.status in ("delivered", "rejected"):
+        raise HTTPException(400, "Yakunlangan buyurtmani navbatga qo'shib bo'lmaydi")
+    o.in_queue = True
+    if payload.pickup_date is not None:
+        o.pickup_date = payload.pickup_date
+    await db.commit()
+    res = await db.execute(_order_query().where(Order.id == order_id))
+    return res.scalar_one()
+
+
+@router.post("/{order_id}/from-queue", response_model=OrderOut)
+async def remove_from_queue(order_id: uuid.UUID, current: CurrentUser,
+                            db: Annotated[AsyncSession, Depends(get_db)]):
+    """Buyurtmani navbatdan chiqarish (sotuvda qoladi)."""
+    res = await db.execute(_order_query().where(Order.id == order_id))
+    o = res.scalar_one_or_none()
+    if not o:
+        raise HTTPException(404, "Buyurtma topilmadi")
+    o.in_queue = False
+    o.priority = 0
+    await db.commit()
+    res = await db.execute(_order_query().where(Order.id == order_id))
+    return res.scalar_one()
 
 
 @router.post("", response_model=OrderOut, status_code=201)
@@ -354,7 +389,7 @@ async def update_order(order_id: uuid.UUID, payload: OrderUpdate, _: CurrentUser
     if new_status and new_status != o.status:
         if not is_valid_transition(o.status, new_status):
             raise HTTPException(400, f"O'tish ruxsat etilmaydi: {o.status} -> {new_status}")
-        if new_status == "delivered" and o.balance_uzs > 0:
+        if new_status == "delivered" and o.balance_uzs > 0 and not (o.customer and o.customer.is_dealer):
             raise HTTPException(400, "Buyurtma to'liq to'lanmagan — avval qoldiq to'lovni yoping")
         o.status = new_status
         if new_status == "delivered":
@@ -379,8 +414,8 @@ async def change_status(order_id: uuid.UUID, payload: OrderStatusChange,
         raise HTTPException(404, "Buyurtma topilmadi")
     if not is_valid_transition(o.status, payload.status):
         raise HTTPException(400, f"O'tish ruxsat etilmaydi: {o.status} -> {payload.status}")
-    # To'liq to'lanmagan buyurtmani "Yetkazildi" holatiga o'tkazib bo'lmaydi
-    if payload.status == "delivered" and o.balance_uzs > 0:
+    # To'liq to'lanmagan buyurtmani "Yetkazildi"ga o'tkazib bo'lmaydi (diller bundan mustasno)
+    if payload.status == "delivered" and o.balance_uzs > 0 and not (o.customer and o.customer.is_dealer):
         raise HTTPException(400, "Buyurtma to'liq to'lanmagan — avval qoldiq to'lovni yoping")
     o.status = payload.status
     if payload.status == "delivered":

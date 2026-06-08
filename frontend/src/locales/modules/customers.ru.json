@@ -46,11 +46,13 @@
     "cityLabel": "Город / район",
     "addressLabel": "Адрес",
     "noteLabel": "Примечание",
+    "dealerLabel": "Дилер (можно выдать без полной оплаты)",
     "fullNameRequired": "Ф.И.О. обязательно",
     "phoneRequired": "Телефон обязателен",
     "toastAdded": "Клиент добавлен",
     "toastUpdated": "Обновлено",
     "toastError": "Ошибка",
     "saving": "Сохранение..."
-  }
+  },
+  "dealerShort": "Дилер"
 }

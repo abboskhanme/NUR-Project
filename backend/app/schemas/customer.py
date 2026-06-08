@@ -18,6 +18,7 @@ class CustomerBase(BaseModel):
     address: Optional[str] = None
     source: Optional[str] = "manual"
     note: Optional[str] = None
+    is_dealer: bool = False
 
 
 class CustomerCreate(CustomerBase):
@@ -33,6 +34,7 @@ class CustomerUpdate(BaseModel):
     city: Optional[str] = None
     address: Optional[str] = None
     note: Optional[str] = None
+    is_dealer: Optional[bool] = None
 
 
 class CustomerOut(ORMBase):
@@ -46,4 +48,5 @@ class CustomerOut(ORMBase):
     address: Optional[str] = None
     source: Optional[str] = None
     note: Optional[str] = None
+    is_dealer: bool = False
     created_at: datetime

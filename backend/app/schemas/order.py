@@ -141,6 +141,8 @@ class OrderOut(ORMBase):
     delivered_at: Optional[date] = None
     status: str
     priority: int = 0
+    in_queue: bool = False
+    pickup_date: Optional[date] = None
     inventory_id: Optional[uuid.UUID] = None
     area_m2: Optional[int] = None
     bunker_direction: Optional[str] = None
@@ -188,6 +190,11 @@ class SalesSummary(BaseModel):
 class QueueItemOut(OrderOut):
     """Navbatdagi buyurtma — tartib raqami bilan."""
     position: int = 0
+
+
+class QueueAdd(BaseModel):
+    # Navbatga o'tkazishda rejalashtirilgan chiqib-ketish sanasi (ixtiyoriy)
+    pickup_date: Optional[date] = None
 
 
 class QueueMove(BaseModel):

@@ -2,7 +2,7 @@
 import uuid
 from typing import Optional
 
-from sqlalchemy import ForeignKey, String, Text
+from sqlalchemy import Boolean, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -22,6 +22,11 @@ class Customer(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     address: Mapped[Optional[str]] = mapped_column(Text)
 
     source: Mapped[Optional[str]] = mapped_column(String(50))   # manual, telegram_bot, import
+
+    # Diller mijoz — to'liq to'lamasa ham buyurtmani "yetkazildi"ga o'tkazish mumkin
+    is_dealer: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false", nullable=False
+    )
     note: Mapped[Optional[str]] = mapped_column(Text)
 
     created_by_id: Mapped[Optional[uuid.UUID]] = mapped_column(

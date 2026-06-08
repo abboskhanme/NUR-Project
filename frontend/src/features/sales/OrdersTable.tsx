@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { usePermissions } from '@/lib/permissions';
 import toast from 'react-hot-toast';
-import { ExternalLink, Plus } from 'lucide-react';
+import { ExternalLink, Plus, ListPlus, ListX } from 'lucide-react';
 
 import { api } from '@/api/client';
 import { formatUZS, formatPhone, formatDate } from '@/lib/format';
@@ -25,10 +26,12 @@ interface OrderItem {
 export interface OrderFull {
   id: string; code: string; status: string; order_date: string; delivered_at?: string | null;
   queue_position?: number | null;
+  in_queue?: boolean;
+  pickup_date?: string | null;
   exchange_rate: string;
   inventory_id?: string | null;
   delivery_address?: string | null;
-  customer?: { id: string; full_name: string; phone: string; region?: string | null; address?: string | null } | null;
+  customer?: { id: string; full_name: string; phone: string; region?: string | null; address?: string | null; is_dealer?: boolean } | null;
   items: OrderItem[];
   items_total_uzs: string; paid_uzs: string; balance_uzs: string;
   has_stamp_ruc: boolean; has_stamp_avt: boolean; has_online: boolean; has_video: boolean;
@@ -184,7 +187,7 @@ function Row({
   }
 
   async function onStatusChange(next: string) {
-    if (next === 'delivered' && balance > 0) {
+    if (next === 'delivered' && balance > 0 && !o.customer?.is_dealer) {
       toast.error(t('sales.notPaidError'));
       setStatus(o.status);
       return;
@@ -395,10 +398,83 @@ function Row({
       </td>
 
       <td className={cell}>
-        <button onClick={() => navigate(`/orders/${o.id}`)} className="p-1 rounded hover:bg-black/5 text-ink-soft" title={t('sales.openOrder')}>
-          <ExternalLink size={14} />
-        </button>
+        <div className="flex items-center gap-0.5">
+          <QueueButton o={o} onChanged={onChanged} />
+          <button onClick={() => navigate(`/orders/${o.id}`)} className="p-1 rounded hover:bg-black/5 text-ink-soft" title={t('sales.openOrder')}>
+            <ExternalLink size={14} />
+          </button>
+        </div>
       </td>
     </tr>
+  );
+}
+
+function QueueButton({ o, onChanged }: { o: OrderFull; onChanged: () => void }) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const [pickup, setPickup] = useState(o.pickup_date ?? '');
+  const [busy, setBusy] = useState(false);
+  if (o.status === 'delivered' || o.status === 'rejected') return null;
+
+  async function addToQueue() {
+    setBusy(true);
+    try {
+      await api.post(`/orders/${o.id}/to-queue`, { pickup_date: pickup || null });
+      toast.success(t('sales.queueAdded'));
+      setOpen(false);
+      onChanged();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || t('common.error'));
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function removeFromQueue() {
+    setBusy(true);
+    try {
+      await api.post(`/orders/${o.id}/from-queue`);
+      onChanged();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || t('common.error'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      {o.in_queue ? (
+        <button onClick={removeFromQueue} disabled={busy}
+                className="p-1 rounded hover:bg-blue-50 text-blue-600" title={t('sales.removeFromQueue')}>
+          <ListX size={14} />
+        </button>
+      ) : (
+        <button onClick={() => setOpen(true)} disabled={busy}
+                className="p-1 rounded hover:bg-black/5 text-ink-soft" title={t('sales.addToQueue')}>
+          <ListPlus size={14} />
+        </button>
+      )}
+      {open && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4" onClick={() => setOpen(false)}>
+          <div className="bg-card rounded-lg shadow-xl w-full max-w-xs p-4 space-y-3" onClick={(e) => e.stopPropagation()}>
+            <h4 className="font-semibold text-sm">{t('sales.addToQueueTitle')}</h4>
+            <div className="min-w-0">
+              <label className="label">{t('sales.pickupDateLabel')}</label>
+              <input type="date" className="input w-full box-border" value={pickup}
+                     onChange={(e) => setPickup(e.target.value)} />
+            </div>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setOpen(false)} className="px-3 py-1.5 text-sm rounded-button hover:bg-black/5">
+                {t('actions.cancel')}
+              </button>
+              <button onClick={addToQueue} disabled={busy} className="btn-primary disabled:opacity-50">
+                {t('sales.toQueueConfirm')}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )}
+    </>
   );
 }
