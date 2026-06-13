@@ -15,7 +15,7 @@ export default function AppLayout() {
       </div>
       <div className="flex-1 flex flex-col min-w-0">
         <TopBar />
-        <main className="flex-1 p-4 md:p-6 pb-24 md:pb-6">
+        <main className="flex-1 p-4 md:p-6 pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-6">
           <Outlet />
         </main>
         <MobileNav />
