@@ -13,7 +13,6 @@ from app.core.dependencies import CurrentUser
 from app.core.permissions import module_guard, require_permission
 from app.db.session import get_db
 from app.models.customer import Customer
-from app.models.finance import Account, FinanceCategory, FinanceTransaction
 from app.models.order import Order, OrderItem, Payment
 from app.models.product import Inventory, Product
 from app.schemas.common import Page
@@ -21,7 +20,6 @@ from app.schemas.order import (
     OrderCreate, OrderOut, OrderStatusChange, OrderUpdate,
     PaymentIn, PaymentOut, SalesSummary, QueueItemOut, QueueMove,    QueueAdd,
 )
-from app.services.finance_service import apply_transaction
 from app.services.order_service import generate_order_code, is_valid_transition
 from app.services import pdf_service
 from app.services import excel_service
@@ -531,7 +529,7 @@ async def change_status(order_id: uuid.UUID, payload: OrderStatusChange,
 
 
 @router.post("/{order_id}/payments", response_model=PaymentOut, status_code=201,
-             dependencies=[Depends(require_permission("finance:write"))])
+             dependencies=[Depends(require_permission("orders:write"))])
 async def add_payment(order_id: uuid.UUID, payload: PaymentIn, user: CurrentUser,
                       db: Annotated[AsyncSession, Depends(get_db)]):
     res = await db.execute(select(Order).where(Order.id == order_id))
@@ -554,48 +552,17 @@ async def add_payment(order_id: uuid.UUID, payload: PaymentIn, user: CurrentUser
             400, f"To'lov qoldiqdan oshib ketdi — qoldiq: {o.balance_uzs:,.0f} so'm".replace(",", " "))
     p = Payment(order_id=order_id, created_by_id=user.id, **data)
     db.add(p)
-    await db.flush()
 
-    # ---- Moliya: avtomatik kirim tranzaksiyasi (qaysi valyutada bo'lsa ham) ----
-    currency = data.get("currency") or "UZS"
-    # Kategoriya: "Buyurtma to'lovi" (yo'q bo'lsa yaratiladi)
-    cat = (await db.execute(
-        select(FinanceCategory).where(FinanceCategory.code == "order_payment")
-    )).scalar_one_or_none()
-    if not cat:
-        cat = FinanceCategory(name="Buyurtma to'lovi", kind="income", code="order_payment")
-        db.add(cat)
-        await db.flush()
-    # Valyutaga mos operatsion hisobvaraq
-    acc = (await db.execute(
-        select(Account).where(Account.currency == currency,
-                              Account.ledger == "operational").limit(1)
-    )).scalar_one_or_none()
-    method_labels = {"cash": "naqd", "card": "karta", "transfer": "o'tkazma"}
-    tx = FinanceTransaction(
-        date=data.get("date") or date.today(),
-        type="income",
-        category_id=cat.id,
-        amount=data["amount"],
-        currency=currency,
-        # USD to'lovda UZS ekvivalentini ham saqlaymiz
-        amount_other_curr=(data.get("amount_uzs_equiv") or Decimal(0)) if currency == "USD" else Decimal(0),
-        account_id=acc.id if acc else None,
-        related_order_id=order_id,
-        note=f"Buyurtma {o.code} — to'lov ({method_labels.get(data.get('method', ''), data.get('method') or '—')})",
-        created_by_id=user.id,
-    )
-    db.add(tx)
-    await db.flush()
-    await apply_transaction(db, tx)  # hisobvaraq balansiga qo'shiladi
-
+    # MUHIM: savdo to'lovi MOLIYAGA bog'lanmaydi — moliya bo'limi alohida, qo'lda
+    # yuritiladi. To'lov faqat savdo bo'limi hisobida (Savdo/To'langan/Qoldiq)
+    # aks etadi; kassa balansi va moliya hisobotlariga ta'sir qilmaydi.
     await db.commit()
     await db.refresh(p)
     return p
 
 
 @router.get("/{order_id}/payments", response_model=list[PaymentOut],
-            dependencies=[Depends(require_permission("orders:read", "finance:read"))])
+            dependencies=[Depends(require_permission("orders:read"))])
 async def list_payments(order_id: uuid.UUID, _: CurrentUser,
                         db: Annotated[AsyncSession, Depends(get_db)]):
     res = await db.execute(select(Payment).where(Payment.order_id == order_id)
@@ -604,7 +571,7 @@ async def list_payments(order_id: uuid.UUID, _: CurrentUser,
 
 
 @router.delete("/{order_id}/payments/{payment_id}", status_code=204,
-               dependencies=[Depends(require_permission("finance:delete"))])
+               dependencies=[Depends(require_permission("orders:delete"))])
 async def delete_payment(order_id: uuid.UUID, payment_id: uuid.UUID, _: CurrentUser,
                          db: Annotated[AsyncSession, Depends(get_db)]):
     res = await db.execute(select(Payment).where(
@@ -618,18 +585,7 @@ async def delete_payment(order_id: uuid.UUID, payment_id: uuid.UUID, _: CurrentU
     if o and o.status == "delivered":
         raise HTTPException(400, "Yetkazilgan buyurtma to'lovini o'chirib bo'lmaydi")
 
-    # Moliyadagi mos kirim tranzaksiyasini ham qaytaramiz (balans tiklanadi)
-    tx = (await db.execute(select(FinanceTransaction).where(
-        FinanceTransaction.related_order_id == order_id,
-        FinanceTransaction.type == "income",
-        FinanceTransaction.amount == p.amount,
-        FinanceTransaction.currency == (p.currency or "UZS"),
-        FinanceTransaction.date == p.date,
-    ).limit(1))).scalar_one_or_none()
-    if tx:
-        await apply_transaction(db, tx, reverse=True)
-        await db.delete(tx)
-
+    # Savdo va moliya ajratilgan — to'lovni o'chirish moliyaga tegmaydi.
     await db.delete(p)
     await db.commit()
 
@@ -651,14 +607,9 @@ async def delete_order(order_id: uuid.UUID, _: CurrentUser,
     if not o:
         raise HTTPException(404, "Buyurtma topilmadi")
 
-    # Bog'langan moliya tranzaksiyalarini teskari qaytarib o'chiramiz
-    txs = (await db.execute(select(FinanceTransaction).where(
-        FinanceTransaction.related_order_id == order_id,
-    ))).scalars().all()
-    for tx in txs:
-        if tx.type in ("income", "expense"):
-            await apply_transaction(db, tx, reverse=True)
-        await db.delete(tx)
+    # Savdo va moliya ajratilgan — buyurtmani o'chirish moliyaga tegmaydi.
+    # Eski (avval yaratilgan) moliya yozuvi bo'lsa, u saqlanadi; related_order_id
+    # esa FK (ondelete=SET NULL) orqali avtomatik NULL bo'ladi.
 
     # Inventar birligini bo'shatamiz
     if o.inventory_id:

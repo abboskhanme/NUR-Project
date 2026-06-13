@@ -37,7 +37,6 @@ from app.db.session import AsyncSessionLocal
 from app.models.customer import Customer
 from app.models.finance import FinanceTransaction
 from app.models.order import Order
-from app.services.finance_service import apply_transaction
 
 
 async def find_orders(db, selectors):
@@ -94,25 +93,21 @@ async def main():
             phone = o.customer.phone if o.customer else "?"
             print(f"  • {o.code}  {o.order_date}  {cust} ({phone})  status={o.status}")
             print(f"      items={len(o.items)}  payments={len(o.payments)}  "
-                  f"income_tx={len(txs)} (∑ {tx_sum})  inventory={o.inventory_id}")
+                  f"inventory={o.inventory_id}")
+            if txs:
+                print(f"      (eslatma: {len(txs)} ta eski moliya yozuvi ∑{tx_sum} — "
+                      f"savdo/moliya ajratilgan, ular O'CHIRILMAYDI)")
 
         if not confirm:
             print("\n[DRY-RUN] Hech narsa o'chmadi. Tasdiqlash uchun --confirm qo'shing.")
             return
 
         # --- Haqiqiy o'chirish ---
+        # Savdo va moliya ajratilgan — buyurtmani o'chirish moliyaga tegmaydi.
+        # Eski moliya yozuvi bo'lsa saqlanadi (related_order_id FK orqali NULL bo'ladi).
         from app.api.v1.orders import _set_inventory_status
 
         for o in orders:
-            txs = (await db.execute(select(FinanceTransaction).where(
-                FinanceTransaction.related_order_id == o.id,
-            ))).scalars().all()
-            for tx in txs:
-                # income/expense balansga ta'sir qilganini teskari qaytaramiz
-                if tx.type in ("income", "expense"):
-                    await apply_transaction(db, tx, reverse=True)
-                await db.delete(tx)
-
             if o.inventory_id:
                 await _set_inventory_status(db, o.inventory_id, "available")
                 o.inventory_id = None
@@ -120,7 +115,7 @@ async def main():
             await db.delete(o)  # cascade: order_items + payments
 
         await db.commit()
-        print(f"\n✓ {len(orders)} ta buyurtma o'chirildi, balans va inventar tiklandi.")
+        print(f"\n✓ {len(orders)} ta buyurtma o'chirildi, inventar tiklandi.")
 
 
 if __name__ == "__main__":
