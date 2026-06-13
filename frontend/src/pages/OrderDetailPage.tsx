@@ -44,7 +44,6 @@ interface OrderDetail {
 // Next-status option keys — resolved with t() at render time
 const NEXT_STATUS_KEYS: Record<string, Array<{ value: string; labelKey: string; danger?: boolean }>> = {
   new: [
-    { value: 'ready', labelKey: 'sales.actionReady' },
     { value: 'delivered', labelKey: 'sales.actionDeliver' },
     { value: 'rejected', labelKey: 'sales.actionReject', danger: true },
   ],

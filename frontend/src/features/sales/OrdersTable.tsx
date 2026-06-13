@@ -37,20 +37,32 @@ export interface OrderFull {
   has_stamp_ruc: boolean; has_stamp_avt: boolean; has_online: boolean; has_video: boolean;
 }
 
-// Status option keys — resolved with t() at render time so language switching works live
+// Status option keys — resolved with t() at render time so language switching works live.
+// "ready" (Tayyor) olib tashlandi — buyurtma to'g'ridan-to'g'ri new → delivered ketadi.
 const STATUS_OPTION_KEYS = [
   { value: 'new', labelKey: 'sales.statusNew' },
-  { value: 'ready', labelKey: 'sales.statusReady' },
   { value: 'delivered', labelKey: 'sales.statusDelivered' },
   { value: 'rejected', labelKey: 'sales.statusRejected' },
 ];
 
 const STATUS_STYLES: Record<string, string> = {
   new: 'bg-blue-100 text-blue-700',
-  ready: 'bg-teal-100 text-teal-700',
+  ready: 'bg-teal-100 text-teal-700',   // eski (legacy) buyurtmalar uchun
   delivered: 'bg-emerald-100 text-emerald-700',
-  rejected: 'bg-red-100 text-red-700',
+  rejected: 'bg-gray-200 text-gray-600',
 };
+
+// Qator foni (yengil tus — matn o'qiladigan qoladi):
+//   rejected                          → kulrang (bekor qilingan)
+//   delivered                         → yashil (yetkazilgan)
+//   to'langan, hali yuk chiqmagan     → qizil (chiqarishga tayyor)
+//   aks holda (yangi, to'lanmagan)    → oq
+function rowTint(status: string, balance: number): string {
+  if (status === 'rejected') return 'bg-gray-200/70 hover:bg-gray-200';
+  if (status === 'delivered') return 'bg-emerald-50 hover:bg-emerald-100/60';
+  if (balance <= 0) return 'bg-red-50 hover:bg-red-100/60';
+  return 'hover:bg-gray-50';
+}
 
 const num = (s: string | number | null | undefined) => {
   const n = parseFloat(String(s ?? '')); return Number.isNaN(n) ? 0 : n;
@@ -225,8 +237,12 @@ function Row({
       saveMain({ [key]: v });
     };
 
-  // Status options resolved at render time
-  const statusOptions = STATUS_OPTION_KEYS.map((o) => ({ value: o.value, label: t(o.labelKey) }));
+  // Status options resolved at render time.
+  // Eski "ready" buyurtma bo'lsa — uni ham ko'rsatamiz (ko'chirib olish uchun).
+  const statusKeys = status === 'ready'
+    ? [{ value: 'ready', labelKey: 'sales.statusReady' }, ...STATUS_OPTION_KEYS]
+    : STATUS_OPTION_KEYS;
+  const statusOptions = statusKeys.map((s) => ({ value: s.value, label: t(s.labelKey) }));
   // Direction options resolved at render time
   const dirOptions = [
     { value: 'right', label: t('sales.dirRightFull') },
@@ -238,7 +254,7 @@ function Row({
   const ro = 'block px-1 py-0.5 border border-transparent truncate';
 
   return (
-    <tr className={'border-b border-black/5 ' + (saving ? 'opacity-60' : '')}>
+    <tr className={'border-b border-black/5 transition-colors ' + rowTint(status, balance) + (saving ? ' opacity-60' : '')}>
       {/* Queue position — only for active (new/ready) orders */}
       <td className={cell + ' text-center'}>
         {o.queue_position ? (

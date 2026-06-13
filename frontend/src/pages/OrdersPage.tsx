@@ -27,7 +27,6 @@ interface Summary {
 // Status option keys — resolved with t() at render time so language switching works live
 const STATUS_OPTION_KEYS = [
   { value: 'new', labelKey: 'sales.statusNew' },
-  { value: 'ready', labelKey: 'sales.statusReady' },
   { value: 'delivered', labelKey: 'sales.statusDelivered' },
   { value: 'rejected', labelKey: 'sales.statusRejected' },
 ];
