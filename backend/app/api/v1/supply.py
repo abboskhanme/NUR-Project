@@ -200,6 +200,47 @@ async def list_items(db: Annotated[AsyncSession, Depends(get_db)], user: Current
     return Page[ItemOut](items=items_out, total=total, page=page, page_size=page_size)
 
 
+@router.get("/reorder-suggestions")
+async def reorder_suggestions(db: Annotated[AsyncSession, Depends(get_db)], user: CurrentUser):
+    """Zaxirasi minimumdan past mahsulotlar uchun buyurtma tavsiyalari.
+
+    Tavsiya etilgan miqdor — minimumning ikki barobariga to'ldirish (zaxira
+    bufer bilan). Taxminiy narx = tavsiya × birlik narxi. Taminotchi bo'yicha
+    guruhlangan, oson buyurtma berish uchun.
+    """
+    import math
+
+    scope = await _my_vendor_id(user, db)
+    q = (
+        select(Item, Vendor.name)
+        .outerjoin(Vendor, Vendor.id == Item.vendor_id)
+        .where(Item.min_qty > 0, Item.stock_qty < Item.min_qty)
+    )
+    if scope is not None:
+        q = q.where(Item.vendor_id == scope)
+    q = q.order_by(Vendor.name.asc().nulls_last(), Item.name.asc())
+    rows = (await db.execute(q)).all()
+
+    out = []
+    total_cost = ZERO
+    for it, vname in rows:
+        suggested = (it.min_qty or ZERO) * 2 - (it.stock_qty or ZERO)
+        if suggested < ZERO:
+            suggested = ZERO
+        if (it.unit or "").lower() == "dona":
+            suggested = Decimal(math.ceil(suggested))
+        cost = suggested * (it.unit_price or ZERO)
+        total_cost += cost
+        out.append({
+            "id": str(it.id), "name": it.name, "unit": it.unit,
+            "vendor": vname, "vendor_id": str(it.vendor_id) if it.vendor_id else None,
+            "stock_qty": float(it.stock_qty or 0), "min_qty": float(it.min_qty or 0),
+            "suggested_qty": float(suggested), "unit_price": float(it.unit_price or 0),
+            "estimated_cost": float(cost),
+        })
+    return {"count": len(out), "total_cost_uzs": float(total_cost), "items": out}
+
+
 @router.post("/items", response_model=ItemOut, status_code=201,
              dependencies=[Depends(require_permission("supply:write"))])
 async def create_item(payload: ItemCreate, user: CurrentUser,

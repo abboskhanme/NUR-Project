@@ -107,6 +107,8 @@
   "methodTransfer": "O'tkazma",
   "deletePaymentTitle": "To'lovni o'chirish",
   "deletePaymentMessage": "Ushbu to'lov o'chirilsinmi?",
+  "deleteOrderTitle": "Buyurtmani o'chirish",
+  "deleteOrderMessage": "Ushbu buyurtma butunlay o'chiriladi. To'lovlar, moliya yozuvlari qaytariladi va inventar bo'shatiladi. Bu amalni qaytarib bo'lmaydi.",
   "warrantyLabel": "Servis kafolati",
   "deliveryDate": "Yetkazilgan",
   "orderDate": "Sana",
@@ -192,5 +194,13 @@
   "pickupDateLabel": "Chiqib ketish (olib ketish) sanasi",
   "toQueueConfirm": "Navbatga qo'shish",
   "queueAdded": "Navbatga qo'shildi",
-  "colPickup": "Chiqib ketish"
+  "colPickup": "Chiqib ketish",
+  "printInvoice": "Faktura",
+  "printInvoiceTitle": "Buyurtma fakturasini PDF yuklab olish",
+  "printWarranty": "Kafolat",
+  "printWarrantyTitle": "Kafolat sertifikatini PDF yuklab olish",
+  "printReceipt": "Kvitansiya",
+  "printReceiptTitle": "To'lov kvitansiyasini PDF yuklab olish",
+  "exportExcel": "Excel",
+  "exportExcelTitle": "Buyurtmalar ro'yxatini Excel ga yuklab olish"
 }

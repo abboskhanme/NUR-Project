@@ -20,7 +20,27 @@ export interface KpiData {
 export interface ByModelRow { model: string; count: number; total_uzs: number }
 export interface ByRegionRow { region: string; count: number; total_uzs: number }
 export interface BySellerRow { seller: string; count: number; total_uzs: number }
+export interface ByCustomerRow { customer: string; phone: string | null; count: number; total_uzs: number }
 export interface StatusRow { status: string; count: number; total_uzs: number }
+
+export interface ReceivableRow {
+  id: string;
+  code: string;
+  order_date: string;
+  status: string;
+  customer: string;
+  phone: string | null;
+  is_dealer: boolean;
+  total_uzs: number;
+  paid_uzs: number;
+  balance_uzs: number;
+  days: number | null;
+}
+export interface ReceivablesData {
+  total_balance_uzs: number;
+  count: number;
+  items: ReceivableRow[];
+}
 
 export interface TrendPoint { date: string; total_uzs: number; orders: number }
 export interface TrendData {

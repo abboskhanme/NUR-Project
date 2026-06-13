@@ -21,16 +21,17 @@ from datetime import date, timedelta
 from decimal import Decimal
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import CurrentUser
 from app.core.permissions import module_guard
 from app.db.session import get_db
+from app.services import excel_service
 from app.models.customer import Customer
 from app.models.finance import FinanceCategory, FinanceTransaction
-from app.models.order import Order, OrderItem
+from app.models.order import Order, OrderItem, Payment
 from app.models.product import Product
 from app.models.service import ServiceTicket
 from app.models.supply import GoodsReceipt, Item, Vendor
@@ -374,6 +375,112 @@ async def sales_by_seller(
         {"seller": s or "—", "count": int(c or 0), "total_uzs": float(t or 0)}
         for s, c, t in res.all()
     ]
+
+
+# --------------------------------------------------------------------------- #
+# SALES — by customer (eng yaxshi mijozlar)
+# --------------------------------------------------------------------------- #
+@router.get("/sales/by-customer")
+async def sales_by_customer(
+    db: Annotated[AsyncSession, Depends(get_db)], _: CurrentUser,
+    date_from: Optional[date] = None, date_to: Optional[date] = None,
+    limit: int = Query(15, ge=1, le=100),
+):
+    """Eng ko'p xarid qilgan mijozlar (summa bo'yicha)."""
+    date_from, date_to = _resolve_range(date_from, date_to, default_days=90)
+    res = await db.execute(
+        select(Customer.full_name, Customer.phone,
+               func.count(func.distinct(Order.id)),
+               func.coalesce(func.sum(OrderItem.total_uzs), 0))
+        .join(Order, Order.customer_id == Customer.id)
+        .join(OrderItem, OrderItem.order_id == Order.id)
+        .where(and_(Order.order_date >= date_from, Order.order_date <= date_to))
+        .group_by(Customer.id, Customer.full_name, Customer.phone)
+        .order_by(func.sum(OrderItem.total_uzs).desc())
+        .limit(limit)
+    )
+    return [
+        {"customer": n or "—", "phone": p, "count": int(c or 0), "total_uzs": float(t or 0)}
+        for n, p, c, t in res.all()
+    ]
+
+
+# --------------------------------------------------------------------------- #
+# SALES — receivables (mijoz qarzlari / to'lanmagan buyurtmalar)
+# --------------------------------------------------------------------------- #
+async def _receivables(db: AsyncSession, limit: int) -> tuple[float, list[dict]]:
+    """To'liq to'lanmagan buyurtmalar ro'yxati (kim qancha qarzdor)."""
+    items_sq = (
+        select(OrderItem.order_id.label("oid"),
+               func.coalesce(func.sum(OrderItem.total_uzs), 0).label("total"))
+        .group_by(OrderItem.order_id).subquery()
+    )
+    pay_sq = (
+        select(Payment.order_id.label("oid"),
+               func.coalesce(
+                   func.sum(func.coalesce(func.nullif(Payment.amount_uzs_equiv, 0),
+                                          Payment.amount)), 0).label("paid"))
+        .group_by(Payment.order_id).subquery()
+    )
+    total_col = func.coalesce(items_sq.c.total, 0)
+    paid_col = func.coalesce(pay_sq.c.paid, 0)
+    balance_col = total_col - paid_col
+
+    res = await db.execute(
+        select(Order.id, Order.code, Order.order_date, Order.status,
+               Customer.full_name, Customer.phone, Customer.is_dealer,
+               total_col, paid_col, balance_col)
+        .join(Customer, Customer.id == Order.customer_id)
+        .join(items_sq, items_sq.c.oid == Order.id)
+        .outerjoin(pay_sq, pay_sq.c.oid == Order.id)
+        .where(and_(Order.status != "rejected", balance_col > 0))
+        .order_by(balance_col.desc())
+        .limit(limit)
+    )
+    today = date.today()
+    rows = []
+    total_balance = 0.0
+    for oid, code, odate, status, cust, phone, dealer, total, paid, balance in res.all():
+        bal = float(balance or 0)
+        total_balance += bal
+        rows.append({
+            "id": str(oid), "code": code, "order_date": odate, "status": status,
+            "customer": cust or "—", "phone": phone, "is_dealer": bool(dealer),
+            "total_uzs": float(total or 0), "paid_uzs": float(paid or 0),
+            "balance_uzs": bal,
+            "days": (today - odate).days if odate else None,
+        })
+    return total_balance, rows
+
+
+@router.get("/sales/receivables")
+async def sales_receivables(
+    db: Annotated[AsyncSession, Depends(get_db)], _: CurrentUser,
+    limit: int = Query(100, ge=1, le=500),
+):
+    """To'liq to'lanmagan buyurtmalar — kim qancha qarzdor.
+
+    Sana bo'yicha filtrlanmaydi: barcha ochiq qarzlarni ko'rsatadi (kassa
+    yig'ish uchun). Rad etilgan buyurtmalar hisobga olinmaydi.
+    """
+    total_balance, rows = await _receivables(db, limit)
+    return {"total_balance_uzs": total_balance, "count": len(rows), "items": rows}
+
+
+@router.get("/sales/receivables.xlsx")
+async def sales_receivables_xlsx(
+    db: Annotated[AsyncSession, Depends(get_db)], _: CurrentUser,
+    limit: int = Query(500, ge=1, le=2000),
+):
+    """Qarzdorlik ro'yxatini Excel (xlsx) ga chiqaradi."""
+    _total, rows = await _receivables(db, limit)
+    data = excel_service.receivables_workbook(rows)
+    today = date.today().strftime("%Y-%m-%d")
+    return Response(
+        content=data,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="qarzdorlik-{today}.xlsx"'},
+    )
 
 
 # --------------------------------------------------------------------------- #

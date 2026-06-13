@@ -107,6 +107,8 @@
   "methodTransfer": "Перевод",
   "deletePaymentTitle": "Удалить платёж",
   "deletePaymentMessage": "Удалить этот платёж?",
+  "deleteOrderTitle": "Удалить заказ",
+  "deleteOrderMessage": "Заказ будет удалён безвозвратно. Платежи и финансовые записи отменяются, единица склада освобождается. Действие необратимо.",
   "warrantyLabel": "Гарантия сервиса",
   "deliveryDate": "Доставлено",
   "orderDate": "Дата",
@@ -192,5 +194,13 @@
   "pickupDateLabel": "Дата выдачи (самовывоза)",
   "toQueueConfirm": "Добавить в очередь",
   "queueAdded": "Добавлено в очередь",
-  "colPickup": "Дата выдачи"
+  "colPickup": "Дата выдачи",
+  "printInvoice": "Фактура",
+  "printInvoiceTitle": "Скачать фактуру заказа в PDF",
+  "printWarranty": "Гарантия",
+  "printWarrantyTitle": "Скачать гарантийный сертификат в PDF",
+  "printReceipt": "Квитанция",
+  "printReceiptTitle": "Скачать квитанцию об оплате в PDF",
+  "exportExcel": "Excel",
+  "exportExcelTitle": "Скачать список заказов в Excel"
 }

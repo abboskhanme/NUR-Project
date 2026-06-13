@@ -120,5 +120,21 @@
     "scheduled": "Rejalashtirilgan",
     "completed": "Bajarildi",
     "cancelled": "Bekor qilingan"
+  },
+  "view": {
+    "list": "Ro'yxat",
+    "calendar": "Kalendar"
+  },
+  "calendar": {
+    "today": "Bugun",
+    "weekdays": {
+      "mon": "Du",
+      "tue": "Se",
+      "wed": "Cho",
+      "thu": "Pa",
+      "fri": "Ju",
+      "sat": "Sha",
+      "sun": "Ya"
+    }
   }
 }

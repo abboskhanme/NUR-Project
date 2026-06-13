@@ -5,9 +5,11 @@ import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import {
   ArrowLeft, Pencil, Phone, MapPin, User, Package, Plus, Trash2, ExternalLink, ShieldCheck,
+  FileText, Receipt,
 } from 'lucide-react';
 
 import { api } from '@/api/client';
+import { downloadPdf } from '@/lib/pdf';
 import { usePermissions } from '@/lib/permissions';
 import Card from '@/components/ui/Card';
 import StatusBadge from '@/components/ui/StatusBadge';
@@ -81,9 +83,22 @@ export default function OrderDetailPage() {
     enabled: !!orderId,
   });
 
+  const [downloading, setDownloading] = useState<string | null>(null);
+
   function refresh() {
     qc.invalidateQueries({ queryKey: ['order', orderId] });
     qc.invalidateQueries({ queryKey: ['orders'] });
+  }
+
+  async function downloadDoc(kind: string, url: string, filename: string) {
+    setDownloading(kind);
+    try {
+      await downloadPdf(url, filename);
+    } catch {
+      toast.error(t('common.error'));
+    } finally {
+      setDownloading(null);
+    }
   }
 
   function askChangeStatus(status: string, label: string) {
@@ -110,6 +125,21 @@ export default function OrderDetailPage() {
         await api.delete(`/orders/${orderId}/payments/${pid}`);
         toast.success(t('common.deleted'));
         refresh();
+      },
+    });
+  }
+
+  function askDeleteOrder() {
+    setConfirm({
+      title: t('sales.deleteOrderTitle'),
+      message: t('sales.deleteOrderMessage'),
+      confirmText: t('actions.delete'),
+      variant: 'danger',
+      action: async () => {
+        await api.delete(`/orders/${orderId}`);
+        toast.success(t('common.deleted'));
+        qc.invalidateQueries({ queryKey: ['orders'] });
+        navigate('/orders');
       },
     });
   }
@@ -184,9 +214,36 @@ export default function OrderDetailPage() {
               </span>
             </div>
           </div>
-          {!locked && (
-            <button onClick={() => setEditing(true)} className="btn-ghost"><Pencil size={15} /> {t('actions.edit')}</button>
-          )}
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => downloadDoc('invoice', `/orders/${orderId}/invoice.pdf`, `faktura-${o.code}.pdf`)}
+              disabled={downloading === 'invoice'}
+              className="btn-ghost disabled:opacity-50"
+              title={t('sales.printInvoiceTitle')}
+            >
+              <FileText size={15} /> {t('sales.printInvoice')}
+            </button>
+            <button
+              onClick={() => downloadDoc('warranty', `/orders/${orderId}/warranty.pdf`, `kafolat-${o.code}.pdf`)}
+              disabled={downloading === 'warranty'}
+              className="btn-ghost disabled:opacity-50"
+              title={t('sales.printWarrantyTitle')}
+            >
+              <ShieldCheck size={15} /> {t('sales.printWarranty')}
+            </button>
+            {!locked && (
+              <button onClick={() => setEditing(true)} className="btn-ghost"><Pencil size={15} /> {t('actions.edit')}</button>
+            )}
+            {can('orders:delete') && (
+              <button
+                onClick={askDeleteOrder}
+                className="btn-ghost text-danger hover:bg-danger/10"
+                title={t('sales.deleteOrderTitle')}
+              >
+                <Trash2 size={15} /> {t('actions.delete')}
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Status workflow */}
@@ -329,11 +386,21 @@ export default function OrderDetailPage() {
                   <td className="py-2 pr-3">{p.method ? (t(METHOD_LABEL_KEYS[p.method] ?? '') || p.method) : '—'}</td>
                   <td className="py-2 pr-3 text-ink-soft">{p.note || '—'}</td>
                   <td className="py-2 pr-3 text-right">
-                    {!locked && can('finance:delete') && (
-                      <button onClick={() => askDeletePayment(p.id)} className="p-1 rounded hover:bg-danger/10 text-danger">
-                        <Trash2 size={14} />
+                    <div className="flex items-center justify-end gap-1">
+                      <button
+                        onClick={() => downloadDoc(`receipt-${p.id}`, `/orders/${orderId}/payments/${p.id}/receipt.pdf`, `kvitansiya-${o.code}.pdf`)}
+                        disabled={downloading === `receipt-${p.id}`}
+                        className="p-1 rounded hover:bg-accent/10 text-accent disabled:opacity-50"
+                        title={t('sales.printReceiptTitle')}
+                      >
+                        <Receipt size={14} />
                       </button>
-                    )}
+                      {!locked && can('finance:delete') && (
+                        <button onClick={() => askDeletePayment(p.id)} className="p-1 rounded hover:bg-danger/10 text-danger">
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

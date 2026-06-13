@@ -54,6 +54,14 @@ class Settings(BaseSettings):
     UPLOAD_DIR: str = "./uploads"
     MAX_UPLOAD_SIZE_MB: int = 20
 
+    # Kompaniya rekvizitlari — PDF hujjatlar (faktura/kvitansiya/kafolat) uchun.
+    # .env orqali real qiymatlarga almashtiriladi.
+    COMPANY_NAME: str = "NUR TECHNO GROUP"
+    COMPANY_PHONE: str = ""
+    COMPANY_ADDRESS: str = ""
+    COMPANY_INN_LABEL: str = ""   # masalan: "STIR: 123456789"
+    COMPANY_WEBSITE: str = ""
+
     INSECURE_SECRET_DEFAULT: str = "change-me"
 
     @property

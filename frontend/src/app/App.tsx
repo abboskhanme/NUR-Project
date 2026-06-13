@@ -13,6 +13,7 @@ import QueuePage from '@/pages/QueuePage';
 import CustomersPage from '@/pages/CustomersPage';
 import CustomerDetailPage from '@/pages/CustomerDetailPage';
 import ProductsPage from '@/pages/ProductsPage';
+import WarehousePage from '@/pages/WarehousePage';
 import ServicePage from '@/pages/ServicePage';
 import FinancePage from '@/pages/FinancePage';
 import HRPage from '@/pages/HRPage';
@@ -71,6 +72,7 @@ export default function App() {
         <Route path="customers" element={<RequireModule module="customers"><CustomersPage /></RequireModule>} />
         <Route path="customers/:customerId" element={<RequireModule module="customers"><CustomerDetailPage /></RequireModule>} />
         <Route path="products" element={<RequireModule module="products"><ProductsPage /></RequireModule>} />
+        <Route path="warehouse" element={<RequireModule module="inventory"><WarehousePage /></RequireModule>} />
         <Route path="service" element={<RequireModule module="service"><ServicePage /></RequireModule>} />
         <Route path="finance" element={<RequireModule module="finance"><FinancePage /></RequireModule>} />
         <Route path="hr" element={<RequireModule module="hr"><HRPage /></RequireModule>} />

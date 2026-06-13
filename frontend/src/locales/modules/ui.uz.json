@@ -80,5 +80,17 @@
     "in_production": "Ishlab chiqarishda",
     "paid": "To'langan",
     "cancelled": "Bekor qilingan"
+  },
+  "search": {
+    "title": "Qidiruv",
+    "placeholder": "Buyurtma, mijoz, mahsulot yoki servis qidiring…",
+    "hint": "Qidirish uchun kamida 2 ta belgi kiriting",
+    "empty": "«{{query}}» bo'yicha hech narsa topilmadi",
+    "groups": {
+      "customers": "Mijozlar",
+      "orders": "Buyurtmalar",
+      "products": "Mahsulotlar",
+      "service": "Servis"
+    }
   }
 }

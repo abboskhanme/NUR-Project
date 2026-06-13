@@ -12,6 +12,12 @@ frontend/dist/
 frontend/.env
 frontend/.env.local
 
+# Secrets — never commit real env files (templates *.example are tracked)
+.env
+.env.prod
+.env.local
+*.sql
+
 # IDE
 .vscode/
 .idea/
@@ -21,3 +27,7 @@ frontend/.env.local
 # Logs
 *.log
 logs/
+
+# TS incremental build cache
+frontend/tsconfig.tsbuildinfo
+*.tsbuildinfo

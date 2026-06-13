@@ -1,0 +1,48 @@
+{
+  "title": "Warehouse",
+  "subtitle": "Kotyol warehouse — units with ID",
+  "addBtn": "Add unit",
+  "status": {
+    "available": "Available",
+    "reserved": "Reserved",
+    "sold": "Sold"
+  },
+  "byModel": "Stock by model",
+  "emptyModels": "Warehouse is empty",
+  "units": "Units",
+  "filterAll": "All",
+  "searchId": "Search by ID",
+  "emptyUnits": "No units found",
+  "emptyUnitsDesc": "Add manufactured kotyols with their ID",
+  "deleteTitle": "Delete unit",
+  "deleteMessage": "Delete unit “{{id}}”?",
+  "col": {
+    "model": "Model",
+    "kvm": "Size",
+    "total": "Total",
+    "id": "ID number",
+    "status": "Status",
+    "added": "Added",
+    "order": "Order / customer"
+  },
+  "add": {
+    "title": "Add unit",
+    "model": "Model (kotyol)",
+    "pickModel": "Select model",
+    "ids": "ID numbers",
+    "idsPlaceholder": "One per line or comma-separated: SKL-001, SKL-002 …",
+    "count": "{{count}} IDs",
+    "note": "Note (optional)",
+    "submit": "Add",
+    "created": "{{count}} units added",
+    "needIds": "At least one ID required"
+  },
+  "edit": {
+    "title": "Edit unit",
+    "model": "Model",
+    "id": "ID number",
+    "added": "Added date",
+    "note": "Note",
+    "needId": "ID number required"
+  }
+}

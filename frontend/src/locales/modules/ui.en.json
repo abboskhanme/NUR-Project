@@ -80,5 +80,17 @@
     "in_production": "In production",
     "paid": "Paid",
     "cancelled": "Cancelled"
+  },
+  "search": {
+    "title": "Search",
+    "placeholder": "Search orders, customers, products or service…",
+    "hint": "Type at least 2 characters to search",
+    "empty": "Nothing found for “{{query}}”",
+    "groups": {
+      "customers": "Customers",
+      "orders": "Orders",
+      "products": "Products",
+      "service": "Service"
+    }
   }
 }

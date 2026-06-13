@@ -6,7 +6,7 @@ export default function Card({
 }: {
   children: ReactNode;
   className?: string;
-  title?: string;
+  title?: ReactNode;
   action?: ReactNode;
 }) {
   return (

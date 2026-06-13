@@ -1,15 +1,30 @@
-import { Bell, LogOut } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Bell, LogOut, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/stores/auth';
 import UserAvatar from '@/features/users/UserAvatar';
 import LanguageSwitcher from '@/components/ui/LanguageSwitcher';
+import GlobalSearch from '@/features/search/GlobalSearch';
 
 export default function TopBar() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
+  const [searchOpen, setSearchOpen] = useState(false);
+
+  // Cmd/Ctrl+K — global qidiruvni ochish
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setSearchOpen(true);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   const onLogout = () => {
     logout();
@@ -21,6 +36,14 @@ export default function TopBar() {
       <div className="font-medium text-ink text-sm md:text-base truncate">{t('ui.companyName')}</div>
 
       <div className="flex items-center gap-2">
+        <button
+          onClick={() => setSearchOpen(true)}
+          className="p-2 rounded-button hover:bg-black/5 text-ink/70"
+          title={t('ui.search.title')}
+        >
+          <Search size={18} />
+        </button>
+
         <LanguageSwitcher />
 
         <button className="p-2 rounded-button hover:bg-black/5 text-ink/70 relative" title={t('ui.notifications')}>
@@ -42,6 +65,8 @@ export default function TopBar() {
           </button>
         </div>
       </div>
+
+      <GlobalSearch open={searchOpen} onClose={() => setSearchOpen(false)} />
     </header>
   );
 }

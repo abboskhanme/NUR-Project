@@ -4,16 +4,19 @@ import { useTranslation } from 'react-i18next';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell,
 } from 'recharts';
+import { FileSpreadsheet } from 'lucide-react';
 
 import { api } from '@/api/client';
+import { downloadFile } from '@/lib/download';
 import Card from '@/components/ui/Card';
-import { formatUZS } from '@/lib/format';
+import { formatUZS, formatPhone } from '@/lib/format';
 import { orderStatusLabel, orderStatusColor } from '@/lib/status';
 import RevenueArea from '@/features/dashboard/RevenueArea';
 import ReportTable, { Column } from './ReportTable';
 import StatTile from './StatTile';
 import type {
-  DateRange, KpiData, ByModelRow, ByRegionRow, BySellerRow, StatusRow, TrendData,
+  DateRange, KpiData, ByModelRow, ByRegionRow, BySellerRow, ByCustomerRow,
+  StatusRow, TrendData, ReceivablesData, ReceivableRow,
 } from './types';
 
 const COLORS = ['#1E3A5F', '#2980B9', '#27AE60', '#F39C12', '#E74C3C', '#8E44AD', '#16A085'];
@@ -47,6 +50,15 @@ export default function SalesReport({ range }: { range: DateRange }) {
     queryKey: ['rep-by-status', range],
     queryFn: () => api.get('/reports/sales/status-breakdown', { params }).then((r) => r.data),
   });
+  const byCustomer = useQuery<ByCustomerRow[]>({
+    queryKey: ['rep-by-customer', range],
+    queryFn: () => api.get('/reports/sales/by-customer', { params }).then((r) => r.data),
+  });
+  // Qarzdorlik sana oralig'iga bog'liq emas — barcha ochiq qarzlar
+  const receivables = useQuery<ReceivablesData>({
+    queryKey: ['rep-receivables'],
+    queryFn: () => api.get('/reports/sales/receivables').then((r) => r.data),
+  });
 
   const modelCols: Column<ByModelRow>[] = [
     { key: 'model', label: t('reports.sales.cols.model'), render: (r) => r.model },
@@ -73,6 +85,28 @@ export default function SalesReport({ range }: { range: DateRange }) {
       ) },
     { key: 'count', label: t('reports.sales.cols.count'), align: 'right' },
     { key: 'total_uzs', label: t('reports.sales.cols.amount'), align: 'right', render: (r) => formatUZS(r.total_uzs) },
+  ];
+  const customerCols: Column<ByCustomerRow>[] = [
+    { key: 'customer', label: t('reports.sales.cols.customer'), render: (r) => r.customer },
+    { key: 'phone', label: t('reports.sales.cols.phone'), render: (r) => (r.phone ? formatPhone(r.phone) : '—') },
+    { key: 'count', label: t('reports.sales.cols.order'), align: 'right' },
+    { key: 'total_uzs', label: t('reports.sales.cols.amount'), align: 'right', render: (r) => formatUZS(r.total_uzs) },
+  ];
+  const receivableCols: Column<ReceivableRow>[] = [
+    { key: 'customer', label: t('reports.sales.cols.customer'),
+      render: (r) => (
+        <span className="inline-flex items-center gap-1.5">
+          {r.customer}
+          {r.is_dealer && <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-700">{t('reports.sales.dealerShort')}</span>}
+        </span>
+      ) },
+    { key: 'code', label: t('reports.sales.cols.orderCode'), render: (r) => r.code },
+    { key: 'days', label: t('reports.sales.cols.daysOpen'), align: 'right',
+      value: (r) => r.days ?? 0,
+      render: (r) => (r.days != null ? t('reports.sales.daysValue', { count: r.days }) : '—') },
+    { key: 'paid_uzs', label: t('reports.sales.cols.paid'), align: 'right', render: (r) => formatUZS(r.paid_uzs) },
+    { key: 'balance_uzs', label: t('reports.sales.cols.balance'), align: 'right',
+      render: (r) => <span className="font-semibold text-danger">{formatUZS(r.balance_uzs)}</span> },
   ];
 
   return (
@@ -152,6 +186,32 @@ export default function SalesReport({ range }: { range: DateRange }) {
           <ReportTable rows={byStatus.data} columns={statusCols} filename="sotuv-holat" />
         </Card>
       </div>
+
+      <Card title={t('reports.sales.cards.topCustomers')}>
+        <ReportTable rows={byCustomer.data} columns={customerCols} filename="top-mijozlar"
+          emptyText={t('reports.sales.empty.noCustomer')} />
+      </Card>
+
+      <Card
+        title={t('reports.sales.cards.receivables')}
+        action={
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-semibold text-danger">
+              {t('reports.sales.totalDebt')}: {receivables.data ? formatUZS(receivables.data.total_balance_uzs) : '—'}
+            </span>
+            <button
+              onClick={() => downloadFile('/reports/sales/receivables.xlsx', 'qarzdorlik.xlsx').catch(() => {})}
+              className="inline-flex items-center gap-1.5 text-sm text-primary hover:text-primary-700"
+              title={t('reports.sales.exportExcel')}
+            >
+              <FileSpreadsheet size={15} /> Excel
+            </button>
+          </div>
+        }
+      >
+        <ReportTable rows={receivables.data?.items} columns={receivableCols} filename="qarzdorlik"
+          emptyText={t('reports.sales.empty.noDebt')} />
+      </Card>
     </div>
   );
 }

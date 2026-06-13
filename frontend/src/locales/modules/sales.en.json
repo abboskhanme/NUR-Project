@@ -107,6 +107,8 @@
   "methodTransfer": "Transfer",
   "deletePaymentTitle": "Delete payment",
   "deletePaymentMessage": "Delete this payment?",
+  "deleteOrderTitle": "Delete order",
+  "deleteOrderMessage": "This order will be permanently deleted. Payments and finance entries are reversed and the inventory unit is freed. This cannot be undone.",
   "warrantyLabel": "Service warranty",
   "deliveryDate": "Delivered",
   "orderDate": "Date",
@@ -192,5 +194,13 @@
   "pickupDateLabel": "Pickup (departure) date",
   "toQueueConfirm": "Add to queue",
   "queueAdded": "Added to queue",
-  "colPickup": "Pickup date"
+  "colPickup": "Pickup date",
+  "printInvoice": "Invoice",
+  "printInvoiceTitle": "Download order invoice as PDF",
+  "printWarranty": "Warranty",
+  "printWarrantyTitle": "Download warranty certificate as PDF",
+  "printReceipt": "Receipt",
+  "printReceiptTitle": "Download payment receipt as PDF",
+  "exportExcel": "Excel",
+  "exportExcelTitle": "Download orders list to Excel"
 }

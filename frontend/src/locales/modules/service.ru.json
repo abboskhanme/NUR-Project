@@ -120,5 +120,21 @@
     "scheduled": "Запланирована",
     "completed": "Выполнена",
     "cancelled": "Отменена"
+  },
+  "view": {
+    "list": "Список",
+    "calendar": "Календарь"
+  },
+  "calendar": {
+    "today": "Сегодня",
+    "weekdays": {
+      "mon": "Пн",
+      "tue": "Вт",
+      "wed": "Ср",
+      "thu": "Чт",
+      "fri": "Пт",
+      "sat": "Сб",
+      "sun": "Вс"
+    }
   }
 }

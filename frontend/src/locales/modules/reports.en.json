@@ -35,7 +35,9 @@
       "byModel": "Sales by model",
       "byRegion": "Sales by region",
       "bySeller": "By seller",
-      "byStatus": "Status breakdown"
+      "byStatus": "Status breakdown",
+      "topCustomers": "Top customers",
+      "receivables": "Receivables (unpaid orders)"
     },
     "cols": {
       "model": "Model",
@@ -44,15 +46,27 @@
       "region": "Region",
       "order": "Order",
       "seller": "Seller",
-      "status": "Status"
+      "status": "Status",
+      "customer": "Customer",
+      "phone": "Phone",
+      "orderCode": "Order",
+      "daysOpen": "Days",
+      "paid": "Paid",
+      "balance": "Balance"
     },
     "empty": {
-      "noSeller": "No seller assigned"
+      "noSeller": "No seller assigned",
+      "noCustomer": "No customers found",
+      "noDebt": "No outstanding debt — all paid"
     },
     "chart": {
       "count": "Count",
       "countUnit": "{{count}} pcs"
-    }
+    },
+    "dealerShort": "Dealer",
+    "daysValue": "{{count}} d",
+    "totalDebt": "Total debt",
+    "exportExcel": "Download to Excel"
   },
   "finance": {
     "kpi": {

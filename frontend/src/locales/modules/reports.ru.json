@@ -35,7 +35,9 @@
       "byModel": "Продажи по модели",
       "byRegion": "Продажи по регионам",
       "bySeller": "По продавцам",
-      "byStatus": "Распределение по статусам"
+      "byStatus": "Распределение по статусам",
+      "topCustomers": "Лучшие клиенты",
+      "receivables": "Задолженность (неоплаченные заказы)"
     },
     "cols": {
       "model": "Модель",
@@ -44,15 +46,27 @@
       "region": "Регион",
       "order": "Заказ",
       "seller": "Продавец",
-      "status": "Статус"
+      "status": "Статус",
+      "customer": "Клиент",
+      "phone": "Телефон",
+      "orderCode": "Заказ",
+      "daysOpen": "Дней",
+      "paid": "Оплачено",
+      "balance": "Остаток"
     },
     "empty": {
-      "noSeller": "Продавец не назначен"
+      "noSeller": "Продавец не назначен",
+      "noCustomer": "Клиенты не найдены",
+      "noDebt": "Задолженности нет — всё оплачено"
     },
     "chart": {
       "count": "Кол-во",
       "countUnit": "{{count}} шт."
-    }
+    },
+    "dealerShort": "Дилер",
+    "daysValue": "{{count}} дн.",
+    "totalDebt": "Итого долг",
+    "exportExcel": "Скачать в Excel"
   },
   "finance": {
     "kpi": {

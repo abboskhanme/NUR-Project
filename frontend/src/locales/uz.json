@@ -15,7 +15,8 @@
     "users": "Foydalanuvchilar",
     "settings": "Sozlamalar",
     "logout": "Chiqish",
-    "queue": "Navbat"
+    "queue": "Navbat",
+    "warehouse": "Ombor"
   },
   "auth": {
     "login": "Tizimga kirish",

@@ -15,7 +15,8 @@
     "users": "Users",
     "settings": "Settings",
     "logout": "Logout",
-    "queue": "Queue"
+    "queue": "Queue",
+    "warehouse": "Warehouse"
   },
   "auth": {
     "login": "Sign in",

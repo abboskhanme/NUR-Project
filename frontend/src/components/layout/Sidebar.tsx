@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import {
   LayoutDashboard, ShoppingCart, Users, Package, Wrench, Wallet,
   UserSquare2, Truck, BarChart3, Settings, ChevronLeft, ChevronRight,
-  ShieldCheck, ListOrdered,
+  ShieldCheck, ListOrdered, Warehouse,
 } from 'lucide-react';
 
 import { useUIStore } from '@/stores/ui';
@@ -23,6 +23,7 @@ export default function Sidebar() {
     { to: '/queue', label: t('nav.queue', { defaultValue: 'Navbat' }), icon: ListOrdered, module: 'orders' },
     { to: '/customers', label: t('nav.customers'), icon: Users, module: 'customers' },
     { to: '/products', label: t('nav.products'), icon: Package, module: 'products' },
+    { to: '/warehouse', label: t('nav.warehouse', { defaultValue: 'Ombor' }), icon: Warehouse, module: 'inventory' },
     { to: '/service', label: t('nav.service'), icon: Wrench, module: 'service' },
     { to: '/finance', label: t('nav.finance'), icon: Wallet, module: 'finance' },
     { to: '/hr', label: t('nav.hr'), icon: UserSquare2, module: 'hr' },

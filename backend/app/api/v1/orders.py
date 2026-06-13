@@ -4,7 +4,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -15,7 +15,7 @@ from app.db.session import get_db
 from app.models.customer import Customer
 from app.models.finance import Account, FinanceCategory, FinanceTransaction
 from app.models.order import Order, OrderItem, Payment
-from app.models.product import Inventory
+from app.models.product import Inventory, Product
 from app.schemas.common import Page
 from app.schemas.order import (
     OrderCreate, OrderOut, OrderStatusChange, OrderUpdate,
@@ -23,6 +23,10 @@ from app.schemas.order import (
 )
 from app.services.finance_service import apply_transaction
 from app.services.order_service import generate_order_code, is_valid_transition
+from app.services import pdf_service
+from app.services import excel_service
+
+XLSX_MEDIA = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 router = APIRouter(dependencies=[Depends(module_guard("orders", exempt=("/payments",)))])
 
@@ -68,6 +72,33 @@ async def _set_inventory_status(db: AsyncSession, inventory_id: Optional[uuid.UU
     inv = res.scalar_one_or_none()
     if inv:
         inv.status = status
+
+
+async def _auto_assign_unit(db: AsyncSession, order: Order, items) -> None:
+    """Ombordan buyurtmaga mos bo'sh kotyol birligini avtomatik biriktiradi.
+
+    Buyurtmadagi birinchi kotyol (asosiy) modeliga eng eski bo'sh birlik (FIFO)
+    tanlanadi va order.inventory_id ga yoziladi. Mos birlik bo'lmasa — buyurtma
+    baribir yaratiladi (sotuv bloklanmaydi), shunchaki birlik bog'lanmaydi.
+    """
+    product_ids = [it.product_id for it in items]
+    if not product_ids:
+        return
+    main_ids = set((await db.execute(
+        select(Product.id).where(Product.id.in_(product_ids), Product.product_type == "main")
+    )).scalars().all())
+    # item tartibini saqlaymiz — birinchi kotyol modeli ustuvor
+    for pid in product_ids:
+        if pid not in main_ids:
+            continue
+        unit = (await db.execute(
+            select(Inventory).where(Inventory.product_id == pid,
+                                    Inventory.status == "available")
+            .order_by(Inventory.added_date.asc()).limit(1)
+        )).scalar_one_or_none()
+        if unit:
+            order.inventory_id = unit.id
+            return
 
 
 def _order_query():
@@ -206,6 +237,30 @@ async def sales_summary(
     )
 
 
+# ---- Excel eksport (declared before /{order_id}) ----
+@router.get("/export.xlsx")
+async def export_orders_xlsx(
+    db: Annotated[AsyncSession, Depends(get_db)], current: CurrentUser,
+    status: Optional[str] = None,
+    salesperson_id: Optional[uuid.UUID] = None,
+    customer_id: Optional[uuid.UUID] = None,
+    date_from: Optional[date] = None, date_to: Optional[date] = None,
+    search: Optional[str] = None,
+):
+    """Joriy filtrlarga mos buyurtmalar ro'yxatini Excel (xlsx) ga chiqaradi."""
+    q = _apply_filters(_order_query(), current, status, salesperson_id,
+                       customer_id, date_from, date_to, search)
+    q = q.order_by(Order.order_date.desc(), Order.created_at.desc()).limit(5000)
+    res = await db.execute(q)
+    orders = res.scalars().unique().all()
+    data = excel_service.orders_workbook(orders)
+    today = date.today().strftime("%Y-%m-%d")
+    return Response(
+        content=data, media_type=XLSX_MEDIA,
+        headers={"Content-Disposition": f'attachment; filename="buyurtmalar-{today}.xlsx"'},
+    )
+
+
 # ---- Queue (Navbat) ----  (declared before /{order_id})
 async def _load_queue(db: AsyncSession, current) -> list[Order]:
     q = _order_query().where(Order.in_queue.is_(True)).where(
@@ -318,6 +373,9 @@ async def create_order(payload: OrderCreate, user: CurrentUser,
             unit_price_usd=it.unit_price_usd, unit_price_uzs=it.unit_price_uzs,
             discount_usd=it.discount_usd, discount=disc_uzs, total_uzs=total_uzs,
         ))
+    # Ombordan mos kotyol birligini avtomatik biriktirish (agar qo'lda berilmagan bo'lsa)
+    if not order.inventory_id:
+        await _auto_assign_unit(db, order, payload.items)
     await _set_inventory_status(db, order.inventory_id, "reserved")
     db.add(order)
     await db.commit()
@@ -333,6 +391,48 @@ async def get_order(order_id: uuid.UUID, _: CurrentUser,
     if not o:
         raise HTTPException(404, "Buyurtma topilmadi")
     return o
+
+
+# ---- PDF hujjatlar (faktura / kafolat / to'lov kvitansiyasi) ----
+def _pdf_response(data: bytes, filename: str) -> Response:
+    return Response(
+        content=data,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="{filename}"'},
+    )
+
+
+async def _load_order_for_pdf(db: AsyncSession, order_id: uuid.UUID) -> Order:
+    res = await db.execute(_order_query().where(Order.id == order_id))
+    o = res.scalar_one_or_none()
+    if not o:
+        raise HTTPException(404, "Buyurtma topilmadi")
+    return o
+
+
+@router.get("/{order_id}/invoice.pdf")
+async def order_invoice(order_id: uuid.UUID, _: CurrentUser,
+                        db: Annotated[AsyncSession, Depends(get_db)]):
+    o = await _load_order_for_pdf(db, order_id)
+    return _pdf_response(pdf_service.order_invoice_pdf(o), f"faktura-{o.code}.pdf")
+
+
+@router.get("/{order_id}/warranty.pdf")
+async def order_warranty(order_id: uuid.UUID, _: CurrentUser,
+                         db: Annotated[AsyncSession, Depends(get_db)]):
+    o = await _load_order_for_pdf(db, order_id)
+    return _pdf_response(pdf_service.warranty_certificate_pdf(o), f"kafolat-{o.code}.pdf")
+
+
+@router.get("/{order_id}/payments/{payment_id}/receipt.pdf")
+async def payment_receipt(order_id: uuid.UUID, payment_id: uuid.UUID, _: CurrentUser,
+                          db: Annotated[AsyncSession, Depends(get_db)]):
+    o = await _load_order_for_pdf(db, order_id)
+    pay = next((p for p in o.payments if p.id == payment_id), None)
+    if not pay:
+        raise HTTPException(404, "To'lov topilmadi")
+    return _pdf_response(
+        pdf_service.payment_receipt_pdf(o, pay), f"kvitansiya-{o.code}.pdf")
 
 
 @router.patch("/{order_id}", response_model=OrderOut)
@@ -531,5 +631,40 @@ async def delete_payment(order_id: uuid.UUID, payment_id: uuid.UUID, _: CurrentU
         await db.delete(tx)
 
     await db.delete(p)
+    await db.commit()
+
+
+@router.delete("/{order_id}", status_code=204,
+               dependencies=[Depends(require_permission("orders:delete"))])
+async def delete_order(order_id: uuid.UUID, _: CurrentUser,
+                       db: Annotated[AsyncSession, Depends(get_db)]):
+    """Buyurtmani to'liq o'chirish (test ma'lumotlarini tozalash uchun).
+
+    Oddiy o'chirish yetarli emas — shu sabab qo'lda quyidagilarni qaytaramiz:
+      1) income/expense moliya tranzaksiyalarini teskari qo'llaymiz (balans tiklanadi)
+         va o'chiramiz (aks holda hisobotlar shishib qoladi),
+      2) bog'langan SKLAD KATYOL birligini "available" ga qaytaramiz,
+      3) buyurtmani o'chiramiz (cascade order_items + payments ni oladi).
+    """
+    res = await db.execute(select(Order).where(Order.id == order_id))
+    o = res.scalar_one_or_none()
+    if not o:
+        raise HTTPException(404, "Buyurtma topilmadi")
+
+    # Bog'langan moliya tranzaksiyalarini teskari qaytarib o'chiramiz
+    txs = (await db.execute(select(FinanceTransaction).where(
+        FinanceTransaction.related_order_id == order_id,
+    ))).scalars().all()
+    for tx in txs:
+        if tx.type in ("income", "expense"):
+            await apply_transaction(db, tx, reverse=True)
+        await db.delete(tx)
+
+    # Inventar birligini bo'shatamiz
+    if o.inventory_id:
+        await _set_inventory_status(db, o.inventory_id, "available")
+        o.inventory_id = None
+
+    await db.delete(o)  # cascade: order_items + payments
     await db.commit()
 

@@ -22,6 +22,7 @@ import ItemModal, { ItemLite } from '@/features/supply/ItemModal';
 import ReceiptModal from '@/features/supply/ReceiptModal';
 import PaymentModal from '@/features/supply/PaymentModal';
 import IssueModal from '@/features/supply/IssueModal';
+import ReorderSuggestions from '@/features/supply/ReorderSuggestions';
 
 interface Vendor extends VendorLite {
   open_debt: string; items_count: number; low_stock_count: number;
@@ -160,6 +161,9 @@ export default function SupplyPage() {
           value={t('supply.kpi.lowStockValue', { count: s?.low_stock_count ?? 0 })}
           icon={<AlertTriangle size={18} />} />
       </div>
+
+      {/* Buyurtma berish tavsiyalari — faqat zaxira kam bo'lganda ko'rinadi */}
+      <ReorderSuggestions vendorId={scopeVendorId} />
 
       {/* Taminotchi tablari (faqat admin/menejer) */}
       {!isSupplier && (

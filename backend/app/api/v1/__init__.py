@@ -6,6 +6,7 @@ from app.api.v1 import (
     users,
     customers,
     products,
+    inventory,
     orders,
     service,
     finance,
@@ -15,6 +16,7 @@ from app.api.v1 import (
     notifications,
     reports,
     permissions,
+    search,
 )
 
 api_router = APIRouter()
@@ -22,6 +24,7 @@ api_router.include_router(auth.router, prefix="/auth", tags=["Auth"])
 api_router.include_router(users.router, prefix="/users", tags=["Users"])
 api_router.include_router(customers.router, prefix="/customers", tags=["Customers"])
 api_router.include_router(products.router, prefix="/products", tags=["Products"])
+api_router.include_router(inventory.router, prefix="/inventory", tags=["Warehouse / Ombor"])
 api_router.include_router(orders.router, prefix="/orders", tags=["Sales / Orders"])
 api_router.include_router(service.router, prefix="/service", tags=["Service"])
 api_router.include_router(finance.router, prefix="/finance", tags=["Finance"])
@@ -31,3 +34,4 @@ api_router.include_router(telegram.router, prefix="/telegram", tags=["Telegram B
 api_router.include_router(notifications.router, prefix="/notifications", tags=["Notifications"])
 api_router.include_router(reports.router, prefix="/reports", tags=["Reports"])
 api_router.include_router(permissions.router, prefix="/permissions", tags=["Permissions"])
+api_router.include_router(search.router, prefix="/search", tags=["Search"])

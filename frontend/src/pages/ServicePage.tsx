@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { Plus, Search, Wrench, CalendarClock, ShieldCheck, ClipboardList, Tag } from 'lucide-react';
+import { Plus, Search, Wrench, CalendarClock, ShieldCheck, ClipboardList, Tag, List, CalendarDays } from 'lucide-react';
 
 import { api } from '@/api/client';
 import Card from '@/components/ui/Card';
@@ -11,6 +11,7 @@ import { formatDateTime, formatPhone } from '@/lib/format';
 import ServiceTicketModal from '@/features/service/ServiceTicketModal';
 import TicketDetailModal from '@/features/service/TicketDetailModal';
 import ServiceCategoryModal from '@/features/service/ServiceCategoryModal';
+import ServiceCalendar from '@/features/service/ServiceCalendar';
 import { ServiceStatusBadge } from '@/features/service/status';
 
 interface Ticket {
@@ -33,6 +34,7 @@ export default function ServicePage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [catOpen, setCatOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [view, setView] = useState<'list' | 'calendar'>('list');
 
   const summaryQ = useQuery<Summary>({
     queryKey: ['service-summary'],
@@ -93,13 +95,29 @@ export default function ServicePage() {
             </button>
           ))}
         </div>
-        <div className="relative">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft" />
-          <input className="input pl-9 w-56" placeholder={t('service.search.placeholder')}
-                 value={search} onChange={(e) => setSearch(e.target.value)} />
+        <div className="flex items-center gap-2">
+          {/* Ko'rinish almashtirgich — standart "ro'yxat" (mavjud ko'rinish o'zgarmaydi) */}
+          <div className="flex rounded-button border border-black/10 overflow-hidden">
+            <button onClick={() => setView('list')} title={t('service.view.list')}
+                    className={`p-2 ${view === 'list' ? 'bg-primary text-white' : 'text-ink-soft hover:bg-black/5'}`}>
+              <List size={16} />
+            </button>
+            <button onClick={() => setView('calendar')} title={t('service.view.calendar')}
+                    className={`p-2 ${view === 'calendar' ? 'bg-primary text-white' : 'text-ink-soft hover:bg-black/5'}`}>
+              <CalendarDays size={16} />
+            </button>
+          </div>
+          <div className="relative">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft" />
+            <input className="input pl-9 w-56" placeholder={t('service.search.placeholder')}
+                   value={search} onChange={(e) => setSearch(e.target.value)} />
+          </div>
         </div>
       </div>
 
+      {view === 'calendar' ? (
+        <ServiceCalendar onSelect={setDetailId} />
+      ) : (
       <Card>
         {ticketsQ.isLoading ? (
           <div className="space-y-2">
@@ -153,6 +171,7 @@ export default function ServicePage() {
           </div>
         )}
       </Card>
+      )}
 
       {createOpen && (
         <ServiceTicketModal onClose={() => setCreateOpen(false)} onSaved={refetchAll} />

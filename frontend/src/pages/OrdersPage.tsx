@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Plus, Search, ShoppingCart, Wallet, AlertCircle, CalendarClock } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { Plus, Search, ShoppingCart, Wallet, AlertCircle, CalendarClock, FileSpreadsheet } from 'lucide-react';
 
 import { api } from '@/api/client';
+import { downloadFile } from '@/lib/download';
 import Card from '@/components/ui/Card';
 import EmptyState from '@/components/ui/EmptyState';
 import { formatUZS } from '@/lib/format';
@@ -100,8 +102,26 @@ export default function OrdersPage() {
   });
   const s = summaryQ.data;
 
+  const [exporting, setExporting] = useState(false);
+
   function refresh() {
     qc.invalidateQueries({ queryKey: ['orders'] });
+  }
+
+  async function exportExcel() {
+    setExporting(true);
+    try {
+      await downloadFile('/orders/export.xlsx', `buyurtmalar-${dateFrom}.xlsx`, {
+        search: search.trim() || undefined,
+        status: searching ? undefined : (statusFilter || undefined),
+        date_from: searching ? undefined : (dateFrom || undefined),
+        date_to: searching ? undefined : (dateTo || undefined),
+      });
+    } catch {
+      toast.error(t('common.error'));
+    } finally {
+      setExporting(false);
+    }
   }
 
   return (
@@ -111,9 +131,15 @@ export default function OrdersPage() {
           <h1 className="text-2xl font-bold">{t('sales.pageTitle')}</h1>
           <p className="text-sm text-ink-soft">{t('sales.pageSubtitle')}</p>
         </div>
-        <button className="btn-primary" onClick={() => setShowCreate(true)}>
-          <Plus size={16} /> {t('sales.modalCreateTitle')}
-        </button>
+        <div className="flex items-center gap-2">
+          <button className="btn-ghost disabled:opacity-50" onClick={exportExcel} disabled={exporting}
+                  title={t('sales.exportExcelTitle')}>
+            <FileSpreadsheet size={16} /> {t('sales.exportExcel')}
+          </button>
+          <button className="btn-primary" onClick={() => setShowCreate(true)}>
+            <Plus size={16} /> {t('sales.modalCreateTitle')}
+          </button>
+        </div>
       </div>
 
       {/* KPI cards */}

@@ -1,0 +1,26 @@
+# Vaqtinchalik local override — boshqa loyihalar (Russian-Speaking) host portlari
+# 5173 va 5433 ni band qilgani uchun NUR ni mojarosiz portlarda ishga tushiradi.
+# Ishlatish:
+#   docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
+# To'xtatish:
+#   docker compose -f docker-compose.yml -f docker-compose.local.yml down
+#
+# Frontend: http://localhost:5174   (5173 o'rniga)
+# Backend:  http://localhost:8011   (o'zgarmadi)
+# Postgres: host 5434 -> container 5432 (faqat tashqi DB toollar uchun)
+
+services:
+  postgres:
+    ports: !override
+      - "5434:5432"
+
+  backend:
+    environment:
+      # Yangi frontend origin (5174) ni CORS ga qo'shamiz, eskisi ham qoladi.
+      ALLOWED_ORIGINS_STR: "http://localhost:5174,http://127.0.0.1:5174,http://localhost:5173,http://127.0.0.1:5173"
+
+  frontend:
+    ports: !override
+      - "5174:5173"
+    environment:
+      VITE_API_BASE_URL: http://localhost:8011/api/v1
