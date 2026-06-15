@@ -32,24 +32,24 @@ type ColType = 'date' | 'int' | 'money' | 'text';
 // lock: avtomatik (buyurtmadan) yaratilgan qatorlarda bu ustun tahrirlanmaydi
 // fmt: matnni yozilayotganda formatlash (telefon, karta raqami)
 interface Col {
-  key: keyof Shipment; label: string; type: ColType; w: string;
+  key: keyof Shipment; label: string; type: ColType; px: number;
   align?: string; lock?: boolean; fmt?: (s: string | number | null | undefined) => string;
 }
 
 const COLS: Col[] = [
-  { key: 'date', label: 'colDate', type: 'date', w: 'w-32', lock: true },
-  { key: 'qty', label: 'colQty', type: 'int', w: 'w-14', align: 'text-right', lock: true },
-  { key: 'destination', label: 'colDestination', type: 'text', w: 'w-44', lock: true },
-  { key: 'kvm', label: 'colKvm', type: 'int', w: 'w-16', align: 'text-right', lock: true },
-  { key: 'direction', label: 'colDirection', type: 'text', w: 'w-24', lock: true },
-  { key: 'driver_phone', label: 'colDriverPhone', type: 'text', w: 'w-32', fmt: formatPhoneInput },
-  { key: 'freight', label: 'colFreight', type: 'money', w: 'w-28', align: 'text-right' },
-  { key: 'kimdan', label: 'colKimdan', type: 'text', w: 'w-16' },
-  { key: 'card_number', label: 'colCardNumber', type: 'text', w: 'w-40', fmt: formatCardInput },
-  { key: 'card_holder', label: 'colCardHolder', type: 'text', w: 'w-36' },
-  { key: 'paid', label: 'colPaid', type: 'text', w: 'w-32' },
-  { key: 'pause', label: 'colPause', type: 'text', w: 'w-20' },
-  { key: 'reason', label: 'colReason', type: 'text', w: 'w-44' },
+  { key: 'date', label: 'colDate', type: 'date', px: 140, lock: true },
+  { key: 'qty', label: 'colQty', type: 'int', px: 60, align: 'text-right', lock: true },
+  { key: 'destination', label: 'colDestination', type: 'text', px: 210, lock: true },
+  { key: 'kvm', label: 'colKvm', type: 'int', px: 72, align: 'text-right', lock: true },
+  { key: 'direction', label: 'colDirection', type: 'text', px: 100, lock: true },
+  { key: 'driver_phone', label: 'colDriverPhone', type: 'text', px: 150, fmt: formatPhoneInput },
+  { key: 'freight', label: 'colFreight', type: 'money', px: 130, align: 'text-right' },
+  { key: 'kimdan', label: 'colKimdan', type: 'text', px: 80 },
+  { key: 'card_number', label: 'colCardNumber', type: 'text', px: 200, fmt: formatCardInput },
+  { key: 'card_holder', label: 'colCardHolder', type: 'text', px: 190 },
+  { key: 'paid', label: 'colPaid', type: 'text', px: 170 },
+  { key: 'pause', label: 'colPause', type: 'text', px: 110 },
+  { key: 'reason', label: 'colReason', type: 'text', px: 240 },
 ];
 
 const INP = 'w-full bg-transparent outline-none px-2 py-1.5 text-sm rounded focus:bg-primary/5 focus:ring-1 focus:ring-primary/30';
@@ -151,13 +151,18 @@ export default function ShippingPage() {
           <EmptyState title={t('shipping.empty')} description={t('shipping.emptyDesc')} />
         ) : (
           <div className="overflow-x-auto -mx-2">
-            <table className="text-sm border-collapse" style={{ minWidth: 1500 }}>
+            <table className="text-sm border-collapse table-fixed"
+                   style={{ width: COLS.reduce((a, c) => a + c.px, 44) }}>
+              <colgroup>
+                {COLS.map((c) => <col key={c.key} style={{ width: c.px }} />)}
+                <col style={{ width: 44 }} />
+              </colgroup>
               <thead className="text-left text-ink-soft border-b border-black/10">
                 <tr className="[&>th]:py-2 [&>th]:px-2 [&>th]:font-medium [&>th]:whitespace-nowrap">
                   {COLS.map((c) => (
-                    <th key={c.key} className={`${c.w} ${c.align ?? ''}`}>{t(`shipping.${c.label}`)}</th>
+                    <th key={c.key} className={c.align ?? ''}>{t(`shipping.${c.label}`)}</th>
                   ))}
-                  <th className="w-10" />
+                  <th />
                 </tr>
               </thead>
               <tbody>
@@ -223,9 +228,9 @@ function Row({ s, onChanged, onDelete }: {
         // Avtomatik qatorda mahsulot ma'lumotini faqat ko'rsatamiz (tahrirlab bo'lmaydi)
         if (fromOrder && c.lock) {
           return (
-            <td key={c.key} className={c.w}>
-              <span className={`block px-2 py-1.5 text-sm text-ink-soft bg-black/[0.03] rounded ${c.align ?? ''}`}
-                    title={t('shipping.lockedHint')}>
+            <td key={c.key} className="align-middle">
+              <span className={`block px-2 py-1.5 text-sm text-ink-soft bg-black/[0.03] rounded truncate ${c.align ?? ''}`}
+                    title={`${readonlyText(c, v)} · ${t('shipping.lockedHint')}`}>
                 {readonlyText(c, v)}
               </span>
             </td>
@@ -233,7 +238,7 @@ function Row({ s, onChanged, onDelete }: {
         }
         if (c.type === 'date') {
           return (
-            <td key={c.key} className={c.w}>
+            <td key={c.key} className="align-middle">
               <input type="date" defaultValue={(v as string) ?? ''} key={String(v ?? '')}
                      className={INP} onBlur={(e) => patchField(c, e.target.value)} />
             </td>
@@ -242,7 +247,7 @@ function Row({ s, onChanged, onDelete }: {
         if (c.type === 'money') {
           const disp = v != null && v !== '' ? formatNumberInput(String(Math.round(Number(v)))) : '';
           return (
-            <td key={c.key} className={c.w}>
+            <td key={c.key} className="align-middle">
               <input inputMode="decimal" defaultValue={disp} key={String(v ?? '')}
                      className={`${INP} text-right`}
                      onChange={(e) => { e.target.value = formatNumberInput(e.target.value); }}
@@ -251,7 +256,7 @@ function Row({ s, onChanged, onDelete }: {
           );
         }
         return (
-          <td key={c.key} className={c.w}>
+          <td key={c.key} className="align-middle">
             <input defaultValue={c.fmt ? c.fmt(v as string) : ((v as string | number) ?? '')} key={String(v ?? '')}
                    className={`${INP} ${c.align ?? ''}`}
                    inputMode={c.type === 'int' || c.fmt ? 'numeric' : undefined}
@@ -260,7 +265,7 @@ function Row({ s, onChanged, onDelete }: {
           </td>
         );
       })}
-      <td className="w-10">
+      <td className="text-center align-middle">
         <button onClick={() => onDelete(s)}
                 className="p-1 rounded text-ink-soft/40 hover:text-danger hover:bg-danger/10 opacity-0 group-hover:opacity-100 transition">
           <Trash2 size={14} />
