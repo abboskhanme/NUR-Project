@@ -184,6 +184,7 @@
     "total": "Total: {{n}} pcs",
     "from": "From",
     "to": "To",
-    "all": "All"
+    "all": "All",
+    "allYear": "Whole year"
   }
 }

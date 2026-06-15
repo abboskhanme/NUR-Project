@@ -1,7 +1,6 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { X } from 'lucide-react';
 
 import { api } from '@/api/client';
 import Card from '@/components/ui/Card';
@@ -9,41 +8,45 @@ import EmptyState from '@/components/ui/EmptyState';
 
 interface Stat { name: string; count: number }
 
-/** Ehtiyot qismlar statistikasi — qaysi qismdan jami nechta sarflangan (bar) + sana filtri. */
+const MONTH_NUMS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const;
+const pad2 = (n: number) => String(n).padStart(2, '0');
+
+/** Ehtiyot qismlar statistikasi — oy/yil dropdown filtri bilan. */
 export default function ServicePartsStats() {
   const { t } = useTranslation();
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
+  const now = new Date();
+  const [month, setMonth] = useState<number>(now.getMonth() + 1); // 0 = butun yil
+  const [year, setYear] = useState<number>(now.getFullYear());
+
+  const { dateFrom, dateTo } = useMemo(() => {
+    if (month === 0) return { dateFrom: `${year}-01-01`, dateTo: `${year}-12-31` };
+    const lastDay = new Date(year, month, 0).getDate();
+    return { dateFrom: `${year}-${pad2(month)}-01`, dateTo: `${year}-${pad2(month)}-${pad2(lastDay)}` };
+  }, [month, year]);
+
+  const YEARS = Array.from({ length: 5 }, (_, i) => now.getFullYear() - i);
 
   const q = useQuery<Stat[]>({
-    queryKey: ['service-parts-stats', from, to],
+    queryKey: ['service-parts-stats', dateFrom, dateTo],
     queryFn: () => api.get('/service/parts/stats', {
-      params: { date_from: from || undefined, date_to: to || undefined },
+      params: { date_from: dateFrom, date_to: dateTo },
     }).then((r) => r.data),
   });
   const stats = q.data ?? [];
   const max = stats.reduce((m, s) => Math.max(m, s.count), 0) || 1;
   const total = stats.reduce((sum, s) => sum + s.count, 0);
-  const filtered = !!(from || to);
 
   return (
     <Card title={t('service.partsStats.title')}>
-      {/* Sana filtri */}
-      <div className="flex items-end gap-3 flex-wrap mb-4">
-        <div>
-          <label className="text-xs text-ink-soft">{t('service.partsStats.from')}</label>
-          <input type="date" className="input mt-1" value={from} onChange={(e) => setFrom(e.target.value)} />
-        </div>
-        <div>
-          <label className="text-xs text-ink-soft">{t('service.partsStats.to')}</label>
-          <input type="date" className="input mt-1" value={to} onChange={(e) => setTo(e.target.value)} />
-        </div>
-        {filtered && (
-          <button onClick={() => { setFrom(''); setTo(''); }}
-                  className="px-3 py-1.5 text-sm rounded-button border border-black/10 text-ink-soft hover:bg-black/5 inline-flex items-center gap-1">
-            <X size={14} /> {t('service.partsStats.all')}
-          </button>
-        )}
+      {/* Oy / yil filtri */}
+      <div className="flex items-center gap-2 flex-wrap mb-4">
+        <select className="input w-40" value={month} onChange={(e) => setMonth(Number(e.target.value))}>
+          <option value={0}>{t('service.partsStats.allYear')}</option>
+          {MONTH_NUMS.map((m) => <option key={m} value={m}>{t(`sales.months.${m}`)}</option>)}
+        </select>
+        <select className="input w-28" value={year} onChange={(e) => setYear(Number(e.target.value))}>
+          {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
+        </select>
       </div>
 
       {q.isLoading ? (
