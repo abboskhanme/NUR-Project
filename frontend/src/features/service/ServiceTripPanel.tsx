@@ -9,7 +9,7 @@ import { formatUZS } from '@/lib/format';
 
 interface Trip {
   id: string; status: string;
-  collected: string; spent: string; total_cost: string;
+  collected: string; spent: string;
   note?: string | null; ticket_count: number; scheduled_count: number;
 }
 
@@ -31,14 +31,12 @@ export default function ServiceTripPanel({ onChanged }: { onChanged: () => void 
 
   const [collected, setCollected] = useState('');
   const [spent, setSpent] = useState('');
-  const [totalCost, setTotalCost] = useState('');
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (!trip) return;
     setCollected(fmt(trip.collected));
     setSpent(fmt(trip.spent));
-    setTotalCost(fmt(trip.total_cost));
   }, [trip?.id]);
 
   async function save() {
@@ -46,7 +44,7 @@ export default function ServiceTripPanel({ onChanged }: { onChanged: () => void 
     setBusy(true);
     try {
       await api.patch(`/service/trips/${trip.id}`, {
-        collected: toNum(collected), spent: toNum(spent), total_cost: toNum(totalCost),
+        collected: toNum(collected), spent: toNum(spent),
       });
       toast.success(t('common.updated'));
       tripQ.refetch();
@@ -85,13 +83,11 @@ export default function ServiceTripPanel({ onChanged }: { onChanged: () => void 
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label={t('service.trip.collected')} value={collected} accent="text-success"
                onChange={(v) => setCollected(grp(v))} />
         <Field label={t('service.trip.spent')} value={spent} accent="text-danger"
                onChange={(v) => setSpent(grp(v))} />
-        <Field label={t('service.trip.totalCost')} value={totalCost} accent="text-ink"
-               onChange={(v) => setTotalCost(grp(v))} />
       </div>
 
       <div className="flex items-center justify-between gap-2 flex-wrap">

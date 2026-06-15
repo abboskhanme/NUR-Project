@@ -120,7 +120,6 @@ class ServiceSummary(BaseModel):
 class ServiceTripUpdate(BaseModel):
     collected: Optional[Decimal] = None
     spent: Optional[Decimal] = None
-    total_cost: Optional[Decimal] = None
     note: Optional[str] = None
 
 
@@ -129,7 +128,6 @@ class ServiceTripOut(ORMBase):
     status: str
     collected: Decimal
     spent: Decimal
-    total_cost: Decimal
     note: Optional[str] = None
     ticket_count: int = 0
     scheduled_count: int = 0   # joriy rejalashtirilgan arizalar soni (live)
