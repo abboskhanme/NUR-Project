@@ -123,6 +123,13 @@ class PartStat(BaseModel):
     count: int
 
 
+class TripMoneyStat(BaseModel):
+    collected: Decimal = Decimal(0)   # olingan
+    spent: Decimal = Decimal(0)       # sarflangan
+    net: Decimal = Decimal(0)         # sof (olingan - sarflangan)
+    trip_count: int = 0
+
+
 class ServiceSummary(BaseModel):
     total: int
     new: int

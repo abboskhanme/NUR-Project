@@ -166,7 +166,8 @@
   "tabs": {
     "tickets": "Arizalar",
     "trips": "Servis safarlari",
-    "partsStats": "Sarflangan qismlar"
+    "partsStats": "Sarflangan qismlar",
+    "money": "Sarflangan mablag"
   },
   "parts": "Ehtiyot qismlar",
   "partModal": {
@@ -186,5 +187,11 @@
     "to": "Gacha",
     "all": "Hammasi",
     "allYear": "Butun yil"
+  },
+  "moneyStats": {
+    "collected": "Olingan",
+    "spent": "Sarflangan",
+    "net": "Sof",
+    "tripCount": "{{n}} ta yakunlangan safar"
   }
 }

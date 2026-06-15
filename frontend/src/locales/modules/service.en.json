@@ -166,7 +166,8 @@
   "tabs": {
     "tickets": "Tickets",
     "trips": "Service trips",
-    "partsStats": "Used parts"
+    "partsStats": "Used parts",
+    "money": "Spending"
   },
   "parts": "Spare parts",
   "partModal": {
@@ -186,5 +187,11 @@
     "to": "To",
     "all": "All",
     "allYear": "Whole year"
+  },
+  "moneyStats": {
+    "collected": "Collected",
+    "spent": "Spent",
+    "net": "Net",
+    "tripCount": "{{n}} finalized trips"
   }
 }

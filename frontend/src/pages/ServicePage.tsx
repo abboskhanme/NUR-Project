@@ -15,6 +15,7 @@ import ServicePartsModal from '@/features/service/ServicePartsModal';
 import ServiceTripPanel from '@/features/service/ServiceTripPanel';
 import ServiceTripsList from '@/features/service/ServiceTripsList';
 import ServicePartsStats from '@/features/service/ServicePartsStats';
+import ServiceMoneyStats from '@/features/service/ServiceMoneyStats';
 import { ServiceStatusBadge } from '@/features/service/status';
 
 interface Ticket {
@@ -46,7 +47,7 @@ export default function ServicePage() {
   const [catOpen, setCatOpen] = useState(false);
   const [partsOpen, setPartsOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
-  const [tab, setTab] = useState<'tickets' | 'trips' | 'partsStats'>('tickets');
+  const [tab, setTab] = useState<'tickets' | 'trips' | 'partsStats' | 'money'>('tickets');
 
   const summaryQ = useQuery<Summary>({
     queryKey: ['service-summary'],
@@ -101,7 +102,7 @@ export default function ServicePage() {
 
       {/* Ichki bo'limlar: Arizalar / Servis safarlari */}
       <div className="flex gap-1 border-b border-black/5">
-        {([['tickets', t('service.tabs.tickets')], ['trips', t('service.tabs.trips')], ['partsStats', t('service.tabs.partsStats')]] as const).map(([key, label]) => (
+        {([['tickets', t('service.tabs.tickets')], ['trips', t('service.tabs.trips')], ['partsStats', t('service.tabs.partsStats')], ['money', t('service.tabs.money')]] as const).map(([key, label]) => (
           <button key={key} onClick={() => setTab(key)}
             className={'px-4 py-2 text-sm font-medium -mb-px border-b-2 transition-colors ' +
               (tab === key ? 'border-primary text-primary' : 'border-transparent text-ink-soft hover:text-ink')}>
@@ -114,6 +115,8 @@ export default function ServicePage() {
         <ServiceTripsList />
       ) : tab === 'partsStats' ? (
         <ServicePartsStats />
+      ) : tab === 'money' ? (
+        <ServiceMoneyStats />
       ) : (
       <>
       {/* KPI — 3 ta karta */}

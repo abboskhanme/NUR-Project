@@ -19,7 +19,7 @@ from app.schemas.common import Page
 from app.schemas.service import (
     OrderMini, PartStat, ServiceCategoryIn, ServiceCategoryOut, ServicePartIn, ServicePartOut,
     ServiceSummary, ServiceTicketCreate, ServiceTicketOut, ServiceTicketUpdate,
-    ServiceTripOut, ServiceTripUpdate, ServiceVisitIn, ServiceVisitOut, WarrantyInfo,
+    ServiceTripOut, ServiceTripUpdate, TripMoneyStat, ServiceVisitIn, ServiceVisitOut, WarrantyInfo,
 )
 from app.services.warranty_service import calculate_warranty
 
@@ -100,6 +100,28 @@ def _trip_out(trip: ServiceTrip, scheduled: int) -> ServiceTripOut:
 async def current_trip(db: Annotated[AsyncSession, Depends(get_db)], user: CurrentUser):
     trip = await _open_trip(db, user)
     return _trip_out(trip, await _scheduled_count(db))
+
+
+@router.get("/trips/stats", response_model=TripMoneyStat)
+async def trips_stats(db: Annotated[AsyncSession, Depends(get_db)], _: CurrentUser,
+                      date_from: Optional[date] = None, date_to: Optional[date] = None):
+    """Servis safari moliyaviy statistikasi (yakunlangan safarlar bo'yicha).
+
+    Vaqt filtri: safar yakunlangan sana (closed_at) bo'yicha.
+    """
+    ref = func.date(ServiceTrip.closed_at)
+    q = select(
+        func.coalesce(func.sum(ServiceTrip.collected), 0),
+        func.coalesce(func.sum(ServiceTrip.spent), 0),
+        func.count(ServiceTrip.id),
+    ).where(ServiceTrip.status == "closed")
+    if date_from:
+        q = q.where(ref >= date_from)
+    if date_to:
+        q = q.where(ref <= date_to)
+    collected, spent, cnt = (await db.execute(q)).one()
+    return TripMoneyStat(collected=collected, spent=spent,
+                         net=(collected or 0) - (spent or 0), trip_count=int(cnt))
 
 
 @router.get("/trips", response_model=list[ServiceTripOut])
