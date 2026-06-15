@@ -10,6 +10,7 @@
   "deleted": "Deleted",
   "deleteTitle": "Delete record",
   "deleteConfirm": "This shipping record will be deleted. Continue?",
+  "lockedHint": "Auto-filled from the order — this column is read-only",
   "colDate": "Date",
   "colQty": "Qty",
   "colDestination": "Destination",

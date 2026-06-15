@@ -8,7 +8,7 @@ import { api } from '@/api/client';
 import Card from '@/components/ui/Card';
 import EmptyState from '@/components/ui/EmptyState';
 import ConfirmModal from '@/components/ui/ConfirmModal';
-import { formatUZS, formatNumberInput, parseNumberInput } from '@/lib/format';
+import { formatUZS, formatDate, formatNumberInput, parseNumberInput } from '@/lib/format';
 
 export interface Shipment {
   id: string;
@@ -29,14 +29,15 @@ export interface Shipment {
 }
 
 type ColType = 'date' | 'int' | 'money' | 'text';
-interface Col { key: keyof Shipment; label: string; type: ColType; w: string; align?: string }
+// lock: avtomatik (buyurtmadan) yaratilgan qatorlarda bu ustun tahrirlanmaydi
+interface Col { key: keyof Shipment; label: string; type: ColType; w: string; align?: string; lock?: boolean }
 
 const COLS: Col[] = [
-  { key: 'date', label: 'colDate', type: 'date', w: 'w-32' },
-  { key: 'qty', label: 'colQty', type: 'int', w: 'w-14', align: 'text-right' },
-  { key: 'destination', label: 'colDestination', type: 'text', w: 'w-44' },
-  { key: 'kvm', label: 'colKvm', type: 'int', w: 'w-16', align: 'text-right' },
-  { key: 'direction', label: 'colDirection', type: 'text', w: 'w-24' },
+  { key: 'date', label: 'colDate', type: 'date', w: 'w-32', lock: true },
+  { key: 'qty', label: 'colQty', type: 'int', w: 'w-14', align: 'text-right', lock: true },
+  { key: 'destination', label: 'colDestination', type: 'text', w: 'w-44', lock: true },
+  { key: 'kvm', label: 'colKvm', type: 'int', w: 'w-16', align: 'text-right', lock: true },
+  { key: 'direction', label: 'colDirection', type: 'text', w: 'w-24', lock: true },
   { key: 'driver_phone', label: 'colDriverPhone', type: 'text', w: 'w-32' },
   { key: 'freight', label: 'colFreight', type: 'money', w: 'w-28', align: 'text-right' },
   { key: 'kimdan', label: 'colKimdan', type: 'text', w: 'w-16' },
@@ -201,10 +202,31 @@ function Row({ s, onChanged, onDelete }: {
     }
   }
 
+  // Buyurtmadan avtomatik tushgan qator — mahsulot/buyurtma ustunlari tahrirlanmaydi
+  const fromOrder = !!s.order_id;
+
+  function readonlyText(c: Col, v: unknown): string {
+    if (v == null || v === '') return '—';
+    if (c.type === 'date') return formatDate(v as string);
+    if (c.type === 'money') return formatUZS(Number(v));
+    return String(v);
+  }
+
   return (
     <tr className="border-b border-black/5 hover:bg-black/[0.015] group">
       {COLS.map((c) => {
         const v = s[c.key];
+        // Avtomatik qatorda mahsulot ma'lumotini faqat ko'rsatamiz (tahrirlab bo'lmaydi)
+        if (fromOrder && c.lock) {
+          return (
+            <td key={c.key} className={c.w}>
+              <span className={`block px-2 py-1.5 text-sm text-ink-soft bg-black/[0.03] rounded ${c.align ?? ''}`}
+                    title={t('shipping.lockedHint')}>
+                {readonlyText(c, v)}
+              </span>
+            </td>
+          );
+        }
         if (c.type === 'date') {
           return (
             <td key={c.key} className={c.w}>

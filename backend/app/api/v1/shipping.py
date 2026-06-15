@@ -64,7 +64,12 @@ async def update_shipment(
     s = (await db.execute(select(Shipment).where(Shipment.id == shipment_id))).scalar_one_or_none()
     if not s:
         raise HTTPException(404, "Yozuv topilmadi")
-    for k, v in payload.model_dump(exclude_unset=True).items():
+    data = payload.model_dump(exclude_unset=True)
+    # Buyurtmadan avtomatik tushgan qatorda mahsulot/buyurtma maydonlari o'zgarmaydi
+    if s.order_id:
+        for locked in ("date", "qty", "destination", "kvm", "direction"):
+            data.pop(locked, None)
+    for k, v in data.items():
         setattr(s, k, v)
     await db.commit()
     await db.refresh(s)

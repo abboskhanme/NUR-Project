@@ -10,6 +10,7 @@
   "deleted": "O'chirildi",
   "deleteTitle": "Yozuvni o'chirish",
   "deleteConfirm": "Ushbu yuk yozuvi o'chiriladi. Davom etamizmi?",
+  "lockedHint": "Buyurtmadan avtomatik — bu ustun tahrirlanmaydi",
   "colDate": "Sana",
   "colQty": "Soni",
   "colDestination": "Manzil",
