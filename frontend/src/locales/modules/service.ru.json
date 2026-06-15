@@ -158,7 +158,8 @@
     "emptyDesc": "Появятся здесь после завершения выезда",
     "colName": "Название",
     "colDate": "Дата",
-    "colTickets": "Заявки"
+    "colTickets": "Заявки",
+    "ticketsTitle": "Заявки выезда"
   },
   "tabs": {
     "tickets": "Заявки",

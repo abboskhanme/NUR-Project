@@ -110,6 +110,24 @@ async def list_trips(db: Annotated[AsyncSession, Depends(get_db)], _: CurrentUse
     return [_trip_out(r, 0) for r in rows]
 
 
+@router.get("/trips/{trip_id}/tickets", response_model=list[ServiceTicketOut])
+async def trip_tickets(trip_id: uuid.UUID, _: CurrentUser,
+                       db: Annotated[AsyncSession, Depends(get_db)]):
+    """Shu safarda borilgan (bog'langan) arizalar ro'yxati."""
+    q = (
+        select(ServiceTicket)
+        .options(
+            selectinload(ServiceTicket.visits),
+            selectinload(ServiceTicket.customer),
+            selectinload(ServiceTicket.order),
+        )
+        .where(ServiceTicket.trip_id == trip_id)
+        .order_by(ServiceTicket.opened_at.desc())
+    )
+    rows = (await db.execute(q)).scalars().unique().all()
+    return [ServiceTicketOut.model_validate(t) for t in rows]
+
+
 @router.patch("/trips/{trip_id}", response_model=ServiceTripOut)
 async def update_trip(trip_id: uuid.UUID, payload: ServiceTripUpdate, _: CurrentUser,
                       db: Annotated[AsyncSession, Depends(get_db)]):

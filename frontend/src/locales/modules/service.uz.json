@@ -158,7 +158,8 @@
     "emptyDesc": "Safarni yakunlaganingizda shu yerda ko'rinadi",
     "colName": "Safar nomi",
     "colDate": "Sana",
-    "colTickets": "Arizalar"
+    "colTickets": "Arizalar",
+    "ticketsTitle": "Safardagi arizalar"
   },
   "tabs": {
     "tickets": "Arizalar",

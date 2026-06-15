@@ -158,7 +158,8 @@
     "emptyDesc": "They appear here after you finalize a trip",
     "colName": "Trip name",
     "colDate": "Date",
-    "colTickets": "Tickets"
+    "colTickets": "Tickets",
+    "ticketsTitle": "Trip tickets"
   },
   "tabs": {
     "tickets": "Tickets",
