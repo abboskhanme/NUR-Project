@@ -165,7 +165,8 @@
   },
   "tabs": {
     "tickets": "Tickets",
-    "trips": "Service trips"
+    "trips": "Service trips",
+    "partsStats": "Used parts"
   },
   "parts": "Spare parts",
   "partModal": {
@@ -176,5 +177,10 @@
     "noParts": "No spare parts yet",
     "deleteTitle": "Delete",
     "done": "Done"
+  },
+  "partsStats": {
+    "title": "Used spare parts",
+    "empty": "No parts used yet",
+    "total": "Total: {{n}} pcs"
   }
 }

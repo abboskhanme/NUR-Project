@@ -118,6 +118,11 @@ class ServicePartOut(ORMBase):
     is_active: bool = True
 
 
+class PartStat(BaseModel):
+    name: str
+    count: int
+
+
 class ServiceSummary(BaseModel):
     total: int
     new: int

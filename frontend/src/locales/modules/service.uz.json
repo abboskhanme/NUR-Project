@@ -165,7 +165,8 @@
   },
   "tabs": {
     "tickets": "Arizalar",
-    "trips": "Servis safarlari"
+    "trips": "Servis safarlari",
+    "partsStats": "Sarflangan qismlar"
   },
   "parts": "Ehtiyot qismlar",
   "partModal": {
@@ -176,5 +177,10 @@
     "noParts": "Hozircha ehtiyot qismlar yo'q",
     "deleteTitle": "O'chirish",
     "done": "Tayyor"
+  },
+  "partsStats": {
+    "title": "Sarflangan ehtiyot qismlar",
+    "empty": "Hali ehtiyot qism ishlatilmagan",
+    "total": "Jami: {{n}} dona"
   }
 }

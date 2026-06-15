@@ -17,7 +17,7 @@ from app.models.service import (
 )
 from app.schemas.common import Page
 from app.schemas.service import (
-    OrderMini, ServiceCategoryIn, ServiceCategoryOut, ServicePartIn, ServicePartOut,
+    OrderMini, PartStat, ServiceCategoryIn, ServiceCategoryOut, ServicePartIn, ServicePartOut,
     ServiceSummary, ServiceTicketCreate, ServiceTicketOut, ServiceTicketUpdate,
     ServiceTripOut, ServiceTripUpdate, ServiceVisitIn, ServiceVisitOut, WarrantyInfo,
 )
@@ -367,6 +367,19 @@ async def list_parts(db: Annotated[AsyncSession, Depends(get_db)], _: CurrentUse
         .order_by(ServicePart.name)
     )
     return [ServicePartOut.model_validate(p) for p in res.scalars().all()]
+
+
+@router.get("/parts/stats", response_model=list[PartStat])
+async def parts_stats(db: Annotated[AsyncSession, Depends(get_db)], _: CurrentUser):
+    """Ehtiyot qismlar statistikasi — qaysi qismdan jami nechta sarflangan."""
+    sub = select(
+        func.jsonb_array_elements_text(ServiceTicket.parts_used).label("name")
+    ).subquery()
+    rows = (await db.execute(
+        select(sub.c.name, func.count().label("cnt"))
+        .group_by(sub.c.name).order_by(func.count().desc(), sub.c.name)
+    )).all()
+    return [PartStat(name=n, count=int(c)) for n, c in rows]
 
 
 @router.post("/parts", response_model=ServicePartOut, status_code=201)
