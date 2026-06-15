@@ -1,5 +1,10 @@
 """Ombor ro'yxatidan import_warehouse.sql hosil qiladi (bir martalik generator).
 
+Ishlatish:
+  python _gen_warehouse_sql.py            -> import_warehouse.sql fayl yozadi
+  python _gen_warehouse_sql.py --stdout   -> SQL ni stdout ga chiqaradi (fayl yo'q)
+    masalan:  python ... --stdout | psql -U postgres -d nur_erp
+
 Har qator: MODEL ... KVM ... "BUNKER O`NGA"/"BUNKER CHAP" ... 1 ... NARX ... ID
 
 Yangi arxitektura: ombor turlari product_type='warehouse' (sotuvdan ajratilgan).
@@ -10,6 +15,7 @@ Yo'nalish (O'NGA/CHAP) va aniq narx har birlikning `notes` ustuniga yoziladi.
 Idempotent: takror ID qayta qo'shilmaydi (ON CONFLICT DO NOTHING), mahsulot ham
 NOT EXISTS bilan himoyalangan.
 """
+import sys
 
 RAW = r"""
 OPTIMA 2     200    BUNKER  O`NGA    1    2 299    68
@@ -240,6 +246,14 @@ SELECT 'turlar' AS nima, count(*) FROM products WHERE product_type='warehouse'
 UNION ALL
 SELECT 'birliklar', count(*) FROM inventory;
 """
+    # --stdout: SQL ni to'g'ridan-to'g'ri stdout ga (faylsiz, psql ga pipe uchun).
+    # Hisobot stderr ga ketadi — pipe'ni ifloslamaydi.
+    if "--stdout" in sys.argv:
+        sys.stdout.write(sql)
+        print(f"[gen] {len(units)} kotyol, {len(types)} tur"
+              + (f"; takror tashlandi: {dup}" if dup else ""), file=sys.stderr)
+        return
+
     out = __file__.replace("_gen_warehouse_sql.py", "import_warehouse.sql")
     with open(out, "w") as f:
         f.write(sql)
