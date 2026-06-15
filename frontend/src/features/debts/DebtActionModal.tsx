@@ -35,17 +35,25 @@ export default function DebtActionModal({
   }, [onClose]);
 
   const isPurchase = kind === 'purchase';
+  const isProduct = product.debt_type === 'product';
   const total = (parseFloat(qty) || 0) * (unitPrice || 0);
 
   async function handleSave() {
     setSaving(true);
     try {
-      if (isPurchase) {
+      if (isPurchase && isProduct) {
         const q = parseFloat(qty);
         if (!q || q <= 0) { toast.error(t('debts.purchase.qty')); setSaving(false); return; }
         await api.post(`/debts/products/${product.id}/purchase`, {
           qty: q,
           unit_price: unitPrice || 0,
+          note: note.trim() || null,
+        });
+        toast.success(t('debts.purchase.success'));
+      } else if (isPurchase) {
+        if (!amount || amount <= 0) { toast.error(t('debts.addDebt.amount')); setSaving(false); return; }
+        await api.post(`/debts/products/${product.id}/purchase`, {
+          amount,
           note: note.trim() || null,
         });
         toast.success(t('debts.purchase.success'));
@@ -72,7 +80,7 @@ export default function DebtActionModal({
         <div className="flex items-center justify-between px-5 py-3 border-b border-black/5">
           <h3 className="font-semibold flex items-center gap-2">
             {isPurchase ? <PackagePlus size={18} className="text-primary" /> : <Wallet size={18} className="text-success" />}
-            {isPurchase ? t('debts.purchase.title') : t('debts.pay.title')}
+            {isPurchase ? (isProduct ? t('debts.purchase.title') : t('debts.addDebt.title')) : t('debts.pay.title')}
           </h3>
           <button onClick={onClose} className="p-1 rounded hover:bg-black/5"><X size={18} /></button>
         </div>
@@ -80,10 +88,12 @@ export default function DebtActionModal({
         <div className="p-5 space-y-4">
           <div className="text-sm">
             <span className="font-medium">{product.name}</span>
-            <span className="text-ink-soft"> · {t(`debts.units.${product.unit}`, { defaultValue: product.unit })}</span>
+            {isProduct && (
+              <span className="text-ink-soft"> · {t(`debts.units.${product.unit}`, { defaultValue: product.unit })}</span>
+            )}
           </div>
 
-          {isPurchase ? (
+          {isPurchase && isProduct ? (
             <>
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -102,6 +112,12 @@ export default function DebtActionModal({
                 <span className="text-lg font-bold text-primary">{formatMoney(total, product.currency)}</span>
               </div>
             </>
+          ) : isPurchase ? (
+            <div>
+              <label className="label">{t('debts.addDebt.amount')} *</label>
+              <MoneyInput value={amount} onChange={setAmount} autoFocus
+                          suffix={t(`debts.currency.${product.currency}`, { defaultValue: product.currency })} />
+            </div>
           ) : (
             <>
               <div className="rounded-button bg-danger/10 border border-danger/20 px-4 py-3 flex items-center justify-between">
@@ -129,7 +145,7 @@ export default function DebtActionModal({
           <button onClick={handleSave} disabled={saving}
                   className={`px-4 py-2 rounded-button font-medium text-white disabled:opacity-50 ${
                     isPurchase ? 'bg-primary hover:bg-primary-700' : 'bg-success hover:bg-success/90'}`}>
-            {saving ? '...' : isPurchase ? t('debts.purchase.submit') : t('debts.pay.submit')}
+            {saving ? '...' : isPurchase ? (isProduct ? t('debts.purchase.submit') : t('debts.addDebt.submit')) : t('debts.pay.submit')}
           </button>
         </div>
       </div>

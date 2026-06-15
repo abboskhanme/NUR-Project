@@ -20,10 +20,18 @@ from app.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
 
 
 class DebtProduct(UUIDPrimaryKeyMixin, TimestampMixin, Base):
-    """Qarzga olib kelinadigan ehtiyot qism."""
+    """Qarz yozuvi. Turi (debt_type):
+      - "product" — qarzga olinadigan ehtiyot qism (birlik + birlik narxi bor)
+      - boshqa har qanday qiymat ("credit", "loan" yoki ixtiyoriy nom, masalan
+        "Ijara") — birlik/narx yo'q, harakatlar to'g'ridan-to'g'ri summa bo'yicha.
+    """
     __tablename__ = "debt_products"
 
     name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    # "product" (maxsus) yoki ixtiyoriy tur nomi/kaliti ("credit"/"loan"/custom)
+    debt_type: Mapped[str] = mapped_column(
+        String(50), default="product", server_default="product"
+    )
     unit: Mapped[str] = mapped_column(String(20), default="dona")  # kg/metr/dona/list
     unit_price: Mapped[Decimal] = mapped_column(Numeric(16, 2), default=0)
     currency: Mapped[str] = mapped_column(String(3), default="UZS")  # UZS / USD

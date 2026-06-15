@@ -55,6 +55,10 @@ export default function DebtsPage() {
   const products = productsQ.data ?? [];
   const s = summaryQ.data;
 
+  // Tur nomi: tayyor kalitlar tarjima qilinadi, ixtiyoriy nom o'zicha ko'rsatiladi
+  const typeLabel = (type: string) =>
+    ['product', 'credit', 'loan'].includes(type) ? t(`debts.type.${type}`) : type;
+
   // Ochiq tranzaksiyalar modalini yangilangan ma'lumot bilan sinxronlash
   useEffect(() => {
     if (!detail) return;
@@ -173,7 +177,14 @@ export default function DebtsPage() {
                    className="flex items-center gap-3 py-3 hover:bg-black/[0.02] -mx-2 px-2 rounded-button transition cursor-pointer"
                    onClick={() => setDetail(p)}>
                 <div className="min-w-0 flex-1">
-                  <div className="font-medium truncate">{p.name}</div>
+                  <div className="font-medium truncate flex items-center gap-2">
+                    <span className="truncate">{p.name}</span>
+                    {p.debt_type !== 'product' && (
+                      <span className="shrink-0 badge bg-primary/10 text-primary text-[10px] font-medium">
+                        {typeLabel(p.debt_type)}
+                      </span>
+                    )}
+                  </div>
                   <div className="text-xs text-ink-soft">
                     {p.supplier ? `${p.supplier} · ` : ''}
                     {p.last_purchase_at ? formatDate(p.last_purchase_at) : '—'}
@@ -187,7 +198,7 @@ export default function DebtsPage() {
                 <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
                   <button onClick={() => setAction({ product: p, kind: 'purchase' })}
                           className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-button text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 transition">
-                    <PackagePlus size={14} /> {t('debts.actions.purchase')}
+                    <PackagePlus size={14} /> {p.debt_type === 'product' ? t('debts.actions.purchase') : t('debts.actions.addDebt')}
                   </button>
                   <button onClick={() => setAction({ product: p, kind: 'payment' })}
                           disabled={p.balance <= 0}
@@ -217,10 +228,14 @@ export default function DebtsPage() {
                   <tr key={p.id} className="border-b border-black/5 hover:bg-black/[0.02]">
                     <td className="py-2.5 pr-3 font-medium">
                       {p.name}
-                      <span className="text-ink-soft font-normal"> · {t(`debts.units.${p.unit}`, { defaultValue: p.unit })}</span>
+                      {p.debt_type === 'product' ? (
+                        <span className="text-ink-soft font-normal"> · {t(`debts.units.${p.unit}`, { defaultValue: p.unit })}</span>
+                      ) : (
+                        <span className="ml-2 badge bg-primary/10 text-primary text-[10px] font-medium">{typeLabel(p.debt_type)}</span>
+                      )}
                     </td>
                     <td className="py-2.5 pr-3 text-ink-soft">{p.supplier || '—'}</td>
-                    <td className="py-2.5 pr-3 text-right">{formatMoney(p.unit_price, p.currency)}</td>
+                    <td className="py-2.5 pr-3 text-right">{p.debt_type === 'product' ? formatMoney(p.unit_price, p.currency) : '—'}</td>
                     <td className={`py-2.5 pr-3 text-right font-medium ${p.balance > 0 ? 'text-danger' : 'text-ink-soft'}`}>
                       {formatMoney(p.balance, p.currency)}
                     </td>

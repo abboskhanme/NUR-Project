@@ -14,17 +14,27 @@
   },
   "search": "Qidirish...",
   "onlyDebt": "Faqat qarzi borlar",
+  "type": {
+    "product": "Mahsulot",
+    "credit": "Kredit",
+    "loan": "Qarz (shaxsdan)"
+  },
   "product": {
-    "new": "Yangi ehtiyot qism",
+    "new": "Yangi qarz",
     "edit": "Tahrirlash",
-    "name": "Mahsulot nomi",
+    "name": "Nomi",
+    "typeLabel": "Turi",
+    "typeCustom": "Boshqa (ixtiyoriy)",
+    "customTypePlaceholder": "Tur nomini kiriting (masalan: Ijara)",
     "unit": "Birlik",
     "currency": "Valyuta",
     "unitPrice": "Birlik narxi",
     "supplier": "Ta'minotchi",
+    "source": "Kimdan / qayerdan",
     "note": "Izoh",
     "namePlaceholder": "Masalan: Podshipnik 6204",
     "supplierPlaceholder": "Ta'minotchi ismi",
+    "sourcePlaceholder": "Masalan: bank nomi yoki ism",
     "deleteConfirm": "Ushbu mahsulot va uning barcha tranzaksiyalari o'chiriladi. Davom etamizmi?",
     "empty": "Hali ehtiyot qism qo'shilmagan",
     "emptyDesc": "\"Yangi ehtiyot qism\" tugmasi orqali birinchisini qo'shing"
@@ -39,6 +49,7 @@
   },
   "actions": {
     "purchase": "Olib kelish",
+    "addDebt": "Qo'shish",
     "pay": "Qarz to'lash"
   },
   "purchase": {
@@ -49,6 +60,11 @@
     "note": "Izoh (ixtiyoriy)",
     "submit": "Qo'shish",
     "success": "Kirim qo'shildi"
+  },
+  "addDebt": {
+    "title": "Qarz qo'shish",
+    "amount": "Summa",
+    "submit": "Qo'shish"
   },
   "pay": {
     "title": "Qarz to'lash",
@@ -61,6 +77,7 @@
   "tx": {
     "title": "Tranzaksiyalar",
     "purchase": "Olib kelish",
+    "addDebt": "Qarz qo'shish",
     "payment": "To'lov",
     "date": "Sana",
     "type": "Turi",

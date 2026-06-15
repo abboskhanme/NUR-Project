@@ -106,8 +106,10 @@ export default function DebtTransactionsModal({
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-medium">
-                        {purchase ? t('debts.tx.purchase') : t('debts.tx.payment')}
-                        {purchase && (
+                        {purchase
+                          ? (product.debt_type === 'product' ? t('debts.tx.purchase') : t('debts.tx.addDebt'))
+                          : t('debts.tx.payment')}
+                        {purchase && product.debt_type === 'product' && (
                           <span className="text-ink-soft font-normal">
                             {' '}· {tx.qty} × {formatMoney(tx.unit_price, tx.currency)}
                           </span>

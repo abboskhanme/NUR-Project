@@ -13,6 +13,7 @@ from app.schemas.common import ORMBase
 # ---------------------------------------------------------------------------
 class DebtProductCreate(BaseModel):
     name: str
+    debt_type: str = "product"  # "product" yoki ixtiyoriy tur (credit/loan/custom)
     unit: str = "dona"
     unit_price: float = 0
     currency: str = "UZS"
@@ -22,6 +23,7 @@ class DebtProductCreate(BaseModel):
 
 class DebtProductUpdate(BaseModel):
     name: Optional[str] = None
+    debt_type: Optional[str] = None
     unit: Optional[str] = None
     unit_price: Optional[float] = None
     currency: Optional[str] = None
@@ -32,6 +34,7 @@ class DebtProductUpdate(BaseModel):
 class DebtProductOut(ORMBase):
     id: uuid.UUID
     name: str
+    debt_type: str = "product"
     unit: str
     unit_price: float
     currency: str = "UZS"
@@ -50,9 +53,14 @@ class DebtProductOut(ORMBase):
 # Tranzaksiyalar
 # ---------------------------------------------------------------------------
 class PurchaseCreate(BaseModel):
-    """Olib kelish — qarzni oshiradi."""
-    qty: float = Field(gt=0)
+    """Qarzni oshirish.
+
+    Mahsulot turida: qty (+ ixtiyoriy unit_price) → summa = qty × narx.
+    Boshqa turlarda (kredit/qarz/custom): to'g'ridan-to'g'ri amount.
+    """
+    qty: Optional[float] = Field(default=None, gt=0)
     unit_price: Optional[float] = None  # bo'lmasa mahsulot narxi olinadi
+    amount: Optional[float] = Field(default=None, gt=0)  # mahsulot bo'lmaganda
     note: Optional[str] = None
 
 

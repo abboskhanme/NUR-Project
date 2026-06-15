@@ -14,17 +14,27 @@
   },
   "search": "Search...",
   "onlyDebt": "Only with debt",
+  "type": {
+    "product": "Product",
+    "credit": "Credit",
+    "loan": "Loan (from a person)"
+  },
   "product": {
-    "new": "New part",
+    "new": "New debt",
     "edit": "Edit",
-    "name": "Product name",
+    "name": "Name",
+    "typeLabel": "Type",
+    "typeCustom": "Other (custom)",
+    "customTypePlaceholder": "Enter a type name (e.g. Rent)",
     "unit": "Unit",
     "currency": "Currency",
     "unitPrice": "Unit price",
     "supplier": "Supplier",
+    "source": "From whom / where",
     "note": "Note",
     "namePlaceholder": "e.g. Bearing 6204",
     "supplierPlaceholder": "Supplier name",
+    "sourcePlaceholder": "e.g. bank name or person",
     "deleteConfirm": "This product and all its transactions will be deleted. Continue?",
     "empty": "No parts added yet",
     "emptyDesc": "Add the first one via the \"New part\" button"
@@ -39,6 +49,7 @@
   },
   "actions": {
     "purchase": "Purchase",
+    "addDebt": "Add",
     "pay": "Pay debt"
   },
   "purchase": {
@@ -49,6 +60,11 @@
     "note": "Note (optional)",
     "submit": "Add",
     "success": "Purchase added"
+  },
+  "addDebt": {
+    "title": "Add debt",
+    "amount": "Amount",
+    "submit": "Add"
   },
   "pay": {
     "title": "Pay debt",
@@ -61,6 +77,7 @@
   "tx": {
     "title": "Transactions",
     "purchase": "Purchase",
+    "addDebt": "Debt added",
     "payment": "Payment",
     "date": "Date",
     "type": "Type",

@@ -9,6 +9,7 @@ import MoneyInput from '@/components/ui/MoneyInput';
 export interface DebtProduct {
   id: string;
   name: string;
+  debt_type: string;
   unit: string;
   unit_price: number;
   currency: string;
@@ -23,19 +24,27 @@ export interface DebtProduct {
 
 const UNITS = ['dona', 'kg', 'metr', 'list'];
 const CURRENCIES = ['UZS', 'USD'];
+const PRESET_TYPES = ['product', 'credit', 'loan'];
 
 export default function DebtProductModal({
   product, onClose, onSaved,
 }: { product?: DebtProduct | null; onClose: () => void; onSaved: () => void }) {
   const { t } = useTranslation();
   const editing = !!product;
+  const initType = product?.debt_type ?? 'product';
+  const initIsPreset = PRESET_TYPES.includes(initType);
   const [name, setName] = useState(product?.name ?? '');
+  const [typeChoice, setTypeChoice] = useState(initIsPreset ? initType : '__custom__');
+  const [customType, setCustomType] = useState(initIsPreset ? '' : initType);
   const [unit, setUnit] = useState(product?.unit ?? 'dona');
   const [unitPrice, setUnitPrice] = useState<number>(product?.unit_price ?? 0);
   const [currency, setCurrency] = useState(product?.currency ?? 'UZS');
   const [supplier, setSupplier] = useState(product?.supplier ?? '');
   const [note, setNote] = useState(product?.note ?? '');
   const [saving, setSaving] = useState(false);
+
+  const isProduct = typeChoice === 'product';
+  const debtType = typeChoice === '__custom__' ? customType.trim() : typeChoice;
 
   useEffect(() => {
     const esc = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -45,12 +54,16 @@ export default function DebtProductModal({
 
   async function handleSave() {
     if (!name.trim()) { toast.error(t('debts.product.name')); return; }
+    if (typeChoice === '__custom__' && !customType.trim()) {
+      toast.error(t('debts.product.customTypePlaceholder')); return;
+    }
     setSaving(true);
     try {
       const payload = {
         name: name.trim(),
-        unit,
-        unit_price: unitPrice || 0,
+        debt_type: debtType || 'product',
+        unit: isProduct ? unit : 'dona',
+        unit_price: isProduct ? (unitPrice || 0) : 0,
         currency,
         supplier: supplier.trim() || null,
         note: note.trim() || null,
@@ -82,13 +95,28 @@ export default function DebtProductModal({
                    value={name} onChange={(e) => setName(e.target.value)} autoFocus />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="label">{t('debts.product.unit')}</label>
-              <select className="input" value={unit} onChange={(e) => setUnit(e.target.value)}>
-                {UNITS.map((u) => <option key={u} value={u}>{t(`debts.units.${u}`)}</option>)}
-              </select>
-            </div>
+          {/* Qarz turi: tayyor variantlar yoki ixtiyoriy nom */}
+          <div>
+            <label className="label">{t('debts.product.typeLabel')}</label>
+            <select className="input" value={typeChoice} onChange={(e) => setTypeChoice(e.target.value)}>
+              {PRESET_TYPES.map((tp) => <option key={tp} value={tp}>{t(`debts.type.${tp}`)}</option>)}
+              <option value="__custom__">{t('debts.product.typeCustom')}</option>
+            </select>
+            {typeChoice === '__custom__' && (
+              <input className="input mt-2" placeholder={t('debts.product.customTypePlaceholder')}
+                     value={customType} onChange={(e) => setCustomType(e.target.value)} />
+            )}
+          </div>
+
+          <div className={isProduct ? 'grid grid-cols-2 gap-3' : ''}>
+            {isProduct && (
+              <div>
+                <label className="label">{t('debts.product.unit')}</label>
+                <select className="input" value={unit} onChange={(e) => setUnit(e.target.value)}>
+                  {UNITS.map((u) => <option key={u} value={u}>{t(`debts.units.${u}`)}</option>)}
+                </select>
+              </div>
+            )}
             <div>
               <label className="label">{t('debts.product.currency')}</label>
               <select className="input" value={currency} onChange={(e) => setCurrency(e.target.value)}>
@@ -97,15 +125,18 @@ export default function DebtProductModal({
             </div>
           </div>
 
-          <div>
-            <label className="label">{t('debts.product.unitPrice')}</label>
-            <MoneyInput value={unitPrice} onChange={setUnitPrice}
-                        suffix={t(`debts.currency.${currency}`)} />
-          </div>
+          {isProduct && (
+            <div>
+              <label className="label">{t('debts.product.unitPrice')}</label>
+              <MoneyInput value={unitPrice} onChange={setUnitPrice}
+                          suffix={t(`debts.currency.${currency}`)} />
+            </div>
+          )}
 
           <div>
-            <label className="label">{t('debts.product.supplier')}</label>
-            <input className="input" placeholder={t('debts.product.supplierPlaceholder')}
+            <label className="label">{isProduct ? t('debts.product.supplier') : t('debts.product.source')}</label>
+            <input className="input"
+                   placeholder={isProduct ? t('debts.product.supplierPlaceholder') : t('debts.product.sourcePlaceholder')}
                    value={supplier} onChange={(e) => setSupplier(e.target.value)} />
           </div>
 

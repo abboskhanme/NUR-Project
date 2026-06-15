@@ -77,6 +77,7 @@ def _build_out(p: DebtProduct, agg: dict) -> DebtProductOut:
     return DebtProductOut(
         id=p.id,
         name=p.name,
+        debt_type=p.debt_type,
         unit=p.unit,
         unit_price=_q(p.unit_price),
         currency=p.currency,
@@ -223,10 +224,23 @@ async def add_purchase(
 ):
     p = (await db.execute(select(DebtProduct).where(DebtProduct.id == product_id))).scalar_one_or_none()
     if not p:
-        raise HTTPException(404, "Mahsulot topilmadi")
-    unit_price = Decimal(str(payload.unit_price)) if payload.unit_price is not None else p.unit_price
-    qty = Decimal(str(payload.qty))
-    amount = (qty * unit_price).quantize(Decimal("0.01"))
+        raise HTTPException(404, "Qarz yozuvi topilmadi")
+
+    if p.debt_type == "product":
+        # Mahsulot: miqdor × birlik narxi
+        if payload.qty is None or payload.qty <= 0:
+            raise HTTPException(422, "Miqdor 0 dan katta bo'lishi kerak")
+        unit_price = Decimal(str(payload.unit_price)) if payload.unit_price is not None else p.unit_price
+        qty = Decimal(str(payload.qty))
+        amount = (qty * unit_price).quantize(Decimal("0.01"))
+    else:
+        # Kredit/qarz/custom: to'g'ridan-to'g'ri summa
+        if payload.amount is None or payload.amount <= 0:
+            raise HTTPException(422, "Summa 0 dan katta bo'lishi kerak")
+        qty = Decimal("0")
+        unit_price = Decimal("0")
+        amount = Decimal(str(payload.amount)).quantize(Decimal("0.01"))
+
     tx = DebtTransaction(
         product_id=product_id,
         kind="purchase",
