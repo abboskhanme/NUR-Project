@@ -4,8 +4,13 @@
   "tabs": {
     "office": "Office staff",
     "worker": "Workers",
+    "assembly": "Assembly",
+    "production": "Production",
     "employees": "Employees",
     "positions": "Positions"
+  },
+  "deptCard": {
+    "people": "people"
   },
   "newWorker": "New worker",
   "monthHint": "Figures shown are for {{month}} {{year}}. Click a number to see its history.",
@@ -197,6 +202,7 @@
     "hireDateLabel": "Hire date",
     "positionLabel": "Position",
     "positionNone": "— not selected —",
+    "departmentTypeLabel": "Department type",
     "addressLabel": "Address",
     "salaryTypeLabel": "Salary type",
     "salaryAmountLabel": "Amount ({{currency}})",

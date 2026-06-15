@@ -29,6 +29,7 @@ export interface EmployeeRow {
   position_id?: string | null;
   position_name?: string | null;
   employment_type: string;
+  department_type?: string;
   salary_type: string;
   salary_amount: string;
   currency: string;
@@ -91,6 +92,7 @@ export default function EmployeeModal({
   const [hireDate, setHireDate] = useState(employee?.hire_date ?? '');
   const [address, setAddress] = useState(employee?.address ?? '');
   const [positionId, setPositionId] = useState(employee?.position_id ?? '');
+  const [departmentType, setDepartmentType] = useState(employee?.department_type ?? 'production');
   const [salaryType, setSalaryType] = useState(employee?.salary_type ?? 'daily');
   const [salaryAmount, setSalaryAmount] = useState(normalizeAmount(employee?.salary_amount));
   const [status, setStatus] = useState(employee?.status ?? 'active');
@@ -132,6 +134,7 @@ export default function EmployeeModal({
           address: address || null,
           position_id: positionId || null,
           employment_type: 'worker',
+          department_type: departmentType,
           salary_type: salaryType,
           salary_amount: salaryAmount || '0',
           status,
@@ -151,6 +154,7 @@ export default function EmployeeModal({
         if (!isOffice) {
           payload.full_name = fullName;
           payload.phone = phone || null;
+          payload.department_type = departmentType;
         }
         await api.patch(`/hr/employees/${employee!.id}`, payload);
         toast.success(t('hr.modal.updated'));
@@ -189,6 +193,21 @@ export default function EmployeeModal({
             <div className="flex items-start gap-2 text-sm bg-primary/5 text-ink/80 rounded-button px-3 py-2.5">
               <Info size={16} className="text-primary mt-0.5 shrink-0" />
               <span dangerouslySetInnerHTML={{ __html: t('hr.modal.officeInfo') }} />
+            </div>
+          )}
+
+          {!isOffice && (
+            <div>
+              <label className="label">{t('hr.modal.departmentTypeLabel')}</label>
+              <select
+                className="input"
+                value={departmentType}
+                onChange={(e) => setDepartmentType(e.target.value)}
+              >
+                <option value="office">{t('hr.tabs.office')}</option>
+                <option value="assembly">{t('hr.tabs.assembly')}</option>
+                <option value="production">{t('hr.tabs.production')}</option>
+              </select>
             </div>
           )}
 

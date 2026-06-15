@@ -4,8 +4,13 @@
   "tabs": {
     "office": "Ofis xodimlari",
     "worker": "Oddiy ishchilar",
+    "assembly": "Yig'uv bo'limi",
+    "production": "Ishlab chiqarish",
     "employees": "Xodimlar",
     "positions": "Lavozimlar"
+  },
+  "deptCard": {
+    "people": "kishi"
   },
   "newWorker": "Yangi ishchi",
   "monthHint": "{{month}} {{year}} uchun ko'rsatkichlar. Tarixini ko'rish uchun raqam ustiga bosing.",
@@ -197,6 +202,7 @@
     "hireDateLabel": "Ish boshlagan sana",
     "positionLabel": "Lavozim",
     "positionNone": "— tanlanmagan —",
+    "departmentTypeLabel": "Bo'lim turi",
     "addressLabel": "Manzil",
     "salaryTypeLabel": "Oylik turi",
     "salaryAmountLabel": "Summa ({{currency}})",

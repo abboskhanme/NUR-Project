@@ -47,3 +47,33 @@ body {
     @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
   }
 }
+
+/* Termal chek — ekranda kattaroq (o'qish uchun), chop etishda 58mm. */
+#thermal-receipt {
+  width: 360px;
+}
+
+/* Termal chek (58mm) — faqat chop etishda butun sahifani egallaydi.
+   Modal ichidagi #thermal-receipt'dan boshqa hamma narsa yashiriladi. */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #thermal-receipt,
+  #thermal-receipt * {
+    visibility: visible;
+  }
+  #thermal-receipt {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 58mm;
+    margin: 0;
+    padding: 0;
+    box-shadow: none;
+  }
+  @page {
+    size: 58mm auto;
+    margin: 0;
+  }
+}

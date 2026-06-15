@@ -4,8 +4,13 @@
   "tabs": {
     "office": "Офисные сотрудники",
     "worker": "Рабочие",
+    "assembly": "Сборка",
+    "production": "Производство",
     "employees": "Сотрудники",
     "positions": "Должности"
+  },
+  "deptCard": {
+    "people": "чел."
   },
   "newWorker": "Новый рабочий",
   "monthHint": "Показаны данные за {{month}} {{year}}. Нажмите на число, чтобы увидеть историю.",
@@ -197,6 +202,7 @@
     "hireDateLabel": "Дата приёма на работу",
     "positionLabel": "Должность",
     "positionNone": "— не выбрано —",
+    "departmentTypeLabel": "Тип подразделения",
     "addressLabel": "Адрес",
     "salaryTypeLabel": "Тип зарплаты",
     "salaryAmountLabel": "Сумма ({{currency}})",

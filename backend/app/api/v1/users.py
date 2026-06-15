@@ -79,6 +79,7 @@ async def _sync_employee_from_user(db: AsyncSession, user: User) -> None:
             full_name=user.full_name,
             phone=user.phone,
             employment_type="office",
+            department_type="office",
             has_account=True,
             user_id=user.id,
             position_id=position_id,
@@ -91,6 +92,7 @@ async def _sync_employee_from_user(db: AsyncSession, user: User) -> None:
         emp.phone = user.phone
         emp.has_account = True
         emp.employment_type = "office"
+        emp.department_type = "office"
         emp.status = new_status
         # Lavozim faqat foydalanuvchida ko'rsatilgan bo'lsa yangilanadi
         if position_id is not None:

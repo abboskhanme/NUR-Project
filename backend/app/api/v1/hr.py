@@ -193,6 +193,7 @@ async def list_employees(
     db: Annotated[AsyncSession, Depends(get_db)], _: CurrentUser,
     page: int = Query(1, ge=1), page_size: int = Query(50, ge=1, le=200),
     status: Optional[str] = "active", employment_type: Optional[str] = None,
+    department_type: Optional[str] = None,
     q: Optional[str] = Query(None, description="Ism bo'yicha qidiruv"),
     with_summary: bool = Query(False, description="Joriy oy bo'yicha yig'ma hisobni qo'shish"),
     year: Optional[int] = Query(None, ge=2000, le=2100),
@@ -203,6 +204,8 @@ async def list_employees(
         query = query.where(Employee.status == status)
     if employment_type:
         query = query.where(Employee.employment_type == employment_type)
+    if department_type:
+        query = query.where(Employee.department_type == department_type)
     if q:
         query = query.where(func.lower(Employee.full_name).like(f"%{q.lower()}%"))
     total = (await db.execute(select(func.count()).select_from(query.subquery()))).scalar() or 0

@@ -69,6 +69,7 @@ class EmployeeBase(BaseModel):
     position_id: Optional[uuid.UUID] = None
     hire_date: Optional[date] = None
     employment_type: str = "worker"
+    department_type: str = "production"
     salary_type: str = "hourly"
     salary_amount: Decimal = Decimal(0)
     currency: str = "UZS"
@@ -89,6 +90,7 @@ class EmployeeUpdate(BaseModel):
     position_id: Optional[uuid.UUID] = None
     hire_date: Optional[date] = None
     employment_type: Optional[str] = None
+    department_type: Optional[str] = None
     salary_type: Optional[str] = None
     salary_amount: Optional[Decimal] = None
     status: Optional[str] = None
@@ -117,6 +119,7 @@ class EmployeeOut(ORMBase):
     position_name: Optional[str] = None
     hire_date: Optional[date] = None
     employment_type: str
+    department_type: str = "production"
     salary_type: str
     salary_amount: Decimal
     currency: str

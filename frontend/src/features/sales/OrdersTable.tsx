@@ -3,11 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { usePermissions } from '@/lib/permissions';
 import toast from 'react-hot-toast';
-import { ExternalLink, Plus, ListPlus, Check } from 'lucide-react';
+import { ExternalLink, Plus, ListPlus, Check, Printer } from 'lucide-react';
 
 import { api } from '@/api/client';
 import { formatUZS, formatPhone, formatDate } from '@/lib/format';
 import { CellDate, CellSelect } from '@/components/ui/TablePickers';
+import ReceiptModal from './ReceiptModal';
 
 export interface ProductOpt {
   id: string; product_type?: string; model?: string | null; name?: string | null;
@@ -111,7 +112,7 @@ export default function OrdersTable({
           <col style={{ width: 160 }} />
           <col style={{ width: 140 }} />
           <col style={{ width: 140 }} />
-          <col style={{ width: 50 }} />
+          <col style={{ width: 80 }} />
         </colgroup>
         <thead className="text-left text-ink-soft border-b border-black/10">
           <tr className="[&>th]:py-2 [&>th]:px-2 [&>th]:font-medium [&>th]:whitespace-nowrap">
@@ -154,6 +155,7 @@ function Row({
   const { can } = usePermissions();
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState(o.status);
+  const [receiptOpen, setReceiptOpen] = useState(false);
   useEffect(() => setStatus(o.status), [o.status]);
 
   const mainIdx = Math.max(0, o.items.findIndex((it) => it.product?.product_type !== 'additional'));
@@ -462,11 +464,15 @@ function Row({
       </td>
 
       <td className={cell}>
-        <div className="flex items-center justify-center">
+        <div className="flex items-center justify-center gap-0.5">
+          <button onClick={() => setReceiptOpen(true)} className="p-1 rounded hover:bg-accent/10 text-accent" title={t('sales.printReceiptCheckTitle')}>
+            <Printer size={14} />
+          </button>
           <button onClick={() => navigate(`/orders/${o.id}`)} className="p-1 rounded hover:bg-black/5 text-ink-soft" title={t('sales.openOrder')}>
             <ExternalLink size={14} />
           </button>
         </div>
+        {receiptOpen && <ReceiptModal order={o} onClose={() => setReceiptOpen(false)} />}
       </td>
     </tr>
   );

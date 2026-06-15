@@ -210,5 +210,20 @@
   "exportExcel": "Excel",
   "exportExcelTitle": "Скачать список заказов в Excel",
   "queuePaidTotal": "Внесённый залог",
-  "queueDueTotal": "Долг (остаток)"
+  "queueDueTotal": "Долг (остаток)",
+  "printReceiptCheckTitle": "Печать чека (термопринтер)",
+  "receiptModalTitle": "Чек",
+  "receiptPrintBtn": "Печать",
+  "receiptOrderLabel": "Заказ",
+  "receiptDateLabel": "Дата",
+  "receiptSellerLabel": "Продавец",
+  "receiptCustomerLabel": "Клиент",
+  "receiptPhoneLabel": "Тел",
+  "receiptDiscountLabel": "Скидка",
+  "receiptTotalLabel": "ИТОГО",
+  "receiptPaidLabel": "Оплачено",
+  "receiptBalanceLabel": "Остаток",
+  "receiptContactLabel": "Контактные телефоны",
+  "receiptServiceLabel": "Сервисная служба",
+  "receiptThanks": "Спасибо за покупку!"
 }

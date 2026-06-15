@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Plus, Search, Pencil, Users, Briefcase, BadgeCheck, ChevronRight, Coins, Wallet, Scale } from 'lucide-react';
+import { Plus, Search, Pencil, Users, Briefcase, BadgeCheck, ChevronRight } from 'lucide-react';
 
 import { api } from '@/api/client';
 import Card from '@/components/ui/Card';
@@ -13,6 +13,57 @@ import EmployeeHistoryModal, { HistoryKind } from '@/features/hr/EmployeeHistory
 import PositionsSection from '@/features/hr/PositionsSection';
 
 type Tab = 'employees' | 'positions';
+type GroupKey = 'office' | 'assembly' | 'production';
+
+// Xodim turini bo'limga ajratamiz: ofis bo'limi, yig'uv bo'limi, ishlab chiqarish.
+// Ofis bo'limiga ham akkountli xodimlar, ham akkountsiz yordamchi ishchilar kiradi.
+function groupOf(e: EmployeeRow): GroupKey {
+  if (e.employment_type === 'office' || e.department_type === 'office') return 'office';
+  return e.department_type === 'assembly' ? 'assembly' : 'production';
+}
+
+const GROUP_RANK: Record<GroupKey, number> = { office: 0, assembly: 1, production: 2 };
+
+// Har bir bo'lim uchun rang sxemasi (ofis — qizil, yig'uv — ko'k, ishlab chiqarish — yashil).
+const GROUP_STYLE: Record<GroupKey, {
+  labelKey: string;
+  dot: string;
+  rowTint: string;
+  border: string;
+  card: string;
+  text: string;
+  icon: string;
+}> = {
+  office: {
+    labelKey: 'hr.tabs.office',
+    dot: 'bg-red-500',
+    rowTint: 'bg-red-100/70 hover:bg-red-200/70',
+    border: 'border-l-red-500',
+    card: 'border-red-500/25 bg-red-50',
+    text: 'text-red-600',
+    icon: 'bg-red-500/15 text-red-600',
+  },
+  assembly: {
+    labelKey: 'hr.tabs.assembly',
+    dot: 'bg-blue-500',
+    rowTint: 'bg-blue-100/70 hover:bg-blue-200/70',
+    border: 'border-l-blue-500',
+    card: 'border-blue-500/25 bg-blue-50',
+    text: 'text-blue-600',
+    icon: 'bg-blue-500/15 text-blue-600',
+  },
+  production: {
+    labelKey: 'hr.tabs.production',
+    dot: 'bg-green-600',
+    rowTint: 'bg-green-100/70 hover:bg-green-200/70',
+    border: 'border-l-green-600',
+    card: 'border-green-600/25 bg-green-50',
+    text: 'text-green-700',
+    icon: 'bg-green-600/15 text-green-700',
+  },
+};
+
+const GROUP_ORDER: GroupKey[] = ['office', 'assembly', 'production'];
 
 export default function HRPage() {
   const { t } = useTranslation();
@@ -50,23 +101,26 @@ export default function HRPage() {
   });
 
   const rawItems: EmployeeRow[] = empQ.data?.items ?? [];
-  // Turi bo'yicha guruhlaymiz: avval ofis xodimlari (qizil), keyin ishchilar (yashil).
+  // Turi bo'yicha guruhlaymiz: ofis (qizil) → yig'uv (ko'k) → ishlab chiqarish (yashil).
   // Backend allaqachon ism bo'yicha tartiblagani uchun har guruh ichida tartib saqlanadi.
-  const items = [...rawItems].sort((a, b) => {
-    const rank = (e: EmployeeRow) => (e.employment_type === 'office' ? 0 : 1);
-    return rank(a) - rank(b);
-  });
+  const items = [...rawItems].sort((a, b) => GROUP_RANK[groupOf(a)] - GROUP_RANK[groupOf(b)]);
 
-  // Joriy oy bo'yicha umumiy ko'rsatkichlar (header kartalari uchun)
-  const totals = items.reduce(
+  // Joriy oy bo'yicha har bir bo'lim uchun alohida ko'rsatkichlar (header kartalari uchun)
+  const totalsByGroup = items.reduce(
     (acc, e) => {
+      const g = groupOf(e);
       const s = e.month_summary;
-      acc.gross += parseFloat(s?.gross ?? '0') || 0;
-      acc.advance += parseFloat(s?.advance ?? '0') || 0;
-      acc.net += parseFloat(s?.net ?? '0') || 0;
+      acc[g].gross += parseFloat(s?.gross ?? '0') || 0;
+      acc[g].advance += parseFloat(s?.advance ?? '0') || 0;
+      acc[g].net += parseFloat(s?.net ?? '0') || 0;
+      acc[g].count += 1;
       return acc;
     },
-    { gross: 0, advance: 0, net: 0 },
+    {
+      office: { gross: 0, advance: 0, net: 0, count: 0 },
+      assembly: { gross: 0, advance: 0, net: 0, count: 0 },
+      production: { gross: 0, advance: 0, net: 0, count: 0 },
+    } as Record<GroupKey, { gross: number; advance: number; net: number; count: number }>,
   );
 
   function refresh() {
@@ -98,24 +152,17 @@ export default function HRPage() {
 
       {!isPositions && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <KpiCard
-            tone="primary"
-            label={t('hr.totals.salary')}
-            value={formatUZS(totals.gross)}
-            icon={<Coins size={18} />}
-          />
-          <KpiCard
-            tone="warning"
-            label={t('hr.totals.advance')}
-            value={formatUZS(totals.advance)}
-            icon={<Wallet size={18} />}
-          />
-          <KpiCard
-            tone="success"
-            label={t('hr.totals.remaining')}
-            value={formatUZS(totals.net)}
-            icon={<Scale size={18} />}
-          />
+          {GROUP_ORDER.map((g) => (
+            <DeptCard
+              key={g}
+              groupKey={g}
+              label={t(GROUP_STYLE[g].labelKey)}
+              count={totalsByGroup[g].count}
+              gross={totalsByGroup[g].gross}
+              advance={totalsByGroup[g].advance}
+              net={totalsByGroup[g].net}
+            />
+          ))}
         </div>
       )}
 
@@ -168,15 +215,13 @@ export default function HRPage() {
             <p className="text-xs text-ink-soft">
               {t('hr.monthHint', { month: t(`hr.months.${curMonth}`), year: curYear })}
             </p>
-            <div className="flex items-center gap-4 text-xs text-ink-soft">
-              <span className="flex items-center gap-1.5">
-                <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-500" />
-                {t('hr.tabs.office')}
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="inline-block w-2.5 h-2.5 rounded-full bg-green-600" />
-                {t('hr.tabs.worker')}
-              </span>
+            <div className="flex items-center gap-4 text-xs text-ink-soft flex-wrap">
+              {GROUP_ORDER.map((g) => (
+                <span key={g} className="flex items-center gap-1.5">
+                  <span className={`inline-block w-2.5 h-2.5 rounded-full ${GROUP_STYLE[g].dot}`} />
+                  {t(GROUP_STYLE[g].labelKey)}
+                </span>
+              ))}
             </div>
           </div>
 
@@ -208,12 +253,10 @@ export default function HRPage() {
                   {items.map((e) => {
                     const s = e.month_summary;
                     const isHourly = (s?.salary_type || e.salary_type) === 'hourly';
-                    // Xodim turini keskin rang bilan ajratamiz: ofis — qizil, ishchi — yashil
-                    const isOffice = e.employment_type === 'office';
-                    const rowTint = isOffice
-                      ? 'bg-red-100/70 hover:bg-red-200/70'
-                      : 'bg-green-100/70 hover:bg-green-200/70';
-                    const accentBorder = isOffice ? 'border-l-red-500' : 'border-l-green-600';
+                    // Xodim turini rang bilan ajratamiz: ofis — qizil, yig'uv — ko'k, ishlab chiqarish — yashil
+                    const style = GROUP_STYLE[groupOf(e)];
+                    const rowTint = style.rowTint;
+                    const accentBorder = style.border;
                     return (
                       <tr
                         key={e.id}
@@ -329,27 +372,41 @@ function NumCell({
   );
 }
 
-const KPI_TONES = {
-  primary: { card: 'border-primary/20 bg-primary/5', text: 'text-primary', icon: 'bg-primary/15 text-primary' },
-  warning: { card: 'border-warning/25 bg-warning/10', text: 'text-warning', icon: 'bg-warning/20 text-warning' },
-  success: { card: 'border-success/25 bg-success/10', text: 'text-success', icon: 'bg-success/20 text-success' },
-} as const;
-
-function KpiCard({ tone, label, value, icon }: {
-  tone: keyof typeof KPI_TONES;
+/** Bo'lim bo'yicha umumiy hisob kartasi: oylik, avans va qoldiq. */
+function DeptCard({ groupKey, label, count, gross, advance, net }: {
+  groupKey: GroupKey;
   label: string;
-  value: string;
-  icon: React.ReactNode;
+  count: number;
+  gross: number;
+  advance: number;
+  net: number;
 }) {
-  const tn = KPI_TONES[tone];
+  const { t } = useTranslation();
+  const st = GROUP_STYLE[groupKey];
   return (
-    <div className={`rounded-card border p-4 flex items-start justify-between ${tn.card}`}>
-      <div className="min-w-0">
-        <div className={`text-sm font-medium ${tn.text}`}>{label}</div>
-        <div className={`text-2xl font-bold mt-2 ${tn.text}`}>{value}</div>
+    <div className={`rounded-card border p-4 ${st.card}`}>
+      <div className="flex items-center justify-between gap-2">
+        <div className={`flex items-center gap-2 font-semibold ${st.text}`}>
+          <span className={`inline-block w-2.5 h-2.5 rounded-full ${st.dot}`} />
+          {label}
+        </div>
+        <span className={`text-xs px-2 py-0.5 rounded-full ${st.icon}`}>
+          {count} {t('hr.deptCard.people')}
+        </span>
       </div>
-      <div className={`w-10 h-10 rounded-button flex items-center justify-center shrink-0 ${tn.icon}`}>
-        {icon}
+      <div className="mt-3 space-y-1.5 text-sm">
+        <div className="flex items-center justify-between">
+          <span className="text-ink-soft">{t('hr.totals.salary')}</span>
+          <span className="tabular-nums font-medium">{formatUZS(gross)}</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-ink-soft">{t('hr.totals.advance')}</span>
+          <span className="tabular-nums font-medium text-warning">{formatUZS(advance)}</span>
+        </div>
+        <div className="flex items-center justify-between pt-1.5 border-t border-black/5">
+          <span className="text-ink-soft">{t('hr.totals.remaining')}</span>
+          <span className={`tabular-nums font-bold ${st.text}`}>{formatUZS(net)}</span>
+        </div>
       </div>
     </div>
   );

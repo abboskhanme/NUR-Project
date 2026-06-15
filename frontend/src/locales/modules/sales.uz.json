@@ -210,5 +210,20 @@
   "exportExcel": "Excel",
   "exportExcelTitle": "Buyurtmalar ro'yxatini Excel ga yuklab olish",
   "queuePaidTotal": "Berilgan zaklad summasi",
-  "queueDueTotal": "Qarz (to‘lanishi kerak)"
+  "queueDueTotal": "Qarz (to‘lanishi kerak)",
+  "printReceiptCheckTitle": "Chek chiqarish (termal printer)",
+  "receiptModalTitle": "Chek",
+  "receiptPrintBtn": "Chop etish",
+  "receiptOrderLabel": "Buyurtma",
+  "receiptDateLabel": "Sana",
+  "receiptSellerLabel": "Sotuvchi",
+  "receiptCustomerLabel": "Mijoz",
+  "receiptPhoneLabel": "Tel",
+  "receiptDiscountLabel": "Chegirma",
+  "receiptTotalLabel": "JAMI",
+  "receiptPaidLabel": "To‘langan",
+  "receiptBalanceLabel": "Qoldiq",
+  "receiptContactLabel": "Aloqa raqamlari",
+  "receiptServiceLabel": "Servis xizmati",
+  "receiptThanks": "Xaridingiz uchun rahmat!"
 }

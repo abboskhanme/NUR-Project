@@ -42,6 +42,10 @@ class Employee(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     hire_date: Mapped[Optional[date]] = mapped_column(Date)
     # office/worker
     employment_type: Mapped[str] = mapped_column(String(20), default="worker")
+    # Xodim turi/bo'limi: office (ofis xodimi) / assembly (yig'uv) / production (ishlab chiqarish)
+    department_type: Mapped[str] = mapped_column(
+        String(20), default="production", server_default="production"
+    )
     # hourly/daily/fixed/kpi
     salary_type: Mapped[str] = mapped_column(String(20), default="hourly")
     salary_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)

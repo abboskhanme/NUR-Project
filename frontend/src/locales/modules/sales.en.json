@@ -210,5 +210,20 @@
   "exportExcel": "Excel",
   "exportExcelTitle": "Download orders list to Excel",
   "queuePaidTotal": "Deposit given",
-  "queueDueTotal": "Debt (outstanding)"
+  "queueDueTotal": "Debt (outstanding)",
+  "printReceiptCheckTitle": "Print receipt (thermal printer)",
+  "receiptModalTitle": "Receipt",
+  "receiptPrintBtn": "Print",
+  "receiptOrderLabel": "Order",
+  "receiptDateLabel": "Date",
+  "receiptSellerLabel": "Seller",
+  "receiptCustomerLabel": "Customer",
+  "receiptPhoneLabel": "Tel",
+  "receiptDiscountLabel": "Discount",
+  "receiptTotalLabel": "TOTAL",
+  "receiptPaidLabel": "Paid",
+  "receiptBalanceLabel": "Balance",
+  "receiptContactLabel": "Contact numbers",
+  "receiptServiceLabel": "Service",
+  "receiptThanks": "Thank you for your purchase!"
 }
