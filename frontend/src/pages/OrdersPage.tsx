@@ -38,6 +38,16 @@ const MONTH_NUMS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const;
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
 
+// Har bir sotuvchi uchun rang (navbatma-navbat) — rang-barang chiplar uchun
+const SP_COLORS = [
+  'bg-primary/10 text-primary',
+  'bg-emerald-100 text-emerald-700',
+  'bg-amber-100 text-amber-700',
+  'bg-sky-100 text-sky-700',
+  'bg-violet-100 text-violet-700',
+  'bg-rose-100 text-rose-700',
+];
+
 export default function OrdersPage() {
   const { t } = useTranslation();
   const qc = useQueryClient();
@@ -134,12 +144,12 @@ export default function OrdersPage() {
           <div className="flex items-center flex-wrap gap-x-3 gap-y-1">
             <h1 className="text-2xl font-bold">{t('sales.pageTitle')}</h1>
             {s?.salesperson_counts && s.salesperson_counts.length > 0 && (
-              <div className="flex flex-wrap items-center gap-1.5" title={t('sales.bySalesperson', { defaultValue: 'Sotuvchi bo‘yicha zakazlar' })}>
-                {s.salesperson_counts.map((sp) => (
+              <div className="flex flex-wrap items-center gap-2" title={t('sales.bySalesperson', { defaultValue: 'Sotuvchi bo‘yicha zakazlar' })}>
+                {s.salesperson_counts.map((sp, idx) => (
                   <span key={sp.salesperson_id ?? sp.name}
-                        className="inline-flex items-center gap-1 text-xs bg-black/5 rounded-full pl-2 pr-1 py-0.5">
-                    <span className="text-ink-soft">{sp.name}</span>
-                    <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-primary/15 text-primary font-semibold">{sp.count}</span>
+                        className={'inline-flex items-center gap-1.5 text-sm font-medium rounded-full pl-3 pr-1.5 py-1 ' + SP_COLORS[idx % SP_COLORS.length]}>
+                    {sp.name}
+                    <span className="inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-full bg-white/75 font-bold text-xs">{sp.count}</span>
                   </span>
                 ))}
               </div>
