@@ -141,5 +141,15 @@
       "sat": "Sat",
       "sun": "Sun"
     }
+  },
+  "trip": {
+    "title": "Service trip",
+    "ticketCount": "{{n}} scheduled tickets",
+    "collected": "Collected (before)",
+    "spent": "Spent (after)",
+    "totalCost": "Total cost",
+    "net": "Net",
+    "finalize": "Finalize trip",
+    "closed": "Trip finalized"
   }
 }

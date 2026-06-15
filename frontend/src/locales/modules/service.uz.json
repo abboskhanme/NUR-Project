@@ -141,5 +141,15 @@
       "sat": "Sha",
       "sun": "Ya"
     }
+  },
+  "trip": {
+    "title": "Servis safari",
+    "ticketCount": "{{n}} ta rejalashtirilgan ariza",
+    "collected": "Olingan (ketishdan oldin)",
+    "spent": "Sarflangan (kelgandan keyin)",
+    "totalCost": "Umumiy harajat",
+    "net": "Sof",
+    "finalize": "Safarni yakunlash",
+    "closed": "Safar yakunlandi"
   }
 }

@@ -12,11 +12,12 @@ from app.core.dependencies import CurrentUser
 from app.core.permissions import module_guard
 from app.db.session import get_db
 from app.models.order import Order, OrderItem
-from app.models.service import ServiceCategory, ServiceTicket, ServiceVisit
+from app.models.service import ServiceCategory, ServiceTicket, ServiceTrip, ServiceVisit
 from app.schemas.common import Page
 from app.schemas.service import (
     OrderMini, ServiceCategoryIn, ServiceCategoryOut, ServiceSummary, ServiceTicketCreate,
-    ServiceTicketOut, ServiceTicketUpdate, ServiceVisitIn, ServiceVisitOut, WarrantyInfo,
+    ServiceTicketOut, ServiceTicketUpdate, ServiceTripOut, ServiceTripUpdate,
+    ServiceVisitIn, ServiceVisitOut, WarrantyInfo,
 )
 from app.services.warranty_service import calculate_warranty
 
@@ -62,6 +63,81 @@ async def summary(db: Annotated[AsyncSession, Depends(get_db)], _: CurrentUser):
         in_warranty_open=in_warranty_open,
         with_visit=counts.get("scheduled", 0),
     )
+
+
+# --------------------------------------------------------------------------- #
+# Servis safari — barcha rejalashtirilgan arizalar bitta safar (3 ta umumiy summa)
+# --------------------------------------------------------------------------- #
+async def _scheduled_count(db: AsyncSession) -> int:
+    return (await db.execute(
+        select(func.count(ServiceTicket.id)).where(ServiceTicket.status == "scheduled")
+    )).scalar() or 0
+
+
+async def _open_trip(db: AsyncSession, user) -> ServiceTrip:
+    trip = (await db.execute(
+        select(ServiceTrip).where(ServiceTrip.status == "open")
+        .order_by(ServiceTrip.opened_at.desc())
+    )).scalars().first()
+    if not trip:
+        trip = ServiceTrip(status="open", opened_at=datetime.now(timezone.utc),
+                           created_by_id=user.id)
+        db.add(trip)
+        await db.commit()
+        await db.refresh(trip)
+    return trip
+
+
+def _trip_out(trip: ServiceTrip, scheduled: int) -> ServiceTripOut:
+    out = ServiceTripOut.model_validate(trip)
+    out.scheduled_count = scheduled
+    return out
+
+
+@router.get("/trips/current", response_model=ServiceTripOut)
+async def current_trip(db: Annotated[AsyncSession, Depends(get_db)], user: CurrentUser):
+    trip = await _open_trip(db, user)
+    return _trip_out(trip, await _scheduled_count(db))
+
+
+@router.get("/trips", response_model=list[ServiceTripOut])
+async def list_trips(db: Annotated[AsyncSession, Depends(get_db)], _: CurrentUser,
+                     limit: int = Query(20, ge=1, le=100)):
+    rows = (await db.execute(
+        select(ServiceTrip).where(ServiceTrip.status == "closed")
+        .order_by(ServiceTrip.closed_at.desc()).limit(limit)
+    )).scalars().all()
+    return [_trip_out(r, 0) for r in rows]
+
+
+@router.patch("/trips/{trip_id}", response_model=ServiceTripOut)
+async def update_trip(trip_id: uuid.UUID, payload: ServiceTripUpdate, _: CurrentUser,
+                      db: Annotated[AsyncSession, Depends(get_db)]):
+    trip = (await db.execute(
+        select(ServiceTrip).where(ServiceTrip.id == trip_id))).scalar_one_or_none()
+    if not trip:
+        raise HTTPException(404, "Safar topilmadi")
+    for k, v in payload.model_dump(exclude_unset=True).items():
+        setattr(trip, k, v)
+    await db.commit()
+    await db.refresh(trip)
+    return _trip_out(trip, await _scheduled_count(db))
+
+
+@router.post("/trips/{trip_id}/close", response_model=ServiceTripOut)
+async def close_trip(trip_id: uuid.UUID, user: CurrentUser,
+                     db: Annotated[AsyncSession, Depends(get_db)]):
+    trip = (await db.execute(
+        select(ServiceTrip).where(ServiceTrip.id == trip_id))).scalar_one_or_none()
+    if not trip:
+        raise HTTPException(404, "Safar topilmadi")
+    trip.status = "closed"
+    trip.closed_at = datetime.now(timezone.utc)
+    trip.ticket_count = await _scheduled_count(db)
+    await db.commit()
+    # Keyingi safar uchun yangi ochiq yozuv
+    new_trip = await _open_trip(db, user)
+    return _trip_out(new_trip, await _scheduled_count(db))
 
 
 @router.get("/tickets", response_model=Page[ServiceTicketOut])

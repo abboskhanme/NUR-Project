@@ -73,3 +73,25 @@ class ServiceCategory(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     name: Mapped[str] = mapped_column(String(80), unique=True, index=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class ServiceTrip(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    """Servis safari — barcha rejalashtirilgan arizalar bitta safar hisoblanadi.
+    Uchta umumiy summa qo'lda kiritiladi (moliyaga bog'lanmaydi):
+      collected  — olingan pul (servisga ketishdan oldin)
+      spent      — sarflangan pul (qaytib kelgandan keyin)
+      total_cost — umumiy servis safari harajati
+    """
+    __tablename__ = "service_trips"
+
+    status: Mapped[str] = mapped_column(String(20), default="open", index=True)  # open / closed
+    collected: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
+    spent: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
+    total_cost: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
+    note: Mapped[Optional[str]] = mapped_column(Text)
+    ticket_count: Mapped[int] = mapped_column(default=0)
+    opened_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    closed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    created_by_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+    )

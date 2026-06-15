@@ -115,3 +115,23 @@ class ServiceSummary(BaseModel):
     in_warranty_open: int
     # Rejalashtirilgan (status='scheduled') arizalar soni — ✅ znachok kartasi
     with_visit: int = 0
+
+
+class ServiceTripUpdate(BaseModel):
+    collected: Optional[Decimal] = None
+    spent: Optional[Decimal] = None
+    total_cost: Optional[Decimal] = None
+    note: Optional[str] = None
+
+
+class ServiceTripOut(ORMBase):
+    id: uuid.UUID
+    status: str
+    collected: Decimal
+    spent: Decimal
+    total_cost: Decimal
+    note: Optional[str] = None
+    ticket_count: int = 0
+    scheduled_count: int = 0   # joriy rejalashtirilgan arizalar soni (live)
+    opened_at: datetime
+    closed_at: Optional[datetime] = None

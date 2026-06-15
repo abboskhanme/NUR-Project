@@ -11,6 +11,7 @@ import { formatDate, formatPhone } from '@/lib/format';
 import ServiceTicketModal from '@/features/service/ServiceTicketModal';
 import TicketDetailModal from '@/features/service/TicketDetailModal';
 import ServiceCategoryModal from '@/features/service/ServiceCategoryModal';
+import ServiceTripPanel from '@/features/service/ServiceTripPanel';
 import { ServiceStatusBadge } from '@/features/service/status';
 
 interface Ticket {
@@ -135,6 +136,9 @@ export default function ServicePage() {
                  value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
       </div>
+
+      {/* Servis safari — faqat "Rejalashtirilgan" filtrida */}
+      {status === 'scheduled' && <ServiceTripPanel onChanged={refetchAll} />}
 
       <Card>
         {ticketsQ.isLoading ? (
