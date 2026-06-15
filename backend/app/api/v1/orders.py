@@ -214,10 +214,18 @@ async def list_orders(
         queue_ids = (await db.execute(qq)).scalars().all()
         pos_map = {oid: i for i, oid in enumerate(queue_ids, start=1)}
 
+    # Sotuvchi ismlarini bir so'rovda yuklab, embed qilamiz (ro'yxatda bosh harflar uchun)
+    sp_ids = {o.salesperson_id for o in items if o.salesperson_id}
+    sp_names: dict[uuid.UUID, str] = {}
+    if sp_ids:
+        sr = await db.execute(select(User.id, User.full_name).where(User.id.in_(sp_ids)))
+        sp_names = {i: n for i, n in sr.all()}
+
     out = []
     for o in items:
         m = OrderOut.model_validate(o)
         m.queue_position = pos_map.get(o.id)
+        m.salesperson_name = sp_names.get(o.salesperson_id)
         out.append(m)
     return Page[OrderOut](items=out, total=total, page=page, page_size=page_size)
 

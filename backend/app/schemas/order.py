@@ -169,6 +169,8 @@ class OrderOut(ORMBase):
     created_at: datetime
     # Navbat raqami — faqat aktiv (new/ready) buyurtmalar uchun, boshqalarda None
     queue_position: Optional[int] = None
+    # Sotuvchi ismi (ro'yxatda bosh harflar belgisi uchun) — list javobida to'ldiriladi
+    salesperson_name: Optional[str] = None
 
 
 class OrderStatusChange(BaseModel):

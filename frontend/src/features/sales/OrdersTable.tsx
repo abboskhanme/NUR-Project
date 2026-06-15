@@ -25,6 +25,7 @@ interface OrderItem {
 export interface OrderFull {
   id: string; code: string; status: string; order_date: string; delivered_at?: string | null;
   queue_position?: number | null;
+  salesperson_name?: string | null;
   in_queue?: boolean;
   pickup_date?: string | null;
   exchange_rate: string;
@@ -67,6 +68,15 @@ function rowTint(status: string, balance: number): string {
 const num = (s: string | number | null | undefined) => {
   const n = parseFloat(String(s ?? '')); return Number.isNaN(n) ? 0 : n;
 };
+// Sotuvchi ismidan bosh harflar: bitta so'z → 1 harf ("Ayubxon" → "A"),
+// ikki+ so'z → birinchi ikki so'z bosh harfi ("Akabjon Avazov" → "AA").
+function sellerInitials(name?: string | null): string {
+  if (!name) return '';
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '';
+  if (parts.length === 1) return parts[0][0].toUpperCase();
+  return (parts[0][0] + parts[1][0]).toUpperCase();
+}
 // Dollar summasi uchun — raqam va bitta o'nlik nuqta
 const decStr = (s: string | number | null | undefined) =>
   String(s ?? '').replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1');
@@ -278,21 +288,31 @@ function Row({
         <QueueButton o={o} onChanged={onChanged} />
       </td>
       {/* Ombor ID raqami — navbat raqami o'rniga; bo'sh kotyolni band qiladi */}
-      <td className={cell + ' text-center'}>
-        {locked ? (
-          <span className={ro + ' font-mono text-center'} title={t('sales.unitIdReadOnly')}>
-            {o.unit_uid || '—'}
-          </span>
-        ) : (
-          <input
-            key={o.unit_uid ?? ''}
-            defaultValue={o.unit_uid ?? ''}
-            className={inp + ' text-center font-mono'}
-            placeholder={t('sales.unitIdPlaceholder')}
-            title={t('sales.unitIdEdit')}
-            onBlur={saveUnitUid}
-          />
-        )}
+      <td className={cell}>
+        <div className="flex items-center gap-1.5">
+          {o.salesperson_name && (
+            <span
+              className="shrink-0 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded-full bg-primary/10 text-primary text-[10px] font-semibold leading-none"
+              title={o.salesperson_name}
+            >
+              {sellerInitials(o.salesperson_name)}
+            </span>
+          )}
+          {locked ? (
+            <span className={ro + ' font-mono text-center flex-1'} title={t('sales.unitIdReadOnly')}>
+              {o.unit_uid || '—'}
+            </span>
+          ) : (
+            <input
+              key={o.unit_uid ?? ''}
+              defaultValue={o.unit_uid ?? ''}
+              className={inp + ' text-center font-mono flex-1 min-w-0'}
+              placeholder={t('sales.unitIdPlaceholder')}
+              title={t('sales.unitIdEdit')}
+              onBlur={saveUnitUid}
+            />
+          )}
+        </div>
       </td>
       {/* Dates */}
       <td className={cell}>
