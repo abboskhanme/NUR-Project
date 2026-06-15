@@ -15,6 +15,7 @@ from app.db.session import get_db
 from app.models.customer import Customer
 from app.models.order import Order, OrderItem, Payment
 from app.models.product import Inventory
+from app.models.shipping import Shipment
 from app.models.user import User
 from app.schemas.common import Page
 from app.schemas.order import (
@@ -140,6 +141,31 @@ async def _delete_linked_unit(db: AsyncSession, order: Order) -> None:
     if inv is not None:
         await db.delete(inv)
     order.inventory_id = None
+
+
+async def _ensure_shipment_for_order(db: AsyncSession, order: Order) -> None:
+    """Buyurtma yetkazilganda "Yuk chiqarish" jurnaliga avtomatik qator qo'shadi.
+
+    Idempotent — shu buyurtma uchun yozuv allaqachon bo'lsa, takror qo'shmaydi.
+    Sana/manzil/KVM/yo'nalish to'ldiriladi; haydovchi va to'lov qo'lda kiritiladi.
+    """
+    exists = (await db.execute(
+        select(Shipment.id).where(Shipment.order_id == order.id).limit(1)
+    )).scalar_one_or_none()
+    if exists:
+        return
+    cust = order.customer
+    destination = (order.delivery_address
+                   or (cust.region if cust else None)
+                   or (cust.address if cust else None))
+    db.add(Shipment(
+        date=order.delivered_at or date.today(),
+        qty=1,
+        destination=destination,
+        kvm=order.area_m2,
+        direction=order.bunker_direction,
+        order_id=order.id,
+    ))
 
 
 def _order_query():
@@ -560,6 +586,8 @@ async def update_order(order_id: uuid.UUID, payload: OrderUpdate, _: CurrentUser
                 o.delivered_at = date.today()
             # Yetkazildi — kotyol ombordan chiqib ketdi, birlikni o'chiramiz
             await _delete_linked_unit(db, o)
+            # ...va yuk chiqarish jurnaliga avtomatik qator
+            await _ensure_shipment_for_order(db, o)
         if new_status == "rejected":
             await _free_unit_by_uid(db, o.unit_uid)
 
@@ -585,6 +613,8 @@ async def change_status(order_id: uuid.UUID, payload: OrderStatusChange,
         o.delivered_at = payload.delivered_at or date.today()
         # Yetkazildi — kotyol ombordan chiqib ketdi, birlikni o'chiramiz
         await _delete_linked_unit(db, o)
+        # ...va yuk chiqarish jurnaliga avtomatik qator
+        await _ensure_shipment_for_order(db, o)
     if payload.status == "rejected":
         await _free_unit_by_uid(db, o.unit_uid)
     if payload.note:

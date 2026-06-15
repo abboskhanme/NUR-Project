@@ -18,6 +18,7 @@ from app.api.v1 import (
     permissions,
     search,
     debts,
+    shipping,
 )
 
 api_router = APIRouter()
@@ -37,3 +38,4 @@ api_router.include_router(reports.router, prefix="/reports", tags=["Reports"])
 api_router.include_router(permissions.router, prefix="/permissions", tags=["Permissions"])
 api_router.include_router(search.router, prefix="/search", tags=["Search"])
 api_router.include_router(debts.router, prefix="/debts", tags=["Debts / Bizning qarzlar"])
+api_router.include_router(shipping.router, prefix="/shipping", tags=["Shipping / Yuk chiqarish"])

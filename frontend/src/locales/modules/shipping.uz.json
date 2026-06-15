@@ -1,0 +1,30 @@
+{
+  "title": "Yuk chiqarish",
+  "subtitle": "Yetkazib berilgan yuklar, haydovchi to'lovlari va muammolar tarixi",
+  "addRow": "Qator qo'shish",
+  "allMonths": "Butun yil",
+  "count": "{{n}} ta yozuv",
+  "totalFreight": "Jami yo'l kira",
+  "empty": "Yozuvlar yo'q",
+  "emptyDesc": "Buyurtma \"Yetkazildi\"ga o'tganda avtomatik tushadi yoki qo'lda qator qo'shing",
+  "deleted": "O'chirildi",
+  "deleteTitle": "Yozuvni o'chirish",
+  "deleteConfirm": "Ushbu yuk yozuvi o'chiriladi. Davom etamizmi?",
+  "colDate": "Sana",
+  "colQty": "Soni",
+  "colDestination": "Manzil",
+  "colKvm": "KVM",
+  "colDirection": "Ung / Chap",
+  "colDriverPhone": "Shofyor tel",
+  "colFreight": "Yo'l kira",
+  "colKimdan": "Kimdan",
+  "colCardNumber": "Karta raqami",
+  "colCardHolder": "Karta egasi",
+  "colPaid": "To'landi",
+  "colPause": "Pauza",
+  "colReason": "Sababi",
+  "months": {
+    "1": "Yanvar", "2": "Fevral", "3": "Mart", "4": "Aprel", "5": "May", "6": "Iyun",
+    "7": "Iyul", "8": "Avgust", "9": "Sentabr", "10": "Oktabr", "11": "Noyabr", "12": "Dekabr"
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "title": "Shipping",
+  "subtitle": "Delivered cargo history, driver payments and issues",
+  "addRow": "Add row",
+  "allMonths": "Whole year",
+  "count": "{{n}} records",
+  "totalFreight": "Total freight",
+  "empty": "No records",
+  "emptyDesc": "Appears automatically when an order is marked \"Delivered\", or add a row manually",
+  "deleted": "Deleted",
+  "deleteTitle": "Delete record",
+  "deleteConfirm": "This shipping record will be deleted. Continue?",
+  "colDate": "Date",
+  "colQty": "Qty",
+  "colDestination": "Destination",
+  "colKvm": "KVM",
+  "colDirection": "Right / Left",
+  "colDriverPhone": "Driver phone",
+  "colFreight": "Freight",
+  "colKimdan": "From",
+  "colCardNumber": "Card number",
+  "colCardHolder": "Card holder",
+  "colPaid": "Paid",
+  "colPause": "Pause",
+  "colReason": "Reason",
+  "months": {
+    "1": "January", "2": "February", "3": "March", "4": "April", "5": "May", "6": "June",
+    "7": "July", "8": "August", "9": "September", "10": "October", "11": "November", "12": "December"
+  }
+}
