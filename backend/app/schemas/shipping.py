@@ -1,6 +1,7 @@
 """Yuk chiqarish — Pydantic sxemalar."""
 import uuid
-from datetime import date, datetime
+# "date" nomli maydon datetime.date tipini soya qilmasligi uchun alias bilan
+from datetime import date as date_type, datetime
 from decimal import Decimal
 from typing import Optional
 
@@ -11,7 +12,7 @@ from app.schemas.common import ORMBase
 
 class ShipmentCreate(BaseModel):
     """Yangi qator — barchasi ixtiyoriy (bo'sh qator qo'shib, joyida to'ldiriladi)."""
-    date: Optional[date] = None
+    date: Optional[date_type] = None
     qty: int = 1
     destination: Optional[str] = None
     kvm: Optional[int] = None
@@ -28,7 +29,7 @@ class ShipmentCreate(BaseModel):
 
 class ShipmentUpdate(BaseModel):
     """Joyida tahrirlash — yuborilgan maydonlargina yangilanadi."""
-    date: Optional[date] = None
+    date: Optional[date_type] = None
     qty: Optional[int] = None
     destination: Optional[str] = None
     kvm: Optional[int] = None
@@ -45,7 +46,7 @@ class ShipmentUpdate(BaseModel):
 
 class ShipmentOut(ORMBase):
     id: uuid.UUID
-    date: Optional[date] = None
+    date: Optional[date_type] = None
     qty: int = 1
     destination: Optional[str] = None
     kvm: Optional[int] = None
