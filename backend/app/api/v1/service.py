@@ -126,10 +126,16 @@ async def trips_stats(db: Annotated[AsyncSession, Depends(get_db)], _: CurrentUs
 
 @router.get("/trips", response_model=list[ServiceTripOut])
 async def list_trips(db: Annotated[AsyncSession, Depends(get_db)], _: CurrentUser,
-                     limit: int = Query(20, ge=1, le=100)):
+                     date_from: Optional[date] = None, date_to: Optional[date] = None,
+                     limit: int = Query(200, ge=1, le=500)):
+    q = select(ServiceTrip).where(ServiceTrip.status == "closed")
+    ref = func.date(ServiceTrip.closed_at)
+    if date_from:
+        q = q.where(ref >= date_from)
+    if date_to:
+        q = q.where(ref <= date_to)
     rows = (await db.execute(
-        select(ServiceTrip).where(ServiceTrip.status == "closed")
-        .order_by(ServiceTrip.closed_at.desc()).limit(limit)
+        q.order_by(ServiceTrip.closed_at.desc()).limit(limit)
     )).scalars().all()
     return [_trip_out(r, 0) for r in rows]
 

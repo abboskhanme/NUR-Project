@@ -16,12 +16,14 @@ interface Trip {
 }
 
 /** Yakunlangan (yopilgan) servis safarlari ro'yxati. Qatorni bosish — arizalar modali. */
-export default function ServiceTripsList() {
+export default function ServiceTripsList({ dateFrom, dateTo }: { dateFrom?: string; dateTo?: string } = {}) {
   const { t } = useTranslation();
   const [openTrip, setOpenTrip] = useState<Trip | null>(null);
   const q = useQuery<Trip[]>({
-    queryKey: ['service-trips-history'],
-    queryFn: () => api.get('/service/trips').then((r) => r.data),
+    queryKey: ['service-trips-history', dateFrom ?? '', dateTo ?? ''],
+    queryFn: () => api.get('/service/trips', {
+      params: { date_from: dateFrom || undefined, date_to: dateTo || undefined },
+    }).then((r) => r.data),
   });
   const trips = q.data ?? [];
 

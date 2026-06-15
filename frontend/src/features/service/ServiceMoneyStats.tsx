@@ -5,6 +5,7 @@ import { Wallet, Coins, TrendingUp } from 'lucide-react';
 
 import { api } from '@/api/client';
 import { formatUZS } from '@/lib/format';
+import ServiceTripsList from '@/features/service/ServiceTripsList';
 
 interface Money { collected: string; spent: string; net: string; trip_count: number }
 
@@ -58,6 +59,9 @@ export default function ServiceMoneyStats() {
       </div>
 
       <div className="text-xs text-ink-soft">{t('service.moneyStats.tripCount', { n: m?.trip_count ?? 0 })}</div>
+
+      {/* Tanlangan davrdagi safarlar ro'yxati (mablag balanslari pastida) */}
+      <ServiceTripsList dateFrom={dateFrom} dateTo={dateTo} />
     </div>
   );
 }
