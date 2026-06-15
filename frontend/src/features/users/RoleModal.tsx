@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import {
   X, Check, ShieldCheck, Sparkles,
-  Users, ShoppingCart, Package, Wrench, Wallet,
+  Users, ShoppingCart, Package, Warehouse, Wrench, Wallet,
   UserSquare2, Truck, BarChart3, Settings, Send, UserCog,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -22,6 +22,7 @@ const MODULE_ICONS: Record<Module, LucideIcon> = {
   customers: Users,
   orders: ShoppingCart,
   products: Package,
+  inventory: Warehouse,
   service: Wrench,
   finance: Wallet,
   hr: UserSquare2,
@@ -84,6 +85,7 @@ export default function RoleModal({
     customers: t('nav.customers'),
     orders: t('nav.sales'),
     products: t('nav.products'),
+    inventory: t('nav.warehouse', { defaultValue: 'Ombor' }),
     service: t('nav.service'),
     finance: t('nav.finance'),
     hr: t('nav.hr'),
