@@ -3,10 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
-import { ChevronsUp, ChevronUp, ChevronDown, ListOrdered, Search } from 'lucide-react';
+import { ChevronsUp, ChevronUp, ChevronDown, ListOrdered, Search, Wallet, Coins } from 'lucide-react';
 
 import { api } from '@/api/client';
 import Card from '@/components/ui/Card';
+import BalanceCard from '@/components/ui/BalanceCard';
 import StatusBadge from '@/components/ui/StatusBadge';
 import EmptyState from '@/components/ui/EmptyState';
 import { formatDate, formatUZS } from '@/lib/format';
@@ -17,7 +18,7 @@ interface QueueOrder {
   id: string; code: string; status: string; order_date: string; pickup_date?: string | null; position: number;
   customer?: { full_name: string; phone?: string; region?: string | null } | null;
   items: Item[];
-  items_total_uzs: string; balance_uzs: string;
+  items_total_uzs: string; paid_uzs: string; balance_uzs: string;
 }
 
 function itemSummary(o: QueueOrder, dirRight: string, dirLeft: string): string {
@@ -52,6 +53,16 @@ export default function QueuePage() {
 
   // Navbat = in_queue bo'lgan BARCHA buyurtmalar (status new/ready dan qat'i nazar)
   const allPending = queue;
+
+  // Navbatdagi jami to'langan va qoldiq (so'mda) — barcha navbat buyurtmalari bo'yicha
+  const totals = useMemo(() => {
+    let paid = 0, due = 0;
+    for (const o of queue) {
+      paid += parseFloat(o.paid_uzs) || 0;
+      due += parseFloat(o.balance_uzs) || 0;
+    }
+    return { paid, due };
+  }, [queue]);
 
   const searching = search.trim().length > 0;
   const pendingShown = useMemo(() => {
@@ -161,6 +172,23 @@ export default function QueuePage() {
           )}
         </div>
       </div>
+
+      {queue.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <BalanceCard
+            title={t('sales.queuePaidTotal')}
+            accent="success"
+            value={formatUZS(totals.paid)}
+            icon={<Wallet size={18} />}
+          />
+          <BalanceCard
+            title={t('sales.queueDueTotal')}
+            accent="warning"
+            value={formatUZS(totals.due)}
+            icon={<Coins size={18} />}
+          />
+        </div>
+      )}
 
       {isLoading ? (
         <Card>

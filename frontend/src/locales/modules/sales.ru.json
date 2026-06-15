@@ -206,5 +206,7 @@
   "printReceipt": "Квитанция",
   "printReceiptTitle": "Скачать квитанцию об оплате в PDF",
   "exportExcel": "Excel",
-  "exportExcelTitle": "Скачать список заказов в Excel"
+  "exportExcelTitle": "Скачать список заказов в Excel",
+  "queuePaidTotal": "Оплачено в очереди",
+  "queueDueTotal": "Остаток в очереди"
 }

@@ -206,5 +206,7 @@
   "printReceipt": "Kvitansiya",
   "printReceiptTitle": "To'lov kvitansiyasini PDF yuklab olish",
   "exportExcel": "Excel",
-  "exportExcelTitle": "Buyurtmalar ro'yxatini Excel ga yuklab olish"
+  "exportExcelTitle": "Buyurtmalar ro'yxatini Excel ga yuklab olish",
+  "queuePaidTotal": "Navbatda to‘langan",
+  "queueDueTotal": "Navbatda qoldiq (to‘lanishi kerak)"
 }
