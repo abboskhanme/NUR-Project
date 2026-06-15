@@ -46,11 +46,13 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    # Seed olib tashlangan — baza tayyor, har startda hech narsa qo'shilmaydi.
-    # Faqat uvicorn ishga tushadi (reload'siz). Sxema o'zgarsa, ustunni qo'lda
-    # psql/ALTER bilan qo'llang (yoki alembic migratsiyasini ishlating).
+    # Har startda alembic migratsiyalari qo'llanadi (yangi ustun/jadval avtomatik
+    # qo'shiladi), so'ng uvicorn ishga tushadi (reload'siz). Shu sabab git pull +
+    # rebuild'dan keyin sxemani qo'lda ALTER qilish shart emas.
     command: >
       sh -c "
+        echo '[init] Applying DB migrations (alembic upgrade head)...' &&
+        alembic upgrade head &&
         echo '[init] Starting uvicorn (prod)...' &&
         uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
       "
