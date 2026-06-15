@@ -8,7 +8,7 @@ import { api } from '@/api/client';
 import Card from '@/components/ui/Card';
 import EmptyState from '@/components/ui/EmptyState';
 import ConfirmModal from '@/components/ui/ConfirmModal';
-import { formatUZS, formatDate, formatNumberInput, parseNumberInput } from '@/lib/format';
+import { formatUZS, formatDate, formatNumberInput, parseNumberInput, formatPhoneInput, formatCardInput } from '@/lib/format';
 
 export interface Shipment {
   id: string;
@@ -30,7 +30,11 @@ export interface Shipment {
 
 type ColType = 'date' | 'int' | 'money' | 'text';
 // lock: avtomatik (buyurtmadan) yaratilgan qatorlarda bu ustun tahrirlanmaydi
-interface Col { key: keyof Shipment; label: string; type: ColType; w: string; align?: string; lock?: boolean }
+// fmt: matnni yozilayotganda formatlash (telefon, karta raqami)
+interface Col {
+  key: keyof Shipment; label: string; type: ColType; w: string;
+  align?: string; lock?: boolean; fmt?: (s: string | number | null | undefined) => string;
+}
 
 const COLS: Col[] = [
   { key: 'date', label: 'colDate', type: 'date', w: 'w-32', lock: true },
@@ -38,10 +42,10 @@ const COLS: Col[] = [
   { key: 'destination', label: 'colDestination', type: 'text', w: 'w-44', lock: true },
   { key: 'kvm', label: 'colKvm', type: 'int', w: 'w-16', align: 'text-right', lock: true },
   { key: 'direction', label: 'colDirection', type: 'text', w: 'w-24', lock: true },
-  { key: 'driver_phone', label: 'colDriverPhone', type: 'text', w: 'w-32' },
+  { key: 'driver_phone', label: 'colDriverPhone', type: 'text', w: 'w-32', fmt: formatPhoneInput },
   { key: 'freight', label: 'colFreight', type: 'money', w: 'w-28', align: 'text-right' },
   { key: 'kimdan', label: 'colKimdan', type: 'text', w: 'w-16' },
-  { key: 'card_number', label: 'colCardNumber', type: 'text', w: 'w-40' },
+  { key: 'card_number', label: 'colCardNumber', type: 'text', w: 'w-40', fmt: formatCardInput },
   { key: 'card_holder', label: 'colCardHolder', type: 'text', w: 'w-36' },
   { key: 'paid', label: 'colPaid', type: 'text', w: 'w-32' },
   { key: 'pause', label: 'colPause', type: 'text', w: 'w-20' },
@@ -248,8 +252,10 @@ function Row({ s, onChanged, onDelete }: {
         }
         return (
           <td key={c.key} className={c.w}>
-            <input defaultValue={(v as string | number) ?? ''} key={String(v ?? '')}
-                   className={`${INP} ${c.align ?? ''}`} inputMode={c.type === 'int' ? 'numeric' : undefined}
+            <input defaultValue={c.fmt ? c.fmt(v as string) : ((v as string | number) ?? '')} key={String(v ?? '')}
+                   className={`${INP} ${c.align ?? ''}`}
+                   inputMode={c.type === 'int' || c.fmt ? 'numeric' : undefined}
+                   onChange={c.fmt ? (e) => { e.target.value = c.fmt!(e.target.value); } : undefined}
                    onBlur={(e) => patchField(c, e.target.value)} />
           </td>
         );

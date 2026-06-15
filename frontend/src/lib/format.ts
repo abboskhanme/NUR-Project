@@ -101,3 +101,27 @@ export function formatPhone(p: string | null | undefined): string {
   }
   return p;
 }
+
+/**
+ * Telefon raqamini kiritish/ko'rsatish uchun formatlash: "942671575" -> "94 267 15 75".
+ * 998 davlat kodi bo'lsa tashlanadi. Inline tahrirlashda yozilayotganda ishlatiladi.
+ */
+export function formatPhoneInput(raw: string | number | null | undefined): string {
+  if (raw == null) return '';
+  let d = String(raw).replace(/\D/g, '');
+  if (d.startsWith('998') && d.length > 9) d = d.slice(3);
+  const parts: string[] = [];
+  parts.push(d.slice(0, 2));
+  if (d.length > 2) parts.push(d.slice(2, 5));
+  if (d.length > 5) parts.push(d.slice(5, 7));
+  if (d.length > 7) parts.push(d.slice(7, 9));
+  if (d.length > 9) parts.push(d.slice(9));
+  return parts.filter(Boolean).join(' ');
+}
+
+/** Plastik karta raqamini 4 xonadan ajratib formatlash: "5614682718865605" -> "5614 6827 1886 5605". */
+export function formatCardInput(raw: string | number | null | undefined): string {
+  if (raw == null) return '';
+  const d = String(raw).replace(/\D/g, '').slice(0, 16);
+  return d.replace(/(.{4})/g, '$1 ').trim();
+}
