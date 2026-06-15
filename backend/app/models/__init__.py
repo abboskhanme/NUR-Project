@@ -29,6 +29,7 @@ from app.models.supply import (
     StockMovement,
 )
 from app.models.system import Notification, AuditLog, FileRecord, TelegramOrder
+from app.models.debt import DebtProduct, DebtTransaction
 
 __all__ = [
     "Base",
@@ -66,4 +67,6 @@ __all__ = [
     "AuditLog",
     "FileRecord",
     "TelegramOrder",
+    "DebtProduct",
+    "DebtTransaction",
 ]

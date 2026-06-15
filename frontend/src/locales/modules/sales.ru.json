@@ -50,6 +50,8 @@
   "kpiRevenue": "Продажи · {{period}}",
   "kpiPaid": "Оплачено · {{period}}",
   "kpiBalance": "Остаток · {{period}}",
+  "kpiDelivered": "Доставлено · {{period}}",
+  "kpiRemaining": "Осталось · {{period}}",
   "allYear": "Весь год",
   "monthTooltip": "Месяц",
   "yearTooltip": "Год",

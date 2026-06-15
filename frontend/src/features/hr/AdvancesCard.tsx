@@ -13,6 +13,7 @@ interface Advance {
   amount: string;
   currency: string;
   note?: string | null;
+  status?: string;
 }
 
 export default function AdvancesCard({ employeeId }: { employeeId: string }) {
@@ -35,7 +36,8 @@ export default function AdvancesCard({ employeeId }: { employeeId: string }) {
     },
   });
   const items = data ?? [];
-  const total = items.reduce((s, a) => s + (parseFloat(a.amount) || 0), 0);
+  // Bekor qilingan (void) avanslar jamiga kirmaydi
+  const total = items.reduce((s, a) => s + (a.status === 'void' ? 0 : (parseFloat(a.amount) || 0)), 0);
 
   return (
     <Card title={t('hr.advances.title')}>
@@ -89,13 +91,20 @@ export default function AdvancesCard({ employeeId }: { employeeId: string }) {
               </tr>
             </thead>
             <tbody>
-              {items.map((a) => (
-                <tr key={a.id} className="border-b border-black/5">
-                  <td className="py-2 pr-4 whitespace-nowrap">{formatDate(a.advance_date)}</td>
-                  <td className="py-2 pl-6 pr-8 text-right tabular-nums font-medium whitespace-nowrap">{formatUZS(a.amount)}</td>
-                  <td className="py-2 pl-6 text-ink/70 w-full">{a.note || '—'}</td>
-                </tr>
-              ))}
+              {items.map((a) => {
+                const voided = a.status === 'void';
+                return (
+                  <tr key={a.id} className={`border-b border-black/5 ${voided ? 'text-ink/40' : ''}`}>
+                    <td className="py-2 pr-4 whitespace-nowrap">{formatDate(a.advance_date)}</td>
+                    <td className={`py-2 pl-6 pr-8 text-right tabular-nums font-medium whitespace-nowrap ${voided ? 'line-through' : ''}`}>{formatUZS(a.amount)}</td>
+                    <td className="py-2 pl-6 text-ink/70 w-full">
+                      {voided
+                        ? <span className="badge bg-danger/10 text-danger">{t('hr.histModal.voidedBadge')}</span>
+                        : (a.note || '—')}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

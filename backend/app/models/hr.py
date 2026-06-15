@@ -105,6 +105,10 @@ class SalaryAdvance(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
     currency: Mapped[str] = mapped_column(String(3), default="UZS")
     note: Mapped[Optional[str]] = mapped_column(Text)
+    # "active" yoki "void" (noto'g'ri kiritilgan — bekor qilingan, lekin tarixda qoladi)
+    status: Mapped[str] = mapped_column(String(10), default="active", server_default="active")
+    # Bog'liq moliya tranzaksiyasi (bekor qilinganda teskari qaytarish uchun)
+    tx_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
     created_by_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
     )

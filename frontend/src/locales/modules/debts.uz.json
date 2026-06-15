@@ -1,0 +1,87 @@
+{
+  "title": "Bizning qarzlar",
+  "subtitle": "Qarzga olinadigan ehtiyot qismlar va to'lovlar",
+  "tabs": {
+    "debts": "Qarzlar",
+    "products": "Ehtiyot qismlar"
+  },
+  "kpi": {
+    "totalDebt": "Umumiy qarzimiz",
+    "purchased": "Olib kelingan",
+    "paid": "To'langan",
+    "remaining": "Qarz qoldi",
+    "withDebt": "Qarzi bor"
+  },
+  "search": "Qidirish...",
+  "onlyDebt": "Faqat qarzi borlar",
+  "product": {
+    "new": "Yangi ehtiyot qism",
+    "edit": "Tahrirlash",
+    "name": "Mahsulot nomi",
+    "unit": "Birlik",
+    "currency": "Valyuta",
+    "unitPrice": "Birlik narxi",
+    "supplier": "Ta'minotchi",
+    "note": "Izoh",
+    "namePlaceholder": "Masalan: Podshipnik 6204",
+    "supplierPlaceholder": "Ta'minotchi ismi",
+    "deleteConfirm": "Ushbu mahsulot va uning barcha tranzaksiyalari o'chiriladi. Davom etamizmi?",
+    "empty": "Hali ehtiyot qism qo'shilmagan",
+    "emptyDesc": "\"Yangi ehtiyot qism\" tugmasi orqali birinchisini qo'shing"
+  },
+  "table": {
+    "name": "Mahsulot",
+    "supplier": "Ta'minotchi",
+    "unitPrice": "Birlik narxi",
+    "balance": "Qarz qoldig'i",
+    "lastPurchase": "Oxirgi kirim",
+    "actions": "Amallar"
+  },
+  "actions": {
+    "purchase": "Olib kelish",
+    "pay": "Qarz to'lash"
+  },
+  "purchase": {
+    "title": "Olib kelish",
+    "qty": "Miqdori",
+    "unitPrice": "Birlik narxi",
+    "total": "Umumiy qiymat",
+    "note": "Izoh (ixtiyoriy)",
+    "submit": "Qo'shish",
+    "success": "Kirim qo'shildi"
+  },
+  "pay": {
+    "title": "Qarz to'lash",
+    "currentDebt": "Joriy qarz",
+    "amount": "To'lov summasi",
+    "note": "Izoh (ixtiyoriy)",
+    "submit": "To'lash",
+    "success": "To'lov qo'shildi"
+  },
+  "tx": {
+    "title": "Tranzaksiyalar",
+    "purchase": "Olib kelish",
+    "payment": "To'lov",
+    "date": "Sana",
+    "type": "Turi",
+    "qty": "Miqdori",
+    "amount": "Summa",
+    "empty": "Tranzaksiyalar yo'q",
+    "deleteConfirm": "Ushbu tranzaksiyani o'chirasizmi?"
+  },
+  "units": {
+    "dona": "dona",
+    "kg": "kg",
+    "metr": "metr",
+    "list": "list"
+  },
+  "currency": {
+    "UZS": "so'm",
+    "USD": "dollar"
+  },
+  "toast": {
+    "saved": "Saqlandi",
+    "deleted": "O'chirildi",
+    "error": "Xatolik yuz berdi"
+  }
+}

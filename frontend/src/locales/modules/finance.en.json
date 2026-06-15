@@ -41,7 +41,9 @@
     "colType": "Type",
     "colCategory": "Category",
     "colAmount": "Amount",
-    "colNote": "Note"
+    "colNote": "Note",
+    "voided": "Voided",
+    "voidedToast": "Transaction voided"
   },
   "filter": {
     "all": "All",
@@ -94,8 +96,8 @@
     "noteLabel": "Note",
     "savedSuccess": "Transaction saved",
     "amountRequired": "Enter a valid amount",
-    "deleteTitle": "Delete transaction",
-    "deleteMessage": "This transaction will be deleted and the balance will be restored. Continue?"
+    "deleteTitle": "Void transaction",
+    "deleteMessage": "This transaction will be voided and the balance restored. The record stays in history marked \"voided\". Continue?"
   },
   "empPayment": {
     "employeeLabel": "Employee *",

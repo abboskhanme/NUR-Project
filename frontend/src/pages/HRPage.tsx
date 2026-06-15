@@ -2,38 +2,45 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Plus, Search, Pencil, Building2, HardHat, Briefcase, BadgeCheck, ChevronRight } from 'lucide-react';
+import { Plus, Search, Pencil, Users, Briefcase, BadgeCheck, ChevronRight, Coins, Wallet, Scale } from 'lucide-react';
 
 import { api } from '@/api/client';
 import Card from '@/components/ui/Card';
 import EmptyState from '@/components/ui/EmptyState';
-import { formatPhone, formatDate, formatUZS } from '@/lib/format';
+import { formatUZS } from '@/lib/format';
 import EmployeeModal, { EmployeeRow } from '@/features/hr/EmployeeModal';
+import EmployeeHistoryModal, { HistoryKind } from '@/features/hr/EmployeeHistoryModal';
 import PositionsSection from '@/features/hr/PositionsSection';
 
-type Tab = 'office' | 'worker' | 'positions';
+type Tab = 'employees' | 'positions';
 
 export default function HRPage() {
   const { t } = useTranslation();
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const [tab, setTab] = useState<Tab>('office');
+  const [tab, setTab] = useState<Tab>('employees');
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('active');
   const [editEmp, setEditEmp] = useState<EmployeeRow | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [hist, setHist] = useState<{ emp: EmployeeRow; kind: HistoryKind } | null>(null);
 
   const isPositions = tab === 'positions';
+  const now = new Date();
+  const curYear = now.getFullYear();
+  const curMonth = now.getMonth() + 1;
 
   const empQ = useQuery({
-    queryKey: ['employees', tab, status, search],
+    queryKey: ['employees', 'all', status, search, curYear, curMonth],
     queryFn: () =>
       api
         .get('/hr/employees', {
           params: {
-            employment_type: tab,
             status: status || undefined,
             q: search || undefined,
+            with_summary: true,
+            year: curYear,
+            month: curMonth,
             page_size: 200,
           },
         })
@@ -41,7 +48,25 @@ export default function HRPage() {
     enabled: !isPositions,
   });
 
-  const items: EmployeeRow[] = empQ.data?.items ?? [];
+  const rawItems: EmployeeRow[] = empQ.data?.items ?? [];
+  // Turi bo'yicha guruhlaymiz: avval ofis xodimlari (qizil), keyin ishchilar (yashil).
+  // Backend allaqachon ism bo'yicha tartiblagani uchun har guruh ichida tartib saqlanadi.
+  const items = [...rawItems].sort((a, b) => {
+    const rank = (e: EmployeeRow) => (e.employment_type === 'office' ? 0 : 1);
+    return rank(a) - rank(b);
+  });
+
+  // Joriy oy bo'yicha umumiy ko'rsatkichlar (header kartalari uchun)
+  const totals = items.reduce(
+    (acc, e) => {
+      const s = e.month_summary;
+      acc.gross += parseFloat(s?.gross ?? '0') || 0;
+      acc.advance += parseFloat(s?.advance ?? '0') || 0;
+      acc.net += parseFloat(s?.net ?? '0') || 0;
+      return acc;
+    },
+    { gross: 0, advance: 0, net: 0 },
+  );
 
   function refresh() {
     qc.invalidateQueries({ queryKey: ['employees'] });
@@ -54,7 +79,7 @@ export default function HRPage() {
           <h1 className="text-2xl font-bold">{t('hr.title')}</h1>
           <p className="text-sm text-ink-soft">{t('hr.subtitle')}</p>
         </div>
-        {tab === 'worker' && (
+        {tab === 'employees' && (
           <button onClick={() => setShowCreate(true)} className="btn-primary">
             <Plus size={16} /> {t('hr.newWorker')}
           </button>
@@ -62,16 +87,36 @@ export default function HRPage() {
       </div>
 
       <div className="flex gap-1 border-b border-black/5 overflow-x-auto">
-        <TabButton active={tab === 'office'} onClick={() => setTab('office')} icon={<Building2 size={16} />}>
-          {t('hr.tabs.office')}
-        </TabButton>
-        <TabButton active={tab === 'worker'} onClick={() => setTab('worker')} icon={<HardHat size={16} />}>
-          {t('hr.tabs.worker')}
+        <TabButton active={tab === 'employees'} onClick={() => setTab('employees')} icon={<Users size={16} />}>
+          {t('hr.tabs.employees')}
         </TabButton>
         <TabButton active={tab === 'positions'} onClick={() => setTab('positions')} icon={<Briefcase size={16} />}>
           {t('hr.tabs.positions')}
         </TabButton>
       </div>
+
+      {!isPositions && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <KpiCard
+            tone="primary"
+            label={t('hr.totals.salary')}
+            value={formatUZS(totals.gross)}
+            icon={<Coins size={18} />}
+          />
+          <KpiCard
+            tone="warning"
+            label={t('hr.totals.advance')}
+            value={formatUZS(totals.advance)}
+            icon={<Wallet size={18} />}
+          />
+          <KpiCard
+            tone="success"
+            label={t('hr.totals.remaining')}
+            value={formatUZS(totals.net)}
+            icon={<Scale size={18} />}
+          />
+        </div>
+      )}
 
       {isPositions ? (
         <PositionsSection />
@@ -98,11 +143,21 @@ export default function HRPage() {
             </select>
           </div>
 
-          {tab === 'office' && (
-            <p className="text-xs text-ink-soft mb-3">
-              {t('hr.officeAutoSyncPlain')}
+          <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
+            <p className="text-xs text-ink-soft">
+              {t('hr.monthHint', { month: t(`hr.months.${curMonth}`), year: curYear })}
             </p>
-          )}
+            <div className="flex items-center gap-4 text-xs text-ink-soft">
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-500" />
+                {t('hr.tabs.office')}
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block w-2.5 h-2.5 rounded-full bg-green-600" />
+                {t('hr.tabs.worker')}
+              </span>
+            </div>
+          </div>
 
           {empQ.isLoading ? (
             <div className="space-y-2">
@@ -112,71 +167,91 @@ export default function HRPage() {
             </div>
           ) : items.length === 0 ? (
             <EmptyState
-              title={tab === 'office' ? t('hr.empty.officeTitle') : t('hr.empty.workerTitle')}
-              description={tab === 'office' ? t('hr.empty.officeDesc') : t('hr.empty.workerDesc')}
+              title={t('hr.empty.allTitle')}
+              description={t('hr.empty.allDesc')}
             />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="text-left text-ink-soft border-b border-black/5">
                   <tr>
-                    <th className="py-2 pr-3">{t('hr.table.fullName')}</th>
-                    <th className="py-2 pr-3">{t('hr.table.birthDate')}</th>
-                    <th className="py-2 pr-3">{t('hr.table.phone')}</th>
-                    <th className="py-2 pr-3">{t('hr.table.secondaryPhone')}</th>
-                    <th className="py-2 pr-3">{t('hr.table.position')}</th>
-                    <th className="py-2 pr-3">{t('hr.table.address')}</th>
-                    <th className="py-2 pr-3">{t('hr.table.status')}</th>
+                    <th className="py-2 pl-3 pr-3 border-l-4 border-l-transparent">{t('hr.table.fullName')}</th>
+                    <th className="py-2 px-3 text-left">{t('hr.table.salary')}</th>
+                    <th className="py-2 px-3 text-left">{t('hr.table.advance')}</th>
+                    <th className="py-2 px-3 text-left">{t('hr.table.remaining')}</th>
+                    <th className="py-2 px-3 text-left">{t('hr.table.hours')}</th>
                     <th className="py-2 pr-3 text-right">{t('hr.table.actions')}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {items.map((e) => (
-                    <tr
-                      key={e.id}
-                      onClick={() => navigate(`/hr/${e.id}`)}
-                      className="border-b border-black/5 hover:bg-primary/5 cursor-pointer"
-                    >
-                      <td className="py-2 pr-3 font-medium">
-                        <div className="flex items-center gap-1.5">
-                          {e.full_name}
-                          {e.has_account && (
-                            <span title={t('hr.tooltip.systemUser')}>
-                              <BadgeCheck size={14} className="text-primary" />
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="py-2 pr-3">{e.birth_date ? formatDate(e.birth_date) : '—'}</td>
-                      <td className="py-2 pr-3">{formatPhone(e.phone)}</td>
-                      <td className="py-2 pr-3">{formatPhone(e.secondary_phone)}</td>
-                      <td className="py-2 pr-3">{e.position_name || '—'}</td>
-                      <td className="py-2 pr-3 max-w-[180px] truncate" title={e.address || ''}>
-                        {e.address || '—'}
-                      </td>
-                      <td className="py-2 pr-3">
-                        {e.status === 'active' ? (
-                          <span className="badge bg-success/10 text-success">{t('hr.status.active')}</span>
+                  {items.map((e) => {
+                    const s = e.month_summary;
+                    const isHourly = (s?.salary_type || e.salary_type) === 'hourly';
+                    // Xodim turini keskin rang bilan ajratamiz: ofis — qizil, ishchi — yashil
+                    const isOffice = e.employment_type === 'office';
+                    const rowTint = isOffice
+                      ? 'bg-red-100/70 hover:bg-red-200/70'
+                      : 'bg-green-100/70 hover:bg-green-200/70';
+                    const accentBorder = isOffice ? 'border-l-red-500' : 'border-l-green-600';
+                    return (
+                      <tr
+                        key={e.id}
+                        onClick={() => navigate(`/hr/${e.id}`)}
+                        className={`border-b border-black/5 cursor-pointer ${rowTint}`}
+                      >
+                        <td className={`py-2 pl-3 pr-3 font-medium border-l-4 ${accentBorder}`}>
+                          <div className="flex items-center gap-1.5">
+                            {e.full_name}
+                            {e.has_account && (
+                              <span title={t('hr.tooltip.systemUser')}>
+                                <BadgeCheck size={14} className="text-primary" />
+                              </span>
+                            )}
+                          </div>
+                        </td>
+
+                        <NumCell
+                          value={formatUZS(s?.gross ?? 0)}
+                          onClick={() => setHist({ emp: e, kind: 'salary' })}
+                          title={t('hr.histModal.title.salary')}
+                        />
+                        <NumCell
+                          value={formatUZS(s?.advance ?? 0)}
+                          className={(parseFloat(s?.advance ?? '0') > 0) ? 'text-warning' : ''}
+                          onClick={() => setHist({ emp: e, kind: 'advance' })}
+                          title={t('hr.histModal.title.advance')}
+                        />
+                        <NumCell
+                          value={formatUZS(s?.net ?? 0)}
+                          className="font-semibold"
+                          onClick={() => setHist({ emp: e, kind: 'remaining' })}
+                          title={t('hr.histModal.title.remaining')}
+                        />
+                        {isHourly ? (
+                          <NumCell
+                            value={`${(parseFloat(s?.total_hours ?? '0') || 0).toFixed(1)} ${t('hr.histModal.hoursUnit')}`}
+                            onClick={() => setHist({ emp: e, kind: 'hours' })}
+                            title={t('hr.histModal.title.hours')}
+                          />
                         ) : (
-                          <span className="badge bg-gray-100 text-gray-700">
-                            {t(`hr.status.${e.status}`, { defaultValue: e.status })}
-                          </span>
+                          <td className="py-2 px-3 text-left text-ink/30">—</td>
                         )}
-                      </td>
-                      <td className="py-2 pr-3">
-                        <div className="flex items-center justify-end gap-1">
-                          <button
-                            title={t('hr.tooltip.edit')}
-                            onClick={(ev) => { ev.stopPropagation(); setEditEmp(e); }}
-                            className="p-1.5 rounded hover:bg-black/10 text-ink/60"
-                          >
-                            <Pencil size={16} />
-                          </button>
-                          <ChevronRight size={16} className="text-ink/30" />
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+
+                        <td className="py-2 pr-3">
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              title={t('hr.tooltip.edit')}
+                              onClick={(ev) => { ev.stopPropagation(); setEditEmp(e); }}
+                              className="p-1.5 rounded hover:bg-black/10 text-ink/60"
+                            >
+                              <Pencil size={16} />
+                            </button>
+                            <ChevronRight size={16} className="text-ink/30" />
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -194,6 +269,67 @@ export default function HRPage() {
           onSaved={refresh}
         />
       )}
+
+      {hist && (
+        <EmployeeHistoryModal
+          employee={hist.emp}
+          kind={hist.kind}
+          year={curYear}
+          month={curMonth}
+          onClose={() => setHist(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+/** Bosish mumkin bo'lgan raqamli katak — tarix modalini ochadi (qatorga o'tishni to'xtatadi). */
+function NumCell({
+  value, onClick, title, className = '',
+}: {
+  value: string;
+  onClick: () => void;
+  title?: string;
+  className?: string;
+}) {
+  return (
+    <td className="py-1.5 px-3 text-left">
+      <button
+        title={title}
+        onClick={(ev) => { ev.stopPropagation(); onClick(); }}
+        className={
+          'tabular-nums whitespace-nowrap rounded px-2 py-1 -my-1 hover:bg-primary/10 hover:text-primary transition-colors ' +
+          className
+        }
+      >
+        {value}
+      </button>
+    </td>
+  );
+}
+
+const KPI_TONES = {
+  primary: { card: 'border-primary/20 bg-primary/5', text: 'text-primary', icon: 'bg-primary/15 text-primary' },
+  warning: { card: 'border-warning/25 bg-warning/10', text: 'text-warning', icon: 'bg-warning/20 text-warning' },
+  success: { card: 'border-success/25 bg-success/10', text: 'text-success', icon: 'bg-success/20 text-success' },
+} as const;
+
+function KpiCard({ tone, label, value, icon }: {
+  tone: keyof typeof KPI_TONES;
+  label: string;
+  value: string;
+  icon: React.ReactNode;
+}) {
+  const tn = KPI_TONES[tone];
+  return (
+    <div className={`rounded-card border p-4 flex items-start justify-between ${tn.card}`}>
+      <div className="min-w-0">
+        <div className={`text-sm font-medium ${tn.text}`}>{label}</div>
+        <div className={`text-2xl font-bold mt-2 ${tn.text}`}>{value}</div>
+      </div>
+      <div className={`w-10 h-10 rounded-button flex items-center justify-center shrink-0 ${tn.icon}`}>
+        {icon}
+      </div>
     </div>
   );
 }

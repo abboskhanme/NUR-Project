@@ -103,6 +103,7 @@ async def month_summary(db: AsyncSession, year: int, month: int) -> dict:
             FinanceTransaction.date >= start,
             FinanceTransaction.date < nxt,
             FinanceTransaction.type.in_(("income", "expense")),
+            FinanceTransaction.status == "active",
         ))
         .group_by(FinanceTransaction.type, FinanceTransaction.currency)
     )).all()
@@ -137,6 +138,7 @@ async def month_summary(db: AsyncSession, year: int, month: int) -> dict:
             FinanceTransaction.date < nxt,
             FinanceTransaction.currency == "UZS",
             FinanceTransaction.type.in_(("income", "expense")),
+            FinanceTransaction.status == "active",
         ))
         .group_by(FinanceTransaction.type, FinanceCategory.name)
     )).all()

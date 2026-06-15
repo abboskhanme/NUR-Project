@@ -50,6 +50,8 @@
   "kpiRevenue": "Savdo · {{period}}",
   "kpiPaid": "To'langan · {{period}}",
   "kpiBalance": "Qoldiq · {{period}}",
+  "kpiDelivered": "Yetkazildi · {{period}}",
+  "kpiRemaining": "Qoldi · {{period}}",
   "allYear": "Butun yil",
   "monthTooltip": "Oy",
   "yearTooltip": "Yil",

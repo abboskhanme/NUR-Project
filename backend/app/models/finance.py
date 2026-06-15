@@ -57,6 +57,9 @@ class FinanceTransaction(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
     doc_file_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True))
     note: Mapped[Optional[str]] = mapped_column(Text)
+    # "active" yoki "void" (noto'g'ri kiritilgan — bekor qilingan, lekin tarixda qoladi).
+    # Void tranzaksiyalar barcha moliyaviy yig'indilardan chiqarib tashlanadi.
+    status: Mapped[str] = mapped_column(String(10), default="active", server_default="active")
     created_by_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
     )

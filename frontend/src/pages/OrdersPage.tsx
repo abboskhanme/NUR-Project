@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
-import { Plus, Search, ShoppingCart, Wallet, AlertCircle, CalendarClock, FileSpreadsheet } from 'lucide-react';
+import { Plus, Search, ShoppingCart, Wallet, AlertCircle, CalendarClock, FileSpreadsheet, PackageCheck, Clock } from 'lucide-react';
 
 import { api } from '@/api/client';
 import { downloadFile } from '@/lib/download';
@@ -179,8 +179,12 @@ export default function OrdersPage() {
       </div>
 
       {/* KPI cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
         <Kpi icon={<ShoppingCart size={18} />} label={t('sales.kpiOrders', { period: periodLabel })} value={s ? String(s.total_orders) : '—'} />
+        <Kpi icon={<PackageCheck size={18} />} label={t('sales.kpiDelivered', { period: periodLabel })}
+             value={s ? String(s.status_counts?.delivered ?? 0) : '—'} accent="text-success" />
+        <Kpi icon={<Clock size={18} />} label={t('sales.kpiRemaining', { period: periodLabel })}
+             value={s ? String((s.status_counts?.new ?? 0) + (s.status_counts?.ready ?? 0)) : '—'} accent="text-warning" />
         <Kpi icon={<Wallet size={18} />} label={t('sales.kpiRevenue', { period: periodLabel })} value={s ? formatUZS(s.revenue_total) : '—'} accent="text-ink" />
         <Kpi icon={<CalendarClock size={18} />} label={t('sales.kpiPaid', { period: periodLabel })} value={s ? formatUZS(s.paid_total) : '—'} accent="text-success" />
         <Kpi icon={<AlertCircle size={18} />} label={t('sales.kpiBalance', { period: periodLabel })}

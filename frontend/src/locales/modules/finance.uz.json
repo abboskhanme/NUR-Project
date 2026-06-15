@@ -41,7 +41,9 @@
     "colType": "Tur",
     "colCategory": "Kategoriya",
     "colAmount": "Summa",
-    "colNote": "Izoh"
+    "colNote": "Izoh",
+    "voided": "Bekor qilingan",
+    "voidedToast": "Tranzaksiya bekor qilindi"
   },
   "filter": {
     "all": "Hammasi",
@@ -94,8 +96,8 @@
     "noteLabel": "Izoh",
     "savedSuccess": "Tranzaksiya saqlandi",
     "amountRequired": "To'g'ri summa kiriting",
-    "deleteTitle": "Tranzaksiyani o'chirish",
-    "deleteMessage": "Bu tranzaksiya o'chiriladi va balans qaytariladi. Davom etilsinmi?"
+    "deleteTitle": "Tranzaksiyani bekor qilish",
+    "deleteMessage": "Bu tranzaksiya bekor qilinadi va balans qaytariladi. Yozuv tarixda \"bekor qilingan\" holatida qoladi. Davom etilsinmi?"
   },
   "empPayment": {
     "employeeLabel": "Xodim *",

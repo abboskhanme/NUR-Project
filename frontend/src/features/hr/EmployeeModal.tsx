@@ -7,6 +7,17 @@ import { useTranslation } from 'react-i18next';
 import { api } from '@/api/client';
 import PhoneInput from '@/components/ui/PhoneInput';
 
+export interface EmployeeMonthSummary {
+  year: number;
+  month: number;
+  present_days: number;
+  total_hours: string;
+  gross: string;
+  advance: string;
+  net: string;
+  salary_type: string;
+}
+
 export interface EmployeeRow {
   id: string;
   full_name: string;
@@ -24,6 +35,7 @@ export interface EmployeeRow {
   status: string;
   has_account: boolean;
   user_id?: string | null;
+  month_summary?: EmployeeMonthSummary | null;
 }
 
 interface Position {

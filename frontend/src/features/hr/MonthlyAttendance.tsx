@@ -119,14 +119,19 @@ export default function MonthlyAttendance({
     setRows((prev) => prev.map((r) => (r.day === day ? { ...r, ...patch } : r)));
   }
 
-  function fillAll() {
-    // Sundays (weekday === 0) are not filled
+  // Yarim oylik to'ldirish: biz har 15 kunda bir marta keldi-ketdini kiritamiz.
+  // from..to oraliqdagi kunlarni to'ldiradi (yakshanba va bloklangan kunlar tashlanadi).
+  function fillRange(from: number, to: number) {
     setRows((prev) =>
       prev.map((r) =>
-        r.locked || r.weekday === 0 ? r : { ...r, checkIn: defIn, checkOut: defOut },
+        r.locked || r.weekday === 0 || r.day < from || r.day > to
+          ? r
+          : { ...r, checkIn: defIn, checkOut: defOut },
       ),
     );
   }
+  const fillFirstHalf = () => fillRange(1, 15);
+  const fillSecondHalf = () => fillRange(16, 31);
 
   function clearAll() {
     setRows((prev) => prev.map((r) => (r.locked ? r : { ...r, checkIn: '', checkOut: '' })));
@@ -188,8 +193,9 @@ export default function MonthlyAttendance({
           <label className="label !mb-0">{t('hr.attendance.checkOut')}</label>
           <TimeInput24 value={defOut} onChange={setDefOut} className="!w-28" />
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={fillAll} className="btn-ghost"><Wand2 size={15} /> {t('hr.attendance.fillAll')}</button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button onClick={fillFirstHalf} className="btn-ghost"><Wand2 size={15} /> {t('hr.attendance.fillFirstHalf')}</button>
+          <button onClick={fillSecondHalf} className="btn-ghost"><Wand2 size={15} /> {t('hr.attendance.fillSecondHalf')}</button>
           <button onClick={() => setConfirmClear(true)} className="btn-ghost"><Eraser size={15} /> {t('hr.attendance.clearAll')}</button>
         </div>
       </div>

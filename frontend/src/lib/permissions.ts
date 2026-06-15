@@ -17,7 +17,7 @@ import { useAuthStore } from '@/stores/auth';
 
 export const MODULES = [
   'users', 'customers', 'orders', 'products', 'inventory', 'service',
-  'finance', 'hr', 'supply', 'reports', 'telegram', 'settings',
+  'finance', 'hr', 'supply', 'reports', 'telegram', 'debts', 'settings',
 ] as const;
 
 export const VERBS = ['read', 'write', 'delete', 'approve', 'export'] as const;

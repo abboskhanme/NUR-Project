@@ -21,7 +21,7 @@ type Tab = 'overview' | 'categories' | 'rates';
 
 interface Tx {
   id: string; date: string; type: string; amount: string; currency: string;
-  note?: string | null; category_name?: string | null;
+  note?: string | null; category_name?: string | null; status?: string;
 }
 interface Category { id: string; name: string; kind: string }
 interface Rate { id: string; date: string; usd_to_uzs: string; source: string }
@@ -107,7 +107,7 @@ export default function FinancePage() {
     setDeleting(true);
     try {
       await api.delete(`/finance/transactions/${delTx.id}`);
-      toast.success(t('common.deleted'));
+      toast.success(t('finance.transactions.voidedToast'));
       setDelTx(null);
       refreshAll();
     } catch (e: any) { toast.error(e?.response?.data?.detail || t('finance.error')); }
@@ -227,24 +227,32 @@ export default function FinancePage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {txItems.map((txItem) => (
-                      <tr key={txItem.id} className="border-b border-black/5 hover:bg-black/5 group">
+                    {txItems.map((txItem) => {
+                      const voided = txItem.status === 'void';
+                      return (
+                      <tr key={txItem.id} className={`border-b border-black/5 hover:bg-black/5 group ${voided ? 'opacity-50' : ''}`}>
                         <td className="py-2 pr-3 whitespace-nowrap">{formatDate(txItem.date)}</td>
                         <td className="py-2 pr-3"><TypeBadge type={txItem.type} /></td>
                         <td className="py-2 pr-[3.75rem] text-ink-soft whitespace-nowrap">{txItem.category_name || '—'}</td>
-                        <td className={`py-2 pr-[3.75rem] font-semibold whitespace-nowrap ${
+                        <td className={`py-2 pr-[3.75rem] font-semibold whitespace-nowrap ${voided ? 'line-through text-ink-soft' :
                           txItem.type === 'income' ? 'text-success' : 'text-danger'}`}>
                           {txItem.type === 'income' ? '+' : '−'}{fmtMoney(txItem.amount, txItem.currency)}
                         </td>
-                        <td className="py-2 pl-2 w-full text-ink-soft">{txItem.note || '—'}</td>
+                        <td className="py-2 pl-2 w-full text-ink-soft">
+                          {voided && <span className="badge bg-danger/10 text-danger mr-2">{t('finance.transactions.voided')}</span>}
+                          {txItem.note || (voided ? '' : '—')}
+                        </td>
                         <td className="py-2">
-                          <button onClick={() => setDelTx(txItem)}
-                            className="p-1 rounded text-ink-soft/40 hover:text-danger hover:bg-danger/10 opacity-0 group-hover:opacity-100 transition">
-                            <Trash2 size={15} />
-                          </button>
+                          {!voided && (
+                            <button onClick={() => setDelTx(txItem)}
+                              className="p-1 rounded text-ink-soft/40 hover:text-danger hover:bg-danger/10 opacity-0 group-hover:opacity-100 transition">
+                              <Trash2 size={15} />
+                            </button>
+                          )}
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

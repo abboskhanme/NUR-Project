@@ -73,6 +73,7 @@ class TransactionOut(ORMBase):
     account_id: Optional[uuid.UUID] = None
     related_order_id: Optional[uuid.UUID] = None
     note: Optional[str] = None
+    status: str = "active"
     created_at: datetime
     # embed qilingan nomlar (ro'yxat jadvali uchun)
     category_name: Optional[str] = None

@@ -94,6 +94,18 @@ class EmployeeUpdate(BaseModel):
     status: Optional[str] = None
 
 
+class EmployeeMonthSummary(BaseModel):
+    """Ro'yxatda ko'rsatish uchun joriy oy bo'yicha qisqacha hisob."""
+    year: int
+    month: int
+    present_days: int
+    total_hours: Decimal
+    gross: Decimal
+    advance: Decimal
+    net: Decimal
+    salary_type: str
+
+
 class EmployeeOut(ORMBase):
     id: uuid.UUID
     full_name: str
@@ -112,6 +124,8 @@ class EmployeeOut(ORMBase):
     has_account: bool
     user_id: Optional[uuid.UUID] = None
     created_at: datetime
+    # Ro'yxatda yig'ma ko'rsatkichlar (with_summary=true bo'lganda to'ldiriladi)
+    month_summary: Optional[EmployeeMonthSummary] = None
 
 
 class AttendanceIn(BaseModel):
@@ -152,6 +166,7 @@ class SalaryAdvanceOut(ORMBase):
     amount: Decimal
     currency: str
     note: Optional[str] = None
+    status: str = "active"
 
 
 class PayrollRunIn(BaseModel):

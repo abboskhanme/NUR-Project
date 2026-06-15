@@ -164,15 +164,25 @@ async def create_transaction(payload: TransactionCreate, user: CurrentUser,
     return tx
 
 
-@router.delete("/transactions/{tx_id}", status_code=204)
-async def delete_transaction(tx_id: uuid.UUID, db: Annotated[AsyncSession, Depends(get_db)]):
+@router.delete("/transactions/{tx_id}", response_model=TransactionOut)
+async def void_transaction(tx_id: uuid.UUID, db: Annotated[AsyncSession, Depends(get_db)]):
+    """Noto'g'ri kiritilgan tranzaksiyani bekor qiladi (yumshoq o'chirish).
+
+    Yozuv butunlay o'chirilmaydi — tarixda 'void' statusi bilan qoladi, lekin
+    moliyaviy ta'siri teskari qaytariladi (balans tiklanadi) va barcha
+    yig'indilardan (KPI, hisobotlar) chiqarib tashlanadi.
+    """
     res = await db.execute(select(FinanceTransaction).where(FinanceTransaction.id == tx_id))
     tx = res.scalar_one_or_none()
     if not tx:
         raise HTTPException(status_code=404, detail="Tranzaksiya topilmadi")
+    if tx.status == "void":
+        return tx
+    tx.status = "void"
     await apply_transaction(db, tx, reverse=True)  # balansni qaytarish
-    await db.delete(tx)
     await db.commit()
+    await db.refresh(tx)
+    return tx
 
 
 # ---- Summary (oylik KPI) ----
@@ -252,6 +262,7 @@ async def create_employee_payment(payload: EmployeePaymentIn, user: CurrentUser,
     )
     db.add(tx)
     await db.flush()
+    adv.tx_id = tx.id  # bekor qilinganda moliya tranzaksiyasini topish uchun
     await apply_transaction(db, tx)
     await db.commit()
     await db.refresh(tx)

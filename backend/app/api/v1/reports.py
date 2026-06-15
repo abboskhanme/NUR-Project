@@ -102,7 +102,8 @@ async def dashboard(
     )
 
     # --- Moliya (joriy oy) ---
-    fin_cond = and_(FinanceTransaction.date >= month_start, FinanceTransaction.date <= today)
+    fin_cond = and_(FinanceTransaction.date >= month_start, FinanceTransaction.date <= today,
+                    FinanceTransaction.status == "active")
     income = float(await _scalar(db, select(func.coalesce(func.sum(FinanceTransaction.amount), 0))
                                  .where(and_(fin_cond, FinanceTransaction.type == "income"))))
     expense = float(await _scalar(db, select(func.coalesce(func.sum(FinanceTransaction.amount), 0))
@@ -288,7 +289,8 @@ async def income_expense(
         select(FinanceTransaction.date, FinanceTransaction.type,
                func.coalesce(func.sum(FinanceTransaction.amount), 0))
         .where(and_(FinanceTransaction.date >= start, FinanceTransaction.date <= end,
-                    FinanceTransaction.type.in_(["income", "expense"])))
+                    FinanceTransaction.type.in_(["income", "expense"]),
+                    FinanceTransaction.status == "active"))
         .group_by(FinanceTransaction.date, FinanceTransaction.type)
     )).all()
 
@@ -514,7 +516,8 @@ async def finance_pnl(
     date_from: Optional[date] = None, date_to: Optional[date] = None,
 ):
     date_from, date_to = _resolve_range(date_from, date_to, month_start=True)
-    cond = and_(FinanceTransaction.date >= date_from, FinanceTransaction.date <= date_to)
+    cond = and_(FinanceTransaction.date >= date_from, FinanceTransaction.date <= date_to,
+                FinanceTransaction.status == "active")
 
     income = float(await _scalar(db, select(func.coalesce(func.sum(FinanceTransaction.amount), 0))
                                  .where(and_(cond, FinanceTransaction.type == "income"))))

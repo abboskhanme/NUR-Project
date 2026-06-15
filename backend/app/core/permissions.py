@@ -42,6 +42,7 @@ MODULES: list[str] = [
     "supply",      # Ta'minot
     "reports",     # Hisobotlar
     "telegram",    # Telegram bot
+    "debts",       # Bizning qarzlar (mustaqil modul)
     "settings",    # Tizim sozlamalari
 ]
 

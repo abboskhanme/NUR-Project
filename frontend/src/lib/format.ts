@@ -14,6 +14,38 @@ export function formatUSD(value: number | string | null | undefined): string {
   return '$' + n.toLocaleString('en-US', { maximumFractionDigits: 2 });
 }
 
+/** Valyutaga qarab formatlash: UZS -> so'm, USD -> $ */
+export function formatMoney(
+  value: number | string | null | undefined,
+  currency?: string | null,
+): string {
+  return currency === 'USD' ? formatUSD(value) : formatUZS(value);
+}
+
+/**
+ * Input ichida raqamni 3 xonadan bo'sh joy bilan ajratib ko'rsatish.
+ * Masalan "1234567.5" -> "1 234 567.5". Faqat raqam va bitta nuqta qoladi.
+ */
+export function formatNumberInput(raw: string | number | null | undefined): string {
+  if (raw == null) return '';
+  let s = String(raw).replace(/[^\d.]/g, '');
+  const dot = s.indexOf('.');
+  if (dot !== -1) {
+    s = s.slice(0, dot + 1) + s.slice(dot + 1).replace(/\./g, '');
+  }
+  const [intPart, decPart] = s.split('.');
+  const cleanInt = (intPart || '').replace(/^0+(?=\d)/, '');
+  const grouped = cleanInt.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  return decPart !== undefined ? `${grouped}.${decPart}` : grouped;
+}
+
+/** Formatlangan input matnidan toza son olish. */
+export function parseNumberInput(display: string | null | undefined): number {
+  if (!display) return 0;
+  const n = parseFloat(String(display).replace(/\s/g, ''));
+  return Number.isNaN(n) ? 0 : n;
+}
+
 export function formatDate(d: string | Date | null | undefined): string {
   if (!d) return '—';
   const date = typeof d === 'string' ? new Date(d) : d;

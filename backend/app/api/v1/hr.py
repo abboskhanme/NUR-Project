@@ -20,7 +20,7 @@ from app.schemas.common import Page
 from app.schemas.hr import (
     AttendanceBatchIn, AttendanceOut,
     DepartmentCreate, DepartmentOut, DepartmentUpdate,
-    EmployeeCreate, EmployeeOut, EmployeeUpdate,
+    EmployeeCreate, EmployeeMonthSummary, EmployeeOut, EmployeeUpdate,
     MonthHistoryItem, MonthlySummary,
     PayrollRunIn, PayrollRunOut,
     PositionCreate, PositionOut, PositionUpdate,
@@ -82,6 +82,7 @@ async def _month_aggregate(db: AsyncSession, emp: Employee, year: int, month: in
             SalaryAdvance.employee_id == emp.id,
             SalaryAdvance.advance_date >= eff_start,
             SalaryAdvance.advance_date <= end,
+            SalaryAdvance.status == "active",
         ))
     )
     advance = Decimal(adv_res.scalar() or 0)
@@ -193,6 +194,9 @@ async def list_employees(
     page: int = Query(1, ge=1), page_size: int = Query(50, ge=1, le=200),
     status: Optional[str] = "active", employment_type: Optional[str] = None,
     q: Optional[str] = Query(None, description="Ism bo'yicha qidiruv"),
+    with_summary: bool = Query(False, description="Joriy oy bo'yicha yig'ma hisobni qo'shish"),
+    year: Optional[int] = Query(None, ge=2000, le=2100),
+    month: Optional[int] = Query(None, ge=1, le=12),
 ):
     query = select(Employee)
     if status:
@@ -206,9 +210,24 @@ async def list_employees(
                             .offset((page - 1) * page_size).limit(page_size))
     employees = res.scalars().all()
     pos_map = await _positions_map(db)
+
+    items = []
+    today = date.today()
+    sy = year or today.year
+    sm = month or today.month
+    for e in employees:
+        out = _emp_out(e, pos_map.get(e.position_id))
+        if with_summary:
+            present, hours, gross, advance, net = await _month_aggregate(db, e, sy, sm)
+            eom = date(sy, sm, calendar.monthrange(sy, sm)[1])
+            rate_type, _amount = await _rate_on(db, e, eom)
+            out.month_summary = EmployeeMonthSummary(
+                year=sy, month=sm, present_days=present, total_hours=hours,
+                gross=gross, advance=advance, net=net, salary_type=rate_type,
+            )
+        items.append(out)
     return Page[EmployeeOut](
-        items=[_emp_out(e, pos_map.get(e.position_id)) for e in employees],
-        total=total, page=page, page_size=page_size,
+        items=items, total=total, page=page, page_size=page_size,
     )
 
 
@@ -448,6 +467,40 @@ async def create_advance(payload: SalaryAdvanceIn, user: CurrentUser,
     return adv
 
 
+@router.delete("/advances/{advance_id}", response_model=SalaryAdvanceOut)
+async def void_advance(advance_id: uuid.UUID, _user: CurrentUser,
+                       db: Annotated[AsyncSession, Depends(get_db)]):
+    """Avans/oylik to'lovini bekor qiladi (yumshoq o'chirish).
+
+    Yozuv tarixda 'void' statusi bilan qoladi (real holatga ta'sir qilmaydi).
+    Bog'liq moliya chiqim tranzaksiyasi teskari qaytariladi va o'chiriladi.
+    """
+    from app.models.finance import FinanceTransaction
+    from app.services.finance_service import apply_transaction
+
+    res = await db.execute(select(SalaryAdvance).where(SalaryAdvance.id == advance_id))
+    adv = res.scalar_one_or_none()
+    if not adv:
+        raise HTTPException(404, "Avans topilmadi")
+    if adv.status == "void":
+        return SalaryAdvanceOut.model_validate(adv)
+
+    adv.status = "void"
+    # Moliya tranzaksiyasini teskari qaytarib o'chiramiz (balans tiklanadi)
+    if adv.tx_id:
+        tx_res = await db.execute(
+            select(FinanceTransaction).where(FinanceTransaction.id == adv.tx_id)
+        )
+        tx = tx_res.scalar_one_or_none()
+        if tx:
+            await apply_transaction(db, tx, reverse=True)
+            await db.delete(tx)
+        adv.tx_id = None
+    await db.commit()
+    await db.refresh(adv)
+    return SalaryAdvanceOut.model_validate(adv)
+
+
 # ---- Payroll ----
 @router.post("/payroll/runs", response_model=PayrollRunOut, status_code=201)
 async def create_payroll_run(payload: PayrollRunIn, user: CurrentUser,
@@ -480,6 +533,7 @@ async def create_payroll_run(payload: PayrollRunIn, user: CurrentUser,
                 SalaryAdvance.employee_id == e.id,
                 SalaryAdvance.advance_date >= payload.period_start,
                 SalaryAdvance.advance_date <= payload.period_end,
+                SalaryAdvance.status == "active",
             ))
         )
         advance = adv_res.scalar() or Decimal(0)

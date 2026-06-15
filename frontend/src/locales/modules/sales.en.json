@@ -50,6 +50,8 @@
   "kpiRevenue": "Revenue · {{period}}",
   "kpiPaid": "Paid · {{period}}",
   "kpiBalance": "Balance · {{period}}",
+  "kpiDelivered": "Delivered · {{period}}",
+  "kpiRemaining": "Remaining · {{period}}",
   "allYear": "Full year",
   "monthTooltip": "Month",
   "yearTooltip": "Year",
