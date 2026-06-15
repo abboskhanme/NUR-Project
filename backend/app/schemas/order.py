@@ -177,9 +177,17 @@ class OrderStatusChange(BaseModel):
     note: Optional[str] = None
 
 
+class SalespersonCount(BaseModel):
+    salesperson_id: Optional[uuid.UUID] = None
+    name: str
+    count: int = 0
+
+
 class SalesSummary(BaseModel):
     total_orders: int = 0
     status_counts: dict[str, int] = Field(default_factory=dict)
+    # Har bir sotuvchi nechta zakaz olgani (joriy filtr bo'yicha, ko'pdan kamga)
+    salesperson_counts: list[SalespersonCount] = Field(default_factory=list)
     # Money (UZS)
     revenue_total: Decimal = Decimal(0)       # sum of all order item totals
     paid_total: Decimal = Decimal(0)          # sum of all payments

@@ -15,10 +15,11 @@ from app.db.session import get_db
 from app.models.customer import Customer
 from app.models.order import Order, OrderItem, Payment
 from app.models.product import Inventory
+from app.models.user import User
 from app.schemas.common import Page
 from app.schemas.order import (
     OrderCreate, OrderOut, OrderStatusChange, OrderUpdate,
-    PaymentIn, PaymentOut, SalesSummary, QueueItemOut, QueueMove,    QueueAdd,
+    PaymentIn, PaymentOut, SalesSummary, SalespersonCount, QueueItemOut, QueueMove, QueueAdd,
 )
 from app.services.order_service import generate_order_code, is_valid_transition
 from app.services import pdf_service
@@ -265,9 +266,22 @@ async def sales_summary(
         select(paid_expr).where(Payment.order_id.in_(month_ids)).where(Payment.date >= month_start)
     )).scalar() or Decimal(0)
 
+    # Sotuvchilar bo'yicha zakaz soni (joriy filtr) — ko'pdan kamga
+    sp_q = _apply_filters(
+        select(User.id, User.full_name, func.count(Order.id))
+        .select_from(Order).join(User, User.id == Order.salesperson_id),
+        current, status, salesperson_id, customer_id, date_from, date_to, search,
+    ).group_by(User.id, User.full_name)
+    sp_rows = (await db.execute(sp_q)).all()
+    salesperson_counts = sorted(
+        (SalespersonCount(salesperson_id=i, name=n, count=int(c)) for i, n, c in sp_rows),
+        key=lambda r: r.count, reverse=True,
+    )
+
     return SalesSummary(
         total_orders=total_orders,
         status_counts=status_counts,
+        salesperson_counts=salesperson_counts,
         revenue_total=revenue_total,
         paid_total=paid_total,
         outstanding_total=(revenue_total or Decimal(0)) - (paid_total or Decimal(0)),

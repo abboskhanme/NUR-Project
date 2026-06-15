@@ -13,9 +13,11 @@ import OrderModal from '@/features/sales/OrderModal';
 import PaymentModal from '@/features/sales/PaymentModal';
 import OrdersTable, { OrderFull, ProductOpt } from '@/features/sales/OrdersTable';
 
+interface SalespersonCount { salesperson_id: string | null; name: string; count: number; }
 interface Summary {
   total_orders: number;
   status_counts: Record<string, number>;
+  salesperson_counts?: SalespersonCount[];
   revenue_total: string;
   paid_total: string;
   outstanding_total: string;
@@ -129,7 +131,20 @@ export default function OrdersPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold">{t('sales.pageTitle')}</h1>
+          <div className="flex items-center flex-wrap gap-x-3 gap-y-1">
+            <h1 className="text-2xl font-bold">{t('sales.pageTitle')}</h1>
+            {s?.salesperson_counts && s.salesperson_counts.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5" title={t('sales.bySalesperson', { defaultValue: 'Sotuvchi bo‘yicha zakazlar' })}>
+                {s.salesperson_counts.map((sp) => (
+                  <span key={sp.salesperson_id ?? sp.name}
+                        className="inline-flex items-center gap-1 text-xs bg-black/5 rounded-full pl-2 pr-1 py-0.5">
+                    <span className="text-ink-soft">{sp.name}</span>
+                    <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-primary/15 text-primary font-semibold">{sp.count}</span>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
           <p className="text-sm text-ink-soft">{t('sales.pageSubtitle')}</p>
         </div>
         <div className="flex items-center gap-2">
