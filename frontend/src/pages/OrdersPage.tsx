@@ -38,7 +38,7 @@ const MONTH_NUMS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const;
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
 
-// Har bir sotuvchi uchun rang (navbatma-navbat) — rang-barang chiplar uchun
+// Sotuvchi chipi rangi — ism bo'yicha barqaror (har ism o'z rangiga ega)
 const SP_COLORS = [
   'bg-primary/10 text-primary',
   'bg-emerald-100 text-emerald-700',
@@ -46,7 +46,17 @@ const SP_COLORS = [
   'bg-sky-100 text-sky-700',
   'bg-violet-100 text-violet-700',
   'bg-rose-100 text-rose-700',
+  'bg-teal-100 text-teal-700',
+  'bg-fuchsia-100 text-fuchsia-700',
+  'bg-indigo-100 text-indigo-700',
+  'bg-orange-100 text-orange-700',
 ];
+
+function spColor(name: string): string {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  return SP_COLORS[h % SP_COLORS.length];
+}
 
 export default function OrdersPage() {
   const { t } = useTranslation();
@@ -145,11 +155,11 @@ export default function OrdersPage() {
             <h1 className="text-2xl font-bold">{t('sales.pageTitle')}</h1>
             {s?.salesperson_counts && s.salesperson_counts.length > 0 && (
               <div className="flex flex-wrap items-center gap-2" title={t('sales.bySalesperson', { defaultValue: 'Sotuvchi bo‘yicha zakazlar' })}>
-                {s.salesperson_counts.map((sp, idx) => (
+                {s.salesperson_counts.map((sp) => (
                   <span key={sp.salesperson_id ?? sp.name}
-                        className={'inline-flex items-center gap-1.5 text-sm font-medium rounded-full pl-3 pr-1.5 py-1 ' + SP_COLORS[idx % SP_COLORS.length]}>
+                        className={'inline-flex items-center gap-2 text-xl font-semibold rounded-full pl-4 pr-2 py-1.5 ' + spColor(sp.name)}>
                     {sp.name}
-                    <span className="inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-full bg-white/75 font-bold text-xs">{sp.count}</span>
+                    <span className="inline-flex items-center justify-center min-w-[30px] h-7 px-2 rounded-full bg-white/75 font-bold text-base">{sp.count}</span>
                   </span>
                 ))}
               </div>
