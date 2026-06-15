@@ -153,6 +153,15 @@
     "closed": "Safar yakunlandi",
     "name": "Safar nomi",
     "namePlaceholder": "Masalan: Farg'ona — 12-iyun",
-    "saved": "saqlandi"
+    "saved": "saqlandi",
+    "empty": "Yakunlangan safarlar yo'q",
+    "emptyDesc": "Safarni yakunlaganingizda shu yerda ko'rinadi",
+    "colName": "Safar nomi",
+    "colDate": "Sana",
+    "colTickets": "Arizalar"
+  },
+  "tabs": {
+    "tickets": "Arizalar",
+    "trips": "Servis safarlari"
   }
 }

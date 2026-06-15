@@ -12,6 +12,7 @@ import ServiceTicketModal from '@/features/service/ServiceTicketModal';
 import TicketDetailModal from '@/features/service/TicketDetailModal';
 import ServiceCategoryModal from '@/features/service/ServiceCategoryModal';
 import ServiceTripPanel from '@/features/service/ServiceTripPanel';
+import ServiceTripsList from '@/features/service/ServiceTripsList';
 import { ServiceStatusBadge } from '@/features/service/status';
 
 interface Ticket {
@@ -42,6 +43,7 @@ export default function ServicePage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [catOpen, setCatOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [tab, setTab] = useState<'tickets' | 'trips'>('tickets');
 
   const summaryQ = useQuery<Summary>({
     queryKey: ['service-summary'],
@@ -91,6 +93,21 @@ export default function ServicePage() {
         </div>
       </div>
 
+      {/* Ichki bo'limlar: Arizalar / Servis safarlari */}
+      <div className="flex gap-1 border-b border-black/5">
+        {([['tickets', t('service.tabs.tickets')], ['trips', t('service.tabs.trips')]] as const).map(([key, label]) => (
+          <button key={key} onClick={() => setTab(key)}
+            className={'px-4 py-2 text-sm font-medium -mb-px border-b-2 transition-colors ' +
+              (tab === key ? 'border-primary text-primary' : 'border-transparent text-ink-soft hover:text-ink')}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'trips' ? (
+        <ServiceTripsList />
+      ) : (
+      <>
       {/* KPI — 3 ta karta */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {/* Servis muammolari (ochiq) — qizil */}
@@ -203,6 +220,8 @@ export default function ServicePage() {
           </div>
         )}
       </Card>
+      </>
+      )}
 
       {createOpen && (
         <ServiceTicketModal onClose={() => setCreateOpen(false)} onSaved={refetchAll} />

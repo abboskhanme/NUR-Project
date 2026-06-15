@@ -153,6 +153,15 @@
     "closed": "Trip finalized",
     "name": "Trip name",
     "namePlaceholder": "e.g. Fergana — Jun 12",
-    "saved": "saved"
+    "saved": "saved",
+    "empty": "No finalized trips",
+    "emptyDesc": "They appear here after you finalize a trip",
+    "colName": "Trip name",
+    "colDate": "Date",
+    "colTickets": "Tickets"
+  },
+  "tabs": {
+    "tickets": "Tickets",
+    "trips": "Service trips"
   }
 }
