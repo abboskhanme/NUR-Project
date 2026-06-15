@@ -38,12 +38,12 @@ interface Col {
 
 const COLS: Col[] = [
   { key: 'date', label: 'colDate', type: 'date', px: 140, lock: true },
-  { key: 'qty', label: 'colQty', type: 'int', px: 60, align: 'text-right', lock: true },
+  { key: 'qty', label: 'colQty', type: 'int', px: 60, lock: true },
   { key: 'destination', label: 'colDestination', type: 'text', px: 210, lock: true },
-  { key: 'kvm', label: 'colKvm', type: 'int', px: 72, align: 'text-right', lock: true },
+  { key: 'kvm', label: 'colKvm', type: 'int', px: 72, lock: true },
   { key: 'direction', label: 'colDirection', type: 'text', px: 100, lock: true },
   { key: 'driver_phone', label: 'colDriverPhone', type: 'text', px: 150, fmt: formatPhoneInput },
-  { key: 'freight', label: 'colFreight', type: 'money', px: 130, align: 'text-right' },
+  { key: 'freight', label: 'colFreight', type: 'money', px: 130 },
   { key: 'kimdan', label: 'colKimdan', type: 'text', px: 80 },
   { key: 'card_number', label: 'colCardNumber', type: 'text', px: 200, fmt: formatCardInput },
   { key: 'card_holder', label: 'colCardHolder', type: 'text', px: 190 },
@@ -160,7 +160,7 @@ export default function ShippingPage() {
               <thead className="text-left text-ink-soft border-b border-black/10">
                 <tr className="[&>th]:py-2 [&>th]:px-2 [&>th]:font-medium [&>th]:whitespace-nowrap">
                   {COLS.map((c) => (
-                    <th key={c.key} className={c.align ?? ''}>{t(`shipping.${c.label}`)}</th>
+                    <th key={c.key}>{t(`shipping.${c.label}`)}</th>
                   ))}
                   <th />
                 </tr>
@@ -249,7 +249,7 @@ function Row({ s, onChanged, onDelete }: {
           return (
             <td key={c.key} className="align-middle">
               <input inputMode="decimal" defaultValue={disp} key={String(v ?? '')}
-                     className={`${INP} text-right`}
+                     className={INP}
                      onChange={(e) => { e.target.value = formatNumberInput(e.target.value); }}
                      onBlur={(e) => patchField(c, e.target.value)} />
             </td>
