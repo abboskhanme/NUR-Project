@@ -1,13 +1,12 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { Plus, Search, Wrench, CalendarClock, ShieldCheck, ClipboardList, Tag, List, CalendarDays } from 'lucide-react';
+import { Plus, Search, Wrench, CalendarClock, Tag, List, CalendarDays, CheckCircle2 } from 'lucide-react';
 
 import { api } from '@/api/client';
 import Card from '@/components/ui/Card';
 import EmptyState from '@/components/ui/EmptyState';
-import BalanceCard from '@/components/ui/BalanceCard';
-import { formatDateTime, formatPhone } from '@/lib/format';
+import { formatDate, formatPhone } from '@/lib/format';
 import ServiceTicketModal from '@/features/service/ServiceTicketModal';
 import TicketDetailModal from '@/features/service/TicketDetailModal';
 import ServiceCategoryModal from '@/features/service/ServiceCategoryModal';
@@ -23,9 +22,17 @@ interface Ticket {
 interface Summary {
   total: number; new: number; scheduled: number;
   completed: number; cancelled: number; in_warranty_open: number; scheduled_next7: number;
+  with_visit: number;
 }
 
 const FILTER_KEYS = ['', 'new', 'scheduled', 'completed', 'cancelled'] as const;
+
+// Ariza muddati — tushgan sanadan +7 kun (avtomatik)
+function deadlineOf(openedAt: string): Date {
+  const d = new Date(openedAt);
+  d.setDate(d.getDate() + 7);
+  return d;
+}
 
 export default function ServicePage() {
   const { t } = useTranslation();
@@ -73,15 +80,32 @@ export default function ServicePage() {
         </div>
       </div>
 
-      {/* KPI */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <BalanceCard title={t('service.kpi.open')} value={String((s?.new ?? 0) + (s?.scheduled ?? 0))}
-                     icon={<ClipboardList size={18} />} accent="primary" />
-        <BalanceCard title={t('service.kpi.new')} value={String(s?.new ?? 0)} icon={<Wrench size={18} />} accent="primary" />
-        <BalanceCard title={t('service.kpi.scheduledNext7')} value={String(s?.scheduled_next7 ?? 0)}
-                     icon={<CalendarClock size={18} />} accent="warning" />
-        <BalanceCard title={t('service.kpi.warrantyOpen')} value={String(s?.in_warranty_open ?? 0)}
-                     icon={<ShieldCheck size={18} />} accent="success" />
+      {/* KPI — 3 ta karta */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {/* Servis muammolari (ochiq) — qizil */}
+        <div className="rounded-card border border-danger/25 bg-danger/10 p-4 flex items-start justify-between">
+          <div>
+            <div className="text-sm font-medium text-danger/90">{t('service.kpi.problems')}</div>
+            <div className="text-2xl font-bold mt-2 text-danger">{(s?.new ?? 0) + (s?.scheduled ?? 0)}</div>
+          </div>
+          <div className="w-10 h-10 rounded-button bg-danger/20 text-danger flex items-center justify-center shrink-0"><Wrench size={18} /></div>
+        </div>
+        {/* Bartaraf etilgan — yashil */}
+        <div className="rounded-card border border-success/25 bg-success/10 p-4 flex items-start justify-between">
+          <div>
+            <div className="text-sm font-medium text-success/90">{t('service.kpi.resolved')}</div>
+            <div className="text-2xl font-bold mt-2 text-success">{s?.completed ?? 0}</div>
+          </div>
+          <div className="w-10 h-10 rounded-button bg-success/20 text-success flex items-center justify-center shrink-0"><CheckCircle2 size={18} /></div>
+        </div>
+        {/* Rejalashtirilgan (✅ znachok soni) — primary */}
+        <div className="rounded-card border border-primary/25 bg-primary/10 p-4 flex items-start justify-between">
+          <div>
+            <div className="text-sm font-medium text-primary/90">{t('service.kpi.planned')}</div>
+            <div className="text-2xl font-bold mt-2 text-primary">{s?.with_visit ?? 0}</div>
+          </div>
+          <div className="w-10 h-10 rounded-button bg-primary/20 text-primary flex items-center justify-center shrink-0"><CalendarClock size={18} /></div>
+        </div>
       </div>
 
       {/* Filtrlar + qidiruv */}
@@ -133,10 +157,11 @@ export default function ServicePage() {
             <table className="w-full text-sm">
               <thead className="text-left text-ink-soft border-b border-black/5">
                 <tr>
-                  <th className="py-2 pr-3">{t('service.table.code')}</th>
+                  <th className="py-2 pr-3 w-10"></th>
                   <th className="py-2 pr-3">{t('service.table.customer')}</th>
                   <th className="py-2 pr-3">{t('service.table.problem')}</th>
-                  <th className="py-2 pr-3">{t('service.table.visitDate')}</th>
+                  <th className="py-2 pr-3">{t('service.table.createdAt')}</th>
+                  <th className="py-2 pr-3">{t('service.table.deadline')}</th>
                   <th className="py-2 pr-3">{t('service.table.warranty')}</th>
                   <th className="py-2 pr-3">{t('service.table.status')}</th>
                 </tr>
@@ -145,7 +170,11 @@ export default function ServicePage() {
                 {tickets.map((tk) => (
                   <tr key={tk.id} onClick={() => setDetailId(tk.id)}
                       className="border-b border-black/5 hover:bg-black/5 cursor-pointer">
-                    <td className="py-2 pr-3 font-medium whitespace-nowrap">{tk.code}</td>
+                    <td className="py-2 pr-3 text-center">
+                      {tk.scheduled_at
+                        ? <CheckCircle2 size={20} className="text-success inline" aria-label={t('service.table.planned', { defaultValue: 'Rejalashtirilgan' })} />
+                        : null}
+                    </td>
                     <td className="py-2 pr-3">
                       {tk.customer ? (
                         <div>
@@ -155,9 +184,8 @@ export default function ServicePage() {
                       ) : <span className="text-ink-soft">—</span>}
                     </td>
                     <td className="py-2 pr-3 max-w-[260px] truncate">{tk.problem}</td>
-                    <td className="py-2 pr-3 whitespace-nowrap">
-                      {tk.scheduled_at ? formatDateTime(tk.scheduled_at) : <span className="text-ink-soft">—</span>}
-                    </td>
+                    <td className="py-2 pr-3 whitespace-nowrap">{formatDate(tk.opened_at)}</td>
+                    <td className="py-2 pr-3 whitespace-nowrap">{formatDate(deadlineOf(tk.opened_at))}</td>
                     <td className="py-2 pr-3">
                       {tk.in_warranty
                         ? <span className="badge bg-success/10 text-success">{t('service.warranty.inWarranty')}</span>

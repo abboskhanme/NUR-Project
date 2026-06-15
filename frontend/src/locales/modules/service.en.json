@@ -15,7 +15,10 @@
     "open": "Open Tickets",
     "new": "New",
     "scheduledNext7": "Next 7 Days (scheduled)",
-    "warrantyOpen": "Open Under Warranty"
+    "warrantyOpen": "Open Under Warranty",
+    "problems": "Service issues",
+    "resolved": "Resolved",
+    "planned": "Scheduled"
   },
   "table": {
     "code": "Code",
@@ -23,7 +26,9 @@
     "problem": "Problem",
     "visitDate": "Visit Date",
     "warranty": "Warranty",
-    "status": "Status"
+    "status": "Status",
+    "createdAt": "Created",
+    "deadline": "Deadline"
   },
   "search": {
     "placeholder": "Code or problem…"

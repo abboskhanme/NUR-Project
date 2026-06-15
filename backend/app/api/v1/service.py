@@ -62,6 +62,9 @@ async def summary(db: Annotated[AsyncSession, Depends(get_db)], _: CurrentUser):
             ServiceTicket.status.in_(open_statuses),
         )
     )).scalar() or 0
+    with_visit = (await db.execute(
+        select(func.count(ServiceTicket.id)).where(ServiceTicket.scheduled_at.is_not(None))
+    )).scalar() or 0
     return ServiceSummary(
         total=sum(counts.values()),
         new=counts.get("new", 0),
@@ -70,6 +73,7 @@ async def summary(db: Annotated[AsyncSession, Depends(get_db)], _: CurrentUser):
         cancelled=counts.get("cancelled", 0),
         in_warranty_open=in_warranty_open,
         scheduled_next7=next7,
+        with_visit=with_visit,
     )
 
 

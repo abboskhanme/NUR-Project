@@ -117,3 +117,5 @@ class ServiceSummary(BaseModel):
     cancelled: int
     in_warranty_open: int
     scheduled_next7: int
+    # Borish rejalashtirilgan (scheduled_at bor) arizalar soni — ✅ znachok kartasi
+    with_visit: int = 0

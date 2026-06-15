@@ -15,7 +15,10 @@
     "open": "Ochiq arizalar",
     "new": "Yangi",
     "scheduledNext7": "Yaqin 7 kun (rejada)",
-    "warrantyOpen": "Kafolatdagi ochiq"
+    "warrantyOpen": "Kafolatdagi ochiq",
+    "problems": "Servis muammolari",
+    "resolved": "Bartaraf etilgan",
+    "planned": "Rejalashtirilgan"
   },
   "table": {
     "code": "Kod",
@@ -23,7 +26,9 @@
     "problem": "Muammo",
     "visitDate": "Borish sanasi",
     "warranty": "Kafolat",
-    "status": "Status"
+    "status": "Status",
+    "createdAt": "Tushgan sana",
+    "deadline": "Muddat"
   },
   "search": {
     "placeholder": "Kod yoki muammo…"

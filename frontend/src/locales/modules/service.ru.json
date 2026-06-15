@@ -15,7 +15,10 @@
     "open": "Открытые заявки",
     "new": "Новые",
     "scheduledNext7": "Ближайшие 7 дней (план)",
-    "warrantyOpen": "Открытые по гарантии"
+    "warrantyOpen": "Открытые по гарантии",
+    "problems": "Сервисные проблемы",
+    "resolved": "Решено",
+    "planned": "Запланировано"
   },
   "table": {
     "code": "Код",
@@ -23,7 +26,9 @@
     "problem": "Проблема",
     "visitDate": "Дата выезда",
     "warranty": "Гарантия",
-    "status": "Статус"
+    "status": "Статус",
+    "createdAt": "Дата",
+    "deadline": "Срок"
   },
   "search": {
     "placeholder": "Код или проблема…"
