@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { usePermissions } from '@/lib/permissions';
 import toast from 'react-hot-toast';
-import { ExternalLink, Plus, ListPlus, ListX } from 'lucide-react';
+import { ExternalLink, Plus, ListPlus, Check } from 'lucide-react';
 
 import { api } from '@/api/client';
 import { formatUZS, formatPhone, formatDate } from '@/lib/format';
@@ -455,28 +454,19 @@ function Row({
 
 function QueueButton({ o, onChanged }: { o: OrderFull; onChanged: () => void }) {
   const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
-  const [pickup, setPickup] = useState(o.pickup_date ?? '');
   const [busy, setBusy] = useState(false);
   if (o.status === 'delivered' || o.status === 'rejected') return null;
 
-  async function addToQueue() {
+  // Bir bosishda navbatga olish/chiqarish — sana so'ralmaydi (majburiy emas).
+  async function toggleQueue() {
     setBusy(true);
     try {
-      await api.post(`/orders/${o.id}/to-queue`, { pickup_date: pickup || null });
-      toast.success(t('sales.queueAdded'));
-      setOpen(false);
-      onChanged();
-    } catch (e: any) {
-      toast.error(e?.response?.data?.detail || t('common.error'));
-    } finally {
-      setBusy(false);
-    }
-  }
-  async function removeFromQueue() {
-    setBusy(true);
-    try {
-      await api.post(`/orders/${o.id}/from-queue`);
+      if (o.in_queue) {
+        await api.post(`/orders/${o.id}/from-queue`);
+      } else {
+        await api.post(`/orders/${o.id}/to-queue`, {});
+        toast.success(t('sales.queueAdded'));
+      }
       onChanged();
     } catch (e: any) {
       toast.error(e?.response?.data?.detail || t('common.error'));
@@ -485,42 +475,17 @@ function QueueButton({ o, onChanged }: { o: OrderFull; onChanged: () => void }) 
     }
   }
 
-  return (
-    <>
-      {o.in_queue ? (
-        <button onClick={removeFromQueue} disabled={busy}
-                className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-blue-600 text-white shadow-sm ring-1 ring-blue-700/20 hover:bg-blue-700 transition disabled:opacity-50"
-                title={t('sales.removeFromQueue')}>
-          <ListX size={15} strokeWidth={2.5} />
-        </button>
-      ) : (
-        <button onClick={() => setOpen(true)} disabled={busy}
-                className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-primary/10 text-primary ring-1 ring-primary/25 hover:bg-primary hover:text-white transition disabled:opacity-50"
-                title={t('sales.addToQueue')}>
-          <ListPlus size={15} strokeWidth={2.5} />
-        </button>
-      )}
-      {open && createPortal(
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4" onClick={() => setOpen(false)}>
-          <div className="bg-card rounded-lg shadow-xl w-full max-w-xs p-4 space-y-3" onClick={(e) => e.stopPropagation()}>
-            <h4 className="font-semibold text-sm">{t('sales.addToQueueTitle')}</h4>
-            <div className="min-w-0">
-              <label className="label">{t('sales.pickupDateLabel')}</label>
-              <input type="date" className="input w-full box-border" value={pickup}
-                     onChange={(e) => setPickup(e.target.value)} />
-            </div>
-            <div className="flex justify-end gap-2">
-              <button onClick={() => setOpen(false)} className="px-3 py-1.5 text-sm rounded-button hover:bg-black/5">
-                {t('actions.cancel')}
-              </button>
-              <button onClick={addToQueue} disabled={busy} className="btn-primary disabled:opacity-50">
-                {t('sales.toQueueConfirm')}
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body,
-      )}
-    </>
+  return o.in_queue ? (
+    <button onClick={toggleQueue} disabled={busy}
+            className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-emerald-500 text-white shadow-sm ring-1 ring-emerald-600/20 hover:bg-emerald-600 transition disabled:opacity-50"
+            title={t('sales.removeFromQueue')}>
+      <Check size={16} strokeWidth={3} />
+    </button>
+  ) : (
+    <button onClick={toggleQueue} disabled={busy}
+            className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-primary/10 text-primary ring-1 ring-primary/25 hover:bg-primary hover:text-white transition disabled:opacity-50"
+            title={t('sales.addToQueue')}>
+      <ListPlus size={15} strokeWidth={2.5} />
+    </button>
   );
 }
