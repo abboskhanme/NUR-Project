@@ -9,6 +9,8 @@
   },
   "newWorker": "New worker",
   "monthHint": "Figures shown are for {{month}} {{year}}. Click a number to see its history.",
+  "monthTooltip": "Month",
+  "yearTooltip": "Year",
   "totals": {
     "salary": "Total salary",
     "advance": "Total advances",

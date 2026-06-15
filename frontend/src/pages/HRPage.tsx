@@ -27,8 +27,9 @@ export default function HRPage() {
 
   const isPositions = tab === 'positions';
   const now = new Date();
-  const curYear = now.getFullYear();
-  const curMonth = now.getMonth() + 1;
+  const [curYear, setCurYear] = useState(now.getFullYear());
+  const [curMonth, setCurMonth] = useState(now.getMonth() + 1);
+  const yearOptions = [now.getFullYear(), now.getFullYear() - 1, now.getFullYear() - 2];
 
   const empQ = useQuery({
     queryKey: ['employees', 'all', status, search, curYear, curMonth],
@@ -140,6 +141,26 @@ export default function HRPage() {
               <option value="active">{t('hr.status.active')}</option>
               <option value="terminated">{t('hr.status.terminated')}</option>
               <option value="">{t('common.all')}</option>
+            </select>
+            <select
+              className="input !w-auto"
+              value={curMonth}
+              onChange={(e) => setCurMonth(Number(e.target.value))}
+              title={t('hr.monthTooltip', { defaultValue: 'Oy' })}
+            >
+              {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                <option key={m} value={m}>{t(`hr.months.${m}`)}</option>
+              ))}
+            </select>
+            <select
+              className="input !w-auto"
+              value={curYear}
+              onChange={(e) => setCurYear(Number(e.target.value))}
+              title={t('hr.yearTooltip', { defaultValue: 'Yil' })}
+            >
+              {yearOptions.map((y) => (
+                <option key={y} value={y}>{y}</option>
+              ))}
             </select>
           </div>
 

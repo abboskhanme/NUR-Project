@@ -9,6 +9,8 @@
   },
   "newWorker": "Yangi ishchi",
   "monthHint": "{{month}} {{year}} uchun ko'rsatkichlar. Tarixini ko'rish uchun raqam ustiga bosing.",
+  "monthTooltip": "Oy",
+  "yearTooltip": "Yil",
   "totals": {
     "salary": "Umumiy oylik",
     "advance": "Umumiy avanslar",
