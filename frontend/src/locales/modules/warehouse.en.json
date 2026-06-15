@@ -23,7 +23,8 @@
     "id": "ID number",
     "status": "Status",
     "added": "Added",
-    "order": "Order / customer"
+    "order": "Order / customer",
+    "direction": "Direction"
   },
   "add": {
     "title": "Add unit",
@@ -35,7 +36,8 @@
     "note": "Note (optional)",
     "submit": "Add",
     "created": "{{count}} units added",
-    "needIds": "At least one ID required"
+    "needIds": "At least one ID required",
+    "direction": "Direction"
   },
   "edit": {
     "title": "Edit unit",
@@ -43,7 +45,8 @@
     "id": "ID number",
     "added": "Added date",
     "note": "Note",
-    "needId": "ID number required"
+    "needId": "ID number required",
+    "direction": "Direction"
   },
   "tabs": {
     "types": "Types",
@@ -62,5 +65,10 @@
     },
     "deleteTitle": "Delete model",
     "deleteMessage": "Delete model «{{name}}»?"
+  },
+  "dir": {
+    "right": "Right",
+    "left": "Left",
+    "any": "— none —"
   }
 }

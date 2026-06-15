@@ -24,7 +24,7 @@ interface Summary {
 }
 interface Unit {
   id: string; unique_id: string; status: string; added_date: string; notes?: string | null;
-  product_id: string;
+  product_id: string; bunker_direction?: string | null;
   model: string | null; kvm: number | null; order_code?: string | null; customer_name?: string | null;
 }
 interface MainProduct extends ProductFull {
@@ -263,6 +263,7 @@ export default function WarehousePage() {
                     <th className="py-2 pr-3">{t('warehouse.col.id')}</th>
                     <th className="py-2 pr-3">{t('warehouse.col.model')}</th>
                     <th className="py-2 pr-3">{t('warehouse.col.kvm')}</th>
+                    <th className="py-2 pr-3">{t('warehouse.col.direction')}</th>
                     <th className="py-2 pr-3">{t('warehouse.col.status')}</th>
                     <th className="py-2 pr-3">{t('warehouse.col.added')}</th>
                     <th className="py-2 pr-3">{t('warehouse.col.order')}</th>
@@ -275,6 +276,11 @@ export default function WarehousePage() {
                       <td className="py-2 pr-3 font-mono font-medium">{u.unique_id}</td>
                       <td className="py-2 pr-3">{u.model ?? '—'}</td>
                       <td className="py-2 pr-3">{u.kvm ? `${u.kvm} kvm` : '—'}</td>
+                      <td className="py-2 pr-3">
+                        {u.bunker_direction === 'right' ? t('warehouse.dir.right')
+                          : u.bunker_direction === 'left' ? t('warehouse.dir.left')
+                          : <span className="text-ink-soft">—</span>}
+                      </td>
                       <td className="py-2 pr-3">
                         <span className={`badge ${STATUS_STYLE[u.status] ?? ''}`}>{statusLabel[u.status] ?? u.status}</span>
                       </td>

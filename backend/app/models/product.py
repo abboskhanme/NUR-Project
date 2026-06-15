@@ -66,5 +66,7 @@ class Inventory(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     status: Mapped[str] = mapped_column(String(20), default="available", index=True)
     added_date: Mapped[date] = mapped_column(Date)
     notes: Mapped[Optional[str]] = mapped_column(Text)
+    # Bunker yo'nalishi: right (o'ngga) / left (chapga). Buyurtmadagi bilan bir xil kod.
+    bunker_direction: Mapped[Optional[str]] = mapped_column(String(10))
 
     product: Mapped[Product] = relationship(back_populates="inventory_items")

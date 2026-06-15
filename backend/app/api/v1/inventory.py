@@ -50,6 +50,7 @@ class UnitOut(ORMBase):
     status: str
     added_date: date
     notes: Optional[str] = None
+    bunker_direction: Optional[str] = None
     product_id: uuid.UUID
     model: Optional[str] = None
     kvm: Optional[int] = None
@@ -62,6 +63,7 @@ class UnitsCreate(BaseModel):
     unique_ids: list[str] = Field(..., min_length=1)
     added_date: Optional[date] = None
     notes: Optional[str] = None
+    bunker_direction: Optional[str] = None
 
 
 class UnitUpdate(BaseModel):
@@ -69,6 +71,7 @@ class UnitUpdate(BaseModel):
     notes: Optional[str] = None
     product_id: Optional[uuid.UUID] = None
     added_date: Optional[date] = None
+    bunker_direction: Optional[str] = None
 
 
 # Buyurtma bilan bog'lanish FAQAT ID raqami (unit_uid == unique_id) bir xilligi
@@ -200,9 +203,11 @@ async def add_units(payload: UnitsCreate, _: CurrentUser,
         raise HTTPException(400, f"Bu ID raqamlar allaqachon mavjud: {', '.join(clashes[:10])}")
 
     added = payload.added_date or date.today()
+    direction = payload.bunker_direction or None
     for uid in ids:
         db.add(Inventory(product_id=prod.id, unique_id=uid, status="available",
-                         added_date=added, notes=payload.notes))
+                         added_date=added, notes=payload.notes,
+                         bunker_direction=direction))
     await db.commit()
     return {"created": len(ids), "product_id": str(prod.id)}
 
@@ -245,6 +250,8 @@ async def update_unit(unit_id: uuid.UUID, payload: UnitUpdate, _: CurrentUser,
         inv.added_date = data["added_date"]
     if "notes" in data:
         inv.notes = data["notes"]
+    if "bunker_direction" in data:
+        inv.bunker_direction = data["bunker_direction"] or None
 
     await db.commit()
     row = (await db.execute(_unit_out_query().where(Inventory.id == unit_id))).first()

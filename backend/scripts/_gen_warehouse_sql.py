@@ -1,4 +1,4 @@
-"""Ombor ro'yxatidan import_warehouse.sql hosil qiladi (bir martalik generator).
+"""Ombor ro'yxatidan import SQL hosil qiladi.
 
 Ishlatish:
   python _gen_warehouse_sql.py            -> import_warehouse.sql fayl yozadi
@@ -7,13 +7,12 @@ Ishlatish:
 
 Har qator: MODEL ... KVM ... "BUNKER O`NGA"/"BUNKER CHAP" ... 1 ... NARX ... ID
 
-Yangi arxitektura: ombor turlari product_type='warehouse' (sotuvdan ajratilgan).
-Bu generator:
+Ombor turlari product_type='warehouse' (sotuvdan ajratilgan). Bu generator:
   1) Har bir (model, kvm) uchun 'warehouse' mahsulot YARATADI (mavjud bo'lmasa).
-  2) Birliklarni shu mahsulotlarga ulaydi.
-Yo'nalish (O'NGA/CHAP) va aniq narx har birlikning `notes` ustuniga yoziladi.
-Idempotent: takror ID qayta qo'shilmaydi (ON CONFLICT DO NOTHING), mahsulot ham
-NOT EXISTS bilan himoyalangan.
+  2) Birliklarni shu mahsulotlarga ulaydi, yo'nalishni (right/left) bunker_direction
+     ustuniga yozadi, narxni notes ga yozadi.
+Idempotent: takror ID qo'shilmaydi, lekin mavjud birlikning yo'nalishi yangilanadi
+(ON CONFLICT (unique_id) DO UPDATE SET bunker_direction).
 """
 import sys
 
@@ -128,7 +127,6 @@ ULTRA 2026    150    BUNKER  O`NGA    1    1 499    268
 ULTRA 2026    150    BUNKER  O`NGA    1    1 499    293
 ULTRA 2026    150    BUNKER CHAP    1    1 499    294
 MAGNUM 26    150    BUNKER CHAP    1    1 559    296
-MAGNUM 26    150    BUNKER CHAP    1    1 559    297
 MAGNUM 26    150    BUNKER CHAP    1    1 559    298
 PREMIUM 3    150    BUNKER  O`NGA    1    1 299    299
 PREMIUM 3    150    BUNKER CHAP    1    1 299    244
@@ -170,7 +168,7 @@ def q(s: str) -> str:
 
 
 def main():
-    units = []           # (model, kvm, uid, direction, price)
+    units = []           # (model, kvm, uid, dir_code, price)
     seen, dup = set(), []
     for line in RAW.strip().splitlines():
         line = line.strip()
@@ -181,34 +179,31 @@ def main():
         kvm = int(bt[-1])
         model = " ".join(bt[:-1]).strip()
         at = after.split()
-        direction = "O'NGA" if at[0].upper().startswith("O") else "CHAP"
+        dir_code = "right" if at[0].upper().startswith("O") else "left"
         uid = at[-1].strip()
-        # narx — qty(at[1]) dan keyingi, uid(at[-1]) gacha bo'lgan tokenlar ("2 299" -> 2299)
-        price = int("".join(at[2:-1]) or "0")
+        price = int("".join(at[2:-1]) or "0")  # qty(at[1]) dan keyin, uid gacha
         if uid in seen:
             dup.append(uid)
             continue
         seen.add(uid)
-        units.append((model, kvm, uid, direction, price))
+        units.append((model, kvm, uid, dir_code, price))
 
     # Aniq (model, kvm) turlari — narx birinchi uchragan qiymat
-    types: dict[tuple[str, int], int] = {}
+    types = {}
     for (m, k, _u, _d, pr) in units:
         types.setdefault((m, k), pr)
 
     type_rows = ",\n  ".join(f"({q(m)}, {k}, {pr})" for (m, k), pr in types.items())
     unit_rows = ",\n  ".join(
-        f"({q(m)}, {k}, {q(u)}, {q('BUNKER ' + d + ' · $' + format(pr, ','))})"
+        f"({q(m)}, {k}, {q(u)}, {q(d)}, {q('$' + format(pr, ','))})"
         for (m, k, u, d, pr) in units
     )
 
     sql = f"""-- NUR ombor importi (avtomatik hosil qilingan — _gen_warehouse_sql.py)
 -- {len(units)} ta kotyol, {len(types)} ta tur (model+kvm).
--- product_type='warehouse' (sotuvdan ajratilgan). Yangi turlarni YARATADI.
--- Yo'nalish + narx har birlikning `notes` ustuniga yoziladi.
--- Idempotent: takror ID qo'shilmaydi (ON CONFLICT DO NOTHING); tur NOT EXISTS bilan.
--- Ishlatish (lokal):
---   docker exec -i nur-postgres psql -U postgres -d nur_erp < backend/scripts/import_warehouse.sql
+-- product_type='warehouse'. Yo'nalish bunker_direction (right/left) ustuniga,
+-- narx notes ga yoziladi. Idempotent: takror ID qo'shilmaydi, lekin mavjudning
+-- yo'nalishi yangilanadi (ON CONFLICT DO UPDATE).
 
 BEGIN;
 
@@ -226,28 +221,30 @@ WHERE NOT EXISTS (
     AND p.kvm = t.kvm
 );
 
--- 2) Birliklarni qo'shish
+-- 2) Birliklarni qo'shish (yo'nalish + narx). Mavjud bo'lsa yo'nalishni yangilaymiz.
 INSERT INTO inventory
-  (id, product_id, unique_id, status, added_date, notes, created_at, updated_at)
-SELECT gen_random_uuid(), p.id, v.uid, 'available', CURRENT_DATE, v.note, now(), now()
+  (id, product_id, unique_id, status, added_date, bunker_direction, notes, created_at, updated_at)
+SELECT gen_random_uuid(), p.id, v.uid, 'available', CURRENT_DATE, v.dir, v.note, now(), now()
 FROM (VALUES
   {unit_rows}
-) AS v(model, kvm, uid, note)
-JOIN products p
-  ON p.product_type = 'warehouse'
- AND lower(btrim(p.model)) = lower(btrim(v.model))
- AND p.kvm = v.kvm
-ON CONFLICT (unique_id) DO NOTHING;
+) AS v(model, kvm, uid, dir, note)
+JOIN LATERAL (
+  SELECT p.id FROM products p
+  WHERE p.product_type = 'warehouse'
+    AND lower(btrim(p.model)) = lower(btrim(v.model))
+    AND p.kvm = v.kvm
+  ORDER BY p.created_at, p.id
+  LIMIT 1
+) p ON true
+ON CONFLICT (unique_id) DO UPDATE SET bunker_direction = EXCLUDED.bunker_direction;
 
 COMMIT;
 
 -- ====== Natija ======
 SELECT 'turlar' AS nima, count(*) FROM products WHERE product_type='warehouse'
-UNION ALL
-SELECT 'birliklar', count(*) FROM inventory;
+UNION ALL SELECT 'birliklar', count(*) FROM inventory
+UNION ALL SELECT 'yo''nalishli', count(*) FROM inventory WHERE bunker_direction IS NOT NULL;
 """
-    # --stdout: SQL ni to'g'ridan-to'g'ri stdout ga (faylsiz, psql ga pipe uchun).
-    # Hisobot stderr ga ketadi — pipe'ni ifloslamaydi.
     if "--stdout" in sys.argv:
         sys.stdout.write(sql)
         print(f"[gen] {len(units)} kotyol, {len(types)} tur"
@@ -260,9 +257,6 @@ SELECT 'birliklar', count(*) FROM inventory;
     print(f"Yozildi: {out}  ({len(units)} kotyol, {len(types)} tur)")
     if dup:
         print(f"  Takror ID tashlandi: {dup}")
-    print("  Turlar:")
-    for (m, k), pr in sorted(types.items()):
-        print(f"    {m} · {k} kvm  (${pr})")
 
 
 if __name__ == "__main__":

@@ -20,6 +20,7 @@ export default function AddUnitsModal({ onClose, onSaved }: { onClose: () => voi
   const [productId, setProductId] = useState('');
   const [idsText, setIdsText] = useState('');
   const [notes, setNotes] = useState('');
+  const [direction, setDirection] = useState('');
   const [saving, setSaving] = useState(false);
 
   const { data: products } = useQuery<{ items: ProductOpt[] }>({
@@ -44,6 +45,7 @@ export default function AddUnitsModal({ onClose, onSaved }: { onClose: () => voi
     try {
       const r = await api.post('/inventory/units', {
         product_id: productId, unique_ids: ids, notes: notes.trim() || null,
+        bunker_direction: direction || null,
       });
       toast.success(t('warehouse.add.created', { count: r.data.created }));
       onSaved();
@@ -85,6 +87,14 @@ export default function AddUnitsModal({ onClose, onSaved }: { onClose: () => voi
               onChange={(e) => setIdsText(e.target.value)}
             />
             <div className="text-xs text-ink-soft mt-1">{t('warehouse.add.count', { count: ids.length })}</div>
+          </div>
+          <div>
+            <label className="text-xs text-ink-soft">{t('warehouse.add.direction')}</label>
+            <select className="input w-full mt-1" value={direction} onChange={(e) => setDirection(e.target.value)}>
+              <option value="">{t('warehouse.dir.any')}</option>
+              <option value="right">{t('warehouse.dir.right')}</option>
+              <option value="left">{t('warehouse.dir.left')}</option>
+            </select>
           </div>
           <div>
             <label className="text-xs text-ink-soft">{t('warehouse.add.note')}</label>

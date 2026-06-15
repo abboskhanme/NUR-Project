@@ -23,7 +23,8 @@
     "id": "ID raqami",
     "status": "Holat",
     "added": "Qoʻshilgan",
-    "order": "Buyurtma / mijoz"
+    "order": "Buyurtma / mijoz",
+    "direction": "Yoʻnalish"
   },
   "add": {
     "title": "Birlik qoʻshish",
@@ -35,7 +36,8 @@
     "note": "Izoh (ixtiyoriy)",
     "submit": "Qoʻshish",
     "created": "{{count}} ta birlik qoʻshildi",
-    "needIds": "Kamida bitta ID raqami kerak"
+    "needIds": "Kamida bitta ID raqami kerak",
+    "direction": "Yoʻnalish"
   },
   "edit": {
     "title": "Birlikni tahrirlash",
@@ -43,7 +45,8 @@
     "id": "ID raqami",
     "added": "Qo'shilgan sana",
     "note": "Izoh",
-    "needId": "ID raqami kerak"
+    "needId": "ID raqami kerak",
+    "direction": "Yoʻnalish"
   },
   "tabs": {
     "types": "Turlari",
@@ -62,5 +65,10 @@
     },
     "deleteTitle": "Modelni oʻchirish",
     "deleteMessage": "«{{name}}» modelini oʻchirishni tasdiqlaysizmi?"
+  },
+  "dir": {
+    "right": "Oʻngga",
+    "left": "Chapga",
+    "any": "— tanlanmagan —"
   }
 }

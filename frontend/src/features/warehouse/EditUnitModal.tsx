@@ -10,6 +10,7 @@ export interface EditableUnit {
   id: string;
   unique_id: string;
   notes?: string | null;
+  bunker_direction?: string | null;
   model?: string | null;
   kvm?: number | null;
   status?: string;
@@ -31,6 +32,7 @@ export default function EditUnitModal({ unit, onClose, onSaved }: {
   const [uniqueId, setUniqueId] = useState(unit.unique_id);
   const [addedDate, setAddedDate] = useState((unit.added_date ?? '').slice(0, 10));
   const [notes, setNotes] = useState(unit.notes ?? '');
+  const [direction, setDirection] = useState(unit.bunker_direction ?? '');
   const [saving, setSaving] = useState(false);
 
   const { data: products } = useQuery<{ items: ProductOpt[] }>({
@@ -51,6 +53,7 @@ export default function EditUnitModal({ unit, onClose, onSaved }: {
         product_id: productId || undefined,
         added_date: addedDate || undefined,
         notes: notes.trim() || null,
+        bunker_direction: direction || null,
       });
       toast.success(t('common.updated'));
       onSaved();
@@ -85,6 +88,14 @@ export default function EditUnitModal({ unit, onClose, onSaved }: {
           <div>
             <label className="text-xs text-ink-soft">{t('warehouse.edit.id')}</label>
             <input className="input w-full mt-1 font-mono" value={uniqueId} onChange={(e) => setUniqueId(e.target.value)} autoFocus />
+          </div>
+          <div>
+            <label className="text-xs text-ink-soft">{t('warehouse.edit.direction')}</label>
+            <select className="input w-full mt-1" value={direction} onChange={(e) => setDirection(e.target.value)}>
+              <option value="">{t('warehouse.dir.any')}</option>
+              <option value="right">{t('warehouse.dir.right')}</option>
+              <option value="left">{t('warehouse.dir.left')}</option>
+            </select>
           </div>
           <div>
             <label className="text-xs text-ink-soft">{t('warehouse.edit.added')}</label>
