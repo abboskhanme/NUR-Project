@@ -150,6 +150,9 @@
     "totalCost": "Total cost",
     "net": "Net",
     "finalize": "Finalize trip",
-    "closed": "Trip finalized"
+    "closed": "Trip finalized",
+    "name": "Trip name",
+    "namePlaceholder": "e.g. Fergana — Jun 12",
+    "saved": "saved"
   }
 }

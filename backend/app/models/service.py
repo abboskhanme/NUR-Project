@@ -40,6 +40,10 @@ class ServiceTicket(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     created_by_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
     )
+    # Servis safari (yakunlanganda bog'lanadi) — yaxlit yozuv uchun
+    trip_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("service_trips.id", ondelete="SET NULL"), index=True
+    )
 
     visits: Mapped[list["ServiceVisit"]] = relationship(
         back_populates="ticket", cascade="all, delete-orphan", lazy="selectin"
@@ -84,6 +88,7 @@ class ServiceTrip(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     """
     __tablename__ = "service_trips"
 
+    name: Mapped[Optional[str]] = mapped_column(String(120))
     status: Mapped[str] = mapped_column(String(20), default="open", index=True)  # open / closed
     collected: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
     spent: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)

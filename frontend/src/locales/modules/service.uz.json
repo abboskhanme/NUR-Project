@@ -150,6 +150,9 @@
     "totalCost": "Umumiy harajat",
     "net": "Sof",
     "finalize": "Safarni yakunlash",
-    "closed": "Safar yakunlandi"
+    "closed": "Safar yakunlandi",
+    "name": "Safar nomi",
+    "namePlaceholder": "Masalan: Farg'ona — 12-iyun",
+    "saved": "saqlandi"
   }
 }

@@ -131,9 +131,19 @@ async def close_trip(trip_id: uuid.UUID, user: CurrentUser,
         select(ServiceTrip).where(ServiceTrip.id == trip_id))).scalar_one_or_none()
     if not trip:
         raise HTTPException(404, "Safar topilmadi")
+    now = datetime.now(timezone.utc)
+    # Shu safardagi BARCHA rejalashtirilgan arizalar avtomatik "bajarildi" ga o'tadi
+    # va safarga bog'lanadi (yaxlit yozuv uchun).
+    scheduled = (await db.execute(
+        select(ServiceTicket).where(ServiceTicket.status == "scheduled"))).scalars().all()
+    for tk in scheduled:
+        tk.status = "completed"
+        tk.trip_id = trip.id
+        if not tk.closed_at:
+            tk.closed_at = now
     trip.status = "closed"
-    trip.closed_at = datetime.now(timezone.utc)
-    trip.ticket_count = await _scheduled_count(db)
+    trip.closed_at = now
+    trip.ticket_count = len(scheduled)
     await db.commit()
     # Keyingi safar uchun yangi ochiq yozuv
     new_trip = await _open_trip(db, user)

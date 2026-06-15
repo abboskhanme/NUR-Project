@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
@@ -8,7 +8,7 @@ import { api } from '@/api/client';
 import { formatUZS } from '@/lib/format';
 
 interface Trip {
-  id: string; status: string;
+  id: string; name?: string | null; status: string;
   collected: string; spent: string;
   note?: string | null; ticket_count: number; scheduled_count: number;
 }
@@ -18,8 +18,9 @@ const toNum = (s: string) => parseInt(s.replace(/[^\d]/g, ''), 10) || 0;
 const fmt = (v: string) => (Number(v) ? grp(String(Math.round(Number(v)))) : '');
 
 /**
- * Servis safari paneli — FAQAT "Rejalashtirilgan" filtrida ko'rsatiladi.
- * Barcha rejalashtirilgan arizalar bitta safar; uchta umumiy summa qo'lda kiritiladi.
+ * Servis safari paneli — FAQAT "Rejalashtirilgan" filtrida.
+ * Nom + olingan/sarflangan avtomatik saqlanadi (Saqlash tugmasi yo'q).
+ * "Safarni yakunlash" — barcha rejalashtirilgan arizalarni "bajarildi" ga o'tkazadi.
  */
 export default function ServiceTripPanel({ onChanged }: { onChanged: () => void }) {
   const { t } = useTranslation();
@@ -29,29 +30,40 @@ export default function ServiceTripPanel({ onChanged }: { onChanged: () => void 
   });
   const trip = tripQ.data;
 
+  const [name, setName] = useState('');
   const [collected, setCollected] = useState('');
   const [spent, setSpent] = useState('');
   const [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const dirty = useRef(false);
 
   useEffect(() => {
     if (!trip) return;
+    setName(trip.name ?? '');
     setCollected(fmt(trip.collected));
     setSpent(fmt(trip.spent));
+    dirty.current = false;
   }, [trip?.id]);
 
-  async function save() {
+  // Avtosaqlash — o'zgarishdan ~700ms keyin
+  useEffect(() => {
+    if (!trip || !dirty.current) return;
+    const tmr = setTimeout(autoSave, 700);
+    return () => clearTimeout(tmr);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [name, collected, spent]);
+
+  async function autoSave() {
     if (!trip) return;
-    setBusy(true);
     try {
       await api.patch(`/service/trips/${trip.id}`, {
-        collected: toNum(collected), spent: toNum(spent),
+        name: name.trim() || null, collected: toNum(collected), spent: toNum(spent),
       });
-      toast.success(t('common.updated'));
-      tripQ.refetch();
+      dirty.current = false;
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1500);
     } catch (e: any) {
       toast.error(e?.response?.data?.detail || t('common.error'));
-    } finally {
-      setBusy(false);
     }
   }
 
@@ -77,17 +89,25 @@ export default function ServiceTripPanel({ onChanged }: { onChanged: () => void 
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="font-semibold flex items-center gap-2">
           <Receipt size={16} className="text-primary" /> {t('service.trip.title')}
+          {saved && <span className="text-xs font-normal text-success">✓ {t('service.trip.saved')}</span>}
         </div>
         <div className="text-xs text-ink-soft">
           {t('service.trip.ticketCount', { n: trip?.scheduled_count ?? 0 })}
         </div>
       </div>
 
+      <div>
+        <label className="text-xs text-ink-soft">{t('service.trip.name')}</label>
+        <input className="input w-full mt-1" placeholder={t('service.trip.namePlaceholder')}
+               value={name}
+               onChange={(e) => { dirty.current = true; setName(e.target.value); }} />
+      </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label={t('service.trip.collected')} value={collected} accent="text-success"
-               onChange={(v) => setCollected(grp(v))} />
+               onChange={(v) => { dirty.current = true; setCollected(grp(v)); }} />
         <Field label={t('service.trip.spent')} value={spent} accent="text-danger"
-               onChange={(v) => setSpent(grp(v))} />
+               onChange={(v) => { dirty.current = true; setSpent(grp(v)); }} />
       </div>
 
       <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -97,15 +117,10 @@ export default function ServiceTripPanel({ onChanged }: { onChanged: () => void 
             {formatUZS(net)}
           </span>
         </div>
-        <div className="flex gap-2">
-          <button onClick={save} disabled={busy} className="btn-primary disabled:opacity-50">
-            {t('actions.save')}
-          </button>
-          <button onClick={finalize} disabled={busy}
-                  className="px-3 py-1.5 text-sm rounded-button border border-success/30 text-success hover:bg-success/10 disabled:opacity-50 inline-flex items-center gap-1">
-            <Check size={15} /> {t('service.trip.finalize')}
-          </button>
-        </div>
+        <button onClick={finalize} disabled={busy}
+                className="px-3 py-1.5 text-sm rounded-button border border-success/30 text-success hover:bg-success/10 disabled:opacity-50 inline-flex items-center gap-1">
+          <Check size={15} /> {t('service.trip.finalize')}
+        </button>
       </div>
     </div>
   );

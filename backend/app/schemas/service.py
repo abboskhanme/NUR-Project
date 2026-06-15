@@ -118,6 +118,7 @@ class ServiceSummary(BaseModel):
 
 
 class ServiceTripUpdate(BaseModel):
+    name: Optional[str] = None
     collected: Optional[Decimal] = None
     spent: Optional[Decimal] = None
     note: Optional[str] = None
@@ -125,6 +126,7 @@ class ServiceTripUpdate(BaseModel):
 
 class ServiceTripOut(ORMBase):
     id: uuid.UUID
+    name: Optional[str] = None
     status: str
     collected: Decimal
     spent: Decimal
