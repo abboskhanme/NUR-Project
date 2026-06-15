@@ -16,7 +16,6 @@ class ServiceTicketBase(BaseModel):
     address: Optional[str] = None
     problem: str
     category: Optional[str] = None
-    scheduled_at: Optional[datetime] = None
     in_warranty: bool = False
 
 
@@ -26,7 +25,6 @@ class ServiceTicketCreate(ServiceTicketBase):
 
 class ServiceTicketUpdate(BaseModel):
     status: Optional[str] = None
-    scheduled_at: Optional[datetime] = None
     resolution: Optional[str] = None
     client_cost: Optional[Decimal] = None
     closed_at: Optional[datetime] = None
@@ -78,7 +76,6 @@ class ServiceTicketOut(ORMBase):
     problem: str
     category: Optional[str] = None
     opened_at: datetime
-    scheduled_at: Optional[datetime] = None
     closed_at: Optional[datetime] = None
     status: str
     in_warranty: bool
@@ -116,6 +113,5 @@ class ServiceSummary(BaseModel):
     completed: int
     cancelled: int
     in_warranty_open: int
-    scheduled_next7: int
-    # Borish rejalashtirilgan (scheduled_at bor) arizalar soni — ✅ znachok kartasi
+    # Rejalashtirilgan (status='scheduled') arizalar soni — ✅ znachok kartasi
     with_visit: int = 0

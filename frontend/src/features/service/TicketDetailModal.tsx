@@ -8,14 +8,13 @@ import {
 } from 'lucide-react';
 
 import { api } from '@/api/client';
-import DateInput from '@/components/ui/DateInput';
 import { formatDate, formatDateTime, formatPhone, formatUZS } from '@/lib/format';
 import { ServiceStatusBadge } from './status';
 
 interface Visit { id: string; planned_at?: string | null; note?: string | null; created_at: string }
 interface Ticket {
   id: string; code: string; status: string; problem: string; category?: string | null;
-  in_warranty: boolean; opened_at: string; scheduled_at?: string | null; closed_at?: string | null;
+  in_warranty: boolean; opened_at: string; closed_at?: string | null;
   resolution?: string | null; client_cost: string; address?: string | null; order_id?: string | null;
   customer?: { full_name: string; phone: string } | null;
   order?: { code: string; delivered_at?: string | null } | null;
@@ -37,16 +36,6 @@ const WMETA_CLS: Record<string, { cls: string; Icon: any }> = {
 const fmtCost = (s: string) => s.replace(/[^\d]/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 const toNum = (s: string) => parseInt(s.replace(/[^\d]/g, ''), 10) || 0;
 
-function splitDt(iso?: string | null): { d: string; t: string } {
-  if (!iso) return { d: '', t: '' };
-  const dt = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return {
-    d: `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`,
-    t: `${pad(dt.getHours())}:${pad(dt.getMinutes())}`,
-  };
-}
-
 export default function TicketDetailModal({
   ticketId, onClose, onChanged,
 }: { ticketId: string; onClose: () => void; onChanged: () => void }) {
@@ -64,8 +53,6 @@ export default function TicketDetailModal({
     enabled: !!tk?.order_id,
   });
 
-  const [date, setDate] = useState('');
-  const [time, setTime] = useState('');
   const [resolution, setResolution] = useState('');
   const [cost, setCost] = useState('');
   const [newNote, setNewNote] = useState('');
@@ -73,8 +60,6 @@ export default function TicketDetailModal({
 
   useEffect(() => {
     if (!tk) return;
-    const s = splitDt(tk.scheduled_at);
-    setDate(s.d); setTime(s.t);
     setResolution(tk.resolution || '');
     setCost(tk.client_cost && Number(tk.client_cost) ? fmtCost(String(Math.round(Number(tk.client_cost)))) : '');
   }, [tk?.id]);
@@ -111,16 +96,14 @@ export default function TicketDetailModal({
   }
 
   function saveDetails() {
-    const scheduled_at = date ? `${date}T${time || '09:00'}:00` : null;
-    patch({ scheduled_at, resolution: resolution.trim() || null, client_cost: toNum(cost) }, t('service.toast.saved'));
+    patch({ resolution: resolution.trim() || null, client_cost: toNum(cost) }, t('service.toast.saved'));
   }
 
   async function addNote() {
-    if (!newNote.trim() && !date) { toast.error(t('service.toast.errorNote')); return; }
+    if (!newNote.trim()) { toast.error(t('service.toast.errorNote')); return; }
     setBusy(true);
     try {
       await api.post(`/service/tickets/${ticketId}/visits`, {
-        planned_at: date ? `${date}T${time || '09:00'}:00` : null,
         note: newNote.trim() || null,
       });
       setNewNote('');
@@ -211,18 +194,7 @@ export default function TicketDetailModal({
               </div>
             )}
 
-            {/* Date / resolution / cost */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="label">{t('service.detail.visitDate')}</label>
-                <DateInput value={date} onChange={setDate} />
-              </div>
-              <div>
-                <label className="label">{t('service.detail.visitTime')}</label>
-                <input type="time" className="input" value={time} onChange={(e) => setTime(e.target.value)} />
-              </div>
-            </div>
-
+            {/* Resolution / cost */}
             <div>
               <label className="label">{t('service.detail.resolution')}</label>
               <textarea className="input min-h-[60px]" placeholder={t('service.detail.resolutionPlaceholder')}

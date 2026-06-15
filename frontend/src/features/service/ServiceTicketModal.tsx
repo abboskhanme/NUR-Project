@@ -1,11 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { X, Search, Check, Package } from 'lucide-react';
 
 import { api } from '@/api/client';
-import DateInput from '@/components/ui/DateInput';
 import { formatDate, formatPhone } from '@/lib/format';
 import { computeWarranty, WARRANTY_META } from '@/features/service/warranty';
 
@@ -26,8 +25,6 @@ export default function ServiceTicketModal({
   const [order, setOrder] = useState<Order | null>(null);
   const [problem, setProblem] = useState('');
   const [category, setCategory] = useState('');
-  const [date, setDate] = useState('');
-  const [time, setTime] = useState('');
   const [address, setAddress] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -62,8 +59,6 @@ export default function ServiceTicketModal({
     queryFn: () => api.get('/service/categories').then((r) => r.data),
   });
   const categories = categoriesQ.data ?? [];
-
-  const scheduledAt = useMemo(() => (date ? `${date}T${time || '09:00'}:00` : null), [date, time]);
 
   const orderHasAddress = !!(order?.delivery_address && order.delivery_address.trim());
   const needAddress = !!order && !orderHasAddress;
@@ -108,7 +103,6 @@ export default function ServiceTicketModal({
         order_id: order.id,
         problem: problem.trim() || category,
         category: category || null,
-        scheduled_at: scheduledAt,
         address: needAddress ? address.trim() : null,
       });
       toast.success(t('service.toast.ticketCreated'));
@@ -248,18 +242,6 @@ export default function ServiceTicketModal({
                 {categories.length === 0 && (
                   <div className="text-xs text-ink-soft mt-1">{t('service.form.noCategoriesHint')}</div>
                 )}
-              </div>
-
-              {/* 4. Visit date */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="label">{t('service.form.visitDate')}</label>
-                  <DateInput value={date} onChange={setDate} />
-                </div>
-                <div>
-                  <label className="label">{t('service.form.visitTime')}</label>
-                  <input type="time" className="input" value={time} onChange={(e) => setTime(e.target.value)} />
-                </div>
               </div>
 
               {/* Address — only if order has no address */}

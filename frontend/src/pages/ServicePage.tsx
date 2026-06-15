@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { Plus, Search, Wrench, CalendarClock, Tag, List, CalendarDays, CheckCircle2 } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { Plus, Search, Wrench, CalendarClock, Tag, CheckCircle2 } from 'lucide-react';
 
 import { api } from '@/api/client';
 import Card from '@/components/ui/Card';
@@ -10,18 +11,17 @@ import { formatDate, formatPhone } from '@/lib/format';
 import ServiceTicketModal from '@/features/service/ServiceTicketModal';
 import TicketDetailModal from '@/features/service/TicketDetailModal';
 import ServiceCategoryModal from '@/features/service/ServiceCategoryModal';
-import ServiceCalendar from '@/features/service/ServiceCalendar';
 import { ServiceStatusBadge } from '@/features/service/status';
 
 interface Ticket {
   id: string; code: string; problem: string; status: string;
-  in_warranty: boolean; opened_at: string; scheduled_at?: string | null;
+  in_warranty: boolean; opened_at: string;
   customer?: { full_name: string; phone: string } | null;
   order?: { code: string } | null;
 }
 interface Summary {
   total: number; new: number; scheduled: number;
-  completed: number; cancelled: number; in_warranty_open: number; scheduled_next7: number;
+  completed: number; cancelled: number; in_warranty_open: number;
   with_visit: number;
 }
 
@@ -41,7 +41,6 @@ export default function ServicePage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [catOpen, setCatOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
-  const [view, setView] = useState<'list' | 'calendar'>('list');
 
   const summaryQ = useQuery<Summary>({
     queryKey: ['service-summary'],
@@ -62,6 +61,17 @@ export default function ServicePage() {
     ticketsQ.refetch();
     summaryQ.refetch();
   };
+
+  // Znachok bosilganda: rejalashtirilgan (scheduled) ↔ yangi (new) o'rtasida almashtiradi
+  async function toggleScheduled(tk: Ticket) {
+    const next = tk.status === 'scheduled' ? 'new' : 'scheduled';
+    try {
+      await api.patch(`/service/tickets/${tk.id}`, { status: next });
+      refetchAll();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || t('common.error'));
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -119,29 +129,13 @@ export default function ServicePage() {
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-2">
-          {/* Ko'rinish almashtirgich — standart "ro'yxat" (mavjud ko'rinish o'zgarmaydi) */}
-          <div className="flex rounded-button border border-black/10 overflow-hidden">
-            <button onClick={() => setView('list')} title={t('service.view.list')}
-                    className={`p-2 ${view === 'list' ? 'bg-primary text-white' : 'text-ink-soft hover:bg-black/5'}`}>
-              <List size={16} />
-            </button>
-            <button onClick={() => setView('calendar')} title={t('service.view.calendar')}
-                    className={`p-2 ${view === 'calendar' ? 'bg-primary text-white' : 'text-ink-soft hover:bg-black/5'}`}>
-              <CalendarDays size={16} />
-            </button>
-          </div>
-          <div className="relative">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft" />
-            <input className="input pl-9 w-56" placeholder={t('service.search.placeholder')}
-                   value={search} onChange={(e) => setSearch(e.target.value)} />
-          </div>
+        <div className="relative">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft" />
+          <input className="input pl-9 w-56" placeholder={t('service.search.placeholder')}
+                 value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
       </div>
 
-      {view === 'calendar' ? (
-        <ServiceCalendar onSelect={setDetailId} />
-      ) : (
       <Card>
         {ticketsQ.isLoading ? (
           <div className="space-y-2">
@@ -170,10 +164,16 @@ export default function ServicePage() {
                 {tickets.map((tk) => (
                   <tr key={tk.id} onClick={() => setDetailId(tk.id)}
                       className="border-b border-black/5 hover:bg-black/5 cursor-pointer">
-                    <td className="py-2 pr-3 text-center">
-                      {tk.scheduled_at
-                        ? <CheckCircle2 size={20} className="text-success inline" aria-label={t('service.table.planned', { defaultValue: 'Rejalashtirilgan' })} />
-                        : null}
+                    <td className="py-2 pr-3 text-center" onClick={(e) => e.stopPropagation()}>
+                      {tk.status === 'new' || tk.status === 'scheduled' ? (
+                        <button onClick={() => toggleScheduled(tk)}
+                                title={t('service.kpi.planned')}
+                                className={'inline-flex transition-colors ' + (tk.status === 'scheduled'
+                                  ? 'text-success'
+                                  : 'text-danger/70 hover:text-danger')}>
+                          <CheckCircle2 size={22} strokeWidth={2.5} />
+                        </button>
+                      ) : null}
                     </td>
                     <td className="py-2 pr-3">
                       {tk.customer ? (
@@ -199,7 +199,6 @@ export default function ServicePage() {
           </div>
         )}
       </Card>
-      )}
 
       {createOpen && (
         <ServiceTicketModal onClose={() => setCreateOpen(false)} onSaved={refetchAll} />

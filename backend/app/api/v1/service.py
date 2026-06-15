@@ -1,6 +1,6 @@
 """Service tickets, visits, warranty."""
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -53,18 +53,6 @@ async def summary(db: Annotated[AsyncSession, Depends(get_db)], _: CurrentUser):
             ServiceTicket.status.in_(open_statuses),
         )
     )).scalar() or 0
-    now = datetime.now(timezone.utc)
-    next7 = (await db.execute(
-        select(func.count(ServiceTicket.id)).where(
-            ServiceTicket.scheduled_at.is_not(None),
-            ServiceTicket.scheduled_at >= now,
-            ServiceTicket.scheduled_at <= now + timedelta(days=7),
-            ServiceTicket.status.in_(open_statuses),
-        )
-    )).scalar() or 0
-    with_visit = (await db.execute(
-        select(func.count(ServiceTicket.id)).where(ServiceTicket.scheduled_at.is_not(None))
-    )).scalar() or 0
     return ServiceSummary(
         total=sum(counts.values()),
         new=counts.get("new", 0),
@@ -72,8 +60,7 @@ async def summary(db: Annotated[AsyncSession, Depends(get_db)], _: CurrentUser):
         completed=counts.get("completed", 0),
         cancelled=counts.get("cancelled", 0),
         in_warranty_open=in_warranty_open,
-        scheduled_next7=next7,
-        with_visit=with_visit,
+        with_visit=counts.get("scheduled", 0),
     )
 
 
@@ -138,11 +125,10 @@ async def create_ticket(payload: ServiceTicketCreate, user: CurrentUser,
     )).scalar() or 0) + 1
     code = _gen_code(year, n)
 
-    initial_status = "scheduled" if data.get("scheduled_at") else "new"
     ticket = ServiceTicket(
         code=code,
         opened_at=datetime.now(timezone.utc),
-        status=initial_status,
+        status="new",
         created_by_id=user.id,
         **data,
     )

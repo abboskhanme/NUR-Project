@@ -30,7 +30,6 @@ class ServiceTicket(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     category: Mapped[Optional[str]] = mapped_column(String(50))
 
     opened_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    scheduled_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     closed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
     status: Mapped[str] = mapped_column(String(20), default="new", index=True)
