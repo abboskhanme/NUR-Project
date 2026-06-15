@@ -86,6 +86,7 @@ export default function OrdersTable({
     <div className="overflow-x-auto -mx-2">
       <table className="text-sm border-collapse table-fixed w-[2000px]">
         <colgroup>
+          <col style={{ width: 44 }} />
           <col style={{ width: 70 }} />
           <col style={{ width: 140 }} />
           <col style={{ width: 140 }} />
@@ -105,6 +106,7 @@ export default function OrdersTable({
         </colgroup>
         <thead className="text-left text-ink-soft border-b border-black/10">
           <tr className="[&>th]:py-2 [&>th]:px-2 [&>th]:font-medium [&>th]:whitespace-nowrap">
+            <th></th>
             <th>{t('sales.colUnitId')}</th>
             <th>{t('sales.colOrder')}</th>
             <th>{t('sales.colDelivered')}</th>
@@ -272,6 +274,10 @@ function Row({
 
   return (
     <tr className={'border-b border-black/5 transition-colors ' + rowTint(status, balance) + (saving ? ' opacity-60' : '')}>
+      {/* Navbatga olish — qator boshida, yorqin */}
+      <td className={cell + ' text-center'}>
+        <QueueButton o={o} onChanged={onChanged} />
+      </td>
       {/* Ombor ID raqami — navbat raqami o'rniga; bo'sh kotyolni band qiladi */}
       <td className={cell + ' text-center'}>
         {locked ? (
@@ -437,8 +443,7 @@ function Row({
       </td>
 
       <td className={cell}>
-        <div className="flex items-center gap-0.5">
-          <QueueButton o={o} onChanged={onChanged} />
+        <div className="flex items-center justify-center">
           <button onClick={() => navigate(`/orders/${o.id}`)} className="p-1 rounded hover:bg-black/5 text-ink-soft" title={t('sales.openOrder')}>
             <ExternalLink size={14} />
           </button>
@@ -484,13 +489,15 @@ function QueueButton({ o, onChanged }: { o: OrderFull; onChanged: () => void }) 
     <>
       {o.in_queue ? (
         <button onClick={removeFromQueue} disabled={busy}
-                className="p-1 rounded hover:bg-blue-50 text-blue-600" title={t('sales.removeFromQueue')}>
-          <ListX size={14} />
+                className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-blue-600 text-white shadow-sm ring-1 ring-blue-700/20 hover:bg-blue-700 transition disabled:opacity-50"
+                title={t('sales.removeFromQueue')}>
+          <ListX size={15} strokeWidth={2.5} />
         </button>
       ) : (
         <button onClick={() => setOpen(true)} disabled={busy}
-                className="p-1 rounded hover:bg-black/5 text-ink-soft" title={t('sales.addToQueue')}>
-          <ListPlus size={14} />
+                className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-primary/10 text-primary ring-1 ring-primary/25 hover:bg-primary hover:text-white transition disabled:opacity-50"
+                title={t('sales.addToQueue')}>
+          <ListPlus size={15} strokeWidth={2.5} />
         </button>
       )}
       {open && createPortal(
