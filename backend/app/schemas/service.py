@@ -29,6 +29,7 @@ class ServiceTicketUpdate(BaseModel):
     client_cost: Optional[Decimal] = None
     closed_at: Optional[datetime] = None
     in_warranty: Optional[bool] = None
+    parts_used: Optional[list[str]] = None
 
 
 class ServiceVisitIn(BaseModel):
@@ -81,6 +82,7 @@ class ServiceTicketOut(ORMBase):
     in_warranty: bool
     resolution: Optional[str] = None
     client_cost: Decimal
+    parts_used: list[str] = []
     visits: list[ServiceVisitOut] = []
     customer: Optional[CustomerMini] = None
     order: Optional[OrderMini] = None
@@ -101,6 +103,16 @@ class ServiceCategoryIn(BaseModel):
 
 
 class ServiceCategoryOut(ORMBase):
+    id: uuid.UUID
+    name: str
+    is_active: bool = True
+
+
+class ServicePartIn(BaseModel):
+    name: str
+
+
+class ServicePartOut(ORMBase):
     id: uuid.UUID
     name: str
     is_active: bool = True

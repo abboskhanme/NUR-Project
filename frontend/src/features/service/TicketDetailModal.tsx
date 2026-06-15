@@ -16,6 +16,7 @@ interface Ticket {
   id: string; code: string; status: string; problem: string; category?: string | null;
   in_warranty: boolean; opened_at: string; closed_at?: string | null;
   resolution?: string | null; client_cost: string; address?: string | null; order_id?: string | null;
+  parts_used?: string[];
   customer?: { full_name: string; phone: string } | null;
   order?: { code: string; delivered_at?: string | null } | null;
   visits: Visit[];
@@ -52,9 +53,15 @@ export default function TicketDetailModal({
     queryFn: () => api.get(`/service/warranty/${tk!.order_id}`).then((r) => r.data),
     enabled: !!tk?.order_id,
   });
+  const partsQ = useQuery<{ id: string; name: string }[]>({
+    queryKey: ['service-parts'],
+    queryFn: () => api.get('/service/parts').then((r) => r.data),
+  });
+  const allParts = partsQ.data ?? [];
 
   const [resolution, setResolution] = useState('');
   const [cost, setCost] = useState('');
+  const [partsUsed, setPartsUsed] = useState<string[]>([]);
   const [newNote, setNewNote] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -62,6 +69,7 @@ export default function TicketDetailModal({
     if (!tk) return;
     setResolution(tk.resolution || '');
     setCost(tk.client_cost && Number(tk.client_cost) ? fmtCost(String(Math.round(Number(tk.client_cost)))) : '');
+    setPartsUsed(tk.parts_used ?? []);
   }, [tk?.id]);
 
   useEffect(() => {
@@ -96,7 +104,12 @@ export default function TicketDetailModal({
   }
 
   function saveDetails() {
-    patch({ resolution: resolution.trim() || null, client_cost: toNum(cost) }, t('service.toast.saved'));
+    patch({ resolution: resolution.trim() || null, client_cost: toNum(cost), parts_used: partsUsed },
+          t('service.toast.saved'));
+  }
+
+  function togglePart(name: string) {
+    setPartsUsed((cur) => (cur.includes(name) ? cur.filter((x) => x !== name) : [...cur, name]));
   }
 
   async function addNote() {
@@ -191,6 +204,26 @@ export default function TicketDetailModal({
                   className="btn-action bg-gray-100 text-gray-600 hover:bg-gray-200">
                   <Ban size={15} /> {t('service.detail.markCancelled')}
                 </button>
+              </div>
+            )}
+
+            {/* Ishlatilgan ehtiyot qismlar — ko'p tanlov */}
+            {allParts.length > 0 && (
+              <div>
+                <label className="label">{t('service.detail.partsUsed')}</label>
+                <div className="flex flex-wrap gap-1.5 mt-1">
+                  {allParts.map((p) => {
+                    const on = partsUsed.includes(p.name);
+                    return (
+                      <button key={p.id} type="button" onClick={() => togglePart(p.name)}
+                        className={'px-2.5 py-1 rounded-full text-xs font-medium border transition ' +
+                          (on ? 'bg-primary text-white border-primary'
+                              : 'bg-black/5 text-ink-soft border-transparent hover:bg-black/10')}>
+                        {p.name}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             )}
 

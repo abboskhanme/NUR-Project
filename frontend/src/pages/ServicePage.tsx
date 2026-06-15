@@ -11,6 +11,7 @@ import { formatDate, formatPhone } from '@/lib/format';
 import ServiceTicketModal from '@/features/service/ServiceTicketModal';
 import TicketDetailModal from '@/features/service/TicketDetailModal';
 import ServiceCategoryModal from '@/features/service/ServiceCategoryModal';
+import ServicePartsModal from '@/features/service/ServicePartsModal';
 import ServiceTripPanel from '@/features/service/ServiceTripPanel';
 import ServiceTripsList from '@/features/service/ServiceTripsList';
 import { ServiceStatusBadge } from '@/features/service/status';
@@ -42,6 +43,7 @@ export default function ServicePage() {
   const [search, setSearch] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
   const [catOpen, setCatOpen] = useState(false);
+  const [partsOpen, setPartsOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [tab, setTab] = useState<'tickets' | 'trips'>('tickets');
 
@@ -86,6 +88,9 @@ export default function ServicePage() {
         <div className="flex items-center gap-2">
           <button className="btn-ghost" onClick={() => setCatOpen(true)}>
             <Tag size={16} /> {t('service.categories')}
+          </button>
+          <button className="btn-ghost" onClick={() => setPartsOpen(true)}>
+            <Wrench size={16} /> {t('service.parts')}
           </button>
           <button className="btn-primary" onClick={() => setCreateOpen(true)}>
             <Plus size={16} /> {t('service.newTicket')}
@@ -230,6 +235,7 @@ export default function ServicePage() {
         <TicketDetailModal ticketId={detailId} onClose={() => setDetailId(null)} onChanged={refetchAll} />
       )}
       {catOpen && <ServiceCategoryModal onClose={() => setCatOpen(false)} />}
+      {partsOpen && <ServicePartsModal onClose={() => setPartsOpen(false)} />}
     </div>
   );
 }

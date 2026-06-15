@@ -5,7 +5,7 @@ from decimal import Decimal
 from typing import Optional
 
 from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Numeric, String, Text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
@@ -28,6 +28,8 @@ class ServiceTicket(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     address: Mapped[Optional[str]] = mapped_column(Text)
     problem: Mapped[str] = mapped_column(Text, nullable=False)
     category: Mapped[Optional[str]] = mapped_column(String(50))
+    # Ishlatilgan ehtiyot qismlar nomlari (servisdan kelgach tanlanadi)
+    parts_used: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
 
     opened_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     closed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
@@ -74,6 +76,14 @@ class ServiceVisit(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 class ServiceCategory(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     """Servis muammolari toifalari — ariza yaratishda dropdownda ishlatiladi."""
     __tablename__ = "service_categories"
+
+    name: Mapped[str] = mapped_column(String(80), unique=True, index=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class ServicePart(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    """Servis ehtiyot qismlari katalogi (timer, nasos, motor, ...)."""
+    __tablename__ = "service_parts"
 
     name: Mapped[str] = mapped_column(String(80), unique=True, index=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)

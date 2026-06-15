@@ -89,7 +89,8 @@
     "errorOrder": "Please select an order",
     "errorProblem": "Enter a problem or select a category",
     "errorAddress": "Please enter an address",
-    "errorNote": "Please write a note"
+    "errorNote": "Please write a note",
+    "partAdded": "Spare part added"
   },
   "detail": {
     "problem": "Problem",
@@ -109,7 +110,8 @@
     "schedule": "Schedule",
     "markCompleted": "Completed",
     "markCancelled": "Cancel",
-    "reja": "Planned:"
+    "reja": "Planned:",
+    "partsUsed": "Spare parts used"
   },
   "categoryModal": {
     "title": "Service Categories",
@@ -164,5 +166,15 @@
   "tabs": {
     "tickets": "Tickets",
     "trips": "Service trips"
+  },
+  "parts": "Spare parts",
+  "partModal": {
+    "title": "Spare parts",
+    "description": "Spare parts used in service (timer, pump, motor...)",
+    "inputPlaceholder": "New spare part name",
+    "add": "Add",
+    "noParts": "No spare parts yet",
+    "deleteTitle": "Delete",
+    "done": "Done"
   }
 }

@@ -89,7 +89,8 @@
     "errorOrder": "Buyurtmani tanlang",
     "errorProblem": "Muammo yozing yoki toifani tanlang",
     "errorAddress": "Manzilni kiriting",
-    "errorNote": "Izoh yozing"
+    "errorNote": "Izoh yozing",
+    "partAdded": "Ehtiyot qism qo'shildi"
   },
   "detail": {
     "problem": "Muammo",
@@ -109,7 +110,8 @@
     "schedule": "Rejalashtirish",
     "markCompleted": "Bajarildi",
     "markCancelled": "Bekor qilish",
-    "reja": "Reja:"
+    "reja": "Reja:",
+    "partsUsed": "Ishlatilgan ehtiyot qismlar"
   },
   "categoryModal": {
     "title": "Servis toifalari",
@@ -164,5 +166,15 @@
   "tabs": {
     "tickets": "Arizalar",
     "trips": "Servis safarlari"
+  },
+  "parts": "Ehtiyot qismlar",
+  "partModal": {
+    "title": "Ehtiyot qismlar",
+    "description": "Servisda ishlatiladigan ehtiyot qismlar (timer, nasos, motor...)",
+    "inputPlaceholder": "Yangi ehtiyot qism nomi",
+    "add": "Qo'shish",
+    "noParts": "Hozircha ehtiyot qismlar yo'q",
+    "deleteTitle": "O'chirish",
+    "done": "Tayyor"
   }
 }

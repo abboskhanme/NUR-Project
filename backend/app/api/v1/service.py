@@ -12,12 +12,14 @@ from app.core.dependencies import CurrentUser
 from app.core.permissions import module_guard
 from app.db.session import get_db
 from app.models.order import Order, OrderItem
-from app.models.service import ServiceCategory, ServiceTicket, ServiceTrip, ServiceVisit
+from app.models.service import (
+    ServiceCategory, ServicePart, ServiceTicket, ServiceTrip, ServiceVisit,
+)
 from app.schemas.common import Page
 from app.schemas.service import (
-    OrderMini, ServiceCategoryIn, ServiceCategoryOut, ServiceSummary, ServiceTicketCreate,
-    ServiceTicketOut, ServiceTicketUpdate, ServiceTripOut, ServiceTripUpdate,
-    ServiceVisitIn, ServiceVisitOut, WarrantyInfo,
+    OrderMini, ServiceCategoryIn, ServiceCategoryOut, ServicePartIn, ServicePartOut,
+    ServiceSummary, ServiceTicketCreate, ServiceTicketOut, ServiceTicketUpdate,
+    ServiceTripOut, ServiceTripUpdate, ServiceVisitIn, ServiceVisitOut, WarrantyInfo,
 )
 from app.services.warranty_service import calculate_warranty
 
@@ -352,6 +354,51 @@ async def delete_category(category_id: uuid.UUID, _: CurrentUser,
     if not c:
         raise HTTPException(404, "Toifa topilmadi")
     c.is_active = False  # soft delete — eski arizalardagi toifa nomi saqlanib qoladi
+    await db.commit()
+
+
+# --------------------------------------------------------------------------- #
+# Ehtiyot qismlar katalogi (timer, nasos, motor, ...)
+# --------------------------------------------------------------------------- #
+@router.get("/parts", response_model=list[ServicePartOut])
+async def list_parts(db: Annotated[AsyncSession, Depends(get_db)], _: CurrentUser):
+    res = await db.execute(
+        select(ServicePart).where(ServicePart.is_active.is_(True))
+        .order_by(ServicePart.name)
+    )
+    return [ServicePartOut.model_validate(p) for p in res.scalars().all()]
+
+
+@router.post("/parts", response_model=ServicePartOut, status_code=201)
+async def create_part(payload: ServicePartIn, _: CurrentUser,
+                      db: Annotated[AsyncSession, Depends(get_db)]):
+    name = payload.name.strip()
+    if not name:
+        raise HTTPException(400, "Nomi bo'sh bo'lishi mumkin emas")
+    existing = (await db.execute(
+        select(ServicePart).where(func.lower(ServicePart.name) == name.lower())
+    )).scalar_one_or_none()
+    if existing:
+        existing.is_active = True
+        await db.commit()
+        await db.refresh(existing)
+        return existing
+    p = ServicePart(name=name)
+    db.add(p)
+    await db.commit()
+    await db.refresh(p)
+    return p
+
+
+@router.delete("/parts/{part_id}", status_code=204)
+async def delete_part(part_id: uuid.UUID, _: CurrentUser,
+                      db: Annotated[AsyncSession, Depends(get_db)]):
+    p = (await db.execute(
+        select(ServicePart).where(ServicePart.id == part_id)
+    )).scalar_one_or_none()
+    if not p:
+        raise HTTPException(404, "Ehtiyot qism topilmadi")
+    p.is_active = False  # soft delete — eski arizalardagi qism nomi saqlanib qoladi
     await db.commit()
 
 

@@ -75,7 +75,7 @@ export default function ServiceTripsList() {
 
 interface TripTicket {
   id: string; code: string; problem: string; status: string;
-  address?: string | null; opened_at: string;
+  address?: string | null; opened_at: string; parts_used?: string[];
   customer?: { full_name: string; phone: string } | null;
 }
 
@@ -116,6 +116,13 @@ function TripTicketsModal({ trip, onClose }: { trip: Trip; onClose: () => void }
                 {tk.customer?.phone && <div className="text-xs text-ink-soft">{formatPhone(tk.customer.phone)}</div>}
                 <div className="mt-1">{tk.problem}</div>
                 {tk.address && <div className="text-xs text-ink-soft mt-0.5">{tk.address}</div>}
+                {tk.parts_used && tk.parts_used.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    {tk.parts_used.map((p) => (
+                      <span key={p} className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[11px]">{p}</span>
+                    ))}
+                  </div>
+                )}
               </div>
             ))
           )}
