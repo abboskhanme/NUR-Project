@@ -207,6 +207,6 @@
   "printReceiptTitle": "Download payment receipt as PDF",
   "exportExcel": "Excel",
   "exportExcelTitle": "Download orders list to Excel",
-  "queuePaidTotal": "Paid in queue",
-  "queueDueTotal": "Outstanding in queue"
+  "queuePaidTotal": "Deposit given",
+  "queueDueTotal": "Debt (outstanding)"
 }

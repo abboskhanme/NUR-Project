@@ -7,7 +7,6 @@ import { ChevronsUp, ChevronUp, ChevronDown, ListOrdered, Search, Wallet, Coins 
 
 import { api } from '@/api/client';
 import Card from '@/components/ui/Card';
-import BalanceCard from '@/components/ui/BalanceCard';
 import StatusBadge from '@/components/ui/StatusBadge';
 import EmptyState from '@/components/ui/EmptyState';
 import { formatDate, formatUZS } from '@/lib/format';
@@ -175,18 +174,26 @@ export default function QueuePage() {
 
       {queue.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <BalanceCard
-            title={t('sales.queuePaidTotal')}
-            accent="success"
-            value={formatUZS(totals.paid)}
-            icon={<Wallet size={18} />}
-          />
-          <BalanceCard
-            title={t('sales.queueDueTotal')}
-            accent="warning"
-            value={formatUZS(totals.due)}
-            icon={<Coins size={18} />}
-          />
+          {/* Berilgan zaklad — yashil */}
+          <div className="rounded-card border border-success/25 bg-success/10 p-4 flex items-start justify-between">
+            <div>
+              <div className="text-sm font-medium text-success/90">{t('sales.queuePaidTotal')}</div>
+              <div className="text-2xl font-bold mt-2 text-success">{formatUZS(totals.paid)}</div>
+            </div>
+            <div className="w-10 h-10 rounded-button bg-success/20 text-success flex items-center justify-center shrink-0">
+              <Wallet size={18} />
+            </div>
+          </div>
+          {/* Qarz — qizil */}
+          <div className="rounded-card border border-danger/25 bg-danger/10 p-4 flex items-start justify-between">
+            <div>
+              <div className="text-sm font-medium text-danger/90">{t('sales.queueDueTotal')}</div>
+              <div className="text-2xl font-bold mt-2 text-danger">{formatUZS(totals.due)}</div>
+            </div>
+            <div className="w-10 h-10 rounded-button bg-danger/20 text-danger flex items-center justify-center shrink-0">
+              <Coins size={18} />
+            </div>
+          </div>
         </div>
       )}
 
