@@ -30,6 +30,7 @@ export interface OrderFull {
   pickup_date?: string | null;
   exchange_rate: string;
   inventory_id?: string | null;
+  unit_uid?: string | null;
   delivery_address?: string | null;
   customer?: { id: string; full_name: string; phone: string; region?: string | null; address?: string | null; is_dealer?: boolean } | null;
   items: OrderItem[];
@@ -104,7 +105,7 @@ export default function OrdersTable({
         </colgroup>
         <thead className="text-left text-ink-soft border-b border-black/10">
           <tr className="[&>th]:py-2 [&>th]:px-2 [&>th]:font-medium [&>th]:whitespace-nowrap">
-            <th>{t('sales.colQueue')}</th>
+            <th>{t('sales.colUnitId')}</th>
             <th>{t('sales.colOrder')}</th>
             <th>{t('sales.colDelivered')}</th>
             <th>{t('sales.colCustomer')}</th>
@@ -185,6 +186,22 @@ function Row({
     return patchOrder({ items: itemsWith(overrides) });
   }
 
+  // Ombor ID raqami — bo'sh kotyolni band qiladi. Xato bo'lsa qiymatni qaytaramiz.
+  async function saveUnitUid(e: React.FocusEvent<HTMLInputElement>) {
+    const v = e.target.value.trim();
+    if (v === (o.unit_uid ?? '')) return;
+    setSaving(true);
+    try {
+      await api.patch(`/orders/${o.id}`, { unit_uid: v || null });
+      onChanged();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail || t('common.error'));
+      e.target.value = o.unit_uid ?? '';
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function patchCustomer(body: Record<string, unknown>) {
     if (!o.customer) return;
     setSaving(true);
@@ -255,15 +272,21 @@ function Row({
 
   return (
     <tr className={'border-b border-black/5 transition-colors ' + rowTint(status, balance) + (saving ? ' opacity-60' : '')}>
-      {/* Queue position — only for active (new/ready) orders */}
+      {/* Ombor ID raqami — navbat raqami o'rniga; bo'sh kotyolni band qiladi */}
       <td className={cell + ' text-center'}>
-        {o.queue_position ? (
-          <span className="inline-flex items-center justify-center min-w-[28px] px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold"
-                title={t('sales.queuePos', { pos: o.queue_position })}>
-            {t('sales.queuePosPrefix')}{o.queue_position}
+        {locked ? (
+          <span className={ro + ' font-mono text-center'} title={t('sales.unitIdReadOnly')}>
+            {o.unit_uid || '—'}
           </span>
         ) : (
-          <span className="text-ink-soft">—</span>
+          <input
+            key={o.unit_uid ?? ''}
+            defaultValue={o.unit_uid ?? ''}
+            className={inp + ' text-center font-mono'}
+            placeholder={t('sales.unitIdPlaceholder')}
+            title={t('sales.unitIdEdit')}
+            onBlur={saveUnitUid}
+          />
         )}
       </td>
       {/* Dates */}
@@ -335,7 +358,7 @@ function Row({
                 serial_id: null,
                 bunker_direction: p?.product_type === 'additional' ? null : (main?.bunker_direction ?? null),
               });
-              patchOrder(o.inventory_id ? { items, inventory_id: null } : { items });
+              patchOrder(o.unit_uid ? { items, unit_uid: null } : { items });
             }}
           />
         )}

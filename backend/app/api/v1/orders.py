@@ -14,7 +14,7 @@ from app.core.permissions import module_guard, require_permission
 from app.db.session import get_db
 from app.models.customer import Customer
 from app.models.order import Order, OrderItem, Payment
-from app.models.product import Inventory, Product
+from app.models.product import Inventory
 from app.schemas.common import Page
 from app.schemas.order import (
     OrderCreate, OrderOut, OrderStatusChange, OrderUpdate,
@@ -72,31 +72,73 @@ async def _set_inventory_status(db: AsyncSession, inventory_id: Optional[uuid.UU
         inv.status = status
 
 
-async def _auto_assign_unit(db: AsyncSession, order: Order, items) -> None:
-    """Ombordan buyurtmaga mos bo'sh kotyol birligini avtomatik biriktiradi.
+# "berilmagan" va "bo'sh (None)" ni ajratish uchun sentinel — unit_uid=None
+# bog'lanishni uzish degani, yo'qligi esa o'zgartirmaslik.
+_UNSET = object()
 
-    Buyurtmadagi birinchi kotyol (asosiy) modeliga eng eski bo'sh birlik (FIFO)
-    tanlanadi va order.inventory_id ga yoziladi. Mos birlik bo'lmasa — buyurtma
-    baribir yaratiladi (sotuv bloklanmaydi), shunchaki birlik bog'lanmaydi.
+
+async def _find_unit_by_uid(db: AsyncSession, uid: Optional[str]) -> Optional[Inventory]:
+    if not uid:
+        return None
+    return (await db.execute(
+        select(Inventory).where(Inventory.unique_id == uid))).scalar_one_or_none()
+
+
+async def _free_unit_by_uid(db: AsyncSession, uid: Optional[str]) -> None:
+    """Ombor birligini (ID raqami bo'yicha) «bo'sh» holatga qaytaradi."""
+    inv = await _find_unit_by_uid(db, uid)
+    if inv and inv.status != "available":
+        inv.status = "available"
+
+
+async def _link_unit(db: AsyncSession, order: Order, uid: Optional[str]) -> None:
+    """Buyurtmani ombor birligiga FAQAT ID raqami orqali bog'laydi.
+
+    uid bo'sh -> bog'lanish uziladi (eski birlik bo'shaydi). Aks holda
+    ombor birligi mavjud va bo'sh bo'lishi shart (model mosligi tekshirilmaydi).
     """
-    product_ids = [it.product_id for it in items]
-    if not product_ids:
+    new_uid = (uid or "").strip() or None
+    old_uid = order.unit_uid
+    if new_uid == old_uid:
         return
-    main_ids = set((await db.execute(
-        select(Product.id).where(Product.id.in_(product_ids), Product.product_type == "main")
-    )).scalars().all())
-    # item tartibini saqlaymiz — birinchi kotyol modeli ustuvor
-    for pid in product_ids:
-        if pid not in main_ids:
-            continue
-        unit = (await db.execute(
-            select(Inventory).where(Inventory.product_id == pid,
-                                    Inventory.status == "available")
-            .order_by(Inventory.added_date.asc()).limit(1)
-        )).scalar_one_or_none()
-        if unit:
-            order.inventory_id = unit.id
-            return
+    # Eski birlikni bo'shatamiz
+    if old_uid:
+        await _free_unit_by_uid(db, old_uid)
+    if not new_uid:
+        order.unit_uid = None
+        order.inventory_id = None
+        return
+    inv = await _find_unit_by_uid(db, new_uid)
+    if not inv:
+        raise HTTPException(422, f"«{new_uid}» ID ombor ro'yxatida yo'q")
+    # Boshqa aktiv buyurtma allaqachon band qilgan bo'lsa
+    other = (await db.execute(
+        select(Order.code).where(
+            Order.unit_uid == new_uid, Order.id != order.id,
+            Order.status.notin_(("delivered", "rejected"))).limit(1)
+    )).scalar_one_or_none()
+    if other:
+        raise HTTPException(400, f"«{new_uid}» ID allaqachon band ({other})")
+    order.unit_uid = new_uid
+    order.inventory_id = inv.id
+    inv.status = "reserved"
+
+
+async def _delete_linked_unit(db: AsyncSession, order: Order) -> None:
+    """Yetkazilganda — bog'langan ombor birligini o'chiradi.
+
+    unit_uid snapshot buyurtmada qoladi (ID raqami ko'rinib turishi uchun),
+    faqat inventory_id NULL bo'ladi.
+    """
+    inv = None
+    if order.inventory_id:
+        inv = (await db.execute(
+            select(Inventory).where(Inventory.id == order.inventory_id))).scalar_one_or_none()
+    if inv is None and order.unit_uid:
+        inv = await _find_unit_by_uid(db, order.unit_uid)
+    if inv is not None:
+        await db.delete(inv)
+    order.inventory_id = None
 
 
 def _order_query():
@@ -356,8 +398,9 @@ async def remove_from_queue(order_id: uuid.UUID, current: CurrentUser,
 async def create_order(payload: OrderCreate, user: CurrentUser,
                        db: Annotated[AsyncSession, Depends(get_db)]):
     code = await generate_order_code(db)
+    # unit_uid/inventory_id alohida ishlanadi (_link_unit orqali band qilinadi)
     order = Order(code=code, salesperson_id=user.id, status="new",
-                  **payload.model_dump(exclude={"items"}))
+                  **payload.model_dump(exclude={"items", "unit_uid", "inventory_id"}))
     rate = order.exchange_rate or Decimal(0)
     for _i, _it in enumerate(payload.items):
         _check_discount(_it.unit_price_usd, _it.quantity, _it.discount_usd, _i)
@@ -371,11 +414,10 @@ async def create_order(payload: OrderCreate, user: CurrentUser,
             unit_price_usd=it.unit_price_usd, unit_price_uzs=it.unit_price_uzs,
             discount_usd=it.discount_usd, discount=disc_uzs, total_uzs=total_uzs,
         ))
-    # Ombordan mos kotyol birligini avtomatik biriktirish (agar qo'lda berilmagan bo'lsa)
-    if not order.inventory_id:
-        await _auto_assign_unit(db, order, payload.items)
-    await _set_inventory_status(db, order.inventory_id, "reserved")
     db.add(order)
+    # Ombor birligini FAQAT qo'lda kiritilgan ID raqami orqali band qilamiz
+    if payload.unit_uid:
+        await _link_unit(db, order, payload.unit_uid)
     await db.commit()
     res = await db.execute(_order_query().where(Order.id == order.id))
     return res.scalar_one()
@@ -445,17 +487,17 @@ async def update_order(order_id: uuid.UUID, payload: OrderUpdate, _: CurrentUser
     new_items = data.pop("items", None)
     # Status o'zgarishi maxsus ishlanadi (delivered_at, inventar, tranzitsiya)
     new_status = data.pop("status", None)
+    # ID raqami (unit_uid) alohida ishlanadi; bog'lanish endi faqat shu orqali.
+    new_uid = data.pop("unit_uid", _UNSET)
+    data.pop("inventory_id", None)  # bog'lanish unit_uid orqali boshqariladi
 
     # Yetkazilgan buyurtmani o'zgartirib bo'lmaydi — summalar va inventar
     # allaqachon yakunlangan. (Rad etilganlar hozircha ochiq qoladi.)
     if o.status in ("delivered", "cancelled"):
         raise HTTPException(400, "Yetkazilgan buyurtmani o'zgartirib bo'lmaydi")
 
-    if "inventory_id" in data and data["inventory_id"] != o.inventory_id:
-        if o.inventory_id:
-            await _set_inventory_status(db, o.inventory_id, "available")
-        if data["inventory_id"] and o.status not in ("cancelled", "rejected"):
-            await _set_inventory_status(db, data["inventory_id"], "reserved")
+    if new_uid is not _UNSET:
+        await _link_unit(db, o, new_uid)
 
     for k, v in data.items():
         setattr(o, k, v)
@@ -494,9 +536,10 @@ async def update_order(order_id: uuid.UUID, payload: OrderUpdate, _: CurrentUser
             # Yetkazilgan sana avtomatik — bugungi kun (agar oldindan berilmagan bo'lsa)
             if not o.delivered_at:
                 o.delivered_at = date.today()
-            await _set_inventory_status(db, o.inventory_id, "sold")
+            # Yetkazildi — kotyol ombordan chiqib ketdi, birlikni o'chiramiz
+            await _delete_linked_unit(db, o)
         if new_status == "rejected":
-            await _set_inventory_status(db, o.inventory_id, "available")
+            await _free_unit_by_uid(db, o.unit_uid)
 
     await db.commit()
     res = await db.execute(_order_query().where(Order.id == order_id))
@@ -518,9 +561,10 @@ async def change_status(order_id: uuid.UUID, payload: OrderStatusChange,
     o.status = payload.status
     if payload.status == "delivered":
         o.delivered_at = payload.delivered_at or date.today()
-        await _set_inventory_status(db, o.inventory_id, "sold")
+        # Yetkazildi — kotyol ombordan chiqib ketdi, birlikni o'chiramiz
+        await _delete_linked_unit(db, o)
     if payload.status == "rejected":
-        await _set_inventory_status(db, o.inventory_id, "available")
+        await _free_unit_by_uid(db, o.unit_uid)
     if payload.note:
         o.note = (o.note or "") + f"\n[status change] {payload.note}"
     await db.commit()
@@ -611,10 +655,12 @@ async def delete_order(order_id: uuid.UUID, _: CurrentUser,
     # Eski (avval yaratilgan) moliya yozuvi bo'lsa, u saqlanadi; related_order_id
     # esa FK (ondelete=SET NULL) orqali avtomatik NULL bo'ladi.
 
-    # Inventar birligini bo'shatamiz
+    # Inventar birligini bo'shatamiz (band qilingan bo'lsa)
     if o.inventory_id:
         await _set_inventory_status(db, o.inventory_id, "available")
         o.inventory_id = None
+    elif o.unit_uid and o.status not in ("delivered", "rejected"):
+        await _free_unit_by_uid(db, o.unit_uid)
 
     await db.delete(o)  # cascade: order_items + payments
     await db.commit()

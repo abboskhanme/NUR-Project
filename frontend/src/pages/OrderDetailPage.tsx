@@ -34,6 +34,7 @@ interface OrderDetail {
   id: string; code: string; status: string; order_date: string; delivered_at?: string | null;
   customer?: { id: string; full_name: string; phone: string; region?: string | null; city?: string | null; address?: string | null; is_dealer?: boolean } | null;
   inventory?: { id: string; unique_id: string; status: string } | null;
+  unit_uid?: string | null;
   area_m2?: number | null; bunker_direction?: string | null; delivery_address?: string | null;
   exchange_rate: string; payment_type?: string | null; note?: string | null;
   has_stamp_ruc: boolean; has_stamp_avt: boolean; has_online: boolean; has_video: boolean;
@@ -303,6 +304,7 @@ export default function OrderDetailPage() {
           <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-sm">
             <Detail label={t('sales.exchangeRate')} value={parseFloat(o.exchange_rate) ? formatUZS(o.exchange_rate) : '—'} />
             <Detail label={t('sales.itemsCount')} value={String(o.items.length)} />
+            <UnitIdEditor orderId={orderId!} value={o.unit_uid ?? ''} locked={locked} onSaved={refresh} />
           </div>
           {o.note && <div className="mt-3 pt-3 border-t border-black/5 text-sm text-ink-soft whitespace-pre-line">{o.note}</div>}
         </Card>
@@ -434,6 +436,47 @@ function Detail({ label, value }: { label: string; value: string }) {
     <div>
       <div className="text-xs text-ink-soft">{label}</div>
       <div className="font-medium">{value}</div>
+    </div>
+  );
+}
+
+// Ombor ID raqami — tahrirlanadigan; bo'sh kotyolni band qiladi.
+function UnitIdEditor({ orderId, value, locked, onSaved }: {
+  orderId: string; value: string; locked: boolean; onSaved: () => void;
+}) {
+  const { t } = useTranslation();
+  const [saving, setSaving] = useState(false);
+  async function save(e: React.FocusEvent<HTMLInputElement>) {
+    const v = e.target.value.trim();
+    if (v === value) return;
+    setSaving(true);
+    try {
+      await api.patch(`/orders/${orderId}`, { unit_uid: v || null });
+      toast.success(t('common.updated'));
+      onSaved();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail || t('common.error'));
+      e.target.value = value;
+    } finally {
+      setSaving(false);
+    }
+  }
+  return (
+    <div>
+      <div className="text-xs text-ink-soft">{t('sales.colUnitId')}</div>
+      {locked ? (
+        <div className="font-mono font-medium">{value || '—'}</div>
+      ) : (
+        <input
+          key={value}
+          defaultValue={value}
+          disabled={saving}
+          placeholder={t('sales.unitIdPlaceholder')}
+          title={t('sales.unitIdEdit')}
+          onBlur={save}
+          className="w-28 mt-0.5 font-mono text-sm bg-transparent border border-black/10 hover:border-black/20 focus:border-primary rounded px-1.5 py-0.5 outline-none disabled:opacity-60"
+        />
+      )}
     </div>
   );
 }

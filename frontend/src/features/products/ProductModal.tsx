@@ -5,7 +5,7 @@ import { X } from 'lucide-react';
 
 import { api } from '@/api/client';
 
-export type ProductType = 'main' | 'additional';
+export type ProductType = 'main' | 'additional' | 'warehouse';
 
 export interface ProductFull {
   id: string;
@@ -55,12 +55,15 @@ export default function ProductModal({
     return () => window.removeEventListener('keydown', esc);
   }, [onClose]);
 
+  // 'warehouse' (ombor turi) ham kotyol modeli kabi — model + kvm bilan kiritiladi.
+  const isAdditional = type === 'additional';
+
   async function handleSave() {
-    if (type === 'main' && !model.trim()) {
+    if (!isAdditional && !model.trim()) {
       toast.error(t('products.modal.modelRequired'));
       return;
     }
-    if (type === 'additional' && !name.trim()) {
+    if (isAdditional && !name.trim()) {
       toast.error(t('products.modal.nameRequired'));
       return;
     }
@@ -70,7 +73,7 @@ export default function ProductModal({
       base_price_usd: num(price),
       description: description.trim() || null,
     };
-    if (type === 'main') {
+    if (!isAdditional) {
       body.model = model.trim();
       body.kvm = kvm.trim() ? parseInt(kvm, 10) : null;
       body.name = null;
@@ -101,8 +104,8 @@ export default function ProductModal({
   }
 
   const modalTitle = isCreate
-    ? (type === 'main' ? t('products.modal.createMain') : t('products.modal.createAdditional'))
-    : (type === 'main' ? t('products.modal.editMain') : t('products.modal.editAdditional'));
+    ? (isAdditional ? t('products.modal.createAdditional') : t('products.modal.createMain'))
+    : (isAdditional ? t('products.modal.editAdditional') : t('products.modal.editMain'));
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
@@ -116,7 +119,7 @@ export default function ProductModal({
         </div>
 
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
-          {type === 'main' ? (
+          {!isAdditional ? (
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="label">{t('products.modal.modelLabel')}</label>
@@ -158,7 +161,7 @@ export default function ProductModal({
                       onChange={(e) => setDescription(e.target.value)} />
           </div>
 
-          {type === 'main' && (
+          {!isAdditional && (
             <p className="text-xs text-ink-soft">
               {t('products.modal.directionHint')}
             </p>

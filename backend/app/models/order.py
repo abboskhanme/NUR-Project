@@ -51,6 +51,10 @@ class Order(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     inventory_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("inventory.id", ondelete="SET NULL")
     )
+    # Ombor ID raqami (band qilingan kotyol) — bog'lanish FAQAT shu raqam bir
+    # xilligi orqali. Yetkazilganda ombor birligi o'chsa ham bu snapshot qoladi,
+    # shuning uchun buyurtmada ID raqami har doim ko'rinib turadi.
+    unit_uid: Mapped[Optional[str]] = mapped_column(String(50), index=True)
 
     # Bunker spec snapshot
     area_m2: Mapped[Optional[int]] = mapped_column()

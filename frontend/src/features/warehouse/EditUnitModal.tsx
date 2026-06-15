@@ -35,12 +35,11 @@ export default function EditUnitModal({ unit, onClose, onSaved }: {
 
   const { data: products } = useQuery<{ items: ProductOpt[] }>({
     queryKey: ['products', 'warehouse-edit'],
-    queryFn: () => api.get('/products', { params: { page_size: 200 } }).then((r) => r.data),
+    queryFn: () => api.get('/products', {
+      params: { product_type: 'warehouse', page_size: 200 },
+    }).then((r) => r.data),
   });
-  const mainProducts = useMemo(
-    () => (products?.items ?? []).filter((p) => (p.product_type ?? 'main') === 'main'),
-    [products],
-  );
+  const mainProducts = useMemo(() => products?.items ?? [], [products]);
 
   async function submit() {
     const id = uniqueId.trim();

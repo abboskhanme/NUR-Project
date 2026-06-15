@@ -44,5 +44,23 @@
     "added": "Qo'shilgan sana",
     "note": "Izoh",
     "needId": "ID raqami kerak"
+  },
+  "tabs": {
+    "types": "Turlari",
+    "list": "Roʻyxat"
+  },
+  "types": {
+    "addBtn": "Model qoʻshish",
+    "empty": "Hozircha model yoʻq",
+    "emptyDesc": "Kotyol modellarini shu yerda qoʻshing",
+    "col": {
+      "model": "Model",
+      "kvm": "Oʻlcham",
+      "price": "Narx",
+      "available": "Boʻsh",
+      "reserved": "Band"
+    },
+    "deleteTitle": "Modelni oʻchirish",
+    "deleteMessage": "«{{name}}» modelini oʻchirishni tasdiqlaysizmi?"
   }
 }

@@ -71,11 +71,18 @@ class UnitUpdate(BaseModel):
     added_date: Optional[date] = None
 
 
+# Buyurtma bilan bog'lanish FAQAT ID raqami (unit_uid == unique_id) bir xilligi
+# orqali; yopilmagan (aktiv) buyurtmagina birlikni «band» qiladi.
+_ACTIVE_ORDER_JOIN = (
+    Order.unit_uid == Inventory.unique_id
+) & Order.status.notin_(("delivered", "rejected"))
+
+
 def _unit_out_query():
     return (
         select(Inventory, Product.model, Product.kvm, Order.code, Customer.full_name)
         .join(Product, Product.id == Inventory.product_id)
-        .outerjoin(Order, Order.inventory_id == Inventory.id)
+        .outerjoin(Order, _ACTIVE_ORDER_JOIN)
         .outerjoin(Customer, Customer.id == Order.customer_id)
     )
 
@@ -96,7 +103,7 @@ async def warehouse_summary(db: Annotated[AsyncSession, Depends(get_db)], _: Cur
         select(Product.id, Product.model, Product.kvm, Inventory.status,
                func.count(Inventory.id))
         .join(Inventory, Inventory.product_id == Product.id)
-        .where(Product.product_type == "main")
+        .where(Product.product_type == "warehouse")
         .group_by(Product.id, Product.model, Product.kvm, Inventory.status)
     )).all()
 
@@ -140,9 +147,9 @@ async def list_units(
     q = (
         select(Inventory, Product.model, Product.kvm, Order.code, Customer.full_name)
         .join(Product, Product.id == Inventory.product_id)
-        .outerjoin(Order, Order.inventory_id == Inventory.id)
+        .outerjoin(Order, _ACTIVE_ORDER_JOIN)
         .outerjoin(Customer, Customer.id == Order.customer_id)
-        .where(Product.product_type == "main")
+        .where(Product.product_type == "warehouse")
     )
     if status:
         q = q.where(Inventory.status == status)
@@ -177,8 +184,8 @@ async def add_units(payload: UnitsCreate, _: CurrentUser,
         select(Product).where(Product.id == payload.product_id))).scalar_one_or_none()
     if not prod:
         raise HTTPException(404, "Mahsulot topilmadi")
-    if prod.product_type != "main":
-        raise HTTPException(400, "Ombor faqat kotyol (asosiy) modellari uchun")
+    if prod.product_type != "warehouse":
+        raise HTTPException(400, "Ombor faqat ombor turlari (kotyol) uchun")
 
     # ID larni tozalash + takrorlarni olib tashlash
     ids = [s.strip() for s in payload.unique_ids if s and s.strip()]
@@ -231,7 +238,7 @@ async def update_unit(unit_id: uuid.UUID, payload: UnitUpdate, _: CurrentUser,
     if "product_id" in data and data["product_id"] and data["product_id"] != inv.product_id:
         prod = (await db.execute(
             select(Product).where(Product.id == data["product_id"]))).scalar_one_or_none()
-        if not prod or prod.product_type != "main":
+        if not prod or prod.product_type != "warehouse":
             raise HTTPException(400, "Noto'g'ri model tanlandi")
         inv.product_id = prod.id
     if "added_date" in data and data["added_date"]:

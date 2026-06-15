@@ -70,7 +70,9 @@ export default function OrderModal({
     queryKey: ['products', 'picker'],
     queryFn: () => api.get('/products', { params: { page_size: 200 } }).then((r) => r.data),
   });
-  const products: Product[] = productsQ.data?.items ?? [];
+  // Ombor turlari (product_type='warehouse') sotuvda ko'rsatilmaydi — aralashmasligi uchun
+  const products: Product[] = (productsQ.data?.items ?? [])
+    .filter((p: Product) => p.product_type !== 'warehouse');
 
   useEffect(() => {
     const esc = (e: KeyboardEvent) => e.key === 'Escape' && onClose();

@@ -87,6 +87,7 @@ class OrderBase(BaseModel):
     area_m2: Optional[int] = None
     bunker_direction: Optional[str] = None
     inventory_id: Optional[uuid.UUID] = None
+    unit_uid: Optional[str] = None
     delivery_address: Optional[str] = None
     exchange_rate: Decimal = Decimal(0)
     payment_type: Optional[str] = None
@@ -108,6 +109,7 @@ class OrderUpdate(BaseModel):
     status: Optional[str] = None
     delivered_at: Optional[date] = None
     inventory_id: Optional[uuid.UUID] = None
+    unit_uid: Optional[str] = None
     area_m2: Optional[int] = None
     bunker_direction: Optional[str] = None
     delivery_address: Optional[str] = None
@@ -144,6 +146,7 @@ class OrderOut(ORMBase):
     in_queue: bool = False
     pickup_date: Optional[date] = None
     inventory_id: Optional[uuid.UUID] = None
+    unit_uid: Optional[str] = None
     area_m2: Optional[int] = None
     bunker_direction: Optional[str] = None
     delivery_address: Optional[str] = None

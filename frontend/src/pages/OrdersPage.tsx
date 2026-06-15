@@ -86,7 +86,9 @@ export default function OrdersPage() {
     queryKey: ['products', 'order-table'],
     queryFn: () => api.get('/products', { params: { page_size: 200 } }).then((r) => r.data),
   });
-  const products: ProductOpt[] = productsQ.data?.items ?? [];
+  // Ombor turlari (product_type='warehouse') sotuvda ko'rsatilmaydi — aralashmasligi uchun
+  const products: ProductOpt[] = (productsQ.data?.items ?? [])
+    .filter((p: ProductOpt) => p.product_type !== 'warehouse');
 
   const summaryQ = useQuery<Summary>({
     queryKey: ['orders', 'summary', search, statusFilter, dateFrom, dateTo],

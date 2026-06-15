@@ -44,5 +44,23 @@
     "added": "Added date",
     "note": "Note",
     "needId": "ID number required"
+  },
+  "tabs": {
+    "types": "Types",
+    "list": "List"
+  },
+  "types": {
+    "addBtn": "Add model",
+    "empty": "No models yet",
+    "emptyDesc": "Add boiler models here",
+    "col": {
+      "model": "Model",
+      "kvm": "Size",
+      "price": "Price",
+      "available": "Available",
+      "reserved": "Reserved"
+    },
+    "deleteTitle": "Delete model",
+    "deleteMessage": "Delete model «{{name}}»?"
   }
 }

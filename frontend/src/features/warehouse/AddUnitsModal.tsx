@@ -24,14 +24,13 @@ export default function AddUnitsModal({ onClose, onSaved }: { onClose: () => voi
 
   const { data: products } = useQuery<{ items: ProductOpt[] }>({
     queryKey: ['products', 'warehouse-add'],
-    queryFn: () => api.get('/products', { params: { page_size: 200 } }).then((r) => r.data),
+    queryFn: () => api.get('/products', {
+      params: { product_type: 'warehouse', page_size: 200 },
+    }).then((r) => r.data),
   });
 
-  // Faqat asosiy (kotyol) modellar
-  const mainProducts = useMemo(
-    () => (products?.items ?? []).filter((p) => (p.product_type ?? 'main') === 'main'),
-    [products],
-  );
+  // Faqat ombor turlari (kotyol) — sotuv mahsulotlari bilan aralashmaydi
+  const mainProducts = useMemo(() => products?.items ?? [], [products]);
 
   const ids = useMemo(
     () => idsText.split(/[\n,]+/).map((s) => s.trim()).filter(Boolean),

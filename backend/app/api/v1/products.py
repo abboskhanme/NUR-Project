@@ -23,7 +23,7 @@ router = APIRouter(dependencies=[Depends(module_guard("products"))])
 # ---- Products ----
 def _validate_product(product_type: str, model, name):
     """Tur bo'yicha majburiy maydonlarni tekshirish."""
-    if product_type == "main" and not model:
+    if product_type in ("main", "warehouse") and not model:
         raise HTTPException(422, "Asosiy mahsulot uchun model majburiy")
     if product_type == "additional" and not name:
         raise HTTPException(422, "Qo'shimcha mahsulot uchun nom majburiy")
