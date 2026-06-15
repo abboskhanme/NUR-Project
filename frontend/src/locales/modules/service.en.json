@@ -181,6 +181,9 @@
   "partsStats": {
     "title": "Used spare parts",
     "empty": "No parts used yet",
-    "total": "Total: {{n}} pcs"
+    "total": "Total: {{n}} pcs",
+    "from": "From",
+    "to": "To",
+    "all": "All"
   }
 }

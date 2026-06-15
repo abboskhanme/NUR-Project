@@ -1,6 +1,6 @@
 """Service tickets, visits, warranty."""
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -370,11 +370,19 @@ async def list_parts(db: Annotated[AsyncSession, Depends(get_db)], _: CurrentUse
 
 
 @router.get("/parts/stats", response_model=list[PartStat])
-async def parts_stats(db: Annotated[AsyncSession, Depends(get_db)], _: CurrentUser):
-    """Ehtiyot qismlar statistikasi — qaysi qismdan jami nechta sarflangan."""
-    sub = select(
-        func.jsonb_array_elements_text(ServiceTicket.parts_used).label("name")
-    ).subquery()
+async def parts_stats(db: Annotated[AsyncSession, Depends(get_db)], _: CurrentUser,
+                      date_from: Optional[date] = None, date_to: Optional[date] = None):
+    """Ehtiyot qismlar statistikasi — qaysi qismdan jami nechta sarflangan.
+
+    Vaqt filtri: ish bajarilgan sana (closed_at, bo'lmasa opened_at) bo'yicha.
+    """
+    ref = func.date(func.coalesce(ServiceTicket.closed_at, ServiceTicket.opened_at))
+    base = select(func.jsonb_array_elements_text(ServiceTicket.parts_used).label("name"))
+    if date_from:
+        base = base.where(ref >= date_from)
+    if date_to:
+        base = base.where(ref <= date_to)
+    sub = base.subquery()
     rows = (await db.execute(
         select(sub.c.name, func.count().label("cnt"))
         .group_by(sub.c.name).order_by(func.count().desc(), sub.c.name)
