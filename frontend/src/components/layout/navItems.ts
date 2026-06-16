@@ -25,7 +25,7 @@ export function useNavItems(): NavItem[] {
   const { t } = useTranslation();
   const { canModule } = usePermissions();
   const items: NavItem[] = [
-    { to: '/', label: t('nav.dashboard'), icon: LayoutDashboard, exact: true },
+    { to: '/', label: t('nav.dashboard'), icon: LayoutDashboard, exact: true, module: 'reports' },
     { to: '/orders', label: t('nav.sales'), icon: ShoppingCart, module: 'orders' },
     { to: '/queue', label: t('nav.queue', { defaultValue: 'Navbat' }), icon: ListOrdered, module: 'orders' },
     { to: '/shipping', label: t('nav.shipping', { defaultValue: 'Yuk chiqarish' }), icon: PackageOpen, module: 'shipping' },

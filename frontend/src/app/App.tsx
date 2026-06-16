@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { api } from '@/api/client';
 import { useAuthStore } from '@/stores/auth';
 import { usePermissions } from '@/lib/permissions';
+import { useNavItems } from '@/components/layout/navItems';
 
 import LoginPage from '@/pages/LoginPage';
 import AppLayout from '@/components/layout/AppLayout';
@@ -39,6 +40,19 @@ function RequireModule({ module, children }: { module: string; children: React.R
 }
 
 /**
+ * Bosh sahifa "hisobotlar" (reports) moduliga bog'langan. Ruxsat bo'lsa — dashboard;
+ * bo'lmasa — foydalanuvchining birinchi mavjud bo'limiga yo'naltiramiz (sikldan saqlanish
+ * uchun "/" ga qaytarmaymiz).
+ */
+function HomeRoute() {
+  const { canModule } = usePermissions();
+  const navItems = useNavItems();
+  if (canModule('reports')) return <DashboardPage />;
+  const first = navItems.find((it) => it.to !== '/');
+  return <Navigate to={first?.to ?? '/settings'} replace />;
+}
+
+/**
  * Token bo'lsa, har bir sahifa yuklanganda /auth/me ni chaqirib
  * persisted user ma'lumotini eng so'nggi versiyaga yangilaymiz.
  * Bu avatar_url va boshqa eski cache'lar bilan bog'liq muammolarni hal qiladi.
@@ -67,7 +81,7 @@ export default function App() {
           </RequireAuth>
         }
       >
-        <Route index element={<DashboardPage />} />
+        <Route index element={<HomeRoute />} />
         <Route path="orders" element={<RequireModule module="orders"><OrdersPage /></RequireModule>} />
         <Route path="orders/:orderId" element={<RequireModule module="orders"><OrderDetailPage /></RequireModule>} />
         <Route path="queue" element={<RequireModule module="orders"><QueuePage /></RequireModule>} />
