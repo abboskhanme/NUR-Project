@@ -12,6 +12,10 @@
   "deptCard": {
     "people": "kishi"
   },
+  "maxPayroll": {
+    "title": "Oylik xarajati (taxminiy)",
+    "hint": "Joriy oy uchun barcha xodimlarga to'lanishi mumkin bo'lgan maksimal oylik. Soatbaylarda o'tgan kunlar haqiqiy, qolgan ish kunlari to'liq kelishga ko'ra (yakshanba dam)."
+  },
   "newWorker": "Yangi ishchi",
   "monthHint": "{{month}} {{year}} uchun ko'rsatkichlar. Tarixini ko'rish uchun raqam ustiga bosing.",
   "monthTooltip": "Oy",
@@ -72,6 +76,7 @@
     "emptySalaryDesc": "Bu oyda hali oylik hisoblanmagan.",
     "addAdvanceTitle": "Avans / oylik berish",
     "amountLabel": "Summa",
+    "dateLabel": "Sana",
     "noteLabel": "Izoh",
     "notePlaceholder": "Avans",
     "give": "Berish",
@@ -80,6 +85,7 @@
     "advanceSaved": "To'lov yozildi",
     "saveError": "To'lovni saqlab bo'lmadi",
     "financeHint": "Bu to'lov moliya bo'limiga ham chiqim sifatida yoziladi.",
+    "financeHintPast": "Bugundan oldingi sana — faqat xodim tarixiga yoziladi, moliya balansidan ayirilmaydi (eski avans).",
     "voided": "To'lov bekor qilindi",
     "voidedBadge": "O'chirilgan",
     "voidTitle": "To'lovni bekor qilish",

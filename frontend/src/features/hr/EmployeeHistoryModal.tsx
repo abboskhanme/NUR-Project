@@ -12,12 +12,24 @@ import type { EmployeeRow, EmployeeMonthSummary } from '@/features/hr/EmployeeMo
 
 export type HistoryKind = 'salary' | 'advance' | 'remaining' | 'hours';
 
-// Mingliklarni bo'sh joy bilan formatlash: 2000000 -> "2 000 000"
-function formatAmount(s: string): string {
-  const cleaned = s.replace(/[^\d]/g, '').replace(/^0+(?=\d)/, '');
-  return cleaned.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
-}
+// Faqat raqamlarni qoldiradi (boshidagi keraksiz nollarsiz)
+const onlyDigits = (s: string) => s.replace(/[^\d]/g, '').replace(/^0+(?=\d)/, '');
+// Ko'rsatish uchun mingliklarni bo'sh joy bilan ajratadi: 2000000 -> "2 000 000"
+const groupDigits = (s: string) => s.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 const toNum = (s: string) => parseFloat(s.replace(/[^\d.]/g, '')) || 0;
+
+// Backend xatosini xavfsiz matnga aylantiradi. FastAPI 422 da `detail` — obyektlar
+// ro'yxati bo'ladi; uni to'g'ridan-to'g'ri toast'ga bersak React qulab tushadi (oq ekran).
+function errText(e: any, fallback: string): string {
+  const d = e?.response?.data?.detail;
+  if (typeof d === 'string') return d;
+  if (Array.isArray(d)) {
+    const msg = d.map((x) => (typeof x === 'string' ? x : x?.msg)).filter(Boolean).join('; ');
+    return msg || fallback;
+  }
+  if (d && typeof d === 'object') return (d.msg || d.message || fallback);
+  return fallback;
+}
 
 interface Advance {
   id: string;
@@ -42,6 +54,14 @@ function monthRange(year: number, month: number) {
   const mm = String(month).padStart(2, '0');
   const last = new Date(year, month, 0).getDate();
   return { from: `${year}-${mm}-01`, to: `${year}-${mm}-${String(last).padStart(2, '0')}` };
+}
+
+// Mahalliy (timezone'ga bog'liq) bugungi sana — "YYYY-MM-DD"
+function todayISO(): string {
+  const d = new Date();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${mm}-${dd}`;
 }
 
 const ICONS: Record<HistoryKind, React.ReactNode> = {
@@ -71,6 +91,14 @@ export default function EmployeeHistoryModal({
 
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
+  // Avans sanasi — default holatda bugun (ko'rsatilayotgan oy ichiga qisiladi).
+  // Bugundan oldingi sana tanlansa moliyadan ayirilmaydi (eski/migratsiya avanslari).
+  const defaultAdvDate = (() => {
+    const { from, to } = monthRange(year, month);
+    const today = todayISO();
+    return today < from ? from : today > to ? to : today;
+  })();
+  const [advDate, setAdvDate] = useState(defaultAdvDate);
   const [saving, setSaving] = useState(false);
   const [confirmVoid, setConfirmVoid] = useState<Advance | null>(null);
   const [voiding, setVoiding] = useState(false);
@@ -120,16 +148,18 @@ export default function EmployeeHistoryModal({
         amount: amt,
         year,
         month,
+        pay_date: advDate || null,
         currency: employee.currency || 'UZS',
         note: note || null,
       });
       toast.success(t('hr.histModal.advanceSaved'));
       setAmount('');
       setNote('');
+      setAdvDate(defaultAdvDate);
       advQ.refetch();
       invalidateAll();
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || t('hr.histModal.saveError'));
+      toast.error(errText(e, t('hr.histModal.saveError')));
     } finally {
       setSaving(false);
     }
@@ -145,7 +175,7 @@ export default function EmployeeHistoryModal({
       advQ.refetch();
       invalidateAll();
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || t('hr.histModal.saveError'));
+      toast.error(errText(e, t('hr.histModal.saveError')));
     } finally {
       setVoiding(false);
     }
@@ -197,8 +227,19 @@ export default function EmployeeHistoryModal({
                     inputMode="decimal"
                     className="input"
                     placeholder="0"
-                    value={amount}
-                    onChange={(e) => setAmount(formatAmount(e.target.value))}
+                    value={groupDigits(amount)}
+                    onChange={(e) => setAmount(onlyDigits(e.target.value))}
+                  />
+                </div>
+                <div className="min-w-[140px]">
+                  <label className="text-xs text-ink-soft">{t('hr.histModal.dateLabel')}</label>
+                  <input
+                    type="date"
+                    className="input"
+                    value={advDate}
+                    min={from}
+                    max={to}
+                    onChange={(e) => setAdvDate(e.target.value)}
                   />
                 </div>
                 <div className="flex-1 min-w-[140px]">
@@ -218,7 +259,11 @@ export default function EmployeeHistoryModal({
                   <Plus size={16} /> {saving ? t('hr.histModal.saving') : t('hr.histModal.give')}
                 </button>
               </div>
-              <p className="text-[11px] text-ink-soft mt-2">{t('hr.histModal.financeHint')}</p>
+              <p className="text-[11px] text-ink-soft mt-2">
+                {advDate && advDate < todayISO()
+                  ? t('hr.histModal.financeHintPast')
+                  : t('hr.histModal.financeHint')}
+              </p>
             </div>
           </div>
         )}

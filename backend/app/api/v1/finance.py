@@ -233,43 +233,66 @@ async def create_employee_payment(payload: EmployeePaymentIn, user: CurrentUser,
 
     # Sana o'sha oy ichida bo'lishi kerak (aggregate sanaga qarab oyga biriktiradi)
     today = date.today()
-    pay_date = payload.date or (today if month_start <= today <= month_end else month_end)
+    pay_date = payload.pay_date or (today if month_start <= today <= month_end else month_end)
     if not (month_start <= pay_date <= month_end):
         pay_date = month_end
 
     currency = payload.currency or emp.currency or "UZS"
     note = payload.note or default_note
 
+    # Eski (migratsiya qilingan) avanslarni kiritish: bugungidan oldingi sanaga
+    # yozilgan avans faqat HR tarixiga tushadi, moliya balansidan AYIRILMAYDI.
+    # Sababi — eski bazadan balans to'liq ko'chirilgan, eski avanslar allaqachon
+    # o'sha balansda hisobga olingan. Bugungi (yoki keyingi) sanadagi avans esa
+    # haqiqiy yangi chiqim — moliyaga ham yoziladi. Oylik to'lovi har doim yoziladi.
+    affects_finance = not (payload.kind == "advance" and pay_date < today)
+
     # 1) HR: SalaryAdvance (xodim oylik-avans tarixiga)
     adv = SalaryAdvance(employee_id=emp.id, advance_date=pay_date, amount=amount,
                         currency=currency, note=note, created_by_id=user.id)
     db.add(adv)
 
-    # 2) Moliya: kategoriya + operatsion hisobvaraq + chiqim tranzaksiyasi
     cat = (await db.execute(
         select(FinanceCategory).where(FinanceCategory.code == cat_code)
     )).scalar_one_or_none()
-    acc = (await db.execute(
-        select(Account).where(and_(
-            Account.currency == currency, Account.ledger == "operational"
-        )).limit(1)
-    )).scalar_one_or_none()
 
-    tx = FinanceTransaction(
-        date=pay_date, type="expense", category_id=cat.id if cat else None,
-        amount=amount, currency=currency, account_id=acc.id if acc else None,
-        note=note, created_by_id=user.id,
-    )
-    db.add(tx)
-    await db.flush()
-    adv.tx_id = tx.id  # bekor qilinganda moliya tranzaksiyasini topish uchun
-    await apply_transaction(db, tx)
+    acc = None
+    tx = None
+    if affects_finance:
+        # 2) Moliya: operatsion hisobvaraq + chiqim tranzaksiyasi
+        acc = (await db.execute(
+            select(Account).where(and_(
+                Account.currency == currency, Account.ledger == "operational"
+            )).limit(1)
+        )).scalar_one_or_none()
+        tx = FinanceTransaction(
+            date=pay_date, type="expense", category_id=cat.id if cat else None,
+            amount=amount, currency=currency, account_id=acc.id if acc else None,
+            note=note, created_by_id=user.id,
+        )
+        db.add(tx)
+        await db.flush()
+        adv.tx_id = tx.id  # bekor qilinganda moliya tranzaksiyasini topish uchun
+        await apply_transaction(db, tx)
+
     await db.commit()
-    await db.refresh(tx)
 
-    out = TransactionOut.model_validate(tx)
-    out.category_name = cat.name if cat else None
-    out.account_name = acc.name if acc else None
+    if tx is not None:
+        await db.refresh(tx)
+        out = TransactionOut.model_validate(tx)
+        out.category_name = cat.name if cat else None
+        out.account_name = acc.name if acc else None
+        return out
+
+    # Moliyaga ta'sir qilmagan avans — javobni HR yozuvidan quramiz
+    await db.refresh(adv)
+    out = TransactionOut(
+        id=adv.id, date=pay_date, type="expense", category_id=cat.id if cat else None,
+        amount=amount, currency=currency, amount_other_curr=Decimal(0),
+        account_id=None, related_order_id=None, note=note, status="active",
+        created_at=adv.created_at, category_name=cat.name if cat else None,
+        account_name=None,
+    )
     return out
 
 

@@ -106,6 +106,9 @@ class EmployeeMonthSummary(BaseModel):
     advance: Decimal
     net: Decimal
     salary_type: str
+    # Joriy oy uchun olinishi mumkin bo'lgan maksimal oylik (taxminiy).
+    # Soatbaylarda: o'tgan kunlar haqiqiy + qolgan ish kunlari to'liq kelsa.
+    max_gross: Decimal = Decimal(0)
 
 
 class EmployeeOut(ORMBase):

@@ -16,6 +16,7 @@ export interface EmployeeMonthSummary {
   advance: string;
   net: string;
   salary_type: string;
+  max_gross?: string;
 }
 
 export interface EmployeeRow {

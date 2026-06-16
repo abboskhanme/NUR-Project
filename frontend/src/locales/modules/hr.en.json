@@ -12,6 +12,10 @@
   "deptCard": {
     "people": "people"
   },
+  "maxPayroll": {
+    "title": "Payroll cost (estimate)",
+    "hint": "Maximum salary payable to all employees for the current month. For hourly staff: past days are actual, remaining workdays assume full attendance (Sunday off)."
+  },
   "newWorker": "New worker",
   "monthHint": "Figures shown are for {{month}} {{year}}. Click a number to see its history.",
   "monthTooltip": "Month",
@@ -72,6 +76,7 @@
     "emptySalaryDesc": "No salary has been accrued this month yet.",
     "addAdvanceTitle": "Pay an advance / salary",
     "amountLabel": "Amount",
+    "dateLabel": "Date",
     "noteLabel": "Note",
     "notePlaceholder": "Advance",
     "give": "Pay",
@@ -80,6 +85,7 @@
     "advanceSaved": "Payment recorded",
     "saveError": "Could not save the payment",
     "financeHint": "This payment is also recorded in the Finance module as an expense.",
+    "financeHintPast": "Past date — recorded only in the employee history; the Finance balance is not reduced (old advance).",
     "voided": "Payment cancelled",
     "voidedBadge": "Deleted",
     "voidTitle": "Cancel payment",

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Plus, Search, Pencil, Users, Briefcase, BadgeCheck, ChevronRight } from 'lucide-react';
+import { Plus, Search, Pencil, Users, Briefcase, BadgeCheck, ChevronRight, Wallet } from 'lucide-react';
 
 import { api } from '@/api/client';
 import Card from '@/components/ui/Card';
@@ -123,6 +123,12 @@ export default function HRPage() {
     } as Record<GroupKey, { gross: number; advance: number; net: number; count: number }>,
   );
 
+  // Joriy oy uchun barcha xodimlarga to'lanishi mumkin bo'lgan maksimal oylik (taxminiy).
+  const maxPayrollTotal = items.reduce(
+    (s, e) => s + (parseFloat(e.month_summary?.max_gross ?? '0') || 0),
+    0,
+  );
+
   function refresh() {
     qc.invalidateQueries({ queryKey: ['employees'] });
   }
@@ -149,6 +155,10 @@ export default function HRPage() {
           {t('hr.tabs.positions')}
         </TabButton>
       </div>
+
+      {!isPositions && (
+        <MaxPayrollCard total={maxPayrollTotal} count={items.length} />
+      )}
 
       {!isPositions && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -369,6 +379,29 @@ function NumCell({
         {value}
       </button>
     </td>
+  );
+}
+
+/**
+ * Joriy oy uchun barcha xodimlarga to'lanishi mumkin bo'lgan maksimal oylik (taxminiy).
+ * Fiksa: belgilangan oylik. Soatbay: o'tgan kunlar haqiqiy + qolgan ish kunlari to'liq kelsa.
+ */
+function MaxPayrollCard({ total, count }: { total: number; count: number }) {
+  const { t } = useTranslation();
+  return (
+    <div className="rounded-card border border-primary/20 bg-primary/5 p-4">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 font-semibold text-primary">
+          <Wallet size={18} />
+          {t('hr.maxPayroll.title')}
+        </div>
+        <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+          {count} {t('hr.deptCard.people')}
+        </span>
+      </div>
+      <div className="mt-2 text-2xl font-bold tabular-nums text-primary">{formatUZS(total)}</div>
+      <p className="text-xs text-ink-soft mt-1">{t('hr.maxPayroll.hint')}</p>
+    </div>
   );
 }
 

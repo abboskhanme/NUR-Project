@@ -106,7 +106,10 @@ class EmployeePaymentIn(BaseModel):
     amount: Optional[Decimal] = None  # avans uchun majburiy; oylikda backend hisoblaydi
     year: int
     month: int
-    date: Optional[date] = None  # ko'rsatilmasa: oyga mos sana
+    # DIQQAT: maydon nomi `date` bo'lsa, `Optional[date]` annotatsiyasi import qilingan
+    # `date` tipini soya qiladi (default `= None` klass atributi sifatida `date`ni
+    # qayta bog'laydi) va tip `None`ga aylanadi. Shuning uchun `pay_date` deb nomladik.
+    pay_date: Optional[date] = None  # ko'rsatilmasa: oyga mos sana
     currency: str = "UZS"
     note: Optional[str] = None
 

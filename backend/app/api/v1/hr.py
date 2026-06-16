@@ -1,7 +1,7 @@
 """HR: employees, attendance, advances, payroll."""
 import calendar
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Annotated, Optional
 
@@ -29,6 +29,51 @@ from app.schemas.hr import (
 )
 
 router = APIRouter(dependencies=[Depends(module_guard("hr"))])
+
+# Standart to'liq ish kuni (soat). Davomat default oynasi 08:30–18:00 ga mos keladi.
+# Soatbay xodimning "to'liq kun"lik haqi shu soatga ko'ra taxminlanadi.
+STANDARD_WORKDAY_HOURS = Decimal("9.5")
+
+
+def _working_days(start: date, end: date) -> int:
+    """[start, end] oralig'idagi ish kunlari soni (yakshanbalar dam — hisobga kirmaydi)."""
+    if start > end:
+        return 0
+    total = (end - start).days + 1
+    full_weeks, rem = divmod(total, 7)
+    count = full_weeks * 6  # har 7 kunda 1 yakshanba
+    for i in range(rem):
+        if (start + timedelta(days=i)).weekday() != 6:  # 6 = yakshanba
+            count += 1
+    return count
+
+
+def _max_month_gross(emp: Employee, year: int, month: int, gross_actual: Decimal,
+                     rate_type: str, rate_amount: Decimal) -> Decimal:
+    """Joriy oy uchun olinishi mumkin bo'lgan MAKSIMAL oylik (taxminiy).
+
+    - fixed: belgilangan oylik (o'zgarmas).
+    - soatbay (va boshqalar): o'tgan kunlardagi haqiqiy hisoblangan haq +
+      qolgan ish kunlari to'liq kelganda hisoblanadigan haq.
+      To'liq kun haqi = stavka × STANDARD_WORKDAY_HOURS.
+      Qolgan kunlar = bugundan keyin oy oxirigacha bo'lgan ish kunlari (yakshanbasiz).
+    """
+    if emp.salary_type == "fixed" or rate_type == "fixed":
+        return emp.salary_amount or Decimal(0)
+
+    start = date(year, month, 1)
+    end = date(year, month, calendar.monthrange(year, month)[1])
+    eff_start = max(start, emp.hire_date) if emp.hire_date else start
+    today = date.today()
+    remaining_start = max(eff_start, today + timedelta(days=1))
+    remaining_days = _working_days(remaining_start, end)
+
+    if rate_type == "daily":
+        full_day_pay = rate_amount or Decimal(0)
+    else:  # hourly va h.k. — to'liq kun = stavka × standart soat
+        full_day_pay = (rate_amount or Decimal(0)) * STANDARD_WORKDAY_HOURS
+
+    return (gross_actual or Decimal(0)) + remaining_days * full_day_pay
 
 
 async def _rate_on(db: AsyncSession, emp: Employee, on_date: date):
@@ -223,10 +268,12 @@ async def list_employees(
         if with_summary:
             present, hours, gross, advance, net = await _month_aggregate(db, e, sy, sm)
             eom = date(sy, sm, calendar.monthrange(sy, sm)[1])
-            rate_type, _amount = await _rate_on(db, e, eom)
+            rate_type, rate_amount = await _rate_on(db, e, eom)
+            max_gross = _max_month_gross(e, sy, sm, gross, rate_type, rate_amount)
             out.month_summary = EmployeeMonthSummary(
                 year=sy, month=sm, present_days=present, total_hours=hours,
                 gross=gross, advance=advance, net=net, salary_type=rate_type,
+                max_gross=max_gross,
             )
         items.append(out)
     return Page[EmployeeOut](
