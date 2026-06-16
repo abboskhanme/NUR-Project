@@ -94,10 +94,10 @@ export default function OrdersTable({
 
   return (
     <div className="overflow-x-auto -mx-2">
-      <table className="text-sm border-collapse table-fixed w-[2000px]">
+      <table className="text-sm border-collapse table-fixed w-[2050px]">
         <colgroup>
           <col style={{ width: 44 }} />
-          <col style={{ width: 70 }} />
+          <col style={{ width: 120 }} />
           <col style={{ width: 140 }} />
           <col style={{ width: 140 }} />
           <col style={{ width: 170 }} />
