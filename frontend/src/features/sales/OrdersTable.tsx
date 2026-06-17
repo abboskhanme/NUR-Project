@@ -152,7 +152,7 @@ function Row({
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { can } = usePermissions();
+  const { can, isSuperadmin } = usePermissions();
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState(o.status);
   const [receiptOpen, setReceiptOpen] = useState(false);
@@ -205,7 +205,10 @@ function Row({
     if (v === (o.unit_uid ?? '')) return;
     setSaving(true);
     try {
-      await api.patch(`/orders/${o.id}`, { unit_uid: v || null });
+      // Yetkazilgan buyurtmada (locked) ID'ni alohida endpoint orqali — ombor talab
+      // qilinmaydi, snapshot sifatida yoziladi. Aktivda — oddiy yo'l (ombor bog'lanadi).
+      const url = locked ? `/orders/${o.id}/unit-uid` : `/orders/${o.id}`;
+      await api.patch(url, { unit_uid: v || null });
       onChanged();
     } catch (err: any) {
       toast.error(err?.response?.data?.detail || t('common.error'));
@@ -300,7 +303,9 @@ function Row({
               {sellerInitials(o.salesperson_name)}
             </span>
           )}
-          {locked ? (
+          {/* Aktiv buyurtmada ID'ni menejer (orders:write) tahrirlaydi; YETKAZILGAN
+              buyurtmada esa faqat super-admin (eski/ombordan chiqib ketgan ID'lar uchun). */}
+          {!(locked ? isSuperadmin : can('orders:write')) ? (
             <span className={ro + ' font-mono text-center flex-1'} title={t('sales.unitIdReadOnly')}>
               {o.unit_uid || '—'}
             </span>

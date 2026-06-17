@@ -60,6 +60,11 @@ class OrderItemOut(ORMBase):
     product: Optional[ProductMini] = None
 
 
+class UnitUidUpdate(BaseModel):
+    """ID raqamini qo'lda yozish uchun (ombor talab qilinmaydi, snapshot)."""
+    unit_uid: Optional[str] = None
+
+
 class PaymentIn(BaseModel):
     date: date
     amount: Decimal

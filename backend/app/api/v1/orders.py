@@ -18,7 +18,7 @@ from app.models.product import Inventory
 from app.models.user import User
 from app.schemas.common import Page
 from app.schemas.order import (
-    OrderCreate, OrderOut, OrderStatusChange, OrderUpdate,
+    OrderCreate, OrderOut, OrderStatusChange, OrderUpdate, UnitUidUpdate,
     PaymentIn, PaymentOut, SalesSummary, SalespersonCount, QueueItemOut, QueueMove, QueueAdd,
 )
 from app.services.order_service import generate_order_code, is_valid_transition
@@ -563,6 +563,38 @@ async def update_order(order_id: uuid.UUID, payload: OrderUpdate, _: CurrentUser
         if new_status == "rejected":
             await _free_unit_by_uid(db, o.unit_uid)
 
+    await db.commit()
+    res = await db.execute(_order_query().where(Order.id == order_id))
+    return res.scalar_one()
+
+
+@router.patch("/{order_id}/unit-uid", response_model=OrderOut)
+async def set_order_unit_uid(order_id: uuid.UUID, payload: UnitUidUpdate, user: CurrentUser,
+                             db: Annotated[AsyncSession, Depends(get_db)]):
+    """ID raqamini qo'lda yozish — holatdan qat'i nazar (yetkazilgan buyurtmalar uchun ham)
+    va ombor ro'yxatida bo'lishini TALAB QILMAYDI (snapshot). FAQAT super-admin uchun.
+
+    Boshqa buyurtmada o'sha ID band bo'lsa — rad etiladi (takrordan saqlanish).
+    """
+    if not (user.is_superadmin or any(r.name == "super_admin" for r in (user.roles or []))):
+        raise HTTPException(403, "Faqat super-admin uchun")
+    res = await db.execute(select(Order).where(Order.id == order_id))
+    o = res.scalar_one_or_none()
+    if not o:
+        raise HTTPException(404, "Buyurtma topilmadi")
+    new_uid = (payload.unit_uid or "").strip() or None
+    if new_uid:
+        taken = (await db.execute(
+            select(Order.code).where(Order.unit_uid == new_uid, Order.id != order_id).limit(1)
+        )).scalar_one_or_none()
+        if taken:
+            raise HTTPException(400, f"«{new_uid}» ID allaqachon band ({taken})")
+    # Eski bog'langan ombor birligi (agar bo'lsa) bo'shaydi; yangi ID faqat yozuv sifatida
+    # saqlanadi — ombor bilan bog'lanmaydi (inventory_id NULL).
+    if o.unit_uid and o.unit_uid != new_uid:
+        await _free_unit_by_uid(db, o.unit_uid)
+    o.unit_uid = new_uid
+    o.inventory_id = None
     await db.commit()
     res = await db.execute(_order_query().where(Order.id == order_id))
     return res.scalar_one()
