@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { usePermissions } from '@/lib/permissions';
@@ -26,6 +27,7 @@ interface OrderItem {
 export interface OrderFull {
   id: string; code: string; status: string; order_date: string; delivered_at?: string | null;
   queue_position?: number | null;
+  salesperson_id?: string | null;
   salesperson_name?: string | null;
   in_queue?: boolean;
   pickup_date?: string | null;
@@ -69,6 +71,8 @@ function rowTint(status: string, balance: number): string {
 const num = (s: string | number | null | undefined) => {
   const n = parseFloat(String(s ?? '')); return Number.isNaN(n) ? 0 : n;
 };
+interface Salesperson { id: string; full_name: string }
+
 // Sotuvchi ismidan bosh harflar: bitta so'z → 1 harf ("Ayubxon" → "A"),
 // ikki+ so'z → birinchi ikki so'z bosh harfi ("Akabjon Avazov" → "AA").
 function sellerInitials(name?: string | null): string {
@@ -91,13 +95,21 @@ export default function OrdersTable({
   onPay: (orderId: string) => void;
 }) {
   const { t } = useTranslation();
+  const { isSuperadmin } = usePermissions();
+  // Sotuvchi tanlovi (faqat super-admin tahrirlaganda kerak)
+  const spQ = useQuery<Salesperson[]>({
+    queryKey: ['order-salespeople'],
+    queryFn: () => api.get('/orders/salespeople').then((r) => r.data),
+    enabled: isSuperadmin,
+  });
+  const salespeople = spQ.data ?? [];
 
   return (
     <div className="overflow-x-auto -mx-2">
-      <table className="text-sm border-collapse table-fixed w-[2050px]">
+      <table className="text-sm border-collapse table-fixed w-[2090px]">
         <colgroup>
           <col style={{ width: 44 }} />
-          <col style={{ width: 120 }} />
+          <col style={{ width: 160 }} />
           <col style={{ width: 140 }} />
           <col style={{ width: 140 }} />
           <col style={{ width: 170 }} />
@@ -137,7 +149,8 @@ export default function OrdersTable({
         </thead>
         <tbody>
           {orders.map((o) => (
-            <Row key={o.id} o={o} products={products} onChanged={onChanged} onPay={onPay} />
+            <Row key={o.id} o={o} products={products} salespeople={salespeople}
+                 onChanged={onChanged} onPay={onPay} />
           ))}
         </tbody>
       </table>
@@ -146,9 +159,10 @@ export default function OrdersTable({
 }
 
 function Row({
-  o, products, onChanged, onPay,
+  o, products, salespeople, onChanged, onPay,
 }: {
-  o: OrderFull; products: ProductOpt[]; onChanged: () => void; onPay: (id: string) => void;
+  o: OrderFull; products: ProductOpt[]; salespeople: Salesperson[];
+  onChanged: () => void; onPay: (id: string) => void;
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -200,6 +214,20 @@ function Row({
   }
 
   // Ombor ID raqami — bo'sh kotyolni band qiladi. Xato bo'lsa qiymatni qaytaramiz.
+  // Sotuvchini biriktirish (faqat super-admin) — yetkazilgan buyurtmada ham ishlaydi
+  async function saveSalesperson(id: string) {
+    if ((id || null) === (o.salesperson_id ?? null)) return;
+    setSaving(true);
+    try {
+      await api.patch(`/orders/${o.id}/salesperson`, { salesperson_id: id || null });
+      onChanged();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail || t('common.error'));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function saveUnitUid(e: React.FocusEvent<HTMLInputElement>) {
     const v = e.target.value.trim();
     if (v === (o.unit_uid ?? '')) return;
@@ -295,13 +323,29 @@ function Row({
       {/* Ombor ID raqami — navbat raqami o'rniga; bo'sh kotyolni band qiladi */}
       <td className={cell}>
         <div className="flex items-center gap-1.5">
-          {o.salesperson_name && (
-            <span
-              className="shrink-0 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded-full bg-primary/10 text-primary text-[10px] font-semibold leading-none"
-              title={o.salesperson_name}
-            >
-              {sellerInitials(o.salesperson_name)}
-            </span>
+          {/* Sotuvchi: super-admin dropdown orqali o'zgartiradi (yetkazilganda ham);
+              boshqalar faqat bosh harflarni ko'radi. */}
+          {isSuperadmin ? (
+            <CellSelect
+              value={o.salesperson_id ?? ''}
+              onChange={saveSalesperson}
+              options={salespeople.map((s) => ({ value: s.id, label: s.full_name }))}
+              allowEmpty
+              emptyLabel="—"
+              placeholder="—"
+              hideChevron
+              triggerClassName="shrink-0 max-w-[84px] h-5 px-1.5 rounded-full bg-primary/10 text-primary text-[10px] font-semibold leading-none"
+              valueClassName="truncate"
+            />
+          ) : (
+            o.salesperson_name && (
+              <span
+                className="shrink-0 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded-full bg-primary/10 text-primary text-[10px] font-semibold leading-none"
+                title={o.salesperson_name}
+              >
+                {sellerInitials(o.salesperson_name)}
+              </span>
+            )
           )}
           {/* Aktiv buyurtmada ID'ni menejer (orders:write) tahrirlaydi; YETKAZILGAN
               buyurtmada esa faqat super-admin (eski/ombordan chiqib ketgan ID'lar uchun). */}

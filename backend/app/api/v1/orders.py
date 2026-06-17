@@ -19,6 +19,7 @@ from app.models.user import User
 from app.schemas.common import Page
 from app.schemas.order import (
     OrderCreate, OrderOut, OrderStatusChange, OrderUpdate, UnitUidUpdate,
+    SalespersonUpdate, SalespersonOption,
     PaymentIn, PaymentOut, SalesSummary, SalespersonCount, QueueItemOut, QueueMove, QueueAdd,
 )
 from app.services.order_service import generate_order_code, is_valid_transition
@@ -416,6 +417,16 @@ async def remove_from_queue(order_id: uuid.UUID, current: CurrentUser,
     return res.scalar_one()
 
 
+@router.get("/salespeople", response_model=list[SalespersonOption])
+async def list_salespeople(db: Annotated[AsyncSession, Depends(get_db)], _: CurrentUser):
+    """Sotuvchi tanlovi (dropdown) uchun aktiv foydalanuvchilar — ID + ism."""
+    rows = (await db.execute(
+        select(User.id, User.full_name)
+        .where(User.is_active.is_(True)).order_by(User.full_name)
+    )).all()
+    return [SalespersonOption(id=i, full_name=n) for i, n in rows]
+
+
 @router.post("", response_model=OrderOut, status_code=201)
 async def create_order(payload: OrderCreate, user: CurrentUser,
                        db: Annotated[AsyncSession, Depends(get_db)]):
@@ -595,6 +606,31 @@ async def set_order_unit_uid(order_id: uuid.UUID, payload: UnitUidUpdate, user: 
         await _free_unit_by_uid(db, o.unit_uid)
     o.unit_uid = new_uid
     o.inventory_id = None
+    await db.commit()
+    res = await db.execute(_order_query().where(Order.id == order_id))
+    return res.scalar_one()
+
+
+@router.patch("/{order_id}/salesperson", response_model=OrderOut)
+async def set_order_salesperson(order_id: uuid.UUID, payload: SalespersonUpdate, user: CurrentUser,
+                                db: Annotated[AsyncSession, Depends(get_db)]):
+    """Buyurtma sotuvchisini qo'lda biriktirish — holatdan qat'i nazar (yetkazilganda ham).
+    FAQAT super-admin uchun (sotuvchi hisobiga ta'sir qiladi).
+    """
+    if not (user.is_superadmin or any(r.name == "super_admin" for r in (user.roles or []))):
+        raise HTTPException(403, "Faqat super-admin uchun")
+    res = await db.execute(select(Order).where(Order.id == order_id))
+    o = res.scalar_one_or_none()
+    if not o:
+        raise HTTPException(404, "Buyurtma topilmadi")
+    sp_id = payload.salesperson_id
+    if sp_id is not None:
+        ok = (await db.execute(
+            select(User.id).where(User.id == sp_id, User.is_active.is_(True))
+        )).scalar_one_or_none()
+        if not ok:
+            raise HTTPException(422, "Sotuvchi topilmadi yoki aktiv emas")
+    o.salesperson_id = sp_id
     await db.commit()
     res = await db.execute(_order_query().where(Order.id == order_id))
     return res.scalar_one()

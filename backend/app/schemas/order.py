@@ -65,6 +65,17 @@ class UnitUidUpdate(BaseModel):
     unit_uid: Optional[str] = None
 
 
+class SalespersonUpdate(BaseModel):
+    """Buyurtma sotuvchisini qo'lda biriktirish (faqat super-admin)."""
+    salesperson_id: Optional[uuid.UUID] = None
+
+
+class SalespersonOption(BaseModel):
+    """Sotuvchi tanlovi (dropdown uchun) — aktiv foydalanuvchilar."""
+    id: uuid.UUID
+    full_name: str
+
+
 class PaymentIn(BaseModel):
     date: date
     amount: Decimal
