@@ -330,7 +330,7 @@ function Row({
             />
           ) : (
             <span
-              className="shrink-0 max-w-[124px] truncate text-[11px] text-ink/70"
+              className="shrink-0 inline-block max-w-[124px] truncate h-5 px-2 rounded-full bg-primary/10 text-primary text-[11px] font-semibold leading-5"
               title={o.salesperson_name ?? ''}
             >
               {o.salesperson_name || '—'}
