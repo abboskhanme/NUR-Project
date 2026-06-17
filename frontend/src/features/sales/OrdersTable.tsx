@@ -73,15 +73,6 @@ const num = (s: string | number | null | undefined) => {
 };
 interface Salesperson { id: string; full_name: string }
 
-// Sotuvchi ismidan bosh harflar: bitta so'z → 1 harf ("Ayubxon" → "A"),
-// ikki+ so'z → birinchi ikki so'z bosh harfi ("Akabjon Avazov" → "AA").
-function sellerInitials(name?: string | null): string {
-  if (!name) return '';
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return '';
-  if (parts.length === 1) return parts[0][0].toUpperCase();
-  return (parts[0][0] + parts[1][0]).toUpperCase();
-}
 // Dollar summasi uchun — raqam va bitta o'nlik nuqta
 const decStr = (s: string | number | null | undefined) =>
   String(s ?? '').replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1');
@@ -106,10 +97,10 @@ export default function OrdersTable({
 
   return (
     <div className="overflow-x-auto -mx-2">
-      <table className="text-sm border-collapse table-fixed w-[2090px]">
+      <table className="text-sm border-collapse table-fixed w-[2140px]">
         <colgroup>
           <col style={{ width: 44 }} />
-          <col style={{ width: 160 }} />
+          <col style={{ width: 210 }} />
           <col style={{ width: 140 }} />
           <col style={{ width: 140 }} />
           <col style={{ width: 170 }} />
@@ -323,8 +314,8 @@ function Row({
       {/* Ombor ID raqami — navbat raqami o'rniga; bo'sh kotyolni band qiladi */}
       <td className={cell}>
         <div className="flex items-center gap-1.5">
-          {/* Sotuvchi: super-admin dropdown orqali o'zgartiradi (yetkazilganda ham);
-              boshqalar faqat bosh harflarni ko'radi. */}
+          {/* Sotuvchi to'liq ismi hammaga ko'rinadi; super-admin dropdown orqali
+              o'zgartiradi (yetkazilganda ham), boshqalar faqat ko'radi (read-only). */}
           {isSuperadmin ? (
             <CellSelect
               value={o.salesperson_id ?? ''}
@@ -334,18 +325,16 @@ function Row({
               emptyLabel="—"
               placeholder="—"
               hideChevron
-              triggerClassName="shrink-0 max-w-[84px] h-5 px-1.5 rounded-full bg-primary/10 text-primary text-[10px] font-semibold leading-none"
+              triggerClassName="shrink-0 max-w-[124px] h-5 px-2 rounded-full bg-primary/10 text-primary text-[11px] font-semibold leading-5"
               valueClassName="truncate"
             />
           ) : (
-            o.salesperson_name && (
-              <span
-                className="shrink-0 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded-full bg-primary/10 text-primary text-[10px] font-semibold leading-none"
-                title={o.salesperson_name}
-              >
-                {sellerInitials(o.salesperson_name)}
-              </span>
-            )
+            <span
+              className="shrink-0 max-w-[124px] truncate text-[11px] text-ink/70"
+              title={o.salesperson_name ?? ''}
+            >
+              {o.salesperson_name || '—'}
+            </span>
           )}
           {/* Aktiv buyurtmada ID'ni menejer (orders:write) tahrirlaydi; YETKAZILGAN
               buyurtmada esa faqat super-admin (eski/ombordan chiqib ketgan ID'lar uchun). */}
