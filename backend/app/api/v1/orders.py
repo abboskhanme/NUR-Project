@@ -434,6 +434,18 @@ async def create_order(payload: OrderCreate, user: CurrentUser,
     # unit_uid/inventory_id alohida ishlanadi (_link_unit orqali band qilinadi)
     order = Order(code=code, salesperson_id=user.id, status="new",
                   **payload.model_dump(exclude={"items", "unit_uid", "inventory_id"}))
+    # Manzil kiritilmasa — mijozning manzilini avtomatik olamiz
+    # (avval to'liq manzil, bo'lmasa viloyat + shahar/tuman).
+    if not (order.delivery_address or "").strip():
+        cust = (await db.execute(
+            select(Customer).where(Customer.id == order.customer_id)
+        )).scalar_one_or_none()
+        if cust:
+            order.delivery_address = (
+                (cust.address or "").strip()
+                or ", ".join(p for p in (cust.region, cust.city) if p)
+                or None
+            )
     rate = order.exchange_rate or Decimal(0)
     for _i, _it in enumerate(payload.items):
         _check_discount(_it.unit_price_usd, _it.quantity, _it.discount_usd, _i)
