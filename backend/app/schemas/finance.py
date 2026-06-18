@@ -110,6 +110,8 @@ class EmployeePaymentIn(BaseModel):
     # `date` tipini soya qiladi (default `= None` klass atributi sifatida `date`ni
     # qayta bog'laydi) va tip `None`ga aylanadi. Shuning uchun `pay_date` deb nomladik.
     pay_date: Optional[date] = None  # ko'rsatilmasa: oyga mos sana
+    # Avansda moliyadan ayirishni boshqaradi (default: yoqilgan). Sanaga bog'liq emas.
+    affect_finance: Optional[bool] = None
     currency: str = "UZS"
     note: Optional[str] = None
 

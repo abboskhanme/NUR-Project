@@ -240,12 +240,13 @@ async def create_employee_payment(payload: EmployeePaymentIn, user: CurrentUser,
     currency = payload.currency or emp.currency or "UZS"
     note = payload.note or default_note
 
-    # Eski (migratsiya qilingan) avanslarni kiritish: bugungidan oldingi sanaga
-    # yozilgan avans faqat HR tarixiga tushadi, moliya balansidan AYIRILMAYDI.
-    # Sababi — eski bazadan balans to'liq ko'chirilgan, eski avanslar allaqachon
-    # o'sha balansda hisobga olingan. Bugungi (yoki keyingi) sanadagi avans esa
-    # haqiqiy yangi chiqim — moliyaga ham yoziladi. Oylik to'lovi har doim yoziladi.
-    affects_finance = not (payload.kind == "advance" and pay_date < today)
+    # Moliyadan ayirish — endi SANAGA bog'liq EMAS, alohida bayroq orqali boshqariladi
+    # (default: yoqilgan). Eski/migratsiya avanslarni moliyaga tegmasdan kiritish uchun
+    # `affect_finance=False` yuboriladi. Oylik to'lovi har doim moliyaga yoziladi.
+    if payload.kind == "salary":
+        affects_finance = True
+    else:
+        affects_finance = payload.affect_finance if payload.affect_finance is not None else True
 
     # 1) HR: SalaryAdvance (xodim oylik-avans tarixiga)
     adv = SalaryAdvance(employee_id=emp.id, advance_date=pay_date, amount=amount,

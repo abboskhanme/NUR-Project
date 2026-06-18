@@ -99,6 +99,8 @@ export default function EmployeeHistoryModal({
     return today < from ? from : today > to ? to : today;
   })();
   const [advDate, setAdvDate] = useState(defaultAdvDate);
+  // Moliyadan ayirish — default yoqilgan; sanaga bog'liq emas, qo'lda boshqariladi
+  const [affectFinance, setAffectFinance] = useState(true);
   const [saving, setSaving] = useState(false);
   const [confirmVoid, setConfirmVoid] = useState<Advance | null>(null);
   const [voiding, setVoiding] = useState(false);
@@ -149,6 +151,7 @@ export default function EmployeeHistoryModal({
         year,
         month,
         pay_date: advDate || null,
+        affect_finance: affectFinance,
         currency: employee.currency || 'UZS',
         note: note || null,
       });
@@ -156,6 +159,7 @@ export default function EmployeeHistoryModal({
       setAmount('');
       setNote('');
       setAdvDate(defaultAdvDate);
+      setAffectFinance(true);
       advQ.refetch();
       invalidateAll();
     } catch (e: any) {
@@ -259,10 +263,17 @@ export default function EmployeeHistoryModal({
                   <Plus size={16} /> {saving ? t('hr.histModal.saving') : t('hr.histModal.give')}
                 </button>
               </div>
-              <p className="text-[11px] text-ink-soft mt-2">
-                {advDate && advDate < todayISO()
-                  ? t('hr.histModal.financeHintPast')
-                  : t('hr.histModal.financeHint')}
+              <label className="flex items-center gap-2 mt-2.5 cursor-pointer select-none w-fit">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 accent-primary"
+                  checked={affectFinance}
+                  onChange={(e) => setAffectFinance(e.target.checked)}
+                />
+                <span className="text-sm font-medium">{t('hr.histModal.affectFinanceLabel')}</span>
+              </label>
+              <p className="text-[11px] text-ink-soft mt-1">
+                {affectFinance ? t('hr.histModal.financeHint') : t('hr.histModal.financeHintOff')}
               </p>
             </div>
           </div>
