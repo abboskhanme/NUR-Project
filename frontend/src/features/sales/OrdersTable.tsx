@@ -470,7 +470,7 @@ function Row({
       <td className={cell + ' text-right text-success'}>
         <span className="inline-flex items-center gap-1 justify-end">
           {formatUZS(o.paid_uzs)}
-          {balance > 0 && can('finance:write') && (
+          {balance > 0 && can('orders:write') && (
             <button onClick={() => onPay(o.id)} className="p-0.5 rounded hover:bg-primary/10 text-primary" title={t('sales.addPaymentTooltip')}>
               <Plus size={13} />
             </button>

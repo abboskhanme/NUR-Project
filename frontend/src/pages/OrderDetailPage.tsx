@@ -360,7 +360,7 @@ export default function OrderDetailPage() {
       <Card title={t('sales.sectionPayments')} action={
         balance <= 0
           ? <span className="text-xs text-success font-medium">{t('sales.fullyPaid')}</span>
-          : can('finance:write')
+          : can('orders:write')
             ? <button onClick={() => setAddingPayment(true)} className="btn-primary text-sm py-1.5"><Plus size={15} /> {t('sales.addPaymentBtn')}</button>
             : <span className="text-xs text-ink-soft">{t('sales.financeOnly')}</span>
       }>
@@ -396,7 +396,7 @@ export default function OrderDetailPage() {
                       >
                         <Receipt size={14} />
                       </button>
-                      {!locked && can('finance:delete') && (
+                      {!locked && can('orders:delete') && (
                         <button onClick={() => askDeletePayment(p.id)} className="p-1 rounded hover:bg-danger/10 text-danger">
                           <Trash2 size={14} />
                         </button>
