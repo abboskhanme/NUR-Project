@@ -31,3 +31,6 @@ logs/
 # TS incremental build cache
 frontend/tsconfig.tsbuildinfo
 *.tsbuildinfo
+
+# Obsidian "second brain" vault — shaxsiy bilim bazasi, gitga yuklanmaydi
+obsidian-vault/
