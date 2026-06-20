@@ -6,6 +6,7 @@ from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import select, func, or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -430,42 +431,60 @@ async def list_salespeople(db: Annotated[AsyncSession, Depends(get_db)], _: Curr
 @router.post("", response_model=OrderOut, status_code=201)
 async def create_order(payload: OrderCreate, user: CurrentUser,
                        db: Annotated[AsyncSession, Depends(get_db)]):
-    code = await generate_order_code(db)
-    # unit_uid/inventory_id alohida ishlanadi (_link_unit orqali band qilinadi)
-    order = Order(code=code, salesperson_id=user.id, status="new",
-                  **payload.model_dump(exclude={"items", "unit_uid", "inventory_id"}))
+    rate = payload.exchange_rate or Decimal(0)
+    # Chegirma tekshiruvi — to'qnashuv retry'sidan oldin bir marta.
+    for _i, _it in enumerate(payload.items):
+        _check_discount(_it.unit_price_usd, _it.quantity, _it.discount_usd, _i)
+
     # Manzil kiritilmasa — mijozning manzilini avtomatik olamiz
     # (avval to'liq manzil, bo'lmasa viloyat + shahar/tuman).
-    if not (order.delivery_address or "").strip():
+    delivery_address = payload.delivery_address
+    if not (delivery_address or "").strip():
         cust = (await db.execute(
-            select(Customer).where(Customer.id == order.customer_id)
+            select(Customer).where(Customer.id == payload.customer_id)
         )).scalar_one_or_none()
         if cust:
-            order.delivery_address = (
+            delivery_address = (
                 (cust.address or "").strip()
                 or ", ".join(p for p in (cust.region, cust.city) if p)
                 or None
             )
-    rate = order.exchange_rate or Decimal(0)
-    for _i, _it in enumerate(payload.items):
-        _check_discount(_it.unit_price_usd, _it.quantity, _it.discount_usd, _i)
 
-    for it in payload.items:
-        disc_uzs = _discount_uzs(it.discount_usd, rate)
-        total_uzs = (it.unit_price_uzs or Decimal(0)) * (it.quantity or 1) - disc_uzs
-        order.items.append(OrderItem(
-            product_id=it.product_id, serial_id=it.serial_id,
-            bunker_direction=it.bunker_direction, quantity=it.quantity,
-            unit_price_usd=it.unit_price_usd, unit_price_uzs=it.unit_price_uzs,
-            discount_usd=it.discount_usd, discount=disc_uzs, total_uzs=total_uzs,
-        ))
-    db.add(order)
-    # Ombor birligini FAQAT qo'lda kiritilgan ID raqami orqali band qilamiz
-    if payload.unit_uid:
-        await _link_unit(db, order, payload.unit_uid)
-    await db.commit()
-    res = await db.execute(_order_query().where(Order.id == order.id))
-    return res.scalar_one()
+    # Kod UNIQUE — bir vaqtda yaratilgan ikki buyurtma bir xil kod olib qolsa
+    # (race), DB IntegrityError beradi. Shunda rollback qilib, kodni qaytadan
+    # generatsiya qilib qayta urinamiz — foydalanuvchi 500 ko'rmaydi.
+    for _attempt in range(5):
+        code = await generate_order_code(db)
+        # unit_uid/inventory_id alohida ishlanadi (_link_unit orqali band qilinadi)
+        order = Order(
+            code=code, salesperson_id=user.id, status="new",
+            **payload.model_dump(
+                exclude={"items", "unit_uid", "inventory_id", "delivery_address"}),
+        )
+        order.delivery_address = delivery_address
+        for it in payload.items:
+            disc_uzs = _discount_uzs(it.discount_usd, rate)
+            total_uzs = (it.unit_price_uzs or Decimal(0)) * (it.quantity or 1) - disc_uzs
+            order.items.append(OrderItem(
+                product_id=it.product_id, serial_id=it.serial_id,
+                bunker_direction=it.bunker_direction, quantity=it.quantity,
+                unit_price_usd=it.unit_price_usd, unit_price_uzs=it.unit_price_uzs,
+                discount_usd=it.discount_usd, discount=disc_uzs, total_uzs=total_uzs,
+            ))
+        db.add(order)
+        # Ombor birligini FAQAT qo'lda kiritilgan ID raqami orqali band qilamiz
+        if payload.unit_uid:
+            await _link_unit(db, order, payload.unit_uid)
+        try:
+            await db.commit()
+        except IntegrityError:
+            await db.rollback()
+            continue
+        res = await db.execute(_order_query().where(Order.id == order.id))
+        return res.scalar_one()
+
+    raise HTTPException(
+        409, "Buyurtma kodini yaratib bo'lmadi, iltimos qayta urinib ko'ring")
 
 
 @router.get("/{order_id}", response_model=OrderOut)
