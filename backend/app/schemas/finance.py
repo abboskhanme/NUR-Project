@@ -112,6 +112,8 @@ class EmployeePaymentIn(BaseModel):
     pay_date: Optional[date] = None  # ko'rsatilmasa: oyga mos sana
     # Avansda moliyadan ayirishni boshqaradi (default: yoqilgan). Sanaga bog'liq emas.
     affect_finance: Optional[bool] = None
+    # Avans tahminiy oylikdan oshganda — faqat super-admin "baribir berish" uchun.
+    override: bool = False
     currency: str = "UZS"
     note: Optional[str] = None
 

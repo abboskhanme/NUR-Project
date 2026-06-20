@@ -21,7 +21,7 @@ from app.schemas.hr import (
     AttendanceBatchIn, AttendanceOut,
     DepartmentCreate, DepartmentOut, DepartmentUpdate,
     EmployeeCreate, EmployeeMonthSummary, EmployeeOut, EmployeeUpdate,
-    MonthHistoryItem, MonthlySummary,
+    MonthDebts, MonthHistoryItem, MonthlySummary,
     PayrollRunIn, PayrollRunOut,
     PositionCreate, PositionOut, PositionUpdate,
     SalaryAdvanceIn, SalaryAdvanceOut,
@@ -133,6 +133,93 @@ async def _month_aggregate(db: AsyncSession, emp: Employee, year: int, month: in
     advance = Decimal(adv_res.scalar() or 0)
     net = gross - advance
     return int(present_days or 0), Decimal(hours or 0), gross, advance, net
+
+
+async def advance_cap(db: AsyncSession, emp: Employee, year: int, month: int):
+    """Avans limiti uchun: (tahminiy oylik max_gross, joriy faol avanslar yig'indisi).
+
+    Ro'yxatdagi `month_summary.max_gross` bilan bir xil hisob — bittadan manba."""
+    _, _, gross, advance, _ = await _month_aggregate(db, emp, year, month)
+    eom = date(year, month, calendar.monthrange(year, month)[1])
+    rate_type, rate_amount = await _rate_on(db, emp, eom)
+    max_gross = _max_month_gross(emp, year, month, gross, rate_type, rate_amount)
+    return max_gross, advance
+
+
+@router.get("/salary-debts", response_model=list[MonthDebts])
+async def salary_debts(_: CurrentUser, db: Annotated[AsyncSession, Depends(get_db)],
+                       year: Optional[int] = None):
+    """Xodimlar oldidagi oylik qarzlarimiz — har oy uchun alohida (yangi → eski).
+
+    Bir oy uchun bitta xodim qarzi = hisoblangan oylik (gross) − berilgan summa
+    (avans + oylik to'lovlari). Faqat qarz > 0 bo'lgan xodimlar ro'yxatga kiradi.
+    Hisob `_month_aggregate` bilan bir xil mantiqда, lekin butun yil 2 ta guruh
+    so'rovida olinadi (har xodim-oyga alohida so'rovsiz)."""
+    today = date.today()
+    year = year or today.year
+    if year > today.year:
+        return []
+    last_month = 12 if year < today.year else today.month
+
+    emps = (await db.execute(
+        select(Employee).where(Employee.status == "active").order_by(Employee.full_name)
+    )).scalars().all()
+    if not emps:
+        return []
+    emp_ids = [e.id for e in emps]
+
+    ystart = date(year, 1, 1)
+    yend = date(year, 12, 31)
+
+    # Soatbay gross: attendance.daily_pay yig'indisi (emp, oy) bo'yicha
+    m_att = func.extract("month", Attendance.work_date)
+    att_rows = (await db.execute(
+        select(Attendance.employee_id, m_att.label("m"),
+               func.coalesce(func.sum(Attendance.daily_pay), 0))
+        .where(and_(
+            Attendance.employee_id.in_(emp_ids),
+            Attendance.work_date >= ystart, Attendance.work_date <= yend,
+            Attendance.hours_worked > 0,
+        )).group_by(Attendance.employee_id, m_att)
+    )).all()
+    gross_map = {(r[0], int(r[1])): Decimal(r[2] or 0) for r in att_rows}
+
+    # Berilgan summa: faol avans/oylik to'lovlari (emp, oy) bo'yicha
+    m_adv = func.extract("month", SalaryAdvance.advance_date)
+    adv_rows = (await db.execute(
+        select(SalaryAdvance.employee_id, m_adv.label("m"),
+               func.coalesce(func.sum(SalaryAdvance.amount), 0))
+        .where(and_(
+            SalaryAdvance.employee_id.in_(emp_ids),
+            SalaryAdvance.advance_date >= ystart, SalaryAdvance.advance_date <= yend,
+            SalaryAdvance.status == "active",
+        )).group_by(SalaryAdvance.employee_id, m_adv)
+    )).all()
+    paid_map = {(r[0], int(r[1])): Decimal(r[2] or 0) for r in adv_rows}
+
+    result: list[MonthDebts] = []
+    for m in range(last_month, 0, -1):  # yangi oydan eskisiga
+        month_end = date(year, m, calendar.monthrange(year, m)[1])
+        items = []
+        total = Decimal(0)
+        for e in emps:
+            if e.hire_date and e.hire_date > month_end:
+                continue  # bu oyda hali ishlamagan
+            if e.salary_type == "fixed":
+                gross = e.salary_amount or Decimal(0)
+            else:
+                gross = gross_map.get((e.id, m), Decimal(0))
+            paid = paid_map.get((e.id, m), Decimal(0))
+            debt = gross - paid
+            if debt > 0:
+                items.append({
+                    "employee_id": e.id, "full_name": e.full_name,
+                    "department_type": e.department_type,
+                    "gross": gross, "paid": paid, "debt": debt,
+                })
+                total += debt
+        result.append(MonthDebts(year=year, month=m, total=total, items=items))
+    return result
 
 
 def _emp_out(e: Employee, pos_name: Optional[str]) -> EmployeeOut:

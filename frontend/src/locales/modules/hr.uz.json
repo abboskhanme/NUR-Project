@@ -7,10 +7,21 @@
     "assembly": "Yig'uv bo'limi",
     "production": "Ishlab chiqarish",
     "employees": "Xodimlar",
-    "positions": "Lavozimlar"
+    "positions": "Lavozimlar",
+    "debts": "Qarzlar"
   },
   "deptCard": {
     "people": "kishi"
+  },
+  "debts": {
+    "grandTitle": "Xodimlar oldidagi jami qarz",
+    "grandHint": "Tanlangan yil bo'yicha to'lanmagan oylik qoldiqlari yig'indisi.",
+    "empty": "Qarzlar yo'q",
+    "noDebt": "Qarz yo'q",
+    "colName": "Xodim",
+    "colGross": "Oylik",
+    "colPaid": "Berilgan",
+    "colDebt": "Qarz"
   },
   "maxPayroll": {
     "title": "Oylik xarajati (taxminiy)",
@@ -92,7 +103,11 @@
     "voidedBadge": "O'chirilgan",
     "voidTitle": "To'lovni bekor qilish",
     "voidConfirm": "{{date}} sanadagi {{amount}} to'lov bekor qilinsinmi? Tarixda o'chirilgan holatda qoladi va moliyadagi tegishli chiqim teskari qaytariladi.",
-    "voidConfirmBtn": "Ha, bekor qilish"
+    "voidConfirmBtn": "Ha, bekor qilish",
+    "advanceBlocked": "Avans tahminiy oylikdan oshib ketadi. Berish mumkin bo'lgan qoldiq: {{remaining}}. Oylikdan ortiq avans berishni faqat super-admin tasdiqlay oladi.",
+    "overrideTitle": "Oylikdan ortiq avans",
+    "overrideConfirm": "Bu avans tahminiy oylikdan ({{maxGross}}) oshib ketadi — jami avans {{wouldBe}} bo'ladi. Baribir berilsinmi?",
+    "overrideConfirmBtn": "Ha, baribir berish"
   },
   "tooltip": {
     "systemUser": "Tizim foydalanuvchisi",

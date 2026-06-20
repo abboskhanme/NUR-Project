@@ -14,7 +14,8 @@
   "table": {
     "name": "Nomi",
     "unit": "Birlik",
-    "price": "Narx"
+    "price": "Narx",
+    "image": "Rasm"
   },
   "deleteTitle": "Mahsulotni o'chirish",
   "deleteMessage": "O'chirilsinmi: {{name}}? Agar buyurtmalarda ishlatilgan bo'lsa, o'chirilmaydi — arxivga o'tkaziladi.",
@@ -35,6 +36,12 @@
     "priceLabel": "Narx (USD)",
     "pricePlaceholder": "0",
     "descriptionLabel": "Izoh",
+    "imageLabel": "Rasm",
+    "imageUpload": "Rasm tanlash",
+    "imageRemove": "Rasmni o'chirish",
+    "imageHint": "PNG / JPEG / WEBP, 5 MB gacha",
+    "imageOnlyImage": "Faqat rasm fayli yuklash mumkin",
+    "imageTooLarge": "Rasm 5 MB dan kichik bo'lishi kerak",
     "directionHint": "Yo'nalish (o'ng/chap) buyurtma qilishda tanlanadi — narxga ta'sir qilmaydi.",
     "modelRequired": "Model majburiy",
     "nameRequired": "Mahsulot nomi majburiy",

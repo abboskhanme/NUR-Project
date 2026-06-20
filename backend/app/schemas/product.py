@@ -52,6 +52,7 @@ class ProductOut(ORMBase):
     description: Optional[str] = None
     base_price_usd: Decimal
     status: str
+    has_image: bool = False
     created_at: datetime
 
     @computed_field  # type: ignore[prop-decorator]

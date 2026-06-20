@@ -111,6 +111,24 @@ class EmployeeMonthSummary(BaseModel):
     max_gross: Decimal = Decimal(0)
 
 
+class EmployeeDebt(BaseModel):
+    """Bitta xodimga bitta oy uchun to'lanmagan oylik qoldig'i (bizning qarzimiz)."""
+    employee_id: uuid.UUID
+    full_name: str
+    department_type: str
+    gross: Decimal       # hisoblangan oylik (soatbayda — ishlangan haq)
+    paid: Decimal        # berilgan (avans + oylik to'lovlari)
+    debt: Decimal        # qoldiq = gross − paid (bizning qarz)
+
+
+class MonthDebts(BaseModel):
+    """Bir oy uchun barcha xodimlar oldidagi qarzlar."""
+    year: int
+    month: int
+    total: Decimal
+    items: list[EmployeeDebt]
+
+
 class EmployeeOut(ORMBase):
     id: uuid.UUID
     full_name: str

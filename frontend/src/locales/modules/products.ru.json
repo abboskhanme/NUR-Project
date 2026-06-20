@@ -14,7 +14,8 @@
   "table": {
     "name": "Название",
     "unit": "Ед. изм.",
-    "price": "Цена"
+    "price": "Цена",
+    "image": "Фото"
   },
   "deleteTitle": "Удаление товара",
   "deleteMessage": "Удалить: {{name}}? Если товар используется в заказах, он будет архивирован, а не удалён.",
@@ -35,6 +36,12 @@
     "priceLabel": "Цена (USD)",
     "pricePlaceholder": "0",
     "descriptionLabel": "Примечание",
+    "imageLabel": "Фото",
+    "imageUpload": "Выбрать фото",
+    "imageRemove": "Удалить фото",
+    "imageHint": "PNG / JPEG / WEBP, до 5 МБ",
+    "imageOnlyImage": "Можно загружать только изображения",
+    "imageTooLarge": "Фото должно быть меньше 5 МБ",
     "directionHint": "Направление (правое/левое) выбирается при оформлении заказа — на цену не влияет.",
     "modelRequired": "Модель обязательна",
     "nameRequired": "Название товара обязательно",

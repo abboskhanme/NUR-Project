@@ -2,7 +2,7 @@
 import uuid
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,7 +10,7 @@ from app.core.dependencies import CurrentUser
 from app.core.permissions import module_guard
 from app.db.session import get_db
 from app.models.order import OrderItem
-from app.models.product import Inventory, Product
+from app.models.product import Inventory, Product, ProductImage
 from app.schemas.common import Page
 from app.schemas.product import (
     InventoryCreate, InventoryOut,
@@ -18,6 +18,9 @@ from app.schemas.product import (
 )
 
 router = APIRouter(dependencies=[Depends(module_guard("products"))])
+
+ALLOWED_IMAGE_TYPES = {"image/png", "image/jpeg", "image/jpg", "image/webp", "image/gif"}
+MAX_IMAGE_BYTES = 5 * 1024 * 1024
 
 
 # ---- Products ----
@@ -27,6 +30,22 @@ def _validate_product(product_type: str, model, name):
         raise HTTPException(422, "Asosiy mahsulot uchun model majburiy")
     if product_type == "additional" and not name:
         raise HTTPException(422, "Qo'shimcha mahsulot uchun nom majburiy")
+
+
+async def _image_ids(db: AsyncSession, product_ids: list[uuid.UUID]) -> set[uuid.UUID]:
+    """Rasmi bor mahsulot ID'lari — og'ir BYTEA data yuklamasdan (faqat kalit)."""
+    if not product_ids:
+        return set()
+    rows = await db.execute(
+        select(ProductImage.product_id).where(ProductImage.product_id.in_(product_ids))
+    )
+    return set(rows.scalars().all())
+
+
+def _out_with_image(p: Product, has_image: bool) -> ProductOut:
+    po = ProductOut.model_validate(p)
+    po.has_image = has_image
+    return po
 
 
 @router.get("", response_model=Page[ProductOut])
@@ -51,8 +70,10 @@ async def list_products(db: Annotated[AsyncSession, Depends(get_db)], _: Current
         .offset((page - 1) * page_size).limit(page_size)
     )
     items = res.scalars().all()
-    return Page[ProductOut](items=[ProductOut.model_validate(p) for p in items],
-                            total=total, page=page, page_size=page_size)
+    have = await _image_ids(db, [p.id for p in items])
+    return Page[ProductOut](
+        items=[_out_with_image(p, p.id in have) for p in items],
+        total=total, page=page, page_size=page_size)
 
 
 @router.post("", response_model=ProductOut, status_code=201)
@@ -79,7 +100,7 @@ async def update_product(product_id: uuid.UUID, payload: ProductUpdate, _: Curre
     _validate_product(p.product_type, p.model, p.name)
     await db.commit()
     await db.refresh(p)
-    return p
+    return _out_with_image(p, bool(await _image_ids(db, [p.id])))
 
 
 @router.delete("/{product_id}", status_code=204)
@@ -97,6 +118,60 @@ async def delete_product(product_id: uuid.UUID, _: CurrentUser,
         p.status = "archived"
     else:
         await db.delete(p)
+    await db.commit()
+
+
+# ---- Mahsulot rasmi (BYTEA, 1 mahsulot — 1 rasm) ----
+@router.post("/{product_id}/image", response_model=ProductOut)
+async def upload_product_image(
+    product_id: uuid.UUID,
+    file: Annotated[UploadFile, File(description="Mahsulot rasmi (PNG/JPEG/WEBP, <5MB)")],
+    _: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    p = (await db.execute(select(Product).where(Product.id == product_id))).scalar_one_or_none()
+    if not p:
+        raise HTTPException(404, "Mahsulot topilmadi")
+    if file.content_type not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(400, f"Rasm formati qo'llab-quvvatlanmaydi: {file.content_type}")
+    data = await file.read()
+    if len(data) == 0:
+        raise HTTPException(400, "Fayl bo'sh")
+    if len(data) > MAX_IMAGE_BYTES:
+        raise HTTPException(400, "Rasm 5 MB dan kichik bo'lishi kerak")
+
+    img = (await db.execute(
+        select(ProductImage).where(ProductImage.product_id == product_id))).scalar_one_or_none()
+    if img is None:
+        img = ProductImage(product_id=product_id, content_type=file.content_type,
+                           size_bytes=len(data), data=data)
+        db.add(img)
+    else:
+        img.content_type = file.content_type
+        img.size_bytes = len(data)
+        img.data = data
+    await db.commit()
+    return _out_with_image(p, True)
+
+
+@router.get("/{product_id}/image")
+async def get_product_image(product_id: uuid.UUID, _: CurrentUser,
+                            db: Annotated[AsyncSession, Depends(get_db)]):
+    img = (await db.execute(
+        select(ProductImage).where(ProductImage.product_id == product_id))).scalar_one_or_none()
+    if not img:
+        raise HTTPException(404, "Rasm mavjud emas")
+    return Response(content=img.data, media_type=img.content_type,
+                    headers={"Cache-Control": "private, max-age=300"})
+
+
+@router.delete("/{product_id}/image", status_code=204)
+async def delete_product_image(product_id: uuid.UUID, _: CurrentUser,
+                               db: Annotated[AsyncSession, Depends(get_db)]):
+    img = (await db.execute(
+        select(ProductImage).where(ProductImage.product_id == product_id))).scalar_one_or_none()
+    if img:
+        await db.delete(img)
     await db.commit()
 
 

@@ -8,6 +8,7 @@ import { api } from '@/api/client';
 import EmptyState from '@/components/ui/EmptyState';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import { formatUZS, formatDate } from '@/lib/format';
+import { usePermissions } from '@/lib/permissions';
 import type { EmployeeRow, EmployeeMonthSummary } from '@/features/hr/EmployeeModal';
 
 export type HistoryKind = 'salary' | 'advance' | 'remaining' | 'hours';
@@ -87,10 +88,18 @@ export default function EmployeeHistoryModal({
 }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
+  const { isSuperadmin } = usePermissions();
   const editable = kind === 'advance';
+
+  // Avans tahminiy oylikdan oshganda "baribir berish" huquqi — faqat super-admin.
+  // Boshqalar uchun oshib ketadigan avans bloklanadi.
+  const canOverrideAdvance = isSuperadmin;
 
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
+  // Oylikdan oshib ketadigan avansni tasdiqlash (admin/director uchun)
+  const [overrideConfirm, setOverrideConfirm] = useState<
+    { amt: number; maxGross: number; wouldBe: number } | null>(null);
   // Avans sanasi — default holatda bugun (ko'rsatilayotgan oy ichiga qisiladi).
   // Bugundan oldingi sana tanlansa moliyadan ayirilmaydi (eski/migratsiya avanslari).
   const defaultAdvDate = (() => {
@@ -138,9 +147,8 @@ export default function EmployeeHistoryModal({
     enabled: needsAttendance,
   });
 
-  async function handleAddAdvance() {
-    const amt = toNum(amount);
-    if (!amt || amt <= 0) { toast.error(t('hr.histModal.amountRequired')); return; }
+  // Avansni yuboradi (override — oylikdan oshganda admin/director tasdig'i bilan)
+  async function submitAdvance(amt: number, override: boolean) {
     setSaving(true);
     try {
       // Moliya endpointi: ham HR avans yozuvini, ham moliya chiqim tranzaksiyasini yaratadi
@@ -154,6 +162,7 @@ export default function EmployeeHistoryModal({
         affect_finance: affectFinance,
         currency: employee.currency || 'UZS',
         note: note || null,
+        override,
       });
       toast.success(t('hr.histModal.advanceSaved'));
       setAmount('');
@@ -166,7 +175,32 @@ export default function EmployeeHistoryModal({
       toast.error(errText(e, t('hr.histModal.saveError')));
     } finally {
       setSaving(false);
+      setOverrideConfirm(null);
     }
+  }
+
+  function handleAddAdvance() {
+    const amt = toNum(amount);
+    if (!amt || amt <= 0) { toast.error(t('hr.histModal.amountRequired')); return; }
+
+    // Tahminiy oylik limiti: max_gross. Joriy avanslar — modaldagi jonli ro'yxatdan
+    // (har qo'shilgandan keyin yangilanadi). Backend ham shu cheklovni majburlaydi.
+    const maxGross = parseFloat(employee.month_summary?.max_gross ?? '0') || 0;
+    const curAdv = (advQ.data ?? []).reduce(
+      (s, a) => s + (a.status === 'void' ? 0 : (parseFloat(a.amount) || 0)), 0);
+    const wouldBe = curAdv + amt;
+
+    if (maxGross > 0 && wouldBe > maxGross) {
+      if (!canOverrideAdvance) {
+        const remaining = Math.max(0, maxGross - curAdv);
+        toast.error(t('hr.histModal.advanceBlocked', { remaining: formatUZS(remaining) }));
+        return;
+      }
+      // admin/director — tasdiq so'raymiz, so'ng override bilan yuboramiz
+      setOverrideConfirm({ amt, maxGross, wouldBe });
+      return;
+    }
+    submitAdvance(amt, false);
   }
 
   async function handleVoid() {
@@ -313,6 +347,22 @@ export default function EmployeeHistoryModal({
       loading={voiding}
       onConfirm={handleVoid}
       onCancel={() => setConfirmVoid(null)}
+    />
+
+    <ConfirmModal
+      open={!!overrideConfirm}
+      title={t('hr.histModal.overrideTitle')}
+      message={overrideConfirm
+        ? t('hr.histModal.overrideConfirm', {
+            maxGross: formatUZS(overrideConfirm.maxGross),
+            wouldBe: formatUZS(overrideConfirm.wouldBe),
+          })
+        : ''}
+      confirmText={t('hr.histModal.overrideConfirmBtn')}
+      variant="danger"
+      loading={saving}
+      onConfirm={() => { if (overrideConfirm) submitAdvance(overrideConfirm.amt, true); }}
+      onCancel={() => setOverrideConfirm(null)}
     />
     </>
   );

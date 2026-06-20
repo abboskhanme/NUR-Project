@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Plus, Search, Pencil, Users, Briefcase, BadgeCheck, ChevronRight, Wallet } from 'lucide-react';
+import { Plus, Search, Pencil, Users, Briefcase, BadgeCheck, ChevronRight, Wallet, HandCoins } from 'lucide-react';
 
 import { api } from '@/api/client';
 import Card from '@/components/ui/Card';
@@ -11,8 +11,9 @@ import { formatUZS } from '@/lib/format';
 import EmployeeModal, { EmployeeRow } from '@/features/hr/EmployeeModal';
 import EmployeeHistoryModal, { HistoryKind } from '@/features/hr/EmployeeHistoryModal';
 import PositionsSection from '@/features/hr/PositionsSection';
+import SalaryDebtsSection from '@/features/hr/SalaryDebtsSection';
 
-type Tab = 'employees' | 'positions';
+type Tab = 'employees' | 'positions' | 'debts';
 type GroupKey = 'office' | 'assembly' | 'production';
 
 // Xodim turini bo'limga ajratamiz: ofis bo'limi, yig'uv bo'limi, ishlab chiqarish.
@@ -77,6 +78,8 @@ export default function HRPage() {
   const [hist, setHist] = useState<{ emp: EmployeeRow; kind: HistoryKind } | null>(null);
 
   const isPositions = tab === 'positions';
+  const isDebts = tab === 'debts';
+  const isEmployees = tab === 'employees';
   const now = new Date();
   const [curYear, setCurYear] = useState(now.getFullYear());
   const [curMonth, setCurMonth] = useState(now.getMonth() + 1);
@@ -97,7 +100,7 @@ export default function HRPage() {
           },
         })
         .then((r) => r.data),
-    enabled: !isPositions,
+    enabled: isEmployees,
   });
 
   const rawItems: EmployeeRow[] = empQ.data?.items ?? [];
@@ -154,13 +157,16 @@ export default function HRPage() {
         <TabButton active={tab === 'positions'} onClick={() => setTab('positions')} icon={<Briefcase size={16} />}>
           {t('hr.tabs.positions')}
         </TabButton>
+        <TabButton active={tab === 'debts'} onClick={() => setTab('debts')} icon={<HandCoins size={16} />}>
+          {t('hr.tabs.debts')}
+        </TabButton>
       </div>
 
-      {!isPositions && (
+      {isEmployees && (
         <MaxPayrollCard total={maxPayrollTotal} count={items.length} />
       )}
 
-      {!isPositions && (
+      {isEmployees && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {GROUP_ORDER.map((g) => (
             <DeptCard
@@ -178,6 +184,8 @@ export default function HRPage() {
 
       {isPositions ? (
         <PositionsSection />
+      ) : isDebts ? (
+        <SalaryDebtsSection />
       ) : (
         <Card>
           <div className="flex items-center gap-2 mb-4 flex-wrap">

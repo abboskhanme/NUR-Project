@@ -7,10 +7,21 @@
     "assembly": "Assembly",
     "production": "Production",
     "employees": "Employees",
-    "positions": "Positions"
+    "positions": "Positions",
+    "debts": "Debts"
   },
   "deptCard": {
     "people": "people"
+  },
+  "debts": {
+    "grandTitle": "Total owed to employees",
+    "grandHint": "Sum of unpaid salary balances for the selected year.",
+    "empty": "No debts",
+    "noDebt": "No debt",
+    "colName": "Employee",
+    "colGross": "Salary",
+    "colPaid": "Paid",
+    "colDebt": "Debt"
   },
   "maxPayroll": {
     "title": "Payroll cost (estimate)",
@@ -92,7 +103,11 @@
     "voidedBadge": "Deleted",
     "voidTitle": "Cancel payment",
     "voidConfirm": "Cancel the {{amount}} payment from {{date}}? It stays in history marked as deleted, and the matching Finance expense is reversed.",
-    "voidConfirmBtn": "Yes, cancel"
+    "voidConfirmBtn": "Yes, cancel",
+    "advanceBlocked": "The advance would exceed the estimated salary. Remaining allowed: {{remaining}}. Only a super-admin can approve an advance above the salary.",
+    "overrideTitle": "Advance over salary",
+    "overrideConfirm": "This advance exceeds the estimated salary ({{maxGross}}) — total advances would be {{wouldBe}}. Give it anyway?",
+    "overrideConfirmBtn": "Yes, give anyway"
   },
   "tooltip": {
     "systemUser": "System user",

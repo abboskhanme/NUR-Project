@@ -4,7 +4,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Any, Optional
 
-from sqlalchemy import Date, ForeignKey, Numeric, String, Text
+from sqlalchemy import Date, ForeignKey, Integer, LargeBinary, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -42,6 +42,10 @@ class Product(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     status: Mapped[str] = mapped_column(String(20), default="active")  # active/archived
 
     inventory_items: Mapped[list["Inventory"]] = relationship(back_populates="product")
+    # Qo'shimcha mahsulot rasmi (1:1, ixtiyoriy) — BYTEA sifatida saqlanadi
+    image: Mapped[Optional["ProductImage"]] = relationship(
+        back_populates="product", uselist=False, cascade="all, delete-orphan",
+    )
 
     @property
     def display_name(self) -> str:
@@ -70,3 +74,23 @@ class Inventory(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     bunker_direction: Mapped[Optional[str]] = mapped_column(String(10))
 
     product: Mapped[Product] = relationship(back_populates="inventory_items")
+
+
+class ProductImage(TimestampMixin, Base):
+    """Mahsulot rasmini PostgreSQL BYTEA sifatida saqlaydi (1 mahsulot — 1 rasm).
+
+    UserAvatar bilan bir xil naqsh: alohida jadval, shunda mahsulot ro'yxati
+    so'rovlarida og'ir BYTEA ma'lumot yuklanmaydi.
+    """
+    __tablename__ = "product_images"
+
+    product_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("products.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    content_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
+    data: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+
+    product: Mapped["Product"] = relationship(back_populates="image")

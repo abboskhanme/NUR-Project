@@ -10,6 +10,7 @@ import EmptyState from '@/components/ui/EmptyState';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import { formatUSD } from '@/lib/format';
 import ProductModal, { ProductFull, ProductType } from '@/features/products/ProductModal';
+import ProductThumb from '@/features/products/ProductThumb';
 
 interface Product extends ProductFull {
   display_name: string;
@@ -145,6 +146,7 @@ export default function ProductsPage() {
           <table className="w-full text-sm">
             <thead className="bg-black/[0.03] text-ink-soft text-left">
               <tr>
+                <th className="px-4 py-2 w-14"></th>
                 <th className="px-4 py-2 font-medium">{t('products.table.name')}</th>
                 <th className="px-4 py-2 font-medium">{t('products.table.unit')}</th>
                 <th className="px-4 py-2 font-medium text-right">{t('products.table.price')}</th>
@@ -154,6 +156,9 @@ export default function ProductsPage() {
             <tbody>
               {items.map((p) => (
                 <tr key={p.id} className="border-t border-black/5 hover:bg-black/[0.02]">
+                  <td className="pl-4 py-2">
+                    <ProductThumb id={p.id} hasImage={p.has_image} size={40} />
+                  </td>
                   <td className="px-4 py-2 font-medium">{p.name}</td>
                   <td className="px-4 py-2 text-ink-soft">{p.unit || '—'}</td>
                   <td className="px-4 py-2 text-right font-semibold text-primary">{formatUSD(p.base_price_usd)}</td>

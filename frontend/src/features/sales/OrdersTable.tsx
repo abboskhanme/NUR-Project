@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -95,8 +95,33 @@ export default function OrdersTable({
   });
   const salespeople = spQ.data ?? [];
 
+  // Gorizontal scroll'ni ro'yxat tepasiga chiqaramiz: tepadagi ko'rinadigan chiziq
+  // jadval bilan sinxron suriladi, pastdagi (jadval ichidagi) scrollbar yashiriladi.
+  const topRef = useRef<HTMLDivElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  function syncFromTop() {
+    if (topRef.current && bodyRef.current) bodyRef.current.scrollLeft = topRef.current.scrollLeft;
+  }
+  function syncFromBody() {
+    if (topRef.current && bodyRef.current) topRef.current.scrollLeft = bodyRef.current.scrollLeft;
+  }
+
   return (
-    <div className="overflow-x-auto -mx-2">
+    <div className="-mx-2">
+      {/* Tepadagi gorizontal scroll — jadval bilan sinxron, DOIMIY ko'rinadi
+          (touchpadsiz, sichqoncha bilan sudrab surish uchun). macOS overlay
+          scrollbar'i yashirinmasligi uchun maxsus uslub beramiz. */}
+      <div ref={topRef} onScroll={syncFromTop}
+           className="overflow-x-scroll sticky top-16 z-[5] bg-card
+                      [scrollbar-width:auto]
+                      [&::-webkit-scrollbar]:h-3
+                      [&::-webkit-scrollbar-track]:bg-black/5 [&::-webkit-scrollbar-track]:rounded-full
+                      [&::-webkit-scrollbar-thumb]:bg-black/30 [&::-webkit-scrollbar-thumb]:rounded-full
+                      hover:[&::-webkit-scrollbar-thumb]:bg-black/45">
+        <div className="h-px w-[2140px]" />
+      </div>
+      <div ref={bodyRef} onScroll={syncFromBody}
+           className="overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       <table className="text-sm border-collapse table-fixed w-[2140px]">
         <colgroup>
           <col style={{ width: 44 }} />
@@ -145,6 +170,7 @@ export default function OrdersTable({
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }

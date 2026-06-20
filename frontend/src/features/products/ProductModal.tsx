@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
-import { X } from 'lucide-react';
+import { Camera, Trash2, X } from 'lucide-react';
 
 import { api } from '@/api/client';
 
@@ -18,7 +18,10 @@ export interface ProductFull {
   description?: string | null;
   base_price_usd: string;
   status: string;
+  has_image?: boolean;
 }
+
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 const UNITS = ['dona', 'metr', 'komplekt', 'kg', 'litr'];
 
@@ -49,14 +52,48 @@ export default function ProductModal({
   const [description, setDescription] = useState(product?.description ?? '');
   const [saving, setSaving] = useState(false);
 
+  // 'warehouse' (ombor turi) ham kotyol modeli kabi — model + kvm bilan kiritiladi.
+  const isAdditional = type === 'additional';
+
+  // --- Rasm (faqat qo'shimcha mahsulot uchun) ---
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null); // saqlashda yuklanadi
+  const [preview, setPreview] = useState<string | null>(null);   // tanlangan faylning URL'i
+  const [existingUrl, setExistingUrl] = useState<string | null>(null); // mavjud rasm
+  const [removeExisting, setRemoveExisting] = useState(false);
+
   useEffect(() => {
     const esc = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', esc);
     return () => window.removeEventListener('keydown', esc);
   }, [onClose]);
 
-  // 'warehouse' (ombor turi) ham kotyol modeli kabi — model + kvm bilan kiritiladi.
-  const isAdditional = type === 'additional';
+  // Tahrirlashda mavjud rasmni yuklab ko'rsatamiz (auth talab qiladi — blob orqali)
+  useEffect(() => {
+    if (!isAdditional || !product?.has_image) return;
+    let obj: string | null = null;
+    let alive = true;
+    api.get(`/products/${product.id}/image`, { responseType: 'blob' })
+      .then((r) => { if (alive) { obj = URL.createObjectURL(r.data); setExistingUrl(obj); } })
+      .catch(() => {});
+    return () => { alive = false; if (obj) URL.revokeObjectURL(obj); };
+  }, [isAdditional, product]);
+
+  function pickImage(file: File) {
+    if (!file.type.startsWith('image/')) { toast.error(t('products.modal.imageOnlyImage')); return; }
+    if (file.size > MAX_IMAGE_BYTES) { toast.error(t('products.modal.imageTooLarge')); return; }
+    setPreview((old) => { if (old) URL.revokeObjectURL(old); return URL.createObjectURL(file); });
+    setImageFile(file);
+    setRemoveExisting(false);
+  }
+
+  function clearImage() {
+    if (preview) { URL.revokeObjectURL(preview); setPreview(null); }
+    setImageFile(null);
+    if (existingUrl) { setRemoveExisting(true); }
+  }
+
+  const shownImage = preview || (removeExisting ? null : existingUrl);
 
   async function handleSave() {
     if (!isAdditional && !model.trim()) {
@@ -87,13 +124,28 @@ export default function ProductModal({
 
     setSaving(true);
     try {
+      let pid = product?.id;
       if (isCreate) {
-        await api.post('/products', body);
-        toast.success(t('products.modal.toastAdded'));
+        const { data } = await api.post('/products', body);
+        pid = data.id;
       } else {
         await api.patch(`/products/${product!.id}`, body);
-        toast.success(t('products.modal.toastUpdated'));
       }
+
+      // Rasm: yangi tanlangan bo'lsa yuklaymiz, yoki mavjud rasm o'chirilgan bo'lsa olib tashlaymiz.
+      if (isAdditional && pid) {
+        if (imageFile) {
+          const form = new FormData();
+          form.append('file', imageFile);
+          await api.post(`/products/${pid}/image`, form, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+          });
+        } else if (removeExisting && !isCreate) {
+          await api.delete(`/products/${pid}/image`);
+        }
+      }
+
+      toast.success(isCreate ? t('products.modal.toastAdded') : t('products.modal.toastUpdated'));
       onSaved();
       onClose();
     } catch (e: any) {
@@ -160,6 +212,43 @@ export default function ProductModal({
             <textarea className="input min-h-[56px]" value={description}
                       onChange={(e) => setDescription(e.target.value)} />
           </div>
+
+          {isAdditional && (
+            <div>
+              <label className="label">{t('products.modal.imageLabel')}</label>
+              <div className="flex items-center gap-3">
+                {shownImage ? (
+                  <img src={shownImage} alt=""
+                       className="w-20 h-20 rounded object-cover border border-black/10" />
+                ) : (
+                  <div className="w-20 h-20 rounded bg-black/5 flex items-center justify-center text-ink-soft">
+                    <Camera size={22} />
+                  </div>
+                )}
+                <div className="flex flex-col gap-2">
+                  <button type="button" onClick={() => fileRef.current?.click()}
+                          className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-button border border-black/10 hover:bg-black/5">
+                    <Camera size={14} /> {t('products.modal.imageUpload')}
+                  </button>
+                  {shownImage && (
+                    <button type="button" onClick={clearImage}
+                            className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-button text-danger hover:bg-danger/5">
+                      <Trash2 size={14} /> {t('products.modal.imageRemove')}
+                    </button>
+                  )}
+                  <p className="text-xs text-ink-soft">{t('products.modal.imageHint')}</p>
+                </div>
+                <input ref={fileRef} type="file"
+                       accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
+                       className="hidden"
+                       onChange={(e) => {
+                         const f = e.target.files?.[0];
+                         if (f) pickImage(f);
+                         e.target.value = '';
+                       }} />
+              </div>
+            </div>
+          )}
 
           {!isAdditional && (
             <p className="text-xs text-ink-soft">

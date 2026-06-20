@@ -231,6 +231,24 @@ async def create_employee_payment(payload: EmployeePaymentIn, user: CurrentUser,
         cat_code = "advance_to_employee"
         default_note = f"Avans — {emp.full_name}"
 
+        # AVANS CHEKLOVI: jami avanslar tahminiy oylikdan oshmasligi kerak.
+        # Oshsa — oddiy xodimga BLOK; faqat super-admin "baribir berish" (override)
+        # huquqiga ega (frontend tasdiqdan keyin override=true yuboradi).
+        from app.api.v1.hr import advance_cap  # lazy import — circular importdan qochish
+        max_gross, current_adv = await advance_cap(db, emp, payload.year, payload.month)
+        if max_gross > 0 and (current_adv + amount) > max_gross:
+            remaining = max_gross - current_adv
+            limit_msg = (
+                f"Avans tahminiy oylikdan oshib ketadi. Oylik: {max_gross:,.0f}, "
+                f"joriy avans: {current_adv:,.0f}, qolgan: {max(remaining, Decimal(0)):,.0f} so'm"
+            ).replace(",", " ")
+            if not payload.override:
+                raise HTTPException(status_code=400, detail=limit_msg)
+            if not user.is_superadmin:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Oylikdan ortiq avans berish faqat super-admin uchun")
+
     # Sana o'sha oy ichida bo'lishi kerak (aggregate sanaga qarab oyga biriktiradi)
     today = date.today()
     pay_date = payload.pay_date or (today if month_start <= today <= month_end else month_end)

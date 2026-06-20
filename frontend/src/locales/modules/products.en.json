@@ -14,7 +14,8 @@
   "table": {
     "name": "Name",
     "unit": "Unit",
-    "price": "Price"
+    "price": "Price",
+    "image": "Image"
   },
   "deleteTitle": "Delete product",
   "deleteMessage": "Delete: {{name}}? If the product is used in orders, it will be archived instead of deleted.",
@@ -35,6 +36,12 @@
     "priceLabel": "Price (USD)",
     "pricePlaceholder": "0",
     "descriptionLabel": "Note",
+    "imageLabel": "Image",
+    "imageUpload": "Choose image",
+    "imageRemove": "Remove image",
+    "imageHint": "PNG / JPEG / WEBP, up to 5 MB",
+    "imageOnlyImage": "Only image files are allowed",
+    "imageTooLarge": "Image must be smaller than 5 MB",
     "directionHint": "Direction (left/right) is chosen at order time — does not affect price.",
     "modelRequired": "Model is required",
     "nameRequired": "Product name is required",
