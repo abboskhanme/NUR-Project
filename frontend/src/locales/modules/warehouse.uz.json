@@ -7,6 +7,8 @@
     "reserved": "Band",
     "sold": "Sotilgan"
   },
+  "totalValue": "Ombor qiymati ($)",
+  "totalValueUzs": "Ombor qiymati (soʻm)",
   "byModel": "Model boʻyicha qoldiq",
   "emptyModels": "Hozircha ombor boʻsh",
   "units": "Birliklar",

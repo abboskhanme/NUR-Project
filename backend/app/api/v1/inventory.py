@@ -6,6 +6,7 @@ Sotuvda mos birlik avtomatik band qilinadi (orders.py da).
 """
 import uuid
 from datetime import date
+from decimal import Decimal
 from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -31,6 +32,7 @@ class ModelSummary(BaseModel):
     product_id: uuid.UUID
     model: Optional[str] = None
     kvm: Optional[int] = None
+    base_price_usd: Decimal = Decimal(0)
     available: int = 0
     reserved: int = 0
     sold: int = 0
@@ -42,6 +44,8 @@ class WarehouseSummary(BaseModel):
     total_available: int
     total_reserved: int
     total_sold: int
+    # Omborda mavjud (bo'sh + band) birliklarning narx bo'yicha umumiy qiymati, USD
+    total_value_usd: Decimal = Decimal(0)
 
 
 class UnitOut(ORMBase):
@@ -103,18 +107,20 @@ def _to_unit_out(row) -> "UnitOut":
 @router.get("/summary", response_model=WarehouseSummary)
 async def warehouse_summary(db: Annotated[AsyncSession, Depends(get_db)], _: CurrentUser):
     rows = (await db.execute(
-        select(Product.id, Product.model, Product.kvm, Inventory.status,
-               func.count(Inventory.id))
+        select(Product.id, Product.model, Product.kvm, Product.base_price_usd,
+               Inventory.status, func.count(Inventory.id))
         .join(Inventory, Inventory.product_id == Product.id)
         .where(Product.product_type == "warehouse")
-        .group_by(Product.id, Product.model, Product.kvm, Inventory.status)
+        .group_by(Product.id, Product.model, Product.kvm, Product.base_price_usd,
+                  Inventory.status)
     )).all()
 
     by_product: dict[uuid.UUID, ModelSummary] = {}
-    for pid, model, kvm, status, cnt in rows:
+    for pid, model, kvm, price, status, cnt in rows:
         m = by_product.get(pid)
         if not m:
-            m = ModelSummary(product_id=pid, model=model, kvm=kvm)
+            m = ModelSummary(product_id=pid, model=model, kvm=kvm,
+                             base_price_usd=price or Decimal(0))
             by_product[pid] = m
         c = int(cnt or 0)
         if status == "available":
@@ -127,11 +133,18 @@ async def warehouse_summary(db: Annotated[AsyncSession, Depends(get_db)], _: Cur
 
     out = sorted(by_product.values(),
                  key=lambda r: (r.model or "", r.kvm or 0))
+    # Omborda turgan (bo'sh + band) birliklar qiymati — sotilgan birlik
+    # ombordan chiqib ketgani uchun hisobga olinmaydi.
+    total_value = sum(
+        (r.base_price_usd * (r.available + r.reserved) for r in out),
+        Decimal(0),
+    )
     return WarehouseSummary(
         rows=out,
         total_available=sum(r.available for r in out),
         total_reserved=sum(r.reserved for r in out),
         total_sold=sum(r.sold for r in out),
+        total_value_usd=total_value,
     )
 
 

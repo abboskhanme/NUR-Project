@@ -2,14 +2,14 @@ import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
-import { Plus, Boxes, PackageCheck, PackageX, Search, Trash2, Pencil } from 'lucide-react';
+import { Plus, Boxes, PackageCheck, PackageX, Search, Trash2, Pencil, Wallet } from 'lucide-react';
 
 import { api } from '@/api/client';
 import Card from '@/components/ui/Card';
 import BalanceCard from '@/components/ui/BalanceCard';
 import EmptyState from '@/components/ui/EmptyState';
 import ConfirmModal from '@/components/ui/ConfirmModal';
-import { formatDate, formatUSD } from '@/lib/format';
+import { formatDate, formatUSD, formatUZS } from '@/lib/format';
 import { usePermissions } from '@/lib/permissions';
 import AddUnitsModal from '@/features/warehouse/AddUnitsModal';
 import EditUnitModal from '@/features/warehouse/EditUnitModal';
@@ -21,6 +21,7 @@ interface SummaryRow {
 }
 interface Summary {
   rows: SummaryRow[]; total_available: number; total_reserved: number; total_sold: number;
+  total_value_usd: number;
 }
 interface Unit {
   id: string; unique_id: string; status: string; added_date: string; notes?: string | null;
@@ -72,8 +73,14 @@ export default function WarehousePage() {
     }).then((r) => r.data),
     enabled: tab === 'types',
   });
+  const rateQ = useQuery<number>({
+    queryKey: ['usd-rate'],
+    queryFn: () => api.get('/finance/exchange-rates/latest').then((r) => Number(r.data?.usd_to_uzs) || 0),
+  });
 
   const s = summaryQ.data;
+  const rate = rateQ.data ?? 0;
+  const totalValueUsd = Number(s?.total_value_usd ?? 0);
   const units = unitsQ.data ?? [];
   const types = typesQ.data?.items ?? [];
 
@@ -149,13 +156,21 @@ export default function WarehousePage() {
       </div>
 
       {/* KPI */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-7 gap-3">
         <BalanceCard title={t('warehouse.status.available')} accent="success"
           value={String(s?.total_available ?? 0)} icon={<PackageCheck size={18} />} />
         <BalanceCard title={t('warehouse.status.reserved')} accent="warning"
           value={String(s?.total_reserved ?? 0)} icon={<Boxes size={18} />} />
         <BalanceCard title={t('warehouse.status.sold')} accent="primary"
           value={String(s?.total_sold ?? 0)} icon={<PackageX size={18} />} />
+        <div className="lg:col-span-2">
+          <BalanceCard title={t('warehouse.totalValue')} accent="primary"
+            value={formatUSD(totalValueUsd)} icon={<Wallet size={18} />} />
+        </div>
+        <div className="col-span-2">
+          <BalanceCard title={t('warehouse.totalValueUzs')} accent="success"
+            value={rate > 0 ? formatUZS(totalValueUsd * rate) : '—'} icon={<Wallet size={18} />} />
+        </div>
       </div>
 
       {/* Tabs */}
