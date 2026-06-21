@@ -129,6 +129,64 @@ class MonthDebts(BaseModel):
     items: list[EmployeeDebt]
 
 
+# ---- Employee loans (bizdan qarzdor xodimlar — director/firma qarzlari) ----
+class EmployeeLoanIn(BaseModel):
+    employee_id: uuid.UUID
+    amount: Decimal
+    currency: str = "UZS"
+    source: str = "firma"          # "director" | "firma" | "other"
+    loan_date: Optional[date] = None
+    note: Optional[str] = None
+
+
+class EmployeeLoanUpdate(BaseModel):
+    amount: Optional[Decimal] = None
+    source: Optional[str] = None
+    loan_date: Optional[date] = None
+    note: Optional[str] = None
+    status: Optional[str] = None    # "active" | "closed"
+
+
+class EmployeeLoanPaymentIn(BaseModel):
+    amount: Decimal
+    pay_date: Optional[date] = None
+    note: Optional[str] = None
+
+
+class EmployeeLoanPaymentOut(ORMBase):
+    id: uuid.UUID
+    loan_id: uuid.UUID
+    amount: Decimal
+    pay_date: date
+    note: Optional[str] = None
+    created_at: datetime
+
+
+class EmployeeLoanOut(ORMBase):
+    id: uuid.UUID
+    employee_id: uuid.UUID
+    amount: Decimal               # asosiy qarz summasi (principal)
+    currency: str
+    source: str
+    loan_date: date
+    note: Optional[str] = None
+    status: str
+    created_at: datetime
+    # Hisoblanadigan maydonlar (so'ndirish tarixidan)
+    paid: Decimal = Decimal(0)    # so'ndirilgan (to'lovlar yig'indisi)
+    balance: Decimal = Decimal(0) # qoldiq = amount − paid
+    payments: list[EmployeeLoanPaymentOut] = []
+
+
+class EmployeeLoanGroup(BaseModel):
+    """Bitta xodimning barcha faol qarzlari (ro'yxatda guruhlab ko'rsatish uchun)."""
+    employee_id: uuid.UUID
+    full_name: str
+    department_type: str
+    total: Decimal
+    items: list[EmployeeLoanOut]
+
+
 class EmployeeOut(ORMBase):
     id: uuid.UUID
     full_name: str

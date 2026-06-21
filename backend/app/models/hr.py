@@ -118,6 +118,49 @@ class SalaryAdvance(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
 
 
+class EmployeeLoan(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    """Xodimning kompaniya/direktor oldidagi alohida qarzi (oylikdan tashqari).
+
+    Oddiy yuritiladi — joriy qarz summasi qo'lda saqlanadi (to'lov tarixisiz):
+    qarz qaytarilsa summa kamaytiriladi yoki yozuv o'chiriladi. Moliya bilan
+    avtomatik bog'lanmaydi — bu shunchaki "bizdan qarzdor xodimlar" reyestri.
+    """
+    __tablename__ = "employee_loans"
+
+    employee_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("employees.id", ondelete="CASCADE"), index=True
+    )
+    amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
+    currency: Mapped[str] = mapped_column(String(3), default="UZS")
+    # Qarz manbai: "director" (direktordan) / "firma" (firmadan) / "other" (boshqa)
+    source: Mapped[str] = mapped_column(String(20), default="firma", server_default="firma")
+    loan_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    note: Mapped[Optional[str]] = mapped_column(Text)
+    # "active" yoki "closed" (to'liq so'ndirilgan/yopilgan, lekin tarixda qoladi)
+    status: Mapped[str] = mapped_column(String(10), default="active", server_default="active")
+    created_by_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+    )
+
+
+class EmployeeLoanPayment(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    """Xodim qarzini so'ndirish (qaytarish) yozuvi — ichki tarix.
+
+    Qarz qoldig'i = EmployeeLoan.amount − shu qarzga tegishli barcha to'lovlar yig'indisi.
+    """
+    __tablename__ = "employee_loan_payments"
+
+    loan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("employee_loans.id", ondelete="CASCADE"), index=True
+    )
+    amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
+    pay_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    note: Mapped[Optional[str]] = mapped_column(Text)
+    created_by_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+    )
+
+
 class PayrollRun(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "payroll_runs"
 

@@ -13,14 +13,16 @@ from app.core.dependencies import CurrentUser
 from app.core.permissions import module_guard
 from app.db.session import get_db
 from app.models.hr import (
-    Attendance, Department, Employee, PayrollItem, PayrollRun, Position,
-    SalaryAdvance, SalaryRate,
+    Attendance, Department, Employee, EmployeeLoan, EmployeeLoanPayment,
+    PayrollItem, PayrollRun, Position, SalaryAdvance, SalaryRate,
 )
 from app.schemas.common import Page
 from app.schemas.hr import (
     AttendanceBatchIn, AttendanceOut,
     DepartmentCreate, DepartmentOut, DepartmentUpdate,
-    EmployeeCreate, EmployeeMonthSummary, EmployeeOut, EmployeeUpdate,
+    EmployeeCreate, EmployeeLoanGroup, EmployeeLoanIn, EmployeeLoanOut,
+    EmployeeLoanPaymentIn, EmployeeLoanPaymentOut, EmployeeLoanUpdate,
+    EmployeeMonthSummary, EmployeeOut, EmployeeUpdate,
     MonthDebts, MonthHistoryItem, MonthlySummary,
     PayrollRunIn, PayrollRunOut,
     PositionCreate, PositionOut, PositionUpdate,
@@ -636,6 +638,174 @@ async def void_advance(advance_id: uuid.UUID, _user: CurrentUser,
     await db.commit()
     await db.refresh(adv)
     return SalaryAdvanceOut.model_validate(adv)
+
+
+# ---- Employee loans (bizdan qarzdor xodimlar) ----
+def _loan_out(loan: EmployeeLoan, payments: list[EmployeeLoanPayment]) -> EmployeeLoanOut:
+    """Qarzni qoldiq va to'lov tarixi bilan chiqarish obyektiga aylantiradi."""
+    paid = sum((p.amount or Decimal(0) for p in payments), Decimal(0))
+    out = EmployeeLoanOut.model_validate(loan)
+    out.paid = paid
+    out.balance = (loan.amount or Decimal(0)) - paid
+    out.payments = [
+        EmployeeLoanPaymentOut.model_validate(p)
+        for p in sorted(payments, key=lambda x: x.pay_date, reverse=True)
+    ]
+    return out
+
+
+@router.get("/employee-loans", response_model=list[EmployeeLoanGroup])
+async def list_employee_loans(
+    db: Annotated[AsyncSession, Depends(get_db)], _: CurrentUser,
+):
+    """Bizdan qarzdor xodimlar — har bir xodim ostida qarzlari va so'ndirish tarixi.
+
+    Faqat status='active' qarzlar; jami qoldig'i > 0 bo'lgan xodimlar ko'rsatiladi,
+    jami qoldiq bo'yicha kamayuvchi tartibda.
+    """
+    res = await db.execute(
+        select(EmployeeLoan, Employee.full_name, Employee.department_type)
+        .join(Employee, Employee.id == EmployeeLoan.employee_id)
+        .where(EmployeeLoan.status == "active")
+        .order_by(EmployeeLoan.loan_date.desc())
+    )
+    rows = res.all()
+    loan_ids = [loan.id for loan, _, _ in rows]
+
+    # Barcha to'lovlarni bitta so'rovda olib, qarz bo'yicha guruhlaymiz (N+1 dan qochish)
+    payments_by_loan: dict[uuid.UUID, list[EmployeeLoanPayment]] = {}
+    if loan_ids:
+        pres = await db.execute(
+            select(EmployeeLoanPayment).where(EmployeeLoanPayment.loan_id.in_(loan_ids))
+        )
+        for p in pres.scalars().all():
+            payments_by_loan.setdefault(p.loan_id, []).append(p)
+
+    groups: dict[uuid.UUID, EmployeeLoanGroup] = {}
+    for loan, full_name, dept in rows:
+        item = _loan_out(loan, payments_by_loan.get(loan.id, []))
+        g = groups.get(loan.employee_id)
+        if g is None:
+            g = EmployeeLoanGroup(
+                employee_id=loan.employee_id, full_name=full_name,
+                department_type=dept or "production", total=Decimal(0), items=[],
+            )
+            groups[loan.employee_id] = g
+        g.items.append(item)
+        g.total += item.balance
+
+    # Faqat hozir qarzi bor (qoldiq > 0) xodimlar
+    result = [g for g in groups.values() if g.total > 0]
+    return sorted(result, key=lambda x: x.total, reverse=True)
+
+
+@router.post("/employee-loans", response_model=EmployeeLoanOut, status_code=201)
+async def create_employee_loan(payload: EmployeeLoanIn, user: CurrentUser,
+                               db: Annotated[AsyncSession, Depends(get_db)]):
+    emp = (await db.execute(
+        select(Employee.id).where(Employee.id == payload.employee_id)
+    )).scalar_one_or_none()
+    if not emp:
+        raise HTTPException(404, "Xodim topilmadi")
+    if payload.amount is None or payload.amount <= 0:
+        raise HTTPException(422, "Summa 0 dan katta bo'lishi kerak")
+    data = payload.model_dump()
+    data["loan_date"] = data.get("loan_date") or date.today()
+    loan = EmployeeLoan(created_by_id=user.id, **data)
+    db.add(loan)
+    await db.commit()
+    await db.refresh(loan)
+    return _loan_out(loan, [])
+
+
+@router.patch("/employee-loans/{loan_id}", response_model=EmployeeLoanOut)
+async def update_employee_loan(loan_id: uuid.UUID, payload: EmployeeLoanUpdate,
+                               _user: CurrentUser, db: Annotated[AsyncSession, Depends(get_db)]):
+    res = await db.execute(select(EmployeeLoan).where(EmployeeLoan.id == loan_id))
+    loan = res.scalar_one_or_none()
+    if not loan:
+        raise HTTPException(404, "Qarz topilmadi")
+    for field in ("amount", "source", "loan_date", "note", "status"):
+        val = getattr(payload, field, None)
+        if val is not None:
+            setattr(loan, field, val)
+    await db.commit()
+    await db.refresh(loan)
+    pres = await db.execute(
+        select(EmployeeLoanPayment).where(EmployeeLoanPayment.loan_id == loan.id)
+    )
+    return _loan_out(loan, list(pres.scalars().all()))
+
+
+@router.delete("/employee-loans/{loan_id}", status_code=204)
+async def delete_employee_loan(loan_id: uuid.UUID, _user: CurrentUser,
+                               db: Annotated[AsyncSession, Depends(get_db)]):
+    res = await db.execute(select(EmployeeLoan).where(EmployeeLoan.id == loan_id))
+    loan = res.scalar_one_or_none()
+    if loan:
+        await db.delete(loan)  # to'lovlar CASCADE bilan o'chadi
+        await db.commit()
+
+
+# ---- Qarzni so'ndirish (qaytarish) — ichki tarix ----
+@router.post("/employee-loans/{loan_id}/payments",
+             response_model=EmployeeLoanPaymentOut, status_code=201)
+async def add_loan_payment(loan_id: uuid.UUID, payload: EmployeeLoanPaymentIn,
+                           user: CurrentUser, db: Annotated[AsyncSession, Depends(get_db)]):
+    """Qarzga so'ndirish (to'lov) yozadi. Qoldiqdan ortiq to'lov rad etiladi."""
+    res = await db.execute(select(EmployeeLoan).where(EmployeeLoan.id == loan_id))
+    loan = res.scalar_one_or_none()
+    if not loan:
+        raise HTTPException(404, "Qarz topilmadi")
+    if payload.amount is None or payload.amount <= 0:
+        raise HTTPException(422, "Summa 0 dan katta bo'lishi kerak")
+
+    pres = await db.execute(
+        select(func.coalesce(func.sum(EmployeeLoanPayment.amount), 0))
+        .where(EmployeeLoanPayment.loan_id == loan_id)
+    )
+    paid = pres.scalar() or Decimal(0)
+    balance = (loan.amount or Decimal(0)) - paid
+    if payload.amount > balance:
+        raise HTTPException(
+            400, f"To'lov qoldiqdan oshib ketdi. Qoldiq: {balance:,.0f}".replace(",", " "))
+
+    pay = EmployeeLoanPayment(
+        loan_id=loan_id,
+        amount=payload.amount,
+        pay_date=payload.pay_date or date.today(),
+        note=payload.note,
+        created_by_id=user.id,
+    )
+    db.add(pay)
+    # To'liq so'ndirilsa — qarzni yopilgan deb belgilaymiz (ro'yxatdan tushadi, tarix qoladi)
+    if payload.amount >= balance:
+        loan.status = "closed"
+    await db.commit()
+    await db.refresh(pay)
+    return pay
+
+
+@router.delete("/employee-loans/{loan_id}/payments/{payment_id}", status_code=204)
+async def delete_loan_payment(loan_id: uuid.UUID, payment_id: uuid.UUID,
+                              _user: CurrentUser, db: Annotated[AsyncSession, Depends(get_db)]):
+    """So'ndirishni bekor qiladi (o'chiradi). Qarz qaytadan ochiq (active) bo'ladi."""
+    res = await db.execute(
+        select(EmployeeLoanPayment).where(
+            EmployeeLoanPayment.id == payment_id,
+            EmployeeLoanPayment.loan_id == loan_id,
+        )
+    )
+    pay = res.scalar_one_or_none()
+    if not pay:
+        return
+    await db.delete(pay)
+    # Qarz yopilgan bo'lsa, to'lov o'chgach qoldiq paydo bo'ladi — qayta ochamiz
+    loan_res = await db.execute(select(EmployeeLoan).where(EmployeeLoan.id == loan_id))
+    loan = loan_res.scalar_one_or_none()
+    if loan and loan.status == "closed":
+        loan.status = "active"
+    await db.commit()
 
 
 # ---- Payroll ----

@@ -8,7 +8,8 @@
     "production": "Ishlab chiqarish",
     "employees": "Xodimlar",
     "positions": "Lavozimlar",
-    "debts": "Qarzlar"
+    "debts": "Qarzlar",
+    "loans": "Xodim qarzlari"
   },
   "deptCard": {
     "people": "kishi"
@@ -22,6 +23,39 @@
     "colGross": "Oylik",
     "colPaid": "Berilgan",
     "colDebt": "Qarz"
+  },
+  "loans": {
+    "grandTitle": "Bizdan qarzdor xodimlar — jami",
+    "grandHint": "Director/firmadan olingan alohida qarzlar yig'indisi (oylikdan tashqari).",
+    "add": "Qarz qo'shish",
+    "edit": "Qarzni tahrirlash",
+    "empty": "Qarzdor xodimlar yo'q",
+    "count": "ta qarz",
+    "employee": "Xodim",
+    "pickEmployee": "Xodimni tanlang",
+    "amountRequired": "Summa 0 dan katta bo'lishi kerak",
+    "notePlaceholder": "Ixtiyoriy izoh",
+    "deleteTitle": "Qarzni o'chirish",
+    "deleteMessage": "Qarz va uning butun so'ndirish tarixi o'chiriladi.",
+    "deletePaymentTitle": "So'ndirishni bekor qilish",
+    "deletePaymentMessage": "Bu so'ndirish yozuvi o'chiriladi, qoldiq qaytadi.",
+    "colDate": "Sana",
+    "colSource": "Manba",
+    "colNote": "Izoh",
+    "colAmount": "Summa",
+    "principal": "Asosiy",
+    "paid": "So'ndirilgan",
+    "balance": "Qoldiq",
+    "repay": "So'ndirish",
+    "repayAmount": "So'ndirish summasi",
+    "repaid": "So'ndirildi",
+    "overBalance": "Summa qoldiqdan oshib ketdi",
+    "history": "So'ndirish tarixi",
+    "source": {
+      "director": "Direktordan",
+      "firma": "Firmadan",
+      "other": "Boshqa"
+    }
   },
   "maxPayroll": {
     "title": "Oylik xarajati (taxminiy)",
