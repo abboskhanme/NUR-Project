@@ -24,6 +24,27 @@ export const VERBS = ['read', 'write', 'delete', 'approve', 'export'] as const;
 
 export const WILDCARD_ALL = '*:*';
 
+/**
+ * Maxsus (super-admin darajasidagi) ruxsatlar — modul:verb matritsasidan tashqarida.
+ * Avval faqat super-admin qila olardi; endi rolga ANIQ biriktirilsa, shu rol egasi ham qila oladi.
+ * DIQQAT: oddiy "*"/"*:*" wildcard bularni bermaydi — aniq berilishi shart (yoki "system:*").
+ * Backend bilan bir xil (app/core/permissions.py · SPECIAL_PERMISSIONS).
+ */
+export const SPECIAL_PERMISSIONS = [
+  { key: 'system:roles',            label: 'Rollar va ruxsatlarni boshqarish',     danger: false },
+  { key: 'system:grant_superadmin', label: 'Boshqaga super-admin huquqini berish', danger: true },
+  { key: 'system:user_delete',      label: "Foydalanuvchini butunlay o'chirish",    danger: true },
+  { key: 'system:user_password',    label: 'Foydalanuvchi parolini almashtirish',   danger: false },
+  { key: 'system:user_avatar',      label: 'Foydalanuvchi rasmini boshqarish',      danger: false },
+  { key: 'system:finance_override', label: 'Oylikdan ortiq avans berish',           danger: true },
+  { key: 'system:order_override',   label: 'Buyurtma ID/sotuvchisini tahrirlash',   danger: false },
+] as const;
+
+export const SYSTEM_WILDCARD = 'system:*';
+export const SPECIAL_PERMISSION_KEYS: ReadonlySet<string> = new Set(
+  SPECIAL_PERMISSIONS.map((p) => p.key),
+);
+
 export type Module = typeof MODULES[number];
 export type Verb = typeof VERBS[number];
 
@@ -67,6 +88,22 @@ export function hasPermission(
   return false;
 }
 
+/**
+ * Maxsus (super-admin darajasidagi) ruxsatni tekshirish.
+ * `hasPermission`'dan farqi: oddiy "*"/"*:*" wildcard YETMAYDI — aniq shu ruxsat
+ * yoki "system:*" berilgan bo'lishi kerak (yoki haqiqiy super-admin).
+ */
+export function hasSpecialPermission(
+  user: { is_superadmin?: boolean; roles?: { name: string; permissions?: any }[] } | null,
+  perm: string,
+): boolean {
+  if (!user) return false;
+  if (user.is_superadmin) return true;
+  if ((user.roles || []).some((r) => r.name === 'super_admin')) return true;
+  const perms = collectUserPermissions(user);
+  return perms.has(perm) || perms.has(SYSTEM_WILDCARD);
+}
+
 /** Modulda kamida bitta ruxsat bormi (sidebar/sahifa ko'rinishi uchun). */
 export function hasModuleAccess(
   user: { is_superadmin?: boolean; roles?: { name: string; permissions?: any }[] } | null,
@@ -96,6 +133,8 @@ export function usePermissions() {
       canAll: (...perms: string[]) => perms.every((p) => hasPermission(user, p)),
       /** Modulga umuman kirish bormi (kamida bitta verb) */
       canModule: (module: string) => hasModuleAccess(user, module),
+      /** Maxsus (super-admin darajasidagi) ruxsat — "*" wildcard yetmaydi */
+      canSpecial: (perm: string) => hasSpecialPermission(user, perm),
     };
   }, [user]);
 }

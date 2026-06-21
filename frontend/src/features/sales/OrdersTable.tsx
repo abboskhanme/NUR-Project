@@ -86,12 +86,13 @@ export default function OrdersTable({
   onPay: (orderId: string) => void;
 }) {
   const { t } = useTranslation();
-  const { isSuperadmin } = usePermissions();
-  // Sotuvchi tanlovi (faqat super-admin tahrirlaganda kerak)
+  const { canSpecial } = usePermissions();
+  // Sotuvchi tanlovi — buyurtma override ruxsati bo'lganlarga (super-admin yoki system:order_override)
+  const canOrderOverride = canSpecial('system:order_override');
   const spQ = useQuery<Salesperson[]>({
     queryKey: ['order-salespeople'],
     queryFn: () => api.get('/orders/salespeople').then((r) => r.data),
-    enabled: isSuperadmin,
+    enabled: canOrderOverride,
   });
   const salespeople = spQ.data ?? [];
 
@@ -183,7 +184,8 @@ function Row({
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { can, isSuperadmin } = usePermissions();
+  const { can, canSpecial } = usePermissions();
+  const canOrderOverride = canSpecial('system:order_override');
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState(o.status);
   const [receiptOpen, setReceiptOpen] = useState(false);
@@ -340,9 +342,9 @@ function Row({
       {/* Ombor ID raqami — navbat raqami o'rniga; bo'sh kotyolni band qiladi */}
       <td className={cell}>
         <div className="flex items-center gap-1.5">
-          {/* Sotuvchi to'liq ismi hammaga ko'rinadi; super-admin dropdown orqali
+          {/* Sotuvchi to'liq ismi hammaga ko'rinadi; override ruxsatli rol dropdown orqali
               o'zgartiradi (yetkazilganda ham), boshqalar faqat ko'radi (read-only). */}
-          {isSuperadmin ? (
+          {canOrderOverride ? (
             <CellSelect
               value={o.salesperson_id ?? ''}
               onChange={saveSalesperson}
@@ -363,8 +365,8 @@ function Row({
             </span>
           )}
           {/* Aktiv buyurtmada ID'ni menejer (orders:write) tahrirlaydi; YETKAZILGAN
-              buyurtmada esa faqat super-admin (eski/ombordan chiqib ketgan ID'lar uchun). */}
-          {!(locked ? isSuperadmin : can('orders:write')) ? (
+              buyurtmada esa override ruxsatli rol (eski/ombordan chiqib ketgan ID'lar uchun). */}
+          {!(locked ? canOrderOverride : can('orders:write')) ? (
             <span className={ro + ' font-mono text-center flex-1'} title={t('sales.unitIdReadOnly')}>
               {o.unit_uid || '—'}
             </span>

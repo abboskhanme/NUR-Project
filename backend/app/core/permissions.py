@@ -60,6 +60,28 @@ WILDCARD_ALL = "*:*"
 
 
 # =============================================================================
+# Maxsus (super-admin darajasidagi) ruxsatlar
+# =============================================================================
+# Bu ruxsatlar modul:verb matritsasidan TASHQARIDA turadi. Avval faqat super-admin
+# qila olardi (hardcoded tekshiruv). Endi rolga ANIQ biriktirilsa, shu rol egasi
+# ham qila oladi — ya'ni "ikkinchi super-admin" rolini tuzish mumkin.
+#
+# DIQQAT: oddiy "*" yoki "*:*" wildcard (direktorning "barcha modullar" roli) bu
+# huquqlarni BERMAYDI. Himoya uchun aniq shu kalit yoki "system:*" berilishi shart.
+SPECIAL_PERMISSIONS: list[dict] = [
+    {"key": "system:roles",            "label": "Rollar va ruxsatlarni boshqarish",      "danger": False},
+    {"key": "system:grant_superadmin", "label": "Boshqaga super-admin huquqini berish",  "danger": True},
+    {"key": "system:user_delete",      "label": "Foydalanuvchini butunlay o'chirish",     "danger": True},
+    {"key": "system:user_password",    "label": "Foydalanuvchi parolini almashtirish",    "danger": False},
+    {"key": "system:user_avatar",      "label": "Foydalanuvchi rasmini boshqarish",       "danger": False},
+    {"key": "system:finance_override", "label": "Oylikdan ortiq avans berish",            "danger": True},
+    {"key": "system:order_override",   "label": "Buyurtma ID/sotuvchisini tahrirlash",    "danger": False},
+]
+SPECIAL_PERMISSION_KEYS: set[str] = {p["key"] for p in SPECIAL_PERMISSIONS}
+SYSTEM_WILDCARD = "system:*"
+
+
+# =============================================================================
 # Asosiy mantiq
 # =============================================================================
 def _collect_user_permissions(user: User) -> Set[str]:
@@ -106,6 +128,64 @@ def has_permission(user: User, perm: str) -> bool:
         return True
 
     return False
+
+
+def is_superadmin(user: User) -> bool:
+    """Haqiqiy super-admin — bayroq yoki `super_admin` roli orqali."""
+    if user.is_superadmin:
+        return True
+    return any(r.name == "super_admin" for r in (user.roles or []))
+
+
+def has_special(user: User, perm: str) -> bool:
+    """Maxsus (super-admin darajasidagi) ruxsatni tekshirish.
+
+    `has_permission`'dan farqi: oddiy "*" / "*:*" wildcard YETMAYDI. Faqat:
+      - haqiqiy super-admin, yoki
+      - rolda aniq shu ruxsat ("system:roles" kabi), yoki
+      - rolda "system:*" bo'lsa.
+    Shu sabab "barcha modullar" roli (direktor) avtomatik ravishda super-admin
+    amallarini olmaydi — ular aniq biriktirilishi kerak.
+    """
+    if is_superadmin(user):
+        return True
+    perms = _collect_user_permissions(user)
+    return perm in perms or SYSTEM_WILDCARD in perms
+
+
+def require_special(perm: str):
+    """FastAPI dependency — maxsus (super-admin darajasidagi) ruxsatni talab qiladi."""
+    async def _check(user: CurrentUser) -> User:
+        if has_special(user, perm):
+            return user
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Bu amal uchun ruxsat yo'q (super-admin darajasidagi).",
+        )
+    return _check
+
+
+def ensure_can_grant_special(actor: User, new_perms: Iterable[str],
+                             old_perms: Iterable[str] = ()) -> None:
+    """Rolga maxsus (super-admin) ruxsat biriktirishni faqat haqiqiy super-adminga ruxsat etadi.
+
+    "Men super-admin o'zgarmaydi" tamoyili: `system:roles` huquqli "ikkinchi admin"
+    rollarni tahrirlay oladi, lekin o'ziga/boshqaga super-admin darajasidagi
+    huquqlarni QO'SHA OLMAYDI (privilege escalation'dan himoya). Mavjud maxsus
+    ruxsatlarni saqlab qolish mumkin — faqat YANGI qo'shilganlari tekshiriladi.
+    """
+    if is_superadmin(actor):
+        return
+
+    def _specials(items: Iterable[str]) -> set[str]:
+        return {p for p in items if p in SPECIAL_PERMISSION_KEYS or p == SYSTEM_WILDCARD}
+
+    added = _specials(new_perms) - _specials(old_perms)
+    if added:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Maxsus (super-admin darajasidagi) ruxsatlarni faqat super-admin biriktira oladi.",
+        )
 
 
 def has_any_permission(user: User, perms: Iterable[str]) -> bool:
@@ -207,4 +287,5 @@ def permission_catalog() -> dict:
         "modules": MODULES,
         "verbs": VERBS,
         "wildcard_all": WILDCARD_ALL,
+        "special": SPECIAL_PERMISSIONS,
     }

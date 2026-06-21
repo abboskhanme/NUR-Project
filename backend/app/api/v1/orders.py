@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.dependencies import CurrentUser
-from app.core.permissions import module_guard, require_permission
+from app.core.permissions import has_special, module_guard, require_permission
 from app.db.session import get_db
 from app.models.customer import Customer
 from app.models.order import Order, OrderItem, Payment
@@ -618,8 +618,8 @@ async def set_order_unit_uid(order_id: uuid.UUID, payload: UnitUidUpdate, user: 
 
     Boshqa buyurtmada o'sha ID band bo'lsa — rad etiladi (takrordan saqlanish).
     """
-    if not (user.is_superadmin or any(r.name == "super_admin" for r in (user.roles or []))):
-        raise HTTPException(403, "Faqat super-admin uchun")
+    if not has_special(user, "system:order_override"):
+        raise HTTPException(403, "Bu amal uchun ruxsat yo'q (super-admin darajasidagi).")
     res = await db.execute(select(Order).where(Order.id == order_id))
     o = res.scalar_one_or_none()
     if not o:
@@ -646,10 +646,10 @@ async def set_order_unit_uid(order_id: uuid.UUID, payload: UnitUidUpdate, user: 
 async def set_order_salesperson(order_id: uuid.UUID, payload: SalespersonUpdate, user: CurrentUser,
                                 db: Annotated[AsyncSession, Depends(get_db)]):
     """Buyurtma sotuvchisini qo'lda biriktirish — holatdan qat'i nazar (yetkazilganda ham).
-    FAQAT super-admin uchun (sotuvchi hisobiga ta'sir qiladi).
+    `system:order_override` ruxsati kerak (sotuvchi hisobiga ta'sir qiladi).
     """
-    if not (user.is_superadmin or any(r.name == "super_admin" for r in (user.roles or []))):
-        raise HTTPException(403, "Faqat super-admin uchun")
+    if not has_special(user, "system:order_override"):
+        raise HTTPException(403, "Bu amal uchun ruxsat yo'q (super-admin darajasidagi).")
     res = await db.execute(select(Order).where(Order.id == order_id))
     o = res.scalar_one_or_none()
     if not o:

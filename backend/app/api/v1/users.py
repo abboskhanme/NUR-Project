@@ -8,7 +8,12 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import CurrentUser, require_roles
-from app.core.permissions import has_permission, require_permission  # Yangi permission tizimi
+from app.core.permissions import (  # Yangi permission tizimi
+    ensure_can_grant_special,
+    has_permission,
+    has_special,
+    require_permission,
+)
 from app.core.security import hash_password, normalize_phone, phone_digits
 from app.db.session import get_db
 from app.models.hr import Employee, Position
@@ -32,12 +37,25 @@ ALLOWED_AVATAR_TYPES = {"image/png", "image/jpeg", "image/jpg", "image/webp", "i
 MAX_AVATAR_BYTES = 2 * 1024 * 1024
 
 
-def _ensure_superadmin(user: User) -> None:
-    if user.is_superadmin:
-        return
-    if any(r.name == "super_admin" for r in (user.roles or [])):
-        return
-    raise HTTPException(status_code=403, detail="Faqat super-admin uchun")
+def _ensure_special(user: User, perm: str) -> None:
+    """Maxsus (super-admin darajasidagi) ruxsatni tekshiradi.
+
+    Haqiqiy super-admin avtomatik o'tadi; aks holda rolga aniq biriktirilgan
+    `system:*` ruxsat kerak. Oddiy "*" wildcard yetmaydi.
+    """
+    if not has_special(user, perm):
+        raise HTTPException(status_code=403, detail="Bu amal uchun ruxsat yo'q (super-admin darajasidagi).")
+
+
+def _perms_list(permissions) -> list[str]:
+    """Role.permissions (dict yoki list) ichidan ruxsat satrlari ro'yxatini ajratib oladi."""
+    if isinstance(permissions, dict):
+        items = permissions.get("permissions") or []
+    elif isinstance(permissions, list):
+        items = permissions
+    else:
+        items = []
+    return [str(p) for p in items if isinstance(p, str)]
 
 
 def _ensure_users_perm(user: User, verb: str) -> None:
@@ -171,9 +189,9 @@ async def create_user(
     current: CurrentUser,
 ):
     _ensure_users_perm(current, "write")
-    # super_admin rolini faqat super-adminning o'zi bera oladi (privilege escalation'dan himoya)
+    # super_admin rolini berish — privilege escalation'dan himoya (system:grant_superadmin)
     if payload.role_names and "super_admin" in payload.role_names:
-        _ensure_superadmin(current)
+        _ensure_special(current, "system:grant_superadmin")
     new_phone = normalize_phone(payload.phone)
     if not new_phone:
         raise HTTPException(status_code=422, detail="Telefon raqam noto'g'ri")
@@ -212,11 +230,11 @@ async def update_user(
     current: CurrentUser,
 ):
     _ensure_users_perm(current, "write")
-    # super_admin huquqini berish/olish faqat super-admin uchun
+    # super_admin huquqini berish/olish — system:grant_superadmin talab qiladi
     if getattr(payload, "is_superadmin", None) is not None or (
         payload.role_names is not None and "super_admin" in payload.role_names
     ):
-        _ensure_superadmin(current)
+        _ensure_special(current, "system:grant_superadmin")
     res = await db.execute(select(User).where(User.id == user_id))
     user = res.scalar_one_or_none()
     if not user:
@@ -308,7 +326,7 @@ async def permanently_delete_user(
     current: CurrentUser,
 ):
     """Butunlay o'chirish — DB'dan to'liq olib tashlanadi. Faqat arxivdagi foydalanuvchini o'chirish mumkin."""
-    _ensure_superadmin(current)
+    _ensure_special(current, "system:user_delete")
     if str(current.id) == str(user_id):
         raise HTTPException(400, "O'zingizni o'chira olmaysiz")
     res = await db.execute(select(User).where(User.id == user_id))
@@ -336,7 +354,7 @@ async def admin_reset_password(
     db: Annotated[AsyncSession, Depends(get_db)],
     current: CurrentUser,
 ):
-    _ensure_superadmin(current)
+    _ensure_special(current, "system:user_password")
     res = await db.execute(select(User).where(User.id == user_id))
     user = res.scalar_one_or_none()
     if not user:
@@ -386,7 +404,7 @@ async def upload_avatar(
     db: Annotated[AsyncSession, Depends(get_db)],
     current: CurrentUser,
 ):
-    _ensure_superadmin(current)
+    _ensure_special(current, "system:user_avatar")
     res = await db.execute(select(User).where(User.id == user_id))
     user = res.scalar_one_or_none()
     if not user:
@@ -418,7 +436,7 @@ async def delete_avatar(
     db: Annotated[AsyncSession, Depends(get_db)],
     current: CurrentUser,
 ):
-    _ensure_superadmin(current)
+    _ensure_special(current, "system:user_avatar")
     res = await db.execute(select(UserAvatar).where(UserAvatar.user_id == user_id))
     av = res.scalar_one_or_none()
     if av:
@@ -446,7 +464,9 @@ async def create_role(
     db: Annotated[AsyncSession, Depends(get_db)],
     current: CurrentUser,
 ):
-    _ensure_superadmin(current)
+    _ensure_special(current, "system:roles")
+    # Maxsus (super-admin) ruxsatlarni rolga biriktirish faqat haqiqiy super-adminga ruxsat etiladi
+    ensure_can_grant_special(current, _perms_list(payload.permissions))
     exists = await db.execute(select(Role).where(Role.name == payload.name))
     if exists.scalar_one_or_none():
         raise HTTPException(409, "Bu nomli rol mavjud")
@@ -468,11 +488,17 @@ async def update_role(
     db: Annotated[AsyncSession, Depends(get_db)],
     current: CurrentUser,
 ):
-    _ensure_superadmin(current)
+    _ensure_special(current, "system:roles")
     res = await db.execute(select(Role).where(Role.id == role_id))
     role = res.scalar_one_or_none()
     if not role:
         raise HTTPException(404, "Rol topilmadi")
+
+    if payload.permissions is not None:
+        # Maxsus (super-admin) ruxsatlarni qo'shish faqat haqiqiy super-adminga
+        ensure_can_grant_special(
+            current, _perms_list(payload.permissions), _perms_list(role.permissions)
+        )
 
     if payload.name is not None and payload.name != role.name:
         dup = await db.execute(
@@ -497,7 +523,7 @@ async def delete_role(
     db: Annotated[AsyncSession, Depends(get_db)],
     current: CurrentUser,
 ):
-    _ensure_superadmin(current)
+    _ensure_special(current, "system:roles")
     res = await db.execute(select(Role).where(Role.id == role_id))
     role = res.scalar_one_or_none()
     if not role:
@@ -515,11 +541,12 @@ async def update_role_permissions(
     db: Annotated[AsyncSession, Depends(get_db)],
     current: CurrentUser,
 ):
-    _ensure_superadmin(current)
+    _ensure_special(current, "system:roles")
     res = await db.execute(select(Role).where(Role.id == role_id))
     role = res.scalar_one_or_none()
     if not role:
         raise HTTPException(404, "Rol topilmadi")
+    ensure_can_grant_special(current, _perms_list(permissions), _perms_list(role.permissions))
     role.permissions = permissions
     await db.commit()
     await db.refresh(role)

@@ -88,12 +88,12 @@ export default function EmployeeHistoryModal({
 }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
-  const { isSuperadmin } = usePermissions();
+  const { canSpecial } = usePermissions();
   const editable = kind === 'advance';
 
-  // Avans tahminiy oylikdan oshganda "baribir berish" huquqi — faqat super-admin.
-  // Boshqalar uchun oshib ketadigan avans bloklanadi.
-  const canOverrideAdvance = isSuperadmin;
+  // Avans tahminiy oylikdan oshganda "baribir berish" huquqi — super-admin yoki
+  // system:finance_override ruxsatli rol. Boshqalar uchun oshib ketadigan avans bloklanadi.
+  const canOverrideAdvance = canSpecial('system:finance_override');
 
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');

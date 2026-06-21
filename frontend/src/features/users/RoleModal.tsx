@@ -2,13 +2,16 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import {
-  X, Check, ShieldCheck, Sparkles,
+  X, Check, ShieldCheck, Sparkles, Lock, ShieldAlert,
   Users, ShoppingCart, Package, Warehouse, Wrench, Wallet,
   UserSquare2, Truck, BarChart3, Settings, Send, UserCog, Coins, PackageOpen,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { api } from '@/api/client';
-import { MODULES, VERBS, type Module, type Verb } from '@/lib/permissions';
+import {
+  MODULES, VERBS, SPECIAL_PERMISSIONS, SPECIAL_PERMISSION_KEYS, SYSTEM_WILDCARD,
+  usePermissions, type Module, type Verb,
+} from '@/lib/permissions';
 
 export interface RoleRow {
   id: string;
@@ -35,31 +38,39 @@ const MODULE_ICONS: Record<Module, LucideIcon> = {
 };
 
 /** Saqlangan permissions ro'yxatini matritsa holatiga ochish. */
-function parsePermissions(raw: any): { full: boolean; set: Set<string> } {
+function parsePermissions(raw: any): { full: boolean; set: Set<string>; special: Set<string> } {
   const items: string[] = Array.isArray(raw) ? raw : raw?.permissions ?? [];
   const set = new Set<string>();
+  const special = new Set<string>();
   let full = false;
   for (const p of items) {
     if (typeof p !== 'string') continue;
     if (p === '*' || p === '*:*') { full = true; continue; }
+    if (p === SYSTEM_WILDCARD) { SPECIAL_PERMISSIONS.forEach((s) => special.add(s.key)); continue; }
+    if (SPECIAL_PERMISSION_KEYS.has(p)) { special.add(p); continue; }
     const [m, v] = p.split(':');
     if (m && v === '*') { VERBS.forEach((vb) => set.add(`${m}:${vb}`)); continue; }
     if (m === '*' && v) { MODULES.forEach((mod) => set.add(`${mod}:${v}`)); continue; }
     if (m && v) set.add(p);
   }
-  return { full, set };
+  return { full, set, special };
 }
 
 /** Matritsa holatini ixcham permissions ro'yxatiga yig'ish. */
-function serializePermissions(full: boolean, set: Set<string>): string[] {
-  if (full) return ['*'];
+function serializePermissions(full: boolean, set: Set<string>, special: Set<string>): string[] {
   const out: string[] = [];
-  for (const m of MODULES) {
-    const checked = VERBS.filter((v) => set.has(`${m}:${v}`));
-    if (checked.length === 0) continue;
-    if (checked.length === VERBS.length) out.push(`${m}:*`);
-    else checked.forEach((v) => out.push(`${m}:${v}`));
+  if (full) {
+    out.push('*');
+  } else {
+    for (const m of MODULES) {
+      const checked = VERBS.filter((v) => set.has(`${m}:${v}`));
+      if (checked.length === 0) continue;
+      if (checked.length === VERBS.length) out.push(`${m}:*`);
+      else checked.forEach((v) => out.push(`${m}:${v}`));
+    }
   }
+  // Maxsus (super-admin) ruxsatlar — "full" wildcard bilan ham ALOHIDA saqlanadi
+  SPECIAL_PERMISSIONS.forEach((s) => { if (special.has(s.key)) out.push(s.key); });
   return out;
 }
 
@@ -71,6 +82,7 @@ export default function RoleModal({
   onSaved: () => void;
 }) {
   const { t } = useTranslation();
+  const { isSuperadmin: editorIsSuper } = usePermissions();
   const isCreate = role === null;
   const isSuperAdminRole = role?.name === 'super_admin';
 
@@ -81,6 +93,7 @@ export default function RoleModal({
   const initial = useMemo(() => parsePermissions(role?.permissions), [role]);
   const [full, setFull] = useState(isSuperAdminRole || initial.full);
   const [perms, setPerms] = useState<Set<string>>(initial.set);
+  const [special, setSpecial] = useState<Set<string>>(initial.special);
 
   const moduleLabels: Record<Module, string> = {
     users: t('nav.users', { defaultValue: 'Foydalanuvchilar' }),
@@ -119,6 +132,15 @@ export default function RoleModal({
     });
   }
 
+  function toggleSpecial(key: string) {
+    setSpecial((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
   function setRow(m: Module, mode: 'none' | 'view' | 'full') {
     setPerms((prev) => {
       const next = new Set(prev);
@@ -148,7 +170,7 @@ export default function RoleModal({
     const payload = {
       name: name.trim(),
       description: description.trim() || null,
-      permissions: { permissions: serializePermissions(full, perms) },
+      permissions: { permissions: serializePermissions(full, perms, special) },
     };
     try {
       if (isCreate) {
@@ -420,6 +442,75 @@ export default function RoleModal({
               </div>
             </div>
           )}
+
+          {/* Maxsus (super-admin darajasidagi) huquqlar — matritsadan tashqari */}
+          <div className="rounded-xl border border-black/[0.06] overflow-hidden">
+            <div className="flex items-center gap-3 px-4 py-3 bg-black/[0.025] border-b border-black/[0.05]">
+              <div className="w-8 h-8 rounded-lg bg-danger/10 text-danger flex items-center justify-center shrink-0">
+                <ShieldAlert size={16} />
+              </div>
+              <div className="min-w-0">
+                <div className="text-sm font-semibold">
+                  {t('perm.special.title', { defaultValue: 'Maxsus (super-admin) huquqlar' })}
+                </div>
+                <div className="text-[11px] text-ink-soft">
+                  {t('perm.special.hint', {
+                    defaultValue:
+                      "Faqat shu yerdan ANIQ biriktirilsa ochiladi — \"barcha modullar\" ruxsati buni bermaydi.",
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {!editorIsSuper && !isSuperAdminRole && (
+              <div className="flex items-center gap-2 px-4 py-2.5 bg-warning/10 text-warning text-[11px] font-medium border-b border-black/[0.05]">
+                <Lock size={13} className="shrink-0" />
+                {t('perm.special.locked', {
+                  defaultValue: 'Bu huquqlarni faqat super-admin biriktira oladi.',
+                })}
+              </div>
+            )}
+
+            <div className="divide-y divide-black/[0.05]">
+              {SPECIAL_PERMISSIONS.map((s) => {
+                const on = isSuperAdminRole || special.has(s.key);
+                const locked = isSuperAdminRole || !editorIsSuper;
+                return (
+                  <div key={s.key} className="flex items-center justify-between gap-3 px-4 py-2.5">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className={'text-sm truncate ' + (on ? 'text-ink' : 'text-ink/55')}>
+                        {s.label}
+                      </span>
+                      {s.danger && (
+                        <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-danger/90 bg-danger/10 px-1.5 py-0.5 rounded">
+                          {t('perm.special.danger', { defaultValue: 'Muhim' })}
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={on}
+                      disabled={locked}
+                      onClick={() => toggleSpecial(s.key)}
+                      className={
+                        'relative w-11 h-6 rounded-full shrink-0 transition-colors duration-200 ' +
+                        (on ? 'bg-primary' : 'bg-black/15 hover:bg-black/20') +
+                        (locked ? ' opacity-60 cursor-not-allowed' : '')
+                      }
+                    >
+                      <span
+                        className={
+                          'absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform duration-200 ' +
+                          (on ? 'translate-x-5' : 'translate-x-0')
+                        }
+                      />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
 
         {/* Footer */}

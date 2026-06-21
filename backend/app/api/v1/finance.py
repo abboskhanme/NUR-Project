@@ -10,7 +10,7 @@ from sqlalchemy import and_, select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import CurrentUser
-from app.core.permissions import module_guard
+from app.core.permissions import has_special, module_guard
 from app.db.session import get_db
 from app.models.finance import Account, ExchangeRate, FinanceCategory, FinanceTransaction
 from app.models.hr import Employee, SalaryAdvance
@@ -232,8 +232,9 @@ async def create_employee_payment(payload: EmployeePaymentIn, user: CurrentUser,
         default_note = f"Avans — {emp.full_name}"
 
         # AVANS CHEKLOVI: jami avanslar tahminiy oylikdan oshmasligi kerak.
-        # Oshsa — oddiy xodimga BLOK; faqat super-admin "baribir berish" (override)
-        # huquqiga ega (frontend tasdiqdan keyin override=true yuboradi).
+        # Oshsa — oddiy xodimga BLOK; faqat super-admin yoki `system:finance_override`
+        # ruxsatli rol "baribir berish" (override) huquqiga ega
+        # (frontend tasdiqdan keyin override=true yuboradi).
         from app.api.v1.hr import advance_cap  # lazy import — circular importdan qochish
         max_gross, current_adv = await advance_cap(db, emp, payload.year, payload.month)
         if max_gross > 0 and (current_adv + amount) > max_gross:
@@ -244,10 +245,10 @@ async def create_employee_payment(payload: EmployeePaymentIn, user: CurrentUser,
             ).replace(",", " ")
             if not payload.override:
                 raise HTTPException(status_code=400, detail=limit_msg)
-            if not user.is_superadmin:
+            if not has_special(user, "system:finance_override"):
                 raise HTTPException(
                     status_code=403,
-                    detail="Oylikdan ortiq avans berish faqat super-admin uchun")
+                    detail="Oylikdan ortiq avans berish uchun ruxsat yo'q (super-admin darajasidagi)")
 
     # Sana o'sha oy ichida bo'lishi kerak (aggregate sanaga qarab oyga biriktiradi)
     today = date.today()
