@@ -54,7 +54,6 @@ const COLS: Col[] = [
   { key: 'region', label: 'colRegion', type: 'region', px: 144 },
   { key: 'destination', label: 'colDestination', type: 'text', px: 188 },
   { key: 'product_name', label: 'colProduct', type: 'product', px: 180 },
-  { key: 'product_price', label: 'colProductPrice', type: 'money', px: 140 },
   { key: 'direction', label: 'colDirection', type: 'direction', px: 104 },
   { key: 'driver_name', label: 'colDriverName', type: 'driver', px: 160 },
   { key: 'driver_phone', label: 'colDriverPhone', type: 'text', px: 152, fmt: formatPhoneInput },
@@ -66,7 +65,7 @@ const COLS: Col[] = [
 
 // Sarlavha guruhlari (span — ketma-ket ustunlar soni; COLS tartibiga mos).
 const GROUP_DEFS = [
-  { key: 'grpCargo', span: 8, text: 'text-accent', border: 'border-accent' },
+  { key: 'grpCargo', span: 7, text: 'text-accent', border: 'border-accent' },
   { key: 'grpDriver', span: 2, text: 'text-warning', border: 'border-warning' },
   { key: 'grpPayment', span: 3, text: 'text-success', border: 'border-success' },
   { key: 'grpStatus', span: 1, text: 'text-danger', border: 'border-danger' },
@@ -163,7 +162,6 @@ function Journal() {
 
   const rows = listQ.data ?? [];
   const totalFreight = rows.reduce((a, s) => a + Number(s.freight || 0), 0);
-  const totalPrice = rows.reduce((a, s) => a + Number(s.product_price || 0), 0);
   const totalQty = rows.reduce((a, s) => a + Number(s.qty || 0), 0);
 
   const refresh = () => {
@@ -207,9 +205,8 @@ function Journal() {
   return (
     <div className="space-y-4">
       {/* KPI chiplar */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 gap-3">
         <Kpi icon={<Package size={16} />} label={t('shipping.colQty')} value={formatNumberInput(String(totalQty))} tone="warning" />
-        <Kpi icon={<Coins size={16} />} label={t('shipping.colProductPrice')} value={formatUZS(totalPrice)} tone="ink" />
         <Kpi icon={<Coins size={16} />} label={t('shipping.totalFreight')} value={formatUZS(totalFreight)} tone="success" />
       </div>
 
@@ -282,7 +279,6 @@ function Journal() {
                   <td className="tabular-nums">{formatNumberInput(String(totalQty))}</td>
                   <td colSpan={3} />
                   <td />
-                  <td className="tabular-nums">{formatUZS(totalPrice)}</td>
                   <td />
                   <td colSpan={2} />
                   <td className="tabular-nums text-success">{formatUZS(totalFreight)}</td>

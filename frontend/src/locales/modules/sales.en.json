@@ -48,6 +48,7 @@
   "ordersEmptyDesc": "Create a new order using the 'New order' button",
   "kpiOrders": "Orders · {{period}}",
   "kpiRevenue": "Revenue · {{period}}",
+  "kpiRevenueUsd": "Revenue ($) · {{period}}",
   "kpiPaid": "Paid · {{period}}",
   "kpiBalance": "Balance · {{period}}",
   "kpiDelivered": "Delivered · {{period}}",

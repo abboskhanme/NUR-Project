@@ -48,6 +48,7 @@
   "ordersEmptyDesc": "'Yangi buyurtma' tugmasi orqali yarating",
   "kpiOrders": "Buyurtma · {{period}}",
   "kpiRevenue": "Savdo · {{period}}",
+  "kpiRevenueUsd": "Savdo ($) · {{period}}",
   "kpiPaid": "To'langan · {{period}}",
   "kpiBalance": "Qoldiq · {{period}}",
   "kpiDelivered": "Yetkazildi · {{period}}",

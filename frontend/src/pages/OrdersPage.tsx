@@ -2,13 +2,13 @@ import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
-import { Plus, Search, ShoppingCart, Wallet, AlertCircle, CalendarClock, FileSpreadsheet, PackageCheck, Clock } from 'lucide-react';
+import { Plus, Search, ShoppingCart, Wallet, AlertCircle, CalendarClock, FileSpreadsheet, PackageCheck, Clock, DollarSign } from 'lucide-react';
 
 import { api } from '@/api/client';
 import { downloadFile } from '@/lib/download';
 import Card from '@/components/ui/Card';
 import EmptyState from '@/components/ui/EmptyState';
-import { formatUZS } from '@/lib/format';
+import { formatUZS, formatUSD } from '@/lib/format';
 import OrderModal from '@/features/sales/OrderModal';
 import PaymentModal from '@/features/sales/PaymentModal';
 import OrdersTable, { OrderFull, ProductOpt } from '@/features/sales/OrdersTable';
@@ -125,6 +125,13 @@ export default function OrdersPage() {
   });
   const s = summaryQ.data;
 
+  // Joriy USD→UZS kurs — umumiy savdoni dollarda ko'rsatish uchun
+  const rateQ = useQuery<number>({
+    queryKey: ['usd-rate'],
+    queryFn: () => api.get('/finance/exchange-rates/latest').then((r) => Number(r.data?.usd_to_uzs) || 0),
+  });
+  const rate = rateQ.data ?? 0;
+
   const [exporting, setExporting] = useState(false);
 
   function refresh() {
@@ -178,14 +185,20 @@ export default function OrdersPage() {
         </div>
       </div>
 
-      {/* KPI cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+      {/* KPI — songa oid kartalar (alohida qator) */}
+      <div className="grid grid-cols-3 gap-3">
         <Kpi icon={<ShoppingCart size={18} />} label={t('sales.kpiOrders', { period: periodLabel })} value={s ? String(s.total_orders) : '—'} />
         <Kpi icon={<PackageCheck size={18} />} label={t('sales.kpiDelivered', { period: periodLabel })}
              value={s ? String(s.status_counts?.delivered ?? 0) : '—'} accent="text-success" />
         <Kpi icon={<Clock size={18} />} label={t('sales.kpiRemaining', { period: periodLabel })}
              value={s ? String((s.status_counts?.new ?? 0) + (s.status_counts?.ready ?? 0)) : '—'} accent="text-warning" />
+      </div>
+
+      {/* KPI — pulga oid kartalar (alohida qator) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <Kpi icon={<Wallet size={18} />} label={t('sales.kpiRevenue', { period: periodLabel })} value={s ? formatUZS(s.revenue_total) : '—'} accent="text-ink" />
+        <Kpi icon={<DollarSign size={18} />} label={t('sales.kpiRevenueUsd', { period: periodLabel })}
+             value={s && rate > 0 ? formatUSD(Number(s.revenue_total) / rate) : '—'} accent="text-ink" />
         <Kpi icon={<CalendarClock size={18} />} label={t('sales.kpiPaid', { period: periodLabel })} value={s ? formatUZS(s.paid_total) : '—'} accent="text-success" />
         <Kpi icon={<AlertCircle size={18} />} label={t('sales.kpiBalance', { period: periodLabel })}
              value={s ? formatUZS(s.outstanding_total) : '—'} accent="text-danger" />

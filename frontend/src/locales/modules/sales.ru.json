@@ -48,6 +48,7 @@
   "ordersEmptyDesc": "Создайте первый заказ кнопкой «Новый заказ»",
   "kpiOrders": "Заказы · {{period}}",
   "kpiRevenue": "Продажи · {{period}}",
+  "kpiRevenueUsd": "Продажи ($) · {{period}}",
   "kpiPaid": "Оплачено · {{period}}",
   "kpiBalance": "Остаток · {{period}}",
   "kpiDelivered": "Доставлено · {{period}}",
