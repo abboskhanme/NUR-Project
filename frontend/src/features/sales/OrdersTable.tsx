@@ -119,11 +119,11 @@ export default function OrdersTable({
                       [&::-webkit-scrollbar-track]:bg-black/5 [&::-webkit-scrollbar-track]:rounded-full
                       [&::-webkit-scrollbar-thumb]:bg-black/30 [&::-webkit-scrollbar-thumb]:rounded-full
                       hover:[&::-webkit-scrollbar-thumb]:bg-black/45">
-        <div className="h-px w-[2140px]" />
+        <div className="h-px w-[2240px]" />
       </div>
       <div ref={bodyRef} onScroll={syncFromBody}
            className="overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-      <table className="text-sm border-collapse table-fixed w-[2140px]">
+      <table className="text-sm border-collapse table-fixed w-[2240px]">
         <colgroup>
           <col style={{ width: 44 }} />
           <col style={{ width: 210 }} />
@@ -132,7 +132,7 @@ export default function OrdersTable({
           <col style={{ width: 170 }} />
           <col style={{ width: 140 }} />
           <col style={{ width: 180 }} />
-          <col style={{ width: 180 }} />
+          <col style={{ width: 280 }} />
           <col style={{ width: 96 }} />
           <col style={{ width: 70 }} />
           <col style={{ width: 64 }} />
@@ -432,9 +432,9 @@ function Row({
       </td>
 
       {/* Product */}
-      <td className={cell}>
+      <td className={cell + ' !whitespace-normal'}>
         {locked ? (
-          <span className={ro}
+          <span className="block px-1 py-0.5 border border-transparent whitespace-normal break-words leading-tight"
                 title={main?.product ? (main.product.display_name ?? main.product.model ?? main.product.name ?? '') : ''}>
             {main?.product ? (main.product.display_name ?? main.product.model ?? main.product.name ?? '—') : '—'}
           </span>
