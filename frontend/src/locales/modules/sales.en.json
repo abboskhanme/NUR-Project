@@ -126,6 +126,8 @@
   "priceReadOnly": "Price is sourced from the products section — not editable here",
   "openOrder": "Open",
   "addPaymentTooltip": "Add payment (finance)",
+  "overrideTotalTooltip": "Total (UZS) — super-admin correction (for old import)",
+  "overridePaidTooltip": "Paid (UZS) — super-admin correction (for old import)",
   "modalCreateTitle": "New order",
   "modalEditTitle": "Edit order",
   "labelCustomer": "Customer *",

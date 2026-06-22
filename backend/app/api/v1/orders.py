@@ -20,7 +20,7 @@ from app.models.user import User
 from app.schemas.common import Page
 from app.schemas.order import (
     OrderCreate, OrderOut, OrderStatusChange, OrderUpdate, UnitUidUpdate,
-    SalespersonUpdate, SalespersonOption,
+    SalespersonUpdate, SalespersonOption, OverrideAmounts,
     PaymentIn, PaymentOut, SalesSummary, SalespersonCount, QueueItemOut, QueueMove, QueueAdd,
 )
 from app.services.order_service import generate_order_code, is_valid_transition
@@ -662,6 +662,77 @@ async def set_order_salesperson(order_id: uuid.UUID, payload: SalespersonUpdate,
         if not ok:
             raise HTTPException(422, "Sotuvchi topilmadi yoki aktiv emas")
     o.salesperson_id = sp_id
+    await db.commit()
+    res = await db.execute(_order_query().where(Order.id == order_id))
+    return res.scalar_one()
+
+
+# Import tuzatish to'lovini belgilash uchun maxsus izoh (qayta tahrirda topib yangilanadi)
+_IMPORT_CORRECTION_NOTE = "__import_correction__"
+
+
+@router.patch("/{order_id}/override-amounts", response_model=OrderOut)
+async def override_order_amounts(order_id: uuid.UUID, payload: OverrideAmounts, user: CurrentUser,
+                                 db: Annotated[AsyncSession, Depends(get_db)]):
+    """Jami (so'm) va/yoki To'langan (so'm) ni qo'lda to'g'rilash — FAQAT super-admin.
+
+    Eski (Google Sheets'dan ko'chgan) buyurtmalarda Jami/To'langan 0 bo'lib qolgan.
+    Holatdan qat'i nazar ishlaydi (yetkazilgan buyurtmada ham).
+
+    - total_uzs: asosiy (additional bo'lmagan) mahsulot satrini shunday sozlaymizki,
+      buyurtma jami (items_total_uzs) aynan shu qiymatga teng bo'lsin. Dollar narxi
+      (unit_price_usd) o'zgarmaydi — faqat so'mdagi qiymat tiklanadi.
+    - paid_uzs: bitta "import tuzatish" to'lovi orqali umumiy to'langan summani shu
+      qiymatga keltiramiz (haqiqiy, qo'lda kiritilgan to'lovlar saqlanadi).
+    """
+    if not has_special(user, "system:order_override"):
+        raise HTTPException(403, "Bu amal uchun ruxsat yo'q (super-admin darajasidagi).")
+    o = (await db.execute(_order_query().where(Order.id == order_id))).scalar_one_or_none()
+    if not o:
+        raise HTTPException(404, "Buyurtma topilmadi")
+
+    # --- Jami (so'm) ni to'g'rilash ---
+    if payload.total_uzs is not None:
+        target = payload.total_uzs
+        # Asosiy satr — frontend bilan bir xil (birinchi additional bo'lmagan)
+        main = next((i for i in o.items if (not i.product or i.product.product_type != "additional")), None)
+        if main is None:
+            main = o.items[0] if o.items else None
+        if main is None:
+            raise HTTPException(400, "Buyurtmada mahsulot yo'q — jamini o'rnatib bo'lmaydi")
+        others_total = sum(((i.total_uzs or Decimal(0)) for i in o.items if i is not main), Decimal(0))
+        main_target = target - others_total
+        if main_target < 0:
+            raise HTTPException(
+                400, f"Jami juda kichik — qo'shimcha mahsulotlar yig'indisi {others_total:,.0f} so'm".replace(",", " "))
+        qty = main.quantity or 1
+        disc_uzs = main.discount or Decimal(0)
+        # total_uzs = unit_price_uzs*qty - disc_uzs  =>  unit_price_uzs = (target + disc)/qty
+        main.unit_price_uzs = (main_target + disc_uzs) / qty
+        main.total_uzs = main_target
+
+    # --- To'langan (so'm) ni to'g'rilash ---
+    if payload.paid_uzs is not None:
+        target_paid = payload.paid_uzs
+        # Haqiqiy (import tuzatishidan boshqa) to'lovlar yig'indisi
+        real_payments = [p for p in o.payments if (p.note or "") != _IMPORT_CORRECTION_NOTE]
+        real_paid = sum(((p.amount_uzs_equiv or p.amount or Decimal(0)) for p in real_payments), Decimal(0))
+        # Eski import tuzatish to'lovi(lari)ni topamiz
+        corrections = [p for p in o.payments if (p.note or "") == _IMPORT_CORRECTION_NOTE]
+        delta = target_paid - real_paid  # tuzatish to'lovi qancha bo'lishi kerak
+        if delta < 0:
+            raise HTTPException(
+                400, f"To'langan summa haqiqiy to'lovlardan kam — haqiqiy: {real_paid:,.0f} so'm".replace(",", " "))
+        # Avvalgi tuzatishlarni olib tashlaymiz, kerak bo'lsa bittasini qayta yaratamiz
+        for c in corrections:
+            await db.delete(c)
+        if delta > 0:
+            db.add(Payment(
+                order_id=o.id, date=o.order_date or date.today(),
+                amount=delta, currency="UZS", amount_uzs_equiv=delta,
+                method=None, note=_IMPORT_CORRECTION_NOTE, created_by_id=user.id,
+            ))
+
     await db.commit()
     res = await db.execute(_order_query().where(Order.id == order_id))
     return res.scalar_one()

@@ -126,6 +126,8 @@
   "priceReadOnly": "Цена берётся из раздела товаров — здесь не изменяется",
   "openOrder": "Открыть",
   "addPaymentTooltip": "Добавить платёж (финансы)",
+  "overrideTotalTooltip": "Итого (сум) — правка супер-админом (для старого импорта)",
+  "overridePaidTooltip": "Оплачено (сум) — правка супер-админом (для старого импорта)",
   "modalCreateTitle": "Новый заказ",
   "modalEditTitle": "Редактировать заказ",
   "labelCustomer": "Клиент *",

@@ -77,6 +77,13 @@ interface Salesperson { id: string; full_name: string }
 const decStr = (s: string | number | null | undefined) =>
   String(s ?? '').replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1');
 
+// So'm summasi uchun — faqat butun qism (nuqtagacha), har 3 xonaga bo'shliq (1 234 567).
+// "18128340.00" -> "18 128 340" (o'nlik qism tashlanadi, so'm butun sonda yuritiladi).
+const somStr = (s: string | number | null | undefined) => {
+  const digits = String(s ?? '').split('.')[0].replace(/[^\d]/g, '').replace(/^0+(?=\d)/, '');
+  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+};
+
 export default function OrdersTable({
   orders, products, onChanged, onPay,
 }: {
@@ -201,6 +208,20 @@ function Row({
     setSaving(true);
     try {
       await api.patch(`/orders/${o.id}`, body);
+      onChanged();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || t('common.error'));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // Super-admin: Jami / To'langan (so'm) ni qo'lda to'g'rilash (import tuzatish).
+  // Yetkazilgan buyurtmada ham ishlaydi.
+  async function overrideAmounts(body: { total_uzs?: number; paid_uzs?: number }) {
+    setSaving(true);
+    try {
+      await api.patch(`/orders/${o.id}/override-amounts`, body);
       onChanged();
     } catch (e: any) {
       toast.error(e?.response?.data?.detail || t('common.error'));
@@ -493,17 +514,36 @@ function Row({
         )}
       </td>
 
-      {/* Totals */}
-      <td className={cell + ' text-right font-medium'}>{formatUZS(o.items_total_uzs)}</td>
+      {/* Totals — super-admin (order_override) so'mda Jami va To'langan'ni qo'lda
+          to'g'rilashi mumkin (eski importda 0 bo'lib qolganlar uchun). */}
+      <td className={cell + ' text-right font-medium'}>
+        {canOrderOverride ? (
+          <input type="text" inputMode="numeric" defaultValue={somStr(o.items_total_uzs)}
+                 key={'tot-' + o.items_total_uzs} placeholder="0"
+                 title={t('sales.overrideTotalTooltip')}
+                 className={inp + ' text-right'}
+                 onChange={(e) => { e.target.value = somStr(e.target.value); }}
+                 onBlur={(e) => { const v = num(e.target.value.replace(/\s/g, '')); if (v === num(o.items_total_uzs)) return; overrideAmounts({ total_uzs: v }); }} />
+        ) : formatUZS(o.items_total_uzs)}
+      </td>
       <td className={cell + ' text-right text-success'}>
-        <span className="inline-flex items-center gap-1 justify-end">
-          {formatUZS(o.paid_uzs)}
-          {balance > 0 && can('orders:write') && (
-            <button onClick={() => onPay(o.id)} className="p-0.5 rounded hover:bg-primary/10 text-primary" title={t('sales.addPaymentTooltip')}>
-              <Plus size={13} />
-            </button>
-          )}
-        </span>
+        {canOrderOverride ? (
+          <input type="text" inputMode="numeric" defaultValue={somStr(o.paid_uzs)}
+                 key={'paid-' + o.paid_uzs} placeholder="0"
+                 title={t('sales.overridePaidTooltip')}
+                 className={inp + ' text-right'}
+                 onChange={(e) => { e.target.value = somStr(e.target.value); }}
+                 onBlur={(e) => { const v = num(e.target.value.replace(/\s/g, '')); if (v === num(o.paid_uzs)) return; overrideAmounts({ paid_uzs: v }); }} />
+        ) : (
+          <span className="inline-flex items-center gap-1 justify-end">
+            {formatUZS(o.paid_uzs)}
+            {balance > 0 && can('orders:write') && (
+              <button onClick={() => onPay(o.id)} className="p-0.5 rounded hover:bg-primary/10 text-primary" title={t('sales.addPaymentTooltip')}>
+                <Plus size={13} />
+              </button>
+            )}
+          </span>
+        )}
       </td>
       <td className={cell + ' text-right ' + (balance > 0 ? 'text-danger font-medium' : 'text-ink-soft')}>
         {formatUZS(o.balance_uzs)}

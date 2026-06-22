@@ -70,6 +70,17 @@ class SalespersonUpdate(BaseModel):
     salesperson_id: Optional[uuid.UUID] = None
 
 
+class OverrideAmounts(BaseModel):
+    """Jami (so'm) va/yoki To'langan (so'm) ni qo'lda to'g'rilash — FAQAT super-admin.
+
+    Eski (Google Sheets'dan ko'chgan) buyurtmalarda Jami/To'langan 0 bo'lib qolgan
+    holatlarni tuzatish uchun. Yetkazilgan buyurtmalarda ham ishlaydi.
+    Berilmagan maydon o'zgartirilmaydi.
+    """
+    total_uzs: Optional[Decimal] = Field(default=None, ge=0)
+    paid_uzs: Optional[Decimal] = Field(default=None, ge=0)
+
+
 class SalespersonOption(BaseModel):
     """Sotuvchi tanlovi (dropdown uchun) — aktiv foydalanuvchilar."""
     id: uuid.UUID

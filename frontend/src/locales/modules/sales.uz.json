@@ -126,6 +126,8 @@
   "priceReadOnly": "Narx mahsulotlar bo'limidan olinadi — bu yerda o'zgartirilmaydi",
   "openOrder": "Ochish",
   "addPaymentTooltip": "To'lov qo'shish (moliya)",
+  "overrideTotalTooltip": "Jami summa (so'm) — super-admin tuzatishi (eski import uchun)",
+  "overridePaidTooltip": "To'langan summa (so'm) — super-admin tuzatishi (eski import uchun)",
   "modalCreateTitle": "Yangi buyurtma",
   "modalEditTitle": "Buyurtmani tahrirlash",
   "labelCustomer": "Mijoz *",
