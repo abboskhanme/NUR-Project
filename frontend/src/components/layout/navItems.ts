@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, ShoppingCart, Users, Package, Wrench, Wallet,
   UserSquare2, Truck, BarChart3, Settings, ShieldCheck, ListOrdered, Warehouse,
-  Coins, PackageOpen,
+  Coins, PackageOpen, Factory,
   type LucideIcon,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -32,6 +32,7 @@ export function useNavItems(): NavItem[] {
     { to: '/customers', label: t('nav.customers'), icon: Users, module: 'customers' },
     { to: '/products', label: t('nav.products'), icon: Package, module: 'products' },
     { to: '/warehouse', label: t('nav.warehouse', { defaultValue: 'Ombor' }), icon: Warehouse, module: 'inventory' },
+    { to: '/production', label: t('nav.production', { defaultValue: 'Ishlab chiqarish' }), icon: Factory, module: 'production' },
     { to: '/service', label: t('nav.service'), icon: Wrench, module: 'service' },
     { to: '/finance', label: t('nav.finance'), icon: Wallet, module: 'finance' },
     { to: '/debts', label: t('nav.debts', { defaultValue: 'Bizning qarzlar' }), icon: Coins, module: 'debts' },

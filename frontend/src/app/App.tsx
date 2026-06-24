@@ -15,6 +15,7 @@ import CustomersPage from '@/pages/CustomersPage';
 import CustomerDetailPage from '@/pages/CustomerDetailPage';
 import ProductsPage from '@/pages/ProductsPage';
 import WarehousePage from '@/pages/WarehousePage';
+import ProductionPage from '@/pages/ProductionPage';
 import ServicePage from '@/pages/ServicePage';
 import FinancePage from '@/pages/FinancePage';
 import DebtsPage from '@/pages/DebtsPage';
@@ -89,6 +90,7 @@ export default function App() {
         <Route path="customers/:customerId" element={<RequireModule module="customers"><CustomerDetailPage /></RequireModule>} />
         <Route path="products" element={<RequireModule module="products"><ProductsPage /></RequireModule>} />
         <Route path="warehouse" element={<RequireModule module="inventory"><WarehousePage /></RequireModule>} />
+        <Route path="production" element={<RequireModule module="production"><ProductionPage /></RequireModule>} />
         <Route path="service" element={<RequireModule module="service"><ServicePage /></RequireModule>} />
         <Route path="finance" element={<RequireModule module="finance"><FinancePage /></RequireModule>} />
         <Route path="debts" element={<RequireModule module="debts"><DebtsPage /></RequireModule>} />

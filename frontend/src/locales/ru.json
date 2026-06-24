@@ -18,7 +18,8 @@
     "settings": "Настройки",
     "logout": "Выйти",
     "queue": "Очередь",
-    "warehouse": "Склад"
+    "warehouse": "Склад",
+    "production": "Производство"
   },
   "auth": {
     "login": "Вход в систему",

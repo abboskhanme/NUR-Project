@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import {
   X, Check, ShieldCheck, Sparkles, Lock, ShieldAlert,
   Users, ShoppingCart, Package, Warehouse, Wrench, Wallet,
-  UserSquare2, Truck, BarChart3, Settings, Send, UserCog, Coins, PackageOpen,
+  UserSquare2, Truck, BarChart3, Settings, Send, UserCog, Coins, PackageOpen, Factory,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { api } from '@/api/client';
@@ -26,6 +26,7 @@ const MODULE_ICONS: Record<Module, LucideIcon> = {
   orders: ShoppingCart,
   products: Package,
   inventory: Warehouse,
+  production: Factory,
   service: Wrench,
   finance: Wallet,
   hr: UserSquare2,
@@ -101,6 +102,7 @@ export default function RoleModal({
     orders: t('nav.sales'),
     products: t('nav.products'),
     inventory: t('nav.warehouse', { defaultValue: 'Ombor' }),
+    production: t('nav.production', { defaultValue: 'Ishlab chiqarish' }),
     service: t('nav.service'),
     finance: t('nav.finance'),
     hr: t('nav.hr'),

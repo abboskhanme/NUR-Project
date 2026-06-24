@@ -18,7 +18,8 @@
     "settings": "Sozlamalar",
     "logout": "Chiqish",
     "queue": "Navbat",
-    "warehouse": "Ombor"
+    "warehouse": "Ombor",
+    "production": "Ishlab chiqarish"
   },
   "auth": {
     "login": "Tizimga kirish",

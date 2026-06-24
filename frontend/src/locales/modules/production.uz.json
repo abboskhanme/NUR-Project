@@ -1,0 +1,71 @@
+{
+  "title": "Ishlab chiqarish",
+  "subtitle": "Kunlik ishlab chiqarilgan kotyol, bunker va garelka jurnali",
+  "tabs": {
+    "summary": "Kunlik hisobot",
+    "kotyol": "Kotyol",
+    "bunker": "Bunker",
+    "garelka": "Garelka"
+  },
+  "kpi": {
+    "kotyol": "Jami kotyol",
+    "bunker": "Jami bunker",
+    "garelka": "Jami garelka"
+  },
+  "summary": {
+    "col": {
+      "date": "Sana",
+      "kotyol": "Kotyol",
+      "bunker": "Bunker",
+      "garelka": "Garelka"
+    },
+    "empty": "Hozircha yozuv yoʻq",
+    "emptyDesc": "Kotyol, bunker yoki garelka qoʻshing"
+  },
+  "addKotyol": "Kotyol qoʻshish",
+  "addBunker": "Bunker qoʻshish",
+  "addGarelka": "Garelka qoʻshish",
+  "filter": {
+    "from": "Sanadan",
+    "to": "Sanagacha",
+    "search": "ID raqami boʻyicha qidirish"
+  },
+  "col": {
+    "date": "Sana",
+    "model": "Model",
+    "kvm": "Oʻlcham",
+    "direction": "Yoʻnalish",
+    "id": "ID raqami",
+    "qty": "Soni",
+    "note": "Izoh"
+  },
+  "empty": "Yozuv topilmadi",
+  "emptyDesc": "Yangi yozuv qoʻshing",
+  "dir": {
+    "right": "Oʻngga",
+    "left": "Chapga",
+    "any": "— tanlanmagan —"
+  },
+  "modal": {
+    "addKotyol": "Kotyol qoʻshish",
+    "editKotyol": "Kotyolni tahrirlash",
+    "addBunker": "Bunker qoʻshish",
+    "editBunker": "Bunkerni tahrirlash",
+    "addGarelka": "Garelka qoʻshish",
+    "editGarelka": "Garelkani tahrirlash",
+    "date": "Ishlab chiqarilgan sana",
+    "model": "Model",
+    "pickModel": "Modelni tanlang",
+    "direction": "Yoʻnalish",
+    "id": "ID raqami",
+    "idPlaceholder": "masalan: KT-001",
+    "qty": "Soni",
+    "note": "Izoh (ixtiyoriy)",
+    "needModel": "Modelni tanlang",
+    "needId": "ID raqami kerak",
+    "needQty": "Soni kamida 1 boʻlishi kerak",
+    "saved": "Saqlandi"
+  },
+  "deleteTitle": "Yozuvni oʻchirish",
+  "deleteMessage": "Ushbu yozuvni oʻchirishni tasdiqlaysizmi?"
+}

@@ -18,7 +18,8 @@
     "settings": "Settings",
     "logout": "Logout",
     "queue": "Queue",
-    "warehouse": "Warehouse"
+    "warehouse": "Warehouse",
+    "production": "Production"
   },
   "auth": {
     "login": "Sign in",

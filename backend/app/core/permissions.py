@@ -36,6 +36,7 @@ MODULES: list[str] = [
     "orders",      # Sotuv buyurtmalari
     "products",    # Mahsulotlar va inventar
     "inventory",   # Ombor (kotyol skladi) — ID raqamli birliklar
+    "production",  # Ishlab chiqarish — kunlik kotyol/bunker/garelka jurnali
     "service",     # Servis va kafolat
     "finance",     # Moliya
     "hr",          # Xodimlar

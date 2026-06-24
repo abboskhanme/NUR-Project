@@ -31,6 +31,7 @@ from app.models.supply import (
 from app.models.system import Notification, AuditLog, FileRecord, TelegramOrder
 from app.models.debt import DebtProduct, DebtTransaction
 from app.models.shipping import Shipment
+from app.models.production import ProductionRecord
 
 __all__ = [
     "Base",
@@ -71,4 +72,5 @@ __all__ = [
     "DebtProduct",
     "DebtTransaction",
     "Shipment",
+    "ProductionRecord",
 ]

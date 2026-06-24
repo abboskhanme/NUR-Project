@@ -1,0 +1,71 @@
+{
+  "title": "Production",
+  "subtitle": "Daily log of produced boilers, bunkers and burners",
+  "tabs": {
+    "summary": "Daily summary",
+    "kotyol": "Boiler",
+    "bunker": "Bunker",
+    "garelka": "Burner"
+  },
+  "kpi": {
+    "kotyol": "Total boilers",
+    "bunker": "Total bunkers",
+    "garelka": "Total burners"
+  },
+  "summary": {
+    "col": {
+      "date": "Date",
+      "kotyol": "Boiler",
+      "bunker": "Bunker",
+      "garelka": "Burner"
+    },
+    "empty": "No records yet",
+    "emptyDesc": "Add a boiler, bunker or burner"
+  },
+  "addKotyol": "Add boiler",
+  "addBunker": "Add bunker",
+  "addGarelka": "Add burner",
+  "filter": {
+    "from": "From date",
+    "to": "To date",
+    "search": "Search by ID"
+  },
+  "col": {
+    "date": "Date",
+    "model": "Model",
+    "kvm": "Size",
+    "direction": "Direction",
+    "id": "ID number",
+    "qty": "Qty",
+    "note": "Note"
+  },
+  "empty": "No records found",
+  "emptyDesc": "Add a new record",
+  "dir": {
+    "right": "Right",
+    "left": "Left",
+    "any": "— not selected —"
+  },
+  "modal": {
+    "addKotyol": "Add boiler",
+    "editKotyol": "Edit boiler",
+    "addBunker": "Add bunker",
+    "editBunker": "Edit bunker",
+    "addGarelka": "Add burner",
+    "editGarelka": "Edit burner",
+    "date": "Production date",
+    "model": "Model",
+    "pickModel": "Select model",
+    "direction": "Direction",
+    "id": "ID number",
+    "idPlaceholder": "e.g. KT-001",
+    "qty": "Quantity",
+    "note": "Note (optional)",
+    "needModel": "Select a model",
+    "needId": "ID number required",
+    "needQty": "Quantity must be at least 1",
+    "saved": "Saved"
+  },
+  "deleteTitle": "Delete record",
+  "deleteMessage": "Confirm deleting this record?"
+}
