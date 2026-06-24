@@ -89,3 +89,23 @@ class UserUpdate(BaseModel):
 
 class AdminPasswordReset(BaseModel):
     new_password: str = Field(min_length=8)
+
+
+class LinkableEmployeeOut(BaseModel):
+    """Akkaunti yo'q (foydalanuvchiga aylantirish mumkin bo'lgan) HR xodimi."""
+    id: uuid.UUID
+    full_name: str
+    phone: Optional[str] = None
+    position: Optional[str] = None
+
+
+class UserFromEmployee(BaseModel):
+    """Mavjud xodimni sayt foydalanuvchisiga aylantirish payloadi.
+
+    full_name/position berilmasa — xodim yozuvidan olinadi.
+    """
+    phone: str = Field(min_length=4, max_length=20)
+    password: str = Field(min_length=8)
+    full_name: Optional[str] = None
+    position: Optional[str] = None
+    role_names: list[str] = []

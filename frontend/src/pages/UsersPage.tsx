@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import {
-  Plus, Search, Pencil, Trash2, ShieldCheck, Users as UsersIcon, Archive,
+  Plus, Search, Pencil, Trash2, ShieldCheck, Users as UsersIcon, Archive, UserPlus,
 } from 'lucide-react';
 
 import { api } from '@/api/client';
@@ -14,6 +14,7 @@ import { usePermissions } from '@/lib/permissions';
 
 import UserAvatar from '@/features/users/UserAvatar';
 import UserModal, { UserRow } from '@/features/users/UserModal';
+import CreateUserFromEmployeeModal from '@/features/users/CreateUserFromEmployeeModal';
 import RolesSection from '@/features/users/RolesSection';
 import ArchiveSection from '@/features/users/ArchiveSection';
 
@@ -35,6 +36,7 @@ export default function UsersPage() {
   const [search, setSearch] = useState('');
   const [editUser, setEditUser] = useState<UserRow | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [showFromEmployee, setShowFromEmployee] = useState(false);
   const [deleteUser, setDeleteUser] = useState<UserRow | null>(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -92,9 +94,14 @@ export default function UsersPage() {
           </p>
         </div>
         {tab === 'users' && (
-          <button onClick={() => setShowCreate(true)} className="btn-primary">
-            <Plus size={16} /> {t('users.newUser')}
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setShowFromEmployee(true)} className="btn border border-black/10 text-ink hover:bg-black/5">
+              <UserPlus size={16} /> {t('users.fromEmp.btn')}
+            </button>
+            <button onClick={() => setShowCreate(true)} className="btn-primary">
+              <Plus size={16} /> {t('users.newUser')}
+            </button>
+          </div>
         )}
       </div>
 
@@ -211,6 +218,17 @@ export default function UsersPage() {
             setEditUser(null);
           }}
           onSaved={() => qc.invalidateQueries({ queryKey: ['users'] })}
+        />
+      )}
+
+      {showFromEmployee && (
+        <CreateUserFromEmployeeModal
+          roles={roles}
+          onClose={() => setShowFromEmployee(false)}
+          onSaved={() => {
+            qc.invalidateQueries({ queryKey: ['users'] });
+            qc.invalidateQueries({ queryKey: ['linkable-employees'] });
+          }}
         />
       )}
 

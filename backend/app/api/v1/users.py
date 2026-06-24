@@ -21,10 +21,12 @@ from app.models.supply import Vendor
 from app.models.user import Role, User, UserAvatar
 from app.schemas.auth import (
     AdminPasswordReset,
+    LinkableEmployeeOut,
     RoleCreate,
     RoleOut,
     RoleUpdate,
     UserCreate,
+    UserFromEmployee,
     UserOut,
     UserUpdate,
 )
@@ -87,6 +89,19 @@ async def _sync_employee_from_user(db: AsyncSession, user: User) -> None:
     """
     res = await db.execute(select(Employee).where(Employee.user_id == user.id))
     emp = res.scalar_one_or_none()
+    # user_id bo'yicha topilmasa — telefon raqami bo'yicha bog'lanmagan (akkauntsiz)
+    # xodimni qidiramiz va shunga bog'laymiz. Bu HR qo'lda qo'shgan xodimni
+    # foydalanuvchiga aylantirganda dublikat yaratilishining oldini oladi.
+    if emp is None and user.phone:
+        digits = phone_digits(user.phone)
+        if digits:
+            res2 = await db.execute(
+                select(Employee).where(
+                    Employee.user_id.is_(None),
+                    func.regexp_replace(Employee.phone, r"\D", "", "g") == digits,
+                )
+            )
+            emp = res2.scalars().first()
     position_id = await _find_or_create_position(db, user.position)
     new_status = "active" if user.is_active else "terminated"
 
@@ -216,6 +231,99 @@ async def create_user(
     # Avtomatik ravishda HR bo'limiga "Ofis xodimi" sifatida qo'shamiz
     await _sync_employee_from_user(db, user)
     # 'supplier' rolli bo'lsa — Ta'minot bo'limiga taminotchi sifatida qo'shamiz
+    await _sync_vendor_from_user(db, user)
+    await db.commit()
+    await db.refresh(user)
+    return user
+
+
+# ============================================================
+# Xodimdan foydalanuvchi yaratish (HR → Foydalanuvchilar)
+# ============================================================
+@router.get("/linkable-employees", response_model=list[LinkableEmployeeOut])
+async def list_linkable_employees(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current: CurrentUser,
+):
+    """Akkaunti yo'q (foydalanuvchiga aylantirish mumkin) HR xodimlari ro'yxati."""
+    _ensure_users_perm(current, "read")
+    res = await db.execute(
+        select(Employee.id, Employee.full_name, Employee.phone, Position.name)
+        .outerjoin(Position, Position.id == Employee.position_id)
+        .where(Employee.user_id.is_(None), Employee.status != "terminated")
+        .order_by(Employee.full_name)
+    )
+    return [
+        LinkableEmployeeOut(id=eid, full_name=name, phone=phone, position=pos)
+        for eid, name, phone, pos in res.all()
+    ]
+
+
+@router.post("/from-employee/{employee_id}", response_model=UserOut, status_code=201)
+async def create_user_from_employee(
+    employee_id: uuid.UUID,
+    payload: UserFromEmployee,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current: CurrentUser,
+):
+    """Mavjud HR xodimini sayt foydalanuvchisiga aylantiradi — yangi User yaratib,
+    MAVJUD xodim yozuviga bog'laydi (dublikat yaratmaydi)."""
+    _ensure_users_perm(current, "write")
+    if payload.role_names and "super_admin" in payload.role_names:
+        _ensure_special(current, "system:grant_superadmin")
+
+    res = await db.execute(select(Employee).where(Employee.id == employee_id))
+    emp = res.scalar_one_or_none()
+    if not emp:
+        raise HTTPException(404, "Xodim topilmadi")
+    if emp.user_id is not None:
+        raise HTTPException(400, "Bu xodimda allaqachon foydalanuvchi akkaunti bor")
+
+    new_phone = normalize_phone(payload.phone)
+    if not new_phone:
+        raise HTTPException(422, "Telefon raqam noto'g'ri")
+    exists = await db.execute(
+        select(User).where(func.regexp_replace(User.phone, r"\D", "", "g") == phone_digits(new_phone))
+    )
+    if exists.scalar_one_or_none():
+        raise HTTPException(409, "Bu telefon raqam allaqachon mavjud")
+
+    full_name = (payload.full_name or emp.full_name or "").strip()
+    if not full_name:
+        raise HTTPException(422, "To'liq ism majburiy")
+
+    # Lavozim — payloaddan yoki xodim yozuvidan
+    position_name = payload.position
+    if position_name is None and emp.position_id:
+        position_name = (await db.execute(
+            select(Position.name).where(Position.id == emp.position_id))).scalar_one_or_none()
+
+    user = User(
+        phone=new_phone,
+        password_hash=hash_password(payload.password),
+        full_name=full_name,
+        position=position_name,
+    )
+    # Kolleksiyani oldindan ishga tushiramiz — flush'dan keyin lazy-load (async xato) bo'lmasligi uchun
+    user.roles = []
+    if payload.role_names:
+        rr = await db.execute(select(Role).where(Role.name.in_(payload.role_names)))
+        user.roles = list(rr.scalars().all())
+    user.is_superadmin = "super_admin" in payload.role_names
+    db.add(user)
+    await db.flush()
+
+    # MAVJUD xodimni bog'laymiz — yangi Employee yaratmaymiz
+    emp.user_id = user.id
+    emp.has_account = True
+    emp.employment_type = "office"
+    emp.department_type = "office"
+    emp.full_name = full_name
+    emp.phone = new_phone
+    if position_name:
+        emp.position_id = await _find_or_create_position(db, position_name)
+
+    # 'supplier' rolli bo'lsa — Ta'minot bo'limiga ham qo'shamiz
     await _sync_vendor_from_user(db, user)
     await db.commit()
     await db.refresh(user)

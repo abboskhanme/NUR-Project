@@ -58,6 +58,17 @@
     "updatedSuccess": "Yangilandi",
     "pwdUpdatedSuccess": "Parol yangilandi. Foydalanuvchiga uzating."
   },
+  "fromEmp": {
+    "btn": "Xodimdan qo'shish",
+    "title": "Xodimdan foydalanuvchi yaratish",
+    "employeeLabel": "Xodimni tanlang *",
+    "searchEmp": "Xodim qidirish (ism yoki telefon)...",
+    "noEmployees": "Akkauntsiz xodim yo'q. Hamma xodimlarda allaqachon foydalanuvchi bor.",
+    "pickFirst": "Avval xodimni tanlang",
+    "pickEmpHint": "Faqat hali sayt foydalanuvchisi bo'lmagan xodimlar ko'rsatiladi.",
+    "submit": "Yaratish va bog'lash",
+    "createdSuccess": "Foydalanuvchi yaratildi va xodimga bog'landi"
+  },
   "roles": {
     "title": "Tizim rollari",
     "newRole": "Yangi rol",
