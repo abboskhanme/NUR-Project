@@ -1,6 +1,5 @@
 import { ReactNode, useMemo, useState } from 'react';
 import { ArrowUpDown, ArrowUp, ArrowDown, Download } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
 
 import { exportCSV } from '@/lib/export';
 
@@ -24,11 +23,10 @@ interface Props<T> {
 export default function ReportTable<T extends object>({
   rows, columns, filename, emptyText, footer,
 }: Props<T>) {
-  const { t } = useTranslation();
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
-  const resolvedEmptyText = emptyText ?? t('common.noData');
+  const resolvedEmptyText = emptyText ?? 'Ma\'lumot yo\'q';
 
   const valueOf = (row: T, col: Column<T>): string | number =>
     col.value ? col.value(row) : ((row as Record<string, unknown>)[col.key] as string | number);
@@ -83,7 +81,7 @@ export default function ReportTable<T extends object>({
             disabled={!sorted || sorted.length === 0}
             className="inline-flex items-center gap-1.5 text-sm text-primary hover:text-primary-700 disabled:opacity-40"
           >
-            <Download size={15} /> {t('reports.table.exportCsv')}
+            <Download size={15} /> CSV
           </button>
         </div>
       )}
@@ -111,7 +109,7 @@ export default function ReportTable<T extends object>({
           </thead>
           <tbody>
             {!sorted && (
-              <tr><td colSpan={columns.length} className="py-8 text-center text-ink-soft">{t('reports.table.loading')}</td></tr>
+              <tr><td colSpan={columns.length} className="py-8 text-center text-ink-soft">Yuklanmoqda…</td></tr>
             )}
             {sorted && sorted.length === 0 && (
               <tr><td colSpan={columns.length} className="py-8 text-center text-ink-soft">{resolvedEmptyText}</td></tr>

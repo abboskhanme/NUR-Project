@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import { X, Pencil } from 'lucide-react';
 
@@ -27,7 +26,6 @@ interface ProductOpt {
 export default function EditUnitModal({ unit, onClose, onSaved }: {
   unit: EditableUnit; onClose: () => void; onSaved: () => void;
 }) {
-  const { t } = useTranslation();
   const [productId, setProductId] = useState(unit.product_id ?? '');
   const [uniqueId, setUniqueId] = useState(unit.unique_id);
   const [addedDate, setAddedDate] = useState((unit.added_date ?? '').slice(0, 10));
@@ -45,7 +43,7 @@ export default function EditUnitModal({ unit, onClose, onSaved }: {
 
   async function submit() {
     const id = uniqueId.trim();
-    if (!id) { toast.error(t('warehouse.edit.needId')); return; }
+    if (!id) { toast.error("ID raqami kerak"); return; }
     setSaving(true);
     try {
       await api.patch(`/inventory/units/${unit.id}`, {
@@ -55,11 +53,11 @@ export default function EditUnitModal({ unit, onClose, onSaved }: {
         notes: notes.trim() || null,
         bunker_direction: direction || null,
       });
-      toast.success(t('common.updated'));
+      toast.success("Yangilandi");
       onSaved();
       onClose();
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || t('common.error'));
+      toast.error(e?.response?.data?.detail || "Xatolik yuz berdi");
     } finally {
       setSaving(false);
     }
@@ -73,47 +71,47 @@ export default function EditUnitModal({ unit, onClose, onSaved }: {
       <div className="bg-card rounded-lg shadow-xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-black/5">
           <h3 className="font-semibold text-base flex items-center gap-2">
-            <Pencil size={17} className="text-primary" /> {t('warehouse.edit.title')}
+            <Pencil size={17} className="text-primary" /> Birlikni tahrirlash
           </h3>
           <button onClick={onClose} className="p-1 rounded hover:bg-black/5 text-ink/50"><X size={18} /></button>
         </div>
 
         <div className="px-5 py-4 space-y-3">
           <div>
-            <label className="text-xs text-ink-soft">{t('warehouse.edit.model')}</label>
+            <label className="text-xs text-ink-soft">Model</label>
             <select className="input w-full mt-1" value={productId} onChange={(e) => setProductId(e.target.value)}>
               {mainProducts.map((p) => <option key={p.id} value={p.id}>{label(p)}</option>)}
             </select>
           </div>
           <div>
-            <label className="text-xs text-ink-soft">{t('warehouse.edit.id')}</label>
+            <label className="text-xs text-ink-soft">ID raqami</label>
             <input className="input w-full mt-1 font-mono" value={uniqueId} onChange={(e) => setUniqueId(e.target.value)} autoFocus />
           </div>
           <div>
-            <label className="text-xs text-ink-soft">{t('warehouse.edit.direction')}</label>
+            <label className="text-xs text-ink-soft">Yoʻnalish</label>
             <select className="input w-full mt-1" value={direction} onChange={(e) => setDirection(e.target.value)}>
-              <option value="">{t('warehouse.dir.any')}</option>
-              <option value="right">{t('warehouse.dir.right')}</option>
-              <option value="left">{t('warehouse.dir.left')}</option>
+              <option value="">— tanlanmagan —</option>
+              <option value="right">Oʻngga</option>
+              <option value="left">Chapga</option>
             </select>
           </div>
           <div>
-            <label className="text-xs text-ink-soft">{t('warehouse.edit.added')}</label>
+            <label className="text-xs text-ink-soft">Qo'shilgan sana</label>
             <input type="date" className="input w-full mt-1" value={addedDate} onChange={(e) => setAddedDate(e.target.value)} />
           </div>
           <div>
-            <label className="text-xs text-ink-soft">{t('warehouse.edit.note')}</label>
+            <label className="text-xs text-ink-soft">Izoh</label>
             <input className="input w-full mt-1" value={notes} onChange={(e) => setNotes(e.target.value)} />
           </div>
         </div>
 
         <div className="px-5 py-3 border-t border-black/5 flex justify-end gap-2">
           <button onClick={onClose} className="px-3 py-1.5 text-sm rounded-button border border-black/10 hover:bg-black/5">
-            {t('actions.cancel')}
+            Bekor qilish
           </button>
           <button onClick={submit} disabled={saving}
                   className="px-4 py-1.5 text-sm rounded-button font-medium bg-primary text-white hover:bg-primary/90 disabled:opacity-50">
-            {saving ? t('common.saving', { defaultValue: 'Saqlanyapti…' }) : t('actions.save')}
+            {saving ? 'Saqlanyapti…' : "Saqlash"}
           </button>
         </div>
       </div>

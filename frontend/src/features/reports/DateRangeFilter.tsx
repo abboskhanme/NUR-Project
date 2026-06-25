@@ -1,4 +1,3 @@
-import { useTranslation } from 'react-i18next';
 import DateInput from '@/components/ui/DateInput';
 import type { DateRange } from './types';
 
@@ -6,6 +5,14 @@ import type { DateRange } from './types';
 type Preset = 'this_month' | 'last_month' | 'last_30' | 'last_90' | 'this_year';
 
 const PRESET_KEYS: Preset[] = ['this_month', 'last_month', 'last_30', 'last_90', 'this_year'];
+
+const PRESET_LABELS: Record<Preset, string> = {
+  this_month: 'Joriy oy',
+  last_month: "O'tgan oy",
+  last_30: '30 kun',
+  last_90: '90 kun',
+  this_year: 'Joriy yil',
+};
 
 const iso = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -36,8 +43,6 @@ interface Props {
 }
 
 export default function DateRangeFilter({ range, onChange, activePreset, onPreset }: Props) {
-  const { t } = useTranslation();
-
   return (
     <div className="flex flex-wrap items-center gap-2">
       <div className="flex flex-wrap gap-1.5">
@@ -51,7 +56,7 @@ export default function DateRangeFilter({ range, onChange, activePreset, onPrese
                 : 'bg-white text-ink border-black/10 hover:border-primary/40'
             }`}
           >
-            {t(`reports.presets.${key}`)}
+            {PRESET_LABELS[key]}
           </button>
         ))}
       </div>

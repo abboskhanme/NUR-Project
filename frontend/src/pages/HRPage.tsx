@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useTranslation } from 'react-i18next';
 import { Plus, Search, Pencil, Users, Briefcase, BadgeCheck, ChevronRight, Wallet, HandCoins, Coins } from 'lucide-react';
 
 import { api } from '@/api/client';
@@ -13,6 +12,21 @@ import EmployeeHistoryModal, { HistoryKind } from '@/features/hr/EmployeeHistory
 import PositionsSection from '@/features/hr/PositionsSection';
 import SalaryDebtsSection from '@/features/hr/SalaryDebtsSection';
 import EmployeeLoansSection from '@/features/hr/EmployeeLoansSection';
+
+const HR_MONTHS: Record<string, string> = {
+  '1': 'Yanvar',
+  '2': 'Fevral',
+  '3': 'Mart',
+  '4': 'Aprel',
+  '5': 'May',
+  '6': 'Iyun',
+  '7': 'Iyul',
+  '8': 'Avgust',
+  '9': 'Sentyabr',
+  '10': 'Oktyabr',
+  '11': 'Noyabr',
+  '12': 'Dekabr',
+};
 
 type Tab = 'employees' | 'positions' | 'debts' | 'loans';
 type GroupKey = 'office' | 'assembly' | 'production';
@@ -28,7 +42,7 @@ const GROUP_RANK: Record<GroupKey, number> = { office: 0, assembly: 1, productio
 
 // Har bir bo'lim uchun rang sxemasi (ofis — qizil, yig'uv — ko'k, ishlab chiqarish — yashil).
 const GROUP_STYLE: Record<GroupKey, {
-  labelKey: string;
+  label: string;
   dot: string;
   rowTint: string;
   border: string;
@@ -37,7 +51,7 @@ const GROUP_STYLE: Record<GroupKey, {
   icon: string;
 }> = {
   office: {
-    labelKey: 'hr.tabs.office',
+    label: 'Ofis xodimlari',
     dot: 'bg-red-500',
     rowTint: 'bg-red-100/70 hover:bg-red-200/70',
     border: 'border-l-red-500',
@@ -46,7 +60,7 @@ const GROUP_STYLE: Record<GroupKey, {
     icon: 'bg-red-500/15 text-red-600',
   },
   assembly: {
-    labelKey: 'hr.tabs.assembly',
+    label: "Yig'uv bo'limi",
     dot: 'bg-blue-500',
     rowTint: 'bg-blue-100/70 hover:bg-blue-200/70',
     border: 'border-l-blue-500',
@@ -55,7 +69,7 @@ const GROUP_STYLE: Record<GroupKey, {
     icon: 'bg-blue-500/15 text-blue-600',
   },
   production: {
-    labelKey: 'hr.tabs.production',
+    label: 'Ishlab chiqarish',
     dot: 'bg-green-600',
     rowTint: 'bg-green-100/70 hover:bg-green-200/70',
     border: 'border-l-green-600',
@@ -68,7 +82,6 @@ const GROUP_STYLE: Record<GroupKey, {
 const GROUP_ORDER: GroupKey[] = ['office', 'assembly', 'production'];
 
 export default function HRPage() {
-  const { t } = useTranslation();
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>('employees');
@@ -142,28 +155,28 @@ export default function HRPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold">{t('hr.title')}</h1>
-          <p className="text-sm text-ink-soft">{t('hr.subtitle')}</p>
+          <h1 className="text-2xl font-bold">Xodimlar (HR)</h1>
+          <p className="text-sm text-ink-soft">Ofis xodimlari, oddiy ishchilar va lavozimlar bazasi</p>
         </div>
         {tab === 'employees' && (
           <button onClick={() => setShowCreate(true)} className="btn-primary">
-            <Plus size={16} /> {t('hr.newWorker')}
+            <Plus size={16} /> Yangi ishchi
           </button>
         )}
       </div>
 
       <div className="flex gap-1 border-b border-black/5 overflow-x-auto">
         <TabButton active={tab === 'employees'} onClick={() => setTab('employees')} icon={<Users size={16} />}>
-          {t('hr.tabs.employees')}
+          Xodimlar
         </TabButton>
         <TabButton active={tab === 'positions'} onClick={() => setTab('positions')} icon={<Briefcase size={16} />}>
-          {t('hr.tabs.positions')}
+          Lavozimlar
         </TabButton>
         <TabButton active={tab === 'debts'} onClick={() => setTab('debts')} icon={<HandCoins size={16} />}>
-          {t('hr.tabs.debts')}
+          Qarzlar
         </TabButton>
         <TabButton active={tab === 'loans'} onClick={() => setTab('loans')} icon={<Coins size={16} />}>
-          {t('hr.tabs.loans', { defaultValue: 'Xodim qarzlari' })}
+          Xodim qarzlari
         </TabButton>
       </div>
 
@@ -177,7 +190,7 @@ export default function HRPage() {
             <DeptCard
               key={g}
               groupKey={g}
-              label={t(GROUP_STYLE[g].labelKey)}
+              label={GROUP_STYLE[g].label}
               count={totalsByGroup[g].count}
               gross={totalsByGroup[g].gross}
               advance={totalsByGroup[g].advance}
@@ -199,7 +212,7 @@ export default function HRPage() {
             <div className="flex items-center gap-2 flex-1 min-w-[200px] bg-white border border-black/10 rounded-button px-3 py-1.5">
               <Search size={16} className="text-ink/40" />
               <input
-                placeholder={t('hr.searchByName')}
+                placeholder="Ism bo'yicha qidirish..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="bg-transparent outline-none flex-1 text-sm"
@@ -210,25 +223,25 @@ export default function HRPage() {
               value={status}
               onChange={(e) => setStatus(e.target.value)}
             >
-              <option value="active">{t('hr.status.active')}</option>
-              <option value="terminated">{t('hr.status.terminated')}</option>
-              <option value="">{t('common.all')}</option>
+              <option value="active">Faol</option>
+              <option value="terminated">Ishdan ketgan</option>
+              <option value="">Barchasi</option>
             </select>
             <select
               className="input !w-auto"
               value={curMonth}
               onChange={(e) => setCurMonth(Number(e.target.value))}
-              title={t('hr.monthTooltip', { defaultValue: 'Oy' })}
+              title="Oy"
             >
               {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-                <option key={m} value={m}>{t(`hr.months.${m}`)}</option>
+                <option key={m} value={m}>{HR_MONTHS[String(m)]}</option>
               ))}
             </select>
             <select
               className="input !w-auto"
               value={curYear}
               onChange={(e) => setCurYear(Number(e.target.value))}
-              title={t('hr.yearTooltip', { defaultValue: 'Yil' })}
+              title="Yil"
             >
               {yearOptions.map((y) => (
                 <option key={y} value={y}>{y}</option>
@@ -238,13 +251,13 @@ export default function HRPage() {
 
           <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
             <p className="text-xs text-ink-soft">
-              {t('hr.monthHint', { month: t(`hr.months.${curMonth}`), year: curYear })}
+              {`${HR_MONTHS[String(curMonth)]} ${curYear} uchun ko'rsatkichlar. Tarixini ko'rish uchun raqam ustiga bosing.`}
             </p>
             <div className="flex items-center gap-4 text-xs text-ink-soft flex-wrap">
               {GROUP_ORDER.map((g) => (
                 <span key={g} className="flex items-center gap-1.5">
                   <span className={`inline-block w-2.5 h-2.5 rounded-full ${GROUP_STYLE[g].dot}`} />
-                  {t(GROUP_STYLE[g].labelKey)}
+                  {GROUP_STYLE[g].label}
                 </span>
               ))}
             </div>
@@ -258,20 +271,20 @@ export default function HRPage() {
             </div>
           ) : items.length === 0 ? (
             <EmptyState
-              title={t('hr.empty.allTitle')}
-              description={t('hr.empty.allDesc')}
+              title="Xodimlar yo'q"
+              description={`Ofis xodimlari Foydalanuvchilardan sinxronlanadi; ishchilarni "Yangi ishchi" tugmasi bilan qo'shing.`}
             />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="text-left text-ink-soft border-b border-black/5">
                   <tr>
-                    <th className="py-2 pl-3 pr-3 border-l-4 border-l-transparent">{t('hr.table.fullName')}</th>
-                    <th className="py-2 px-3 text-left">{t('hr.table.salary')}</th>
-                    <th className="py-2 px-3 text-left">{t('hr.table.advance')}</th>
-                    <th className="py-2 px-3 text-left">{t('hr.table.remaining')}</th>
-                    <th className="py-2 px-3 text-left">{t('hr.table.hours')}</th>
-                    <th className="py-2 pr-3 text-right">{t('hr.table.actions')}</th>
+                    <th className="py-2 pl-3 pr-3 border-l-4 border-l-transparent">Ism familiya</th>
+                    <th className="py-2 px-3 text-left">Oylik</th>
+                    <th className="py-2 px-3 text-left">Avans</th>
+                    <th className="py-2 px-3 text-left">Qoldiq</th>
+                    <th className="py-2 px-3 text-left">Soat</th>
+                    <th className="py-2 pr-3 text-right">Amallar</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -292,7 +305,7 @@ export default function HRPage() {
                           <div className="flex items-center gap-1.5">
                             {e.full_name}
                             {e.has_account && (
-                              <span title={t('hr.tooltip.systemUser')}>
+                              <span title="Tizim foydalanuvchisi">
                                 <BadgeCheck size={14} className="text-primary" />
                               </span>
                             )}
@@ -302,25 +315,25 @@ export default function HRPage() {
                         <NumCell
                           value={formatUZS(s?.gross ?? 0)}
                           onClick={() => setHist({ emp: e, kind: 'salary' })}
-                          title={t('hr.histModal.title.salary')}
+                          title="Hisoblangan oylik"
                         />
                         <NumCell
                           value={formatUZS(s?.advance ?? 0)}
                           className={(parseFloat(s?.advance ?? '0') > 0) ? 'text-warning' : ''}
                           onClick={() => setHist({ emp: e, kind: 'advance' })}
-                          title={t('hr.histModal.title.advance')}
+                          title="Olingan avanslar"
                         />
                         <NumCell
                           value={formatUZS(s?.net ?? 0)}
                           className="font-semibold"
                           onClick={() => setHist({ emp: e, kind: 'remaining' })}
-                          title={t('hr.histModal.title.remaining')}
+                          title="Qoldiq (qolgan oylik)"
                         />
                         {isHourly ? (
                           <NumCell
-                            value={`${(parseFloat(s?.total_hours ?? '0') || 0).toFixed(1)} ${t('hr.histModal.hoursUnit')}`}
+                            value={`${(parseFloat(s?.total_hours ?? '0') || 0).toFixed(1)} soat`}
                             onClick={() => setHist({ emp: e, kind: 'hours' })}
-                            title={t('hr.histModal.title.hours')}
+                            title="Ishlangan soatlar"
                           />
                         ) : (
                           <td className="py-2 px-3 text-left text-ink/30">—</td>
@@ -329,7 +342,7 @@ export default function HRPage() {
                         <td className="py-2 pr-3">
                           <div className="flex items-center justify-end gap-1">
                             <button
-                              title={t('hr.tooltip.edit')}
+                              title="Tahrirlash"
                               onClick={(ev) => { ev.stopPropagation(); setEditEmp(e); }}
                               className="p-1.5 rounded hover:bg-black/10 text-ink/60"
                             >
@@ -402,20 +415,19 @@ function NumCell({
  * Fiksa: belgilangan oylik. Soatbay: o'tgan kunlar haqiqiy + qolgan ish kunlari to'liq kelsa.
  */
 function MaxPayrollCard({ total, count }: { total: number; count: number }) {
-  const { t } = useTranslation();
   return (
     <div className="rounded-card border border-primary/20 bg-primary/5 p-4">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 font-semibold text-primary">
           <Wallet size={18} />
-          {t('hr.maxPayroll.title')}
+          Oylik xarajati (taxminiy)
         </div>
         <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">
-          {count} {t('hr.deptCard.people')}
+          {count} kishi
         </span>
       </div>
       <div className="mt-2 text-2xl font-bold tabular-nums text-primary">{formatUZS(total)}</div>
-      <p className="text-xs text-ink-soft mt-1">{t('hr.maxPayroll.hint')}</p>
+      <p className="text-xs text-ink-soft mt-1">Joriy oy uchun barcha xodimlarga to'lanishi mumkin bo'lgan maksimal oylik. Soatbaylarda o'tgan kunlar haqiqiy, qolgan ish kunlari to'liq kelishga ko'ra (yakshanba dam).</p>
     </div>
   );
 }
@@ -429,7 +441,6 @@ function DeptCard({ groupKey, label, count, gross, advance, net }: {
   advance: number;
   net: number;
 }) {
-  const { t } = useTranslation();
   const st = GROUP_STYLE[groupKey];
   return (
     <div className={`rounded-card border p-4 ${st.card}`}>
@@ -439,20 +450,20 @@ function DeptCard({ groupKey, label, count, gross, advance, net }: {
           {label}
         </div>
         <span className={`text-xs px-2 py-0.5 rounded-full ${st.icon}`}>
-          {count} {t('hr.deptCard.people')}
+          {count} kishi
         </span>
       </div>
       <div className="mt-3 space-y-1.5 text-sm">
         <div className="flex items-center justify-between">
-          <span className="text-ink-soft">{t('hr.totals.salary')}</span>
+          <span className="text-ink-soft">Umumiy oylik</span>
           <span className="tabular-nums font-medium">{formatUZS(gross)}</span>
         </div>
         <div className="flex items-center justify-between">
-          <span className="text-ink-soft">{t('hr.totals.advance')}</span>
+          <span className="text-ink-soft">Umumiy avanslar</span>
           <span className="tabular-nums font-medium text-warning">{formatUZS(advance)}</span>
         </div>
         <div className="flex items-center justify-between pt-1.5 border-t border-black/5">
-          <span className="text-ink-soft">{t('hr.totals.remaining')}</span>
+          <span className="text-ink-soft">Umumiy qoldiq</span>
           <span className={`tabular-nums font-bold ${st.text}`}>{formatUZS(net)}</span>
         </div>
       </div>

@@ -1,6 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useTranslation } from 'react-i18next';
 import { ChevronDown } from 'lucide-react';
+
+// Davlat nomlari (lug'atdan)
+const COUNTRY_NAMES: Record<string, string> = {
+  UZ: "O'zbekiston",
+  RU: 'Rossiya',
+  KZ: "Qozog'iston",
+  KG: "Qirg'iziston",
+  TJ: 'Tojikiston',
+  TR: 'Turkiya',
+};
 
 export interface Country {
   code: string;
@@ -105,7 +114,6 @@ export default function PhoneInput({
   defaultCountry?: string;
   id?: string;
 }) {
-  const { t } = useTranslation();
   const [country, setCountry] = useState<Country>(() => {
     if (value) return detectCountry(value);
     if (defaultCountry) {
@@ -162,7 +170,7 @@ export default function PhoneInput({
           onClick={() => !disabled && setOpen((o) => !o)}
           disabled={disabled}
           className="input flex items-center gap-2 !py-2 hover:bg-black/[0.03] disabled:opacity-60"
-          aria-label={t('ui.countrySelector')}
+          aria-label="Davlat"
         >
           <Flag country={country} size={18} />
           <span className="text-sm font-medium">{country.code}</span>
@@ -190,7 +198,7 @@ export default function PhoneInput({
                     <Flag country={c} size={18} />
                     <span className="font-medium w-6">{c.code}</span>
                     <span className="text-ink/80 truncate flex-1">
-                      {t(`ui.countries.${c.code}`, { defaultValue: c.name })}
+                      {COUNTRY_NAMES[c.code] ?? c.name}
                     </span>
                     <span className="text-ink-soft text-xs">{c.dialCode}</span>
                   </button>

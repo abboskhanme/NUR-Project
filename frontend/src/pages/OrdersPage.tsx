@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import { Plus, Search, ShoppingCart, Wallet, AlertCircle, CalendarClock, FileSpreadsheet, PackageCheck, Clock, DollarSign } from 'lucide-react';
 
@@ -26,15 +25,31 @@ interface Summary {
   month_paid: string;
 }
 
-// Status option keys — resolved with t() at render time so language switching works live
-const STATUS_OPTION_KEYS = [
-  { value: 'new', labelKey: 'sales.statusNew' },
-  { value: 'delivered', labelKey: 'sales.statusDelivered' },
-  { value: 'rejected', labelKey: 'sales.statusRejected' },
+// Status options with their labels
+const STATUS_OPTIONS = [
+  { value: 'new', label: "Navbatda" },
+  { value: 'delivered', label: "Yetkazildi" },
+  { value: 'rejected', label: "Rad etildi" },
 ];
 
 // Month keys (1-12)
 const MONTH_NUMS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const;
+
+// Oy nomlari (1-12)
+const MONTH_NAMES: Record<string, string> = {
+  '1': "Yanvar",
+  '2': "Fevral",
+  '3': "Mart",
+  '4': "Aprel",
+  '5': "May",
+  '6': "Iyun",
+  '7': "Iyul",
+  '8': "Avgust",
+  '9': "Sentabr",
+  '10': "Oktabr",
+  '11': "Noyabr",
+  '12': "Dekabr",
+};
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
 
@@ -59,7 +74,6 @@ function spColor(name: string): string {
 }
 
 export default function OrdersPage() {
-  const { t } = useTranslation();
   const qc = useQueryClient();
   const now = new Date();
   const [search, setSearch] = useState('');
@@ -86,7 +100,7 @@ export default function OrdersPage() {
   const periodLabel =
     month === 0
       ? `${year}`
-      : `${t(`sales.months.${month}`)} ${year}`;
+      : `${MONTH_NAMES[String(month)]} ${year}`;
 
   const searching = search.trim().length > 0;
 
@@ -148,7 +162,7 @@ export default function OrdersPage() {
         date_to: searching ? undefined : (dateTo || undefined),
       });
     } catch {
-      toast.error(t('common.error'));
+      toast.error("Xatolik yuz berdi");
     } finally {
       setExporting(false);
     }
@@ -159,9 +173,9 @@ export default function OrdersPage() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <div className="flex items-center flex-wrap gap-x-3 gap-y-1">
-            <h1 className="text-2xl font-bold">{t('sales.pageTitle')}</h1>
+            <h1 className="text-2xl font-bold">Buyurtmalar</h1>
             {s?.salesperson_counts && s.salesperson_counts.length > 0 && (
-              <div className="flex flex-wrap items-center gap-2" title={t('sales.bySalesperson', { defaultValue: 'Sotuvchi bo‘yicha zakazlar' })}>
+              <div className="flex flex-wrap items-center gap-2" title="Sotuvchi bo‘yicha zakazlar">
                 {s.salesperson_counts.map((sp) => (
                   <span key={sp.salesperson_id ?? sp.name}
                         className={'inline-flex items-center gap-2 text-xl font-semibold rounded-full pl-4 pr-2 py-1.5 ' + spColor(sp.name)}>
@@ -172,35 +186,35 @@ export default function OrdersPage() {
               </div>
             )}
           </div>
-          <p className="text-sm text-ink-soft">{t('sales.pageSubtitle')}</p>
+          <p className="text-sm text-ink-soft">Sotuv bo'limi — barcha buyurtmalar</p>
         </div>
         <div className="flex items-center gap-2">
           <button className="btn-ghost disabled:opacity-50" onClick={exportExcel} disabled={exporting}
-                  title={t('sales.exportExcelTitle')}>
-            <FileSpreadsheet size={16} /> {t('sales.exportExcel')}
+                  title="Buyurtmalar ro'yxatini Excel ga yuklab olish">
+            <FileSpreadsheet size={16} /> Excel
           </button>
           <button className="btn-primary" onClick={() => setShowCreate(true)}>
-            <Plus size={16} /> {t('sales.modalCreateTitle')}
+            <Plus size={16} /> Yangi buyurtma
           </button>
         </div>
       </div>
 
       {/* KPI — songa oid kartalar (alohida qator) */}
       <div className="grid grid-cols-3 gap-3">
-        <Kpi icon={<ShoppingCart size={18} />} label={t('sales.kpiOrders', { period: periodLabel })} value={s ? String(s.total_orders) : '—'} />
-        <Kpi icon={<PackageCheck size={18} />} label={t('sales.kpiDelivered', { period: periodLabel })}
+        <Kpi icon={<ShoppingCart size={18} />} label={`Buyurtma · ${periodLabel}`} value={s ? String(s.total_orders) : '—'} />
+        <Kpi icon={<PackageCheck size={18} />} label={`Yetkazildi · ${periodLabel}`}
              value={s ? String(s.status_counts?.delivered ?? 0) : '—'} accent="text-success" />
-        <Kpi icon={<Clock size={18} />} label={t('sales.kpiRemaining', { period: periodLabel })}
+        <Kpi icon={<Clock size={18} />} label={`Qoldi · ${periodLabel}`}
              value={s ? String((s.status_counts?.new ?? 0) + (s.status_counts?.ready ?? 0)) : '—'} accent="text-warning" />
       </div>
 
       {/* KPI — pulga oid kartalar (alohida qator) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Kpi icon={<Wallet size={18} />} label={t('sales.kpiRevenue', { period: periodLabel })} value={s ? formatUZS(s.revenue_total) : '—'} accent="text-ink" />
-        <Kpi icon={<DollarSign size={18} />} label={t('sales.kpiRevenueUsd', { period: periodLabel })}
+        <Kpi icon={<Wallet size={18} />} label={`Savdo · ${periodLabel}`} value={s ? formatUZS(s.revenue_total) : '—'} accent="text-ink" />
+        <Kpi icon={<DollarSign size={18} />} label={`Savdo ($) · ${periodLabel}`}
              value={s && rate > 0 ? formatUSD(Number(s.revenue_total) / rate) : '—'} accent="text-ink" />
-        <Kpi icon={<CalendarClock size={18} />} label={t('sales.kpiPaid', { period: periodLabel })} value={s ? formatUZS(s.paid_total) : '—'} accent="text-success" />
-        <Kpi icon={<AlertCircle size={18} />} label={t('sales.kpiBalance', { period: periodLabel })}
+        <Kpi icon={<CalendarClock size={18} />} label={`To'langan · ${periodLabel}`} value={s ? formatUZS(s.paid_total) : '—'} accent="text-success" />
+        <Kpi icon={<AlertCircle size={18} />} label={`Qoldiq · ${periodLabel}`}
              value={s ? formatUZS(s.outstanding_total) : '—'} accent="text-danger" />
       </div>
 
@@ -208,19 +222,19 @@ export default function OrdersPage() {
         <div className="flex flex-wrap gap-3 mb-4">
           <div className="flex items-center gap-2 flex-1 min-w-[200px] bg-white border border-black/10 rounded-button px-3 py-1.5">
             <Search size={16} className="text-ink/40" />
-            <input placeholder={t('sales.searchPlaceholder')} value={search}
+            <input placeholder="Kod, mijoz ismi yoki telefon bo'yicha qidirish..." value={search}
                    onChange={(e) => setSearch(e.target.value)}
                    className="bg-transparent outline-none flex-1 text-sm" />
           </div>
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="input max-w-[190px]">
-            <option value="">{t('sales.statusAll')}</option>
-            {STATUS_OPTION_KEYS.map((o) => <option key={o.value} value={o.value}>{t(o.labelKey)}</option>)}
+            <option value="">Barcha statuslar</option>
+            {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
-          <select value={month} onChange={(e) => setMonth(Number(e.target.value))} className="input max-w-[150px]" title={t('sales.monthTooltip')}>
-            <option value={0}>{t('sales.allYear')}</option>
-            {MONTH_NUMS.map((m) => <option key={m} value={m}>{t(`sales.months.${m}`)}</option>)}
+          <select value={month} onChange={(e) => setMonth(Number(e.target.value))} className="input max-w-[150px]" title="Oy">
+            <option value={0}>Butun yil</option>
+            {MONTH_NUMS.map((m) => <option key={m} value={m}>{MONTH_NAMES[String(m)]}</option>)}
           </select>
-          <select value={year} onChange={(e) => setYear(Number(e.target.value))} className="input max-w-[110px]" title={t('sales.yearTooltip')}>
+          <select value={year} onChange={(e) => setYear(Number(e.target.value))} className="input max-w-[110px]" title="Yil">
             {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
           </select>
         </div>
@@ -230,11 +244,11 @@ export default function OrdersPage() {
             {Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-12 rounded-button bg-black/5 animate-pulse" />)}
           </div>
         ) : orders.length === 0 ? (
-          <EmptyState title={t('sales.ordersEmpty')} description={t('sales.ordersEmptyDesc')} />
+          <EmptyState title="Buyurtmalar yo'q" description="'Yangi buyurtma' tugmasi orqali yarating" />
         ) : (
           <>
             <p className="text-xs text-ink-soft mb-2">
-              {t('sales.inlineEditHint')}
+              Kataklarni bevosita tahrirlash mumkin — o'zgartirish avtomatik saqlanadi. To'liq ko'rish uchun qator oxiridagi tugmani bosing.
             </p>
             <OrdersTable orders={orders} products={products} onChanged={refresh} onPay={setPayingId} />
           </>

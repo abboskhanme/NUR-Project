@@ -1,6 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useTranslation } from 'react-i18next';
 import { Wallet, Coins, TrendingUp } from 'lucide-react';
 
 import { api } from '@/api/client';
@@ -12,9 +11,13 @@ interface Money { collected: string; spent: string; net: string; trip_count: num
 const MONTH_NUMS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const;
 const pad2 = (n: number) => String(n).padStart(2, '0');
 
+const SALES_MONTHS: Record<string, string> = {
+  '1': 'Yanvar', '2': 'Fevral', '3': 'Mart', '4': 'Aprel', '5': 'May', '6': 'Iyun',
+  '7': 'Iyul', '8': 'Avgust', '9': 'Sentabr', '10': 'Oktabr', '11': 'Noyabr', '12': 'Dekabr',
+};
+
 /** Servis safari moliyaviy statistikasi (olingan/sarflangan/sof) — oy/yil filtri. */
 export default function ServiceMoneyStats() {
-  const { t } = useTranslation();
   const now = new Date();
   const [month, setMonth] = useState<number>(now.getMonth() + 1); // 0 = butun yil
   const [year, setYear] = useState<number>(now.getFullYear());
@@ -41,8 +44,8 @@ export default function ServiceMoneyStats() {
       {/* Oy / yil filtri */}
       <div className="flex items-center gap-2 flex-wrap">
         <select className="input w-40" value={month} onChange={(e) => setMonth(Number(e.target.value))}>
-          <option value={0}>{t('service.partsStats.allYear')}</option>
-          {MONTH_NUMS.map((mo) => <option key={mo} value={mo}>{t(`sales.months.${mo}`)}</option>)}
+          <option value={0}>Butun yil</option>
+          {MONTH_NUMS.map((mo) => <option key={mo} value={mo}>{SALES_MONTHS[String(mo)]}</option>)}
         </select>
         <select className="input w-28" value={year} onChange={(e) => setYear(Number(e.target.value))}>
           {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
@@ -50,15 +53,15 @@ export default function ServiceMoneyStats() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <MoneyCard label={t('service.moneyStats.collected')} value={formatUZS(m?.collected ?? 0)}
+        <MoneyCard label="Olingan" value={formatUZS(m?.collected ?? 0)}
                    tone="success" icon={<Wallet size={18} />} />
-        <MoneyCard label={t('service.moneyStats.spent')} value={formatUZS(m?.spent ?? 0)}
+        <MoneyCard label="Sarflangan" value={formatUZS(m?.spent ?? 0)}
                    tone="danger" icon={<Coins size={18} />} />
-        <MoneyCard label={t('service.moneyStats.net')} value={formatUZS(net)}
+        <MoneyCard label="Sof" value={formatUZS(net)}
                    tone={net >= 0 ? 'success' : 'danger'} icon={<TrendingUp size={18} />} />
       </div>
 
-      <div className="text-xs text-ink-soft">{t('service.moneyStats.tripCount', { n: m?.trip_count ?? 0 })}</div>
+      <div className="text-xs text-ink-soft">{`${m?.trip_count ?? 0} ta yakunlangan safar`}</div>
 
       {/* Tanlangan davrdagi safarlar ro'yxati (mablag balanslari pastida) */}
       <ServiceTripsList dateFrom={dateFrom} dateTo={dateTo} />

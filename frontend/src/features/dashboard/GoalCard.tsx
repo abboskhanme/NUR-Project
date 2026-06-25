@@ -1,6 +1,5 @@
 import { useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useTranslation } from 'react-i18next';
 import { Target, Pencil, ShoppingCart, TrendingUp } from 'lucide-react';
 
 import { api } from '@/api/client';
@@ -20,7 +19,6 @@ function ProgressRow({
   pct: number | null;
   accent: string;
 }) {
-  const { t } = useTranslation();
   const filled = Math.min(pct ?? 0, 100);
   const reached = (pct ?? 0) >= 100;
   return (
@@ -44,14 +42,13 @@ function ProgressRow({
           </span>
         </div>
       ) : (
-        <div className="mt-2 text-xs text-ink-soft">{t('dashboard.goal.notSet')}</div>
+        <div className="mt-2 text-xs text-ink-soft">Belgilanmagan</div>
       )}
     </div>
   );
 }
 
 export default function GoalCard() {
-  const { t } = useTranslation();
   const { canSpecial } = usePermissions();
   const canManage = canSpecial('system:goals_manage');
   const [editing, setEditing] = useState(false);
@@ -66,13 +63,13 @@ export default function GoalCard() {
   return (
     <>
       <Card
-        title={<span className="flex items-center gap-2"><Target size={18} className="text-primary" />{t('dashboard.goal.title')}</span>}
+        title={<span className="flex items-center gap-2"><Target size={18} className="text-primary" />Oylik maqsad</span>}
         action={canManage && (
           <button
             onClick={() => setEditing(true)}
             className="flex items-center gap-1 px-2.5 py-1 text-xs rounded-button border border-black/10 hover:bg-black/5"
           >
-            <Pencil size={13} /> {hasGoal ? t('actions.edit') : t('dashboard.goal.set')}
+            <Pencil size={13} /> {hasGoal ? 'Tahrirlash' : 'Belgilash'}
           </button>
         )}
       >
@@ -80,7 +77,7 @@ export default function GoalCard() {
           <div className="space-y-4">
             <ProgressRow
               icon={<ShoppingCart size={15} />}
-              label={t('dashboard.goal.orders')}
+              label="Sotuv (soni)"
               actual={String(data!.actual_orders)}
               target={data!.target_orders != null ? String(data!.target_orders) : null}
               pct={data!.orders_pct}
@@ -88,7 +85,7 @@ export default function GoalCard() {
             />
             <ProgressRow
               icon={<TrendingUp size={15} />}
-              label={t('dashboard.goal.revenue')}
+              label="Tushum"
               actual={formatUZS(data!.actual_revenue_uzs)}
               target={data!.target_revenue_uzs != null ? formatUZS(data!.target_revenue_uzs) : null}
               pct={data!.revenue_pct}
@@ -97,7 +94,7 @@ export default function GoalCard() {
           </div>
         ) : (
           <p className="text-sm text-ink-soft py-2">
-            {canManage ? t('dashboard.goal.emptyManage') : t('dashboard.goal.empty')}
+            {canManage ? 'Bu oy uchun maqsad belgilanmagan — «Belgilash» tugmasi orqali qo\'ying.' : 'Bu oy uchun maqsad hali belgilanmagan.'}
           </p>
         )}
       </Card>

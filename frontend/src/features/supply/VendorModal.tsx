@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import { X } from 'lucide-react';
 
@@ -15,7 +14,6 @@ export interface VendorLite {
 export default function VendorModal({
   vendor, onClose, onSaved,
 }: { vendor?: VendorLite | null; onClose: () => void; onSaved: () => void }) {
-  const { t } = useTranslation();
   const editing = !!vendor;
   const [name, setName] = useState(vendor?.name ?? '');
   const [phone, setPhone] = useState(vendor?.phone ?? '');
@@ -38,7 +36,7 @@ export default function VendorModal({
   }, [onClose]);
 
   async function handleSave() {
-    if (!name.trim()) { toast.error(t('supply.vendorModal.nameRequired')); return; }
+    if (!name.trim()) { toast.error('Nomini kiriting'); return; }
     setSaving(true);
     try {
       const body = {
@@ -47,11 +45,11 @@ export default function VendorModal({
       };
       if (editing) await api.patch(`/supply/vendors/${vendor!.id}`, body);
       else await api.post('/supply/vendors', body);
-      toast.success(editing ? t('supply.vendorModal.savedEdit') : t('supply.vendorModal.savedNew'));
+      toast.success(editing ? 'Yangilandi' : "Taminotchi qo'shildi");
       onSaved();
       onClose();
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || t('supply.error'));
+      toast.error(e?.response?.data?.detail || 'Xatolik');
     } finally {
       setSaving(false);
     }
@@ -63,27 +61,27 @@ export default function VendorModal({
            onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3 border-b border-black/5">
           <h3 className="font-semibold">
-            {editing ? t('supply.vendorModal.titleEdit') : t('supply.vendorModal.titleNew')}
+            {editing ? 'Taminotchini tahrirlash' : 'Yangi taminotchi'}
           </h3>
           <button onClick={onClose} className="p-1 rounded hover:bg-black/5"><X size={18} /></button>
         </div>
 
         <div className="p-5 space-y-3">
           <div>
-            <label className="label">{t('supply.vendorModal.labelName')}</label>
+            <label className="label">Nomi *</label>
             <input className="input" value={name} onChange={(e) => setName(e.target.value)}
-                   placeholder={t('supply.vendorModal.placeholderName')} />
+                   placeholder="Masalan: Umid Tokir" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="label">{t('supply.vendorModal.labelPhone')}</label>
+              <label className="label">Telefon</label>
               <input className="input" value={phone} onChange={(e) => setPhone(e.target.value)}
                      placeholder="+998..." />
             </div>
             <div>
-              <label className="label">{t('supply.vendorModal.labelLoginAccount')}</label>
+              <label className="label">Login akkaunt</label>
               <select className="input" value={userId} onChange={(e) => setUserId(e.target.value)}>
-                <option value="">{t('supply.vendorModal.optionNotLinked')}</option>
+                <option value="">— Bog'lanmagan —</option>
                 {(usersQ.data ?? []).map((u) => (
                   <option key={u.id} value={u.id}>{u.full_name}</option>
                 ))}
@@ -91,26 +89,26 @@ export default function VendorModal({
             </div>
           </div>
           <div>
-            <label className="label">{t('supply.vendorModal.labelAddress')}</label>
+            <label className="label">Manzil</label>
             <input className="input" value={address} onChange={(e) => setAddress(e.target.value)} />
           </div>
           <div>
-            <label className="label">{t('supply.vendorModal.labelNote')}</label>
+            <label className="label">Izoh</label>
             <textarea className="input min-h-[56px]" value={note} onChange={(e) => setNote(e.target.value)} />
           </div>
           <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
             <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)}
                    className="w-4 h-4 accent-primary" />
-            {t('supply.vendorModal.labelActive')}
+            Faol
           </label>
         </div>
 
         <div className="px-5 py-3 border-t border-black/5 flex justify-end gap-2">
           <button onClick={onClose} className="px-3 py-1.5 text-sm rounded-button hover:bg-black/5">
-            {t('supply.cancel')}
+            Bekor
           </button>
           <button onClick={handleSave} disabled={saving} className="btn-primary disabled:opacity-50">
-            {saving ? t('supply.vendorModal.saving') : t('supply.save')}
+            {saving ? 'Saqlanmoqda…' : 'Saqlash'}
           </button>
         </div>
       </div>

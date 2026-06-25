@@ -8,7 +8,6 @@ export interface User {
   full_name: string;
   avatar_url?: string | null;
   position?: string | null;
-  locale: string;
   theme: string;
   is_active: boolean;
   is_superadmin: boolean;

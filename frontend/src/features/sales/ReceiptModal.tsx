@@ -1,5 +1,4 @@
 import { useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
 import { X, Printer } from 'lucide-react';
 
 import { formatDate, formatPhone } from '@/lib/format';
@@ -32,8 +31,6 @@ function nowStamp(): string {
  * Bitta chop etishda chek ikki nusxada chiqadi (orasida kesish chizig'i bilan).
  */
 export default function ReceiptModal({ order, onClose }: { order: OrderFull; onClose: () => void }) {
-  const { t } = useTranslation();
-
   useEffect(() => {
     const esc = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', esc);
@@ -43,7 +40,7 @@ export default function ReceiptModal({ order, onClose }: { order: OrderFull; onC
   const rate = num(order.exchange_rate);
   const balance = num(order.balance_uzs);
   const dirLabel = (d?: string | null) =>
-    d === 'right' ? t('sales.dirRightFull') : d === 'left' ? t('sales.dirLeftFull') : '';
+    d === 'right' ? "O'NGA" : d === 'left' ? "CHAPGA" : '';
 
   // Inline stillar — print paytida tailwind ranglari yo'qoladi, shuning uchun
   // chop etiladigan qism uchun aniq inline qiymatlar ishlatamiz.
@@ -78,13 +75,13 @@ export default function ReceiptModal({ order, onClose }: { order: OrderFull; onC
       </div>
       <div style={hr} />
 
-      <div style={line}><span>{t('sales.receiptOrderLabel')}:</span><span style={{ fontWeight: 700 }}>{order.code}</span></div>
-      <div style={line}><span>{t('sales.receiptDateLabel')}:</span><span>{formatDate(order.order_date)}</span></div>
+      <div style={line}><span>Buyurtma:</span><span style={{ fontWeight: 700 }}>{order.code}</span></div>
+      <div style={line}><span>Sana:</span><span>{formatDate(order.order_date)}</span></div>
       {order.customer?.full_name && (
-        <div style={line}><span>{t('sales.receiptCustomerLabel')}:</span><span>{order.customer.full_name}</span></div>
+        <div style={line}><span>Mijoz:</span><span>{order.customer.full_name}</span></div>
       )}
       {order.customer?.phone && (
-        <div style={line}><span>{t('sales.receiptPhoneLabel')}:</span><span>{formatPhone(order.customer.phone)}</span></div>
+        <div style={line}><span>Tel:</span><span>{formatPhone(order.customer.phone)}</span></div>
       )}
 
       <div style={hr} />
@@ -107,7 +104,7 @@ export default function ReceiptModal({ order, onClose }: { order: OrderFull; onC
             </div>
             {discUzs > 0 && (
               <div style={line}>
-                <span>{t('sales.receiptDiscountLabel')}</span>
+                <span>Chegirma</span>
                 <span>−{som(discUzs)}</span>
               </div>
             )}
@@ -119,11 +116,11 @@ export default function ReceiptModal({ order, onClose }: { order: OrderFull; onC
 
       {/* Yakuniy summalar */}
       <div style={{ ...line, fontWeight: 700, fontSize: 14 }}>
-        <span>{t('sales.receiptTotalLabel')}</span><span>{som(num(order.items_total_uzs))}</span>
+        <span>JAMI</span><span>{som(num(order.items_total_uzs))}</span>
       </div>
-      <div style={line}><span>{t('sales.receiptPaidLabel')}</span><span>{som(num(order.paid_uzs))}</span></div>
+      <div style={line}><span>To‘langan</span><span>{som(num(order.paid_uzs))}</span></div>
       <div style={line}>
-        <span>{t('sales.receiptBalanceLabel')}</span><span>{som(balance)}</span>
+        <span>Qoldiq</span><span>{som(balance)}</span>
       </div>
 
       <div style={hr} />
@@ -131,18 +128,18 @@ export default function ReceiptModal({ order, onClose }: { order: OrderFull; onC
       {/* Sotuvchi */}
       {order.salesperson_name && (
         <div style={{ textAlign: 'center', marginBottom: 4 }}>
-          {t('sales.receiptSellerLabel')}: <b>{order.salesperson_name}</b>
+          Sotuvchi: <b>{order.salesperson_name}</b>
         </div>
       )}
 
       {/* Aloqa raqamlari — raqamlar shrifti 2.5x kattaroq, bold qora */}
-      <div style={{ ...muted, fontWeight: 700 }}>{t('sales.receiptContactLabel')}</div>
+      <div style={{ ...muted, fontWeight: 700 }}>Aloqa raqamlari</div>
       {COMPANY_PHONES.map((p) => <div key={p} style={phone}>{p}</div>)}
-      <div style={{ ...muted, fontWeight: 700, marginTop: 6 }}>{t('sales.receiptServiceLabel')}</div>
+      <div style={{ ...muted, fontWeight: 700, marginTop: 6 }}>Servis xizmati</div>
       {SERVICE_PHONES.map((p) => <div key={p} style={phone}>{p}</div>)}
 
       <div style={hr} />
-      <div style={{ textAlign: 'center', fontSize: 11, marginTop: 2 }}>{t('sales.receiptThanks')}</div>
+      <div style={{ textAlign: 'center', fontSize: 11, marginTop: 2 }}>Xaridingiz uchun rahmat!</div>
       <div style={{ textAlign: 'center', fontSize: 10, marginTop: 4 }}>{nowStamp()}</div>
     </div>
   );
@@ -163,7 +160,7 @@ export default function ReceiptModal({ order, onClose }: { order: OrderFull; onC
            onClick={(e) => e.stopPropagation()}>
         {/* Sarlavha — chop etilmaydi */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-black/5">
-          <h3 className="font-semibold text-sm">{t('sales.receiptModalTitle')}</h3>
+          <h3 className="font-semibold text-sm">Chek</h3>
           <button onClick={onClose} className="p-1 rounded hover:bg-black/5"><X size={18} /></button>
         </div>
 
@@ -191,10 +188,10 @@ export default function ReceiptModal({ order, onClose }: { order: OrderFull; onC
         {/* Tugmalar — chop etilmaydi */}
         <div className="px-4 py-3 border-t border-black/5 flex justify-end gap-2">
           <button onClick={onClose} className="px-3 py-1.5 text-sm rounded-button hover:bg-black/5">
-            {t('sales.cancelBtnShort')}
+            Bekor
           </button>
           <button onClick={() => window.print()} className="btn-primary text-sm py-1.5">
-            <Printer size={15} /> {t('sales.receiptPrintBtn')}
+            <Printer size={15} /> Chop etish
           </button>
         </div>
       </div>

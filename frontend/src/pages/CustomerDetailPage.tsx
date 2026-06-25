@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useTranslation } from 'react-i18next';
 import { ArrowLeft, Pencil, Phone, MapPin, User, ShoppingCart, Wallet, AlertCircle } from 'lucide-react';
 
 import { api } from '@/api/client';
@@ -24,7 +23,6 @@ export default function CustomerDetailPage() {
   const { customerId } = useParams<{ customerId: string }>();
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
 
   const custQ = useQuery<CustomerFull>({
@@ -69,7 +67,7 @@ export default function CustomerDetailPage() {
   return (
     <div className="space-y-4">
       <button onClick={() => navigate('/customers')} className="flex items-center gap-1.5 text-sm text-ink-soft hover:text-ink">
-        <ArrowLeft size={16} /> {t('customers.detail.backToList')}
+        <ArrowLeft size={16} /> Mijozlarga qaytish
       </button>
 
       {/* Header */}
@@ -81,7 +79,7 @@ export default function CustomerDetailPage() {
           <div className="flex-1 min-w-[200px]">
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <h1 className="text-2xl font-bold">{c.full_name}</h1>
-              <button onClick={() => setEditing(true)} className="btn-ghost"><Pencil size={15} /> {t('customers.editTooltip')}</button>
+              <button onClick={() => setEditing(true)} className="btn-ghost"><Pencil size={15} /> Tahrirlash</button>
             </div>
             <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1.5 text-sm text-ink/80">
               <span className="flex items-center gap-2"><Phone size={14} className="text-ink/40" /> {formatPhone(c.phone)}</span>
@@ -96,31 +94,31 @@ export default function CustomerDetailPage() {
 
       {/* KPI */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Kpi icon={<ShoppingCart size={18} />} label={t('customers.detail.kpiOrders')} value={String(orders.length)} />
-        <Kpi icon={<Wallet size={18} />} label={t('customers.detail.kpiRevenue')} value={formatUZS(totals.revenue)} accent="text-ink" />
-        <Kpi icon={<Wallet size={18} />} label={t('customers.detail.kpiPaid')} value={formatUZS(totals.paid)} accent="text-success" />
-        <Kpi icon={<AlertCircle size={18} />} label={t('customers.detail.kpiDebt')} value={formatUZS(totals.balance)} accent={totals.balance > 0 ? 'text-danger' : 'text-ink-soft'} />
+        <Kpi icon={<ShoppingCart size={18} />} label="Buyurtmalar" value={String(orders.length)} />
+        <Kpi icon={<Wallet size={18} />} label="Umumiy savdo" value={formatUZS(totals.revenue)} accent="text-ink" />
+        <Kpi icon={<Wallet size={18} />} label="To'langan" value={formatUZS(totals.paid)} accent="text-success" />
+        <Kpi icon={<AlertCircle size={18} />} label="Qoldiq qarz" value={formatUZS(totals.balance)} accent={totals.balance > 0 ? 'text-danger' : 'text-ink-soft'} />
       </div>
 
       {/* Orders */}
-      <Card title={t('customers.detail.ordersHistory')}>
+      <Card title="Buyurtmalar tarixi">
         {ordersQ.isLoading ? (
           <div className="space-y-2">
             {Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-10 rounded-button bg-black/5 animate-pulse" />)}
           </div>
         ) : orders.length === 0 ? (
-          <EmptyState title={t('customers.detail.ordersEmpty')} description={t('customers.detail.ordersEmptyDesc')} />
+          <EmptyState title="Buyurtmalar yo'q" description="Bu mijozda hali buyurtma yo'q" />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="text-left text-ink-soft border-b border-black/5">
                 <tr>
-                  <th className="py-2 pr-3">{t('customers.detail.colCode')}</th>
-                  <th className="py-2 pr-3">{t('customers.detail.colDate')}</th>
-                  <th className="py-2 pr-3 text-right">{t('customers.detail.colAmount')}</th>
-                  <th className="py-2 pr-3 text-right">{t('customers.detail.colPaid')}</th>
-                  <th className="py-2 pr-3 text-right">{t('customers.detail.colBalance')}</th>
-                  <th className="py-2 pr-3">{t('customers.detail.colStatus')}</th>
+                  <th className="py-2 pr-3">Kod</th>
+                  <th className="py-2 pr-3">Sana</th>
+                  <th className="py-2 pr-3 text-right">Summa</th>
+                  <th className="py-2 pr-3 text-right">To'langan</th>
+                  <th className="py-2 pr-3 text-right">Qoldiq</th>
+                  <th className="py-2 pr-3">Status</th>
                 </tr>
               </thead>
               <tbody>

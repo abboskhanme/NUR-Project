@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import { Plus, Pencil, Trash2, Search, Flame, Boxes, Cylinder, Warehouse, CheckCircle2, Container } from 'lucide-react';
 
@@ -26,8 +25,22 @@ type Tab = 'summary' | Category;
 
 const TAB_KEYS: Tab[] = ['summary', 'kotyol', 'bunker', 'garelka', 'tana'];
 
+const TAB_LABELS: Record<Tab, string> = {
+  summary: "Kunlik hisobot",
+  kotyol: "Kotyol",
+  bunker: "Bunker",
+  garelka: "Garelka",
+  tana: "Kotyol tanasi",
+};
+
+const ADD_LABELS: Record<Category, string> = {
+  kotyol: "Kotyol qoʻshish",
+  bunker: "Bunker qoʻshish",
+  garelka: "Garelka qoʻshish",
+  tana: "Tana qoʻshish",
+};
+
 export default function ProductionPage() {
-  const { t } = useTranslation();
   const qc = useQueryClient();
   const { can } = usePermissions();
   const [tab, setTab] = useState<Tab>('summary');
@@ -62,45 +75,43 @@ export default function ProductionPage() {
     if (!deleteRec) return;
     try {
       await api.delete(`/production/records/${deleteRec.id}`);
-      toast.success(t('common.deleted'));
+      toast.success("O'chirildi");
       refresh();
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || t('common.error'));
+      toast.error(e?.response?.data?.detail || "Xatolik yuz berdi");
     } finally {
       setDeleteRec(null);
     }
   }
 
   const dirLabel = (d?: string | null) =>
-    d === 'right' ? t('production.dir.right') : d === 'left' ? t('production.dir.left') : '—';
+    d === 'right' ? "Oʻngga" : d === 'left' ? "Chapga" : '—';
 
-  const addBtnKey = category
-    ? (`production.add${cap(category)}` as const)
-    : null;
+  const addBtnLabel = category ? ADD_LABELS[category] : null;
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold">{t('production.title')}</h1>
-          <p className="text-sm text-ink-soft">{t('production.subtitle')}</p>
+          <h1 className="text-2xl font-bold">Ishlab chiqarish</h1>
+          <p className="text-sm text-ink-soft">Kunlik ishlab chiqarilgan kotyol, bunker va garelka jurnali</p>
         </div>
-        {category && addBtnKey && can('production:write') && (
+        {category && addBtnLabel && can('production:write') && (
           <button className="btn-primary" onClick={() => setModal({ category, record: null })}>
-            <Plus size={16} /> {t(addBtnKey)}
+            <Plus size={16} /> {addBtnLabel}
           </button>
         )}
       </div>
 
       {/* KPI */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <BalanceCard title={t('production.kpi.kotyol')} accent="primary"
+        <BalanceCard title="Jami kotyol" accent="primary"
           value={String(s?.total_kotyol ?? 0)} icon={<Cylinder size={18} />} />
-        <BalanceCard title={t('production.kpi.bunker')} accent="success"
+        <BalanceCard title="Jami bunker" accent="success"
           value={String(s?.total_bunker ?? 0)} icon={<Boxes size={18} />} />
-        <BalanceCard title={t('production.kpi.garelka')} accent="warning"
+        <BalanceCard title="Jami garelka" accent="warning"
           value={String(s?.total_garelka ?? 0)} icon={<Flame size={18} />} />
-        <BalanceCard title={t('production.kpi.tana')} accent="primary"
+        <BalanceCard title="Jami tana" accent="primary"
           value={String(s?.total_tana ?? 0)} icon={<Container size={18} />} />
       </div>
 
@@ -112,27 +123,27 @@ export default function ProductionPage() {
               'px-4 py-2 text-sm font-medium -mb-px border-b-2 transition-colors ' +
               (tab === k ? 'border-primary text-primary' : 'border-transparent text-ink-soft hover:text-ink')
             }>
-            {t(`production.tabs.${k}`)}
+            {TAB_LABELS[k]}
           </button>
         ))}
       </div>
 
       {tab === 'summary' ? (
-        <Card title={t('production.tabs.summary')}>
+        <Card title="Kunlik hisobot">
           {summaryQ.isLoading ? (
             <Skeleton />
           ) : (s?.days.length ?? 0) === 0 ? (
-            <EmptyState title={t('production.summary.empty')} description={t('production.summary.emptyDesc')} />
+            <EmptyState title="Hozircha yozuv yoʻq" description="Kotyol, tana, bunker yoki garelka qoʻshing" />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="text-left text-ink-soft border-b border-black/5">
                   <tr>
-                    <th className="py-2 pr-3">{t('production.summary.col.date')}</th>
-                    <th className="py-2 pr-3 text-right">{t('production.summary.col.kotyol')}</th>
-                    <th className="py-2 pr-3 text-right">{t('production.summary.col.bunker')}</th>
-                    <th className="py-2 pr-3 text-right">{t('production.summary.col.garelka')}</th>
-                    <th className="py-2 pr-3 text-right">{t('production.summary.col.tana')}</th>
+                    <th className="py-2 pr-3">Sana</th>
+                    <th className="py-2 pr-3 text-right">Kotyol</th>
+                    <th className="py-2 pr-3 text-right">Bunker</th>
+                    <th className="py-2 pr-3 text-right">Garelka</th>
+                    <th className="py-2 pr-3 text-right">Tana</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -151,11 +162,11 @@ export default function ProductionPage() {
           )}
         </Card>
       ) : (
-        <Card title={t(`production.tabs.${tab}`)}>
+        <Card title={TAB_LABELS[tab]}>
           {tab === 'kotyol' && (
             <div className="relative mb-4 w-full max-w-xs">
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft" />
-              <input className="input pl-9 w-full" placeholder={t('production.filter.search')}
+              <input className="input pl-9 w-full" placeholder="ID raqami boʻyicha qidirish"
                      value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
           )}
@@ -163,30 +174,30 @@ export default function ProductionPage() {
           {recordsQ.isLoading ? (
             <Skeleton />
           ) : records.length === 0 ? (
-            <EmptyState title={t('production.empty')} description={t('production.emptyDesc')} />
+            <EmptyState title="Yozuv topilmadi" description="Yangi yozuv qoʻshing" />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="text-left text-ink-soft border-b border-black/5">
                   <tr>
-                    <th className="py-2 pr-3">{t('production.col.date')}</th>
+                    <th className="py-2 pr-3">Sana</th>
                     {tab === 'kotyol' ? (
                       <>
-                        <th className="py-2 pr-3">{t('production.col.id')}</th>
-                        <th className="py-2 pr-3">{t('production.col.model')}</th>
-                        <th className="py-2 pr-3">{t('production.col.kvm')}</th>
-                        <th className="py-2 pr-3">{t('production.col.direction')}</th>
+                        <th className="py-2 pr-3">ID raqami</th>
+                        <th className="py-2 pr-3">Model</th>
+                        <th className="py-2 pr-3">Oʻlcham</th>
+                        <th className="py-2 pr-3">Yoʻnalish</th>
                       </>
                     ) : tab === 'tana' ? (
                       <>
-                        <th className="py-2 pr-3">{t('production.col.size')}</th>
-                        <th className="py-2 pr-3">{t('production.col.direction')}</th>
-                        <th className="py-2 pr-3 text-right">{t('production.col.qty')}</th>
+                        <th className="py-2 pr-3">Oʻlcham</th>
+                        <th className="py-2 pr-3">Yoʻnalish</th>
+                        <th className="py-2 pr-3 text-right">Soni</th>
                       </>
                     ) : (
-                      <th className="py-2 pr-3 text-right">{t('production.col.qty')}</th>
+                      <th className="py-2 pr-3 text-right">Soni</th>
                     )}
-                    <th className="py-2 pr-3">{t('production.col.note')}</th>
+                    <th className="py-2 pr-3">Izoh</th>
                     <th className="py-2 pr-3"></th>
                   </tr>
                 </thead>
@@ -216,25 +227,25 @@ export default function ProductionPage() {
                           {tab === 'kotyol' && (
                             r.transferred ? (
                               <span className="p-1 inline-flex items-center text-success"
-                                    title={t('production.inWarehouse')}>
+                                    title="Omborga oʻtkazilgan">
                                 <CheckCircle2 size={14} />
                               </span>
                             ) : can('inventory:write') ? (
                               <button onClick={() => setXferRec(r)}
-                                      className="p-1 rounded hover:bg-accent/10 text-accent" title={t('production.transferTitle')}>
+                                      className="p-1 rounded hover:bg-accent/10 text-accent" title="Omborga oʻtkazish">
                                 <Warehouse size={14} />
                               </button>
                             ) : null
                           )}
                           {can('production:write') && (
                             <button onClick={() => setModal({ category: tab, record: r })}
-                                    className="p-1 rounded hover:bg-primary/10 text-primary" title={t('actions.edit')}>
+                                    className="p-1 rounded hover:bg-primary/10 text-primary" title="Tahrirlash">
                               <Pencil size={14} />
                             </button>
                           )}
                           {can('production:delete') && (
                             <button onClick={() => setDeleteRec(r)}
-                                    className="p-1 rounded hover:bg-danger/10 text-danger" title={t('actions.delete')}>
+                                    className="p-1 rounded hover:bg-danger/10 text-danger" title="O'chirish">
                               <Trash2 size={14} />
                             </button>
                           )}
@@ -271,9 +282,9 @@ export default function ProductionPage() {
       )}
       <ConfirmModal
         open={deleteRec !== null}
-        title={t('production.deleteTitle')}
-        message={t('production.deleteMessage')}
-        confirmText={t('actions.delete')}
+        title="Yozuvni oʻchirish"
+        message="Ushbu yozuvni oʻchirishni tasdiqlaysizmi?"
+        confirmText="O'chirish"
         variant="danger"
         onConfirm={confirmDelete}
         onCancel={() => setDeleteRec(null)}
@@ -288,8 +299,4 @@ function Skeleton() {
       {Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-10 rounded-button bg-black/5 animate-pulse" />)}
     </div>
   );
-}
-
-function cap(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1);
 }

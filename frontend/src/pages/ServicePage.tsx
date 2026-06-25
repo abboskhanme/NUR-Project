@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { Plus, Search, Wrench, CalendarClock, Tag, CheckCircle2 } from 'lucide-react';
@@ -32,6 +31,13 @@ interface Summary {
 
 const FILTER_KEYS = ['', 'new', 'scheduled', 'completed', 'cancelled'] as const;
 
+const SERVICE_FILTER_LABELS: Record<string, string> = {
+  new: 'Yangi',
+  scheduled: 'Rejalashtirilgan',
+  completed: 'Bajarilgan',
+  cancelled: 'Bekor qilingan',
+};
+
 // Ariza muddati — tushgan sanadan +7 kun (avtomatik)
 function deadlineOf(openedAt: string): Date {
   const d = new Date(openedAt);
@@ -40,7 +46,6 @@ function deadlineOf(openedAt: string): Date {
 }
 
 export default function ServicePage() {
-  const { t } = useTranslation();
   const [status, setStatus] = useState('');
   const [search, setSearch] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
@@ -76,7 +81,7 @@ export default function ServicePage() {
       await api.patch(`/service/tickets/${tk.id}`, { status: next });
       refetchAll();
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || t('common.error'));
+      toast.error(e?.response?.data?.detail || 'Xatolik yuz berdi');
     }
   }
 
@@ -84,25 +89,25 @@ export default function ServicePage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold">{t('service.title')}</h1>
-          <p className="text-sm text-ink-soft">{t('service.subtitle')}</p>
+          <h1 className="text-2xl font-bold">Servis xizmati</h1>
+          <p className="text-sm text-ink-soft">Sotilgan mahsulotlarga kafolat va texnik xizmat</p>
         </div>
         <div className="flex items-center gap-2">
           <button className="btn-ghost" onClick={() => setCatOpen(true)}>
-            <Tag size={16} /> {t('service.categories')}
+            <Tag size={16} /> Toifalar
           </button>
           <button className="btn-ghost" onClick={() => setPartsOpen(true)}>
-            <Wrench size={16} /> {t('service.parts')}
+            <Wrench size={16} /> Ehtiyot qismlar
           </button>
           <button className="btn-primary" onClick={() => setCreateOpen(true)}>
-            <Plus size={16} /> {t('service.newTicket')}
+            <Plus size={16} /> Yangi ariza
           </button>
         </div>
       </div>
 
       {/* Ichki bo'limlar: Arizalar / Servis safarlari */}
       <div className="flex gap-1 border-b border-black/5">
-        {([['tickets', t('service.tabs.tickets')], ['trips', t('service.tabs.trips')], ['partsStats', t('service.tabs.partsStats')], ['money', t('service.tabs.money')]] as const).map(([key, label]) => (
+        {([['tickets', 'Arizalar'], ['trips', 'Servis safarlari'], ['partsStats', 'Sarflangan qismlar'], ['money', 'Sarflangan mablag']] as const).map(([key, label]) => (
           <button key={key} onClick={() => setTab(key)}
             className={'px-4 py-2 text-sm font-medium -mb-px border-b-2 transition-colors ' +
               (tab === key ? 'border-primary text-primary' : 'border-transparent text-ink-soft hover:text-ink')}>
@@ -124,7 +129,7 @@ export default function ServicePage() {
         {/* Servis muammolari (ochiq) — qizil */}
         <div className="rounded-card border border-danger/25 bg-danger/10 p-4 flex items-start justify-between">
           <div>
-            <div className="text-sm font-medium text-danger/90">{t('service.kpi.problems')}</div>
+            <div className="text-sm font-medium text-danger/90">Servis muammolari</div>
             <div className="text-2xl font-bold mt-2 text-danger">{(s?.new ?? 0) + (s?.scheduled ?? 0)}</div>
           </div>
           <div className="w-10 h-10 rounded-button bg-danger/20 text-danger flex items-center justify-center shrink-0"><Wrench size={18} /></div>
@@ -132,7 +137,7 @@ export default function ServicePage() {
         {/* Bartaraf etilgan — yashil */}
         <div className="rounded-card border border-success/25 bg-success/10 p-4 flex items-start justify-between">
           <div>
-            <div className="text-sm font-medium text-success/90">{t('service.kpi.resolved')}</div>
+            <div className="text-sm font-medium text-success/90">Bartaraf etilgan</div>
             <div className="text-2xl font-bold mt-2 text-success">{s?.completed ?? 0}</div>
           </div>
           <div className="w-10 h-10 rounded-button bg-success/20 text-success flex items-center justify-center shrink-0"><CheckCircle2 size={18} /></div>
@@ -140,7 +145,7 @@ export default function ServicePage() {
         {/* Rejalashtirilgan (✅ znachok soni) — primary */}
         <div className="rounded-card border border-primary/25 bg-primary/10 p-4 flex items-start justify-between">
           <div>
-            <div className="text-sm font-medium text-primary/90">{t('service.kpi.planned')}</div>
+            <div className="text-sm font-medium text-primary/90">Rejalashtirilgan</div>
             <div className="text-2xl font-bold mt-2 text-primary">{s?.with_visit ?? 0}</div>
           </div>
           <div className="w-10 h-10 rounded-button bg-primary/20 text-primary flex items-center justify-center shrink-0"><CalendarClock size={18} /></div>
@@ -154,13 +159,13 @@ export default function ServicePage() {
             <button key={key} onClick={() => setStatus(key)}
               className={`px-3 py-1.5 rounded-button text-sm font-medium transition ${
                 status === key ? 'bg-primary text-white' : 'bg-black/5 text-ink-soft hover:bg-black/10'}`}>
-              {key === '' ? t('service.filter.all') : t(`service.filter.${key}`)}
+              {key === '' ? 'Hammasi' : SERVICE_FILTER_LABELS[key]}
             </button>
           ))}
         </div>
         <div className="relative">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft" />
-          <input className="input pl-9 w-56" placeholder={t('service.search.placeholder')}
+          <input className="input pl-9 w-56" placeholder="Kod yoki muammo…"
                  value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
       </div>
@@ -176,20 +181,20 @@ export default function ServicePage() {
             ))}
           </div>
         ) : tickets.length === 0 ? (
-          <EmptyState title={t('service.empty.title')}
-                      description={t('service.empty.description')} />
+          <EmptyState title="Servis arizalari yo'q"
+                      description={`"Yangi ariza" tugmasi orqali birinchi arizani qo'shing`} />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="text-left text-ink-soft border-b border-black/5">
                 <tr>
                   <th className="py-2 pr-3 w-10"></th>
-                  <th className="py-2 pr-3">{t('service.table.customer')}</th>
-                  <th className="py-2 pr-3">{t('service.table.problem')}</th>
-                  <th className="py-2 pr-3">{t('service.table.createdAt')}</th>
-                  <th className="py-2 pr-3">{t('service.table.deadline')}</th>
-                  <th className="py-2 pr-3">{t('service.table.warranty')}</th>
-                  <th className="py-2 pr-3">{t('service.table.status')}</th>
+                  <th className="py-2 pr-3">Mijoz</th>
+                  <th className="py-2 pr-3">Muammo</th>
+                  <th className="py-2 pr-3">Tushgan sana</th>
+                  <th className="py-2 pr-3">Muddat</th>
+                  <th className="py-2 pr-3">Kafolat</th>
+                  <th className="py-2 pr-3">Status</th>
                 </tr>
               </thead>
               <tbody>
@@ -199,7 +204,7 @@ export default function ServicePage() {
                     <td className="py-2 pr-3 text-center" onClick={(e) => e.stopPropagation()}>
                       {tk.status === 'new' || tk.status === 'scheduled' ? (
                         <button onClick={() => toggleScheduled(tk)}
-                                title={t('service.kpi.planned')}
+                                title="Rejalashtirilgan"
                                 className={'inline-flex transition-colors ' + (tk.status === 'scheduled'
                                   ? 'text-success'
                                   : 'text-danger/70 hover:text-danger')}>
@@ -220,8 +225,8 @@ export default function ServicePage() {
                     <td className="py-2 pr-3 whitespace-nowrap">{formatDate(deadlineOf(tk.opened_at))}</td>
                     <td className="py-2 pr-3">
                       {tk.in_warranty
-                        ? <span className="badge bg-success/10 text-success">{t('service.warranty.inWarranty')}</span>
-                        : <span className="badge bg-gray-100 text-gray-600">{t('service.warranty.noWarranty')}</span>}
+                        ? <span className="badge bg-success/10 text-success">Kafolatda</span>
+                        : <span className="badge bg-gray-100 text-gray-600">Yo'q</span>}
                     </td>
                     <td className="py-2 pr-3"><ServiceStatusBadge status={tk.status} /></td>
                   </tr>

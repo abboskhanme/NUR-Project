@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
 
@@ -18,7 +17,6 @@ interface Product extends ProductFull {
 }
 
 export default function ProductsPage() {
-  const { t } = useTranslation();
   const qc = useQueryClient();
   const [tab, setTab] = useState<ProductType>('main');
   const [editing, setEditing] = useState<Product | null>(null);
@@ -27,8 +25,8 @@ export default function ProductsPage() {
   const [deleting, setDeleting] = useState(false);
 
   const TABS: Array<{ key: ProductType; label: string; hint: string }> = [
-    { key: 'main', label: t('products.tabs.main'), hint: t('products.tabs.mainHint') },
-    { key: 'additional', label: t('products.tabs.additional'), hint: t('products.tabs.additionalHint') },
+    { key: 'main', label: "Asosiy (kotyollar)", hint: "Isitish kotyollari" },
+    { key: 'additional', label: "Qo'shimcha mahsulotlar", hint: "Turba, defizor va boshqalar" },
   ];
 
   const { data, isLoading } = useQuery({
@@ -64,11 +62,11 @@ export default function ProductsPage() {
     setDeleting(true);
     try {
       await api.delete(`/products/${toDelete.id}`);
-      toast.success(t('products.toastDeleted'));
+      toast.success("O'chirildi");
       setToDelete(null);
       refresh();
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || t('products.toastError'));
+      toast.error(e?.response?.data?.detail || "Xatolik");
     } finally {
       setDeleting(false);
     }
@@ -78,11 +76,11 @@ export default function ProductsPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold">{t('products.title')}</h1>
+          <h1 className="text-2xl font-bold">Mahsulot katalogi</h1>
           <p className="text-sm text-ink-soft">{active.hint}</p>
         </div>
         <button className="btn-primary" onClick={openCreate}>
-          <Plus size={16} /> {tab === 'main' ? t('products.addMain') : t('products.addAdditional')}
+          <Plus size={16} /> {tab === 'main' ? 'Yangi kotyol' : 'Yangi mahsulot'}
         </button>
       </div>
 
@@ -108,14 +106,14 @@ export default function ProductsPage() {
           ))}
         </div>
       ) : items.length === 0 ? (
-        <EmptyState title={t('products.empty')} />
+        <EmptyState title="Mahsulotlar yo'q" />
       ) : tab === 'main' ? (
         <div className="space-y-6">
           {sizeGroups.map(({ kvm, rows }) => (
             <section key={kvm ?? 'none'}>
               <div className="flex items-center gap-2 mb-2">
                 <h2 className="text-sm font-bold text-ink">
-                  {kvm ? `${kvm} ${t('products.sizeUnit')}` : t('products.noSize')}
+                  {kvm ? `${kvm} kvm` : "O'lchamsiz"}
                 </h2>
                 <span className="badge bg-primary/10 text-primary">{rows.length}</span>
                 <div className="flex-1 h-px bg-black/5" />
@@ -131,8 +129,8 @@ export default function ProductsPage() {
                       <RowActions
                         onEdit={() => openEdit(p)}
                         onDelete={() => setToDelete(p)}
-                        editTooltip={t('products.editTooltip')}
-                        deleteTooltip={t('products.deleteTooltip')}
+                        editTooltip="Tahrirlash"
+                        deleteTooltip="O'chirish"
                       />
                     </div>
                   </Card>
@@ -147,9 +145,9 @@ export default function ProductsPage() {
             <thead className="bg-black/[0.03] text-ink-soft text-left">
               <tr>
                 <th className="px-4 py-2 w-14"></th>
-                <th className="px-4 py-2 font-medium">{t('products.table.name')}</th>
-                <th className="px-4 py-2 font-medium">{t('products.table.unit')}</th>
-                <th className="px-4 py-2 font-medium text-right">{t('products.table.price')}</th>
+                <th className="px-4 py-2 font-medium">Nomi</th>
+                <th className="px-4 py-2 font-medium">Birlik</th>
+                <th className="px-4 py-2 font-medium text-right">Narx</th>
                 <th className="px-4 py-2 w-20"></th>
               </tr>
             </thead>
@@ -166,8 +164,8 @@ export default function ProductsPage() {
                     <RowActions
                       onEdit={() => openEdit(p)}
                       onDelete={() => setToDelete(p)}
-                      editTooltip={t('products.editTooltip')}
-                      deleteTooltip={t('products.deleteTooltip')}
+                      editTooltip="Tahrirlash"
+                      deleteTooltip="O'chirish"
                     />
                   </td>
                 </tr>
@@ -188,12 +186,12 @@ export default function ProductsPage() {
 
       <ConfirmModal
         open={toDelete !== null}
-        title={t('products.deleteTitle')}
+        title="Mahsulotni o'chirish"
         message={
-          <>{t('products.deleteMessage', { name: toDelete?.display_name ?? '' })}</>
+          <>{`O'chirilsinmi: ${toDelete?.display_name ?? ''}? Agar buyurtmalarda ishlatilgan bo'lsa, o'chirilmaydi — arxivga o'tkaziladi.`}</>
         }
         loading={deleting}
-        confirmText={t('actions.delete')}
+        confirmText="O'chirish"
         onConfirm={confirmDelete}
         onCancel={() => setToDelete(null)}
       />

@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useTranslation } from 'react-i18next';
 import { ShoppingCart, ChevronDown, ChevronUp, Truck } from 'lucide-react';
 
 import { api } from '@/api/client';
@@ -26,7 +25,6 @@ interface ReorderData { count: number; total_cost_uzs: number; items: Suggestion
  * @param vendorId — tanlangan taminotchiga qarab keshni yangilash uchun
  */
 export default function ReorderSuggestions({ vendorId }: { vendorId?: string }) {
-  const { t } = useTranslation();
   const [open, setOpen] = useState(true);
 
   const { data } = useQuery<ReorderData>({
@@ -42,14 +40,14 @@ export default function ReorderSuggestions({ vendorId }: { vendorId?: string }) 
     <Card
       title={
         <span className="inline-flex items-center gap-2 text-warning">
-          <ShoppingCart size={17} /> {t('supply.reorder.title')}
+          <ShoppingCart size={17} /> Buyurtma berish tavsiyalari
           <span className="badge bg-warning/10 text-warning">{data.count}</span>
         </span>
       }
       action={
         <div className="flex items-center gap-3">
           <span className="text-sm font-semibold text-ink">
-            {t('supply.reorder.totalCost')}: {formatUZS(data.total_cost_uzs)}
+            Taxminiy summa: {formatUZS(data.total_cost_uzs)}
           </span>
           <button onClick={() => setOpen((o) => !o)} className="p-1 rounded hover:bg-black/5 text-ink/50">
             {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
@@ -62,12 +60,12 @@ export default function ReorderSuggestions({ vendorId }: { vendorId?: string }) 
           <table className="w-full text-sm">
             <thead className="text-left text-ink-soft border-b border-black/10">
               <tr>
-                <th className="py-2 pr-3">{t('supply.reorder.colName')}</th>
-                <th className="py-2 pr-3">{t('supply.reorder.colVendor')}</th>
-                <th className="py-2 pr-3 text-right">{t('supply.reorder.colStock')}</th>
-                <th className="py-2 pr-3 text-right">{t('supply.reorder.colMin')}</th>
-                <th className="py-2 pr-3 text-right">{t('supply.reorder.colSuggested')}</th>
-                <th className="py-2 pr-3 text-right">{t('supply.reorder.colCost')}</th>
+                <th className="py-2 pr-3">Mahsulot</th>
+                <th className="py-2 pr-3">Ta'minotchi</th>
+                <th className="py-2 pr-3 text-right">Qoldiq</th>
+                <th className="py-2 pr-3 text-right">Minimum</th>
+                <th className="py-2 pr-3 text-right">Tavsiya</th>
+                <th className="py-2 pr-3 text-right">Taxminiy narx</th>
               </tr>
             </thead>
             <tbody>

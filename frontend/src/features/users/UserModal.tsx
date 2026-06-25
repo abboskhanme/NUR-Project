@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import {
   X, User as UserIcon, KeyRound, Eye, EyeOff, RefreshCw, Check,
@@ -38,7 +37,6 @@ export default function UserModal({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const { t } = useTranslation();
   const isCreate = user === null;
   const [tab, setTab] = useState<Tab>('profile');
 
@@ -74,11 +72,11 @@ export default function UserModal({
 
   async function handleSave() {
     if (!phone || !fullName) {
-      toast.error(t('users.modal.phoneRequired'));
+      toast.error("Telefon raqam va to'liq ism majburiy");
       return;
     }
     if (isCreate && password.length < 8) {
-      toast.error(t('users.modal.passwordMinLength'));
+      toast.error('Parol kamida 8 ta belgi bo\'lishi kerak');
       return;
     }
     setSaving(true);
@@ -89,7 +87,7 @@ export default function UserModal({
           position: position || null,
           role_names: selectedRoles,
         });
-        toast.success(t('users.modal.createdSuccess'));
+        toast.success('Foydalanuvchi yaratildi');
       } else {
         await api.patch(`/users/${user!.id}`, {
           phone, full_name: fullName,
@@ -97,12 +95,12 @@ export default function UserModal({
           is_active: isActive,
           role_names: selectedRoles,
         });
-        toast.success(t('users.modal.updatedSuccess'));
+        toast.success('Yangilandi');
       }
       onSaved();
       onClose();
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || t('common.error'));
+      toast.error(e?.response?.data?.detail || 'Xatolik yuz berdi');
     } finally {
       setSaving(false);
     }
@@ -110,17 +108,17 @@ export default function UserModal({
 
   async function resetPassword() {
     if (newPwd.length < 8) {
-      toast.error(t('users.modal.passwordMinLengthShort'));
+      toast.error('Kamida 8 ta belgi bo\'lishi kerak');
       return;
     }
     setPwdLoading(true);
     try {
       await api.post(`/users/${user!.id}/password`, { new_password: newPwd });
-      toast.success(t('users.modal.pwdUpdatedSuccess'));
+      toast.success('Parol yangilandi. Foydalanuvchiga uzating.');
       setNewPwd('');
       setShowPwd(false);
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || t('common.error'));
+      toast.error(e?.response?.data?.detail || 'Xatolik yuz berdi');
     } finally {
       setPwdLoading(false);
     }
@@ -146,7 +144,7 @@ export default function UserModal({
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-black/5 shrink-0">
           <h3 className="font-semibold">
-            {isCreate ? t('users.modal.newTitle') : t('users.editTitle', { name: user?.full_name })}
+            {isCreate ? 'Yangi foydalanuvchi' : `Foydalanuvchini tahrirlash — ${user?.full_name}`}
           </h3>
           <button onClick={onClose} className="p-1 rounded hover:bg-black/5">
             <X size={18} />
@@ -157,10 +155,10 @@ export default function UserModal({
         {!isCreate && (
           <div className="flex border-b border-black/5 shrink-0 bg-black/[0.02]">
             <TabBtn active={tab === 'profile'} onClick={() => setTab('profile')} icon={<UserIcon size={15} />}>
-              {t('users.modal.profileTab')}
+              Profil
             </TabBtn>
             <TabBtn active={tab === 'password'} onClick={() => setTab('password')} icon={<KeyRound size={15} />}>
-              {t('users.modal.passwordTab')}
+              Parol
             </TabBtn>
           </div>
         )}
@@ -171,7 +169,7 @@ export default function UserModal({
             <div className="space-y-5">
               {!isCreate && localUser && (
                 <div className="pb-4 border-b border-black/5">
-                  <label className="label mb-2">{t('users.modal.avatarLabel')}</label>
+                  <label className="label mb-2">Profil rasmi</label>
                   <AvatarUploader
                     user={localUser}
                     size={80}
@@ -187,11 +185,11 @@ export default function UserModal({
 
               <div className="space-y-3">
                 <div>
-                  <label className="label">{t('users.modal.phoneLabel')}</label>
+                  <label className="label">Telefon raqam (login) *</label>
                   <PhoneInput value={phone} onChange={setPhone} />
                 </div>
                 <div>
-                  <label className="label">{t('users.modal.fullNameLabel')}</label>
+                  <label className="label">To'liq ism *</label>
                   <input
                     className="input"
                     value={fullName}
@@ -199,7 +197,7 @@ export default function UserModal({
                   />
                 </div>
                 <div>
-                  <label className="label">{t('users.modal.positionLabel')}</label>
+                  <label className="label">Lavozim</label>
                   <input
                     className="input"
                     value={position}
@@ -209,13 +207,13 @@ export default function UserModal({
 
                 {isCreate && (
                   <div>
-                    <label className="label">{t('users.modal.initialPasswordLabel')}</label>
+                    <label className="label">Boshlang'ich parol *</label>
                     <input
                       type="password"
                       className="input"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      placeholder={t('users.modal.passwordPlaceholder')}
+                      placeholder="kamida 8 ta belgi"
                     />
                   </div>
                 )}
@@ -229,7 +227,7 @@ export default function UserModal({
                         checked={isActive}
                         onChange={(e) => setIsActive(e.target.checked)}
                       />
-                      {t('users.modal.activeLabel')}
+                      Aktiv akkount
                     </label>
                   </div>
                 )}
@@ -238,18 +236,18 @@ export default function UserModal({
               {/* Roles */}
               <div className="pt-4 border-t border-black/5">
                 <div className="flex items-center justify-between mb-2">
-                  <label className="label !mb-0">{t('users.modal.rolesLabel')}</label>
+                  <label className="label !mb-0">Rollar</label>
                   <span className="text-xs text-ink-soft">
-                    {t('users.modal.rolesSelected', { count: selectedRoles.length })}
+                    {`${selectedRoles.length} ta tanlangan`}
                   </span>
                 </div>
                 <p className="text-xs text-ink-soft mb-2">
-                  {t('users.modal.superAdminHintPre')}{' '}
+                  Super-admin huquqi{' '}
                   <span className="font-medium text-ink/70">super_admin</span>{' '}
-                  {t('users.modal.superAdminHintPost')}
+                  rolini berish orqali boshqariladi.
                 </p>
                 {roles.length === 0 ? (
-                  <p className="text-sm text-ink-soft py-2">{t('users.modal.noRoles')}</p>
+                  <p className="text-sm text-ink-soft py-2">Rollar mavjud emas</p>
                 ) : (
                   <div className="border border-black/10 rounded-button divide-y divide-black/5 max-h-64 overflow-y-auto">
                     {roles.map((r) => {
@@ -290,10 +288,10 @@ export default function UserModal({
           {tab === 'password' && !isCreate && (
             <div className="space-y-3 max-w-md">
               <p className="text-sm text-ink-soft">
-                {t('users.modal.passwordHint')}
+                Yangi parol qo'ying. Tasdiqlangach foydalanuvchiga og'zaki yoki Telegram orqali uzating.
               </p>
               <div>
-                <label className="label">{t('users.modal.newPasswordLabel')}</label>
+                <label className="label">Yangi parol</label>
                 <div className="flex gap-2">
                   <div className="flex-1 relative">
                     <input
@@ -301,7 +299,7 @@ export default function UserModal({
                       className="input pr-10"
                       value={newPwd}
                       onChange={(e) => setNewPwd(e.target.value)}
-                      placeholder={t('users.modal.passwordPlaceholder')}
+                      placeholder="kamida 8 ta belgi"
                     />
                     <button
                       type="button"
@@ -315,14 +313,14 @@ export default function UserModal({
                     type="button"
                     onClick={generatePwd}
                     className="px-3 rounded-button border border-black/10 hover:bg-black/5 text-sm flex items-center gap-1"
-                    title={t('users.modal.generateTitle')}
+                    title="Tasodifiy 12-belgili parol"
                   >
-                    <RefreshCw size={14} /> {t('users.modal.generateBtn')}
+                    <RefreshCw size={14} /> Generatsiya
                   </button>
                 </div>
                 {newPwd && showPwd && (
                   <p className="mt-2 text-xs text-warn">
-                    {t('users.modal.pwdVisible')}
+                    Parolni eslab qoling yoki nusxa oling — modal yopilgach ko'rinmaydi.
                   </p>
                 )}
               </div>
@@ -331,7 +329,7 @@ export default function UserModal({
                 disabled={pwdLoading || !newPwd}
                 className="btn-primary disabled:opacity-50"
               >
-                {pwdLoading ? t('users.modal.pwdUpdating') : t('users.modal.setPwdBtn')}
+                {pwdLoading ? 'Yangilanmoqda...' : 'Parolni qo\'yish'}
               </button>
             </div>
           )}
@@ -340,7 +338,7 @@ export default function UserModal({
         {/* Footer */}
         <div className="px-5 py-3 border-t border-black/5 flex justify-end gap-2 shrink-0">
           <button onClick={onClose} className="px-3 py-1.5 text-sm rounded-button hover:bg-black/5">
-            {t('actions.cancel')}
+            Bekor qilish
           </button>
           {tab === 'profile' && (
             <button
@@ -348,7 +346,7 @@ export default function UserModal({
               disabled={saving}
               className="btn-primary disabled:opacity-50"
             >
-              {saving ? t('users.modal.saving') : t('actions.save')}
+              {saving ? 'Saqlanmoqda...' : 'Saqlash'}
             </button>
           )}
         </div>

@@ -1,5 +1,4 @@
 import { useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
 import { AlertTriangle, X } from 'lucide-react';
 
 export interface ConfirmModalProps {
@@ -30,10 +29,8 @@ export default function ConfirmModal({
   onConfirm,
   onCancel,
 }: ConfirmModalProps) {
-  const { t } = useTranslation();
-
-  const resolvedConfirmText = confirmText ?? t('ui.confirmModal.confirm');
-  const resolvedCancelText = cancelText ?? t('ui.confirmModal.cancel');
+  const resolvedConfirmText = confirmText ?? 'Tasdiqlash';
+  const resolvedCancelText = cancelText ?? 'Bekor qilish';
 
   useEffect(() => {
     if (!open) return;
@@ -96,7 +93,7 @@ export default function ConfirmModal({
             disabled={loading}
             className={`px-4 py-1.5 text-sm rounded-button font-medium disabled:opacity-50 ${btn}`}
           >
-            {loading ? t('ui.confirmModal.processing') : resolvedConfirmText}
+            {loading ? 'Bajarilmoqda…' : resolvedConfirmText}
           </button>
         </div>
       </div>

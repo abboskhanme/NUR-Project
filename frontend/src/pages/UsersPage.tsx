@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import {
   Plus, Search, Pencil, Trash2, ShieldCheck, Users as UsersIcon, Archive, UserPlus,
@@ -27,7 +26,6 @@ interface Role {
 type Tab = 'users' | 'roles' | 'archive';
 
 export default function UsersPage() {
-  const { t } = useTranslation();
   const { user: me, canModule } = usePermissions();
   const isAdmin = canModule('users');
   const qc = useQueryClient();
@@ -63,11 +61,11 @@ export default function UsersPage() {
     setDeleting(true);
     try {
       await api.delete(`/users/${deleteUser.id}`);
-      toast.success(t('users.archivedSuccess'));
+      toast.success("Foydalanuvchi arxivga ko'chirildi");
       qc.invalidateQueries({ queryKey: ['users'] });
       setDeleteUser(null);
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || t('common.error'));
+      toast.error(e?.response?.data?.detail || "Xatolik yuz berdi");
     } finally {
       setDeleting(false);
     }
@@ -76,7 +74,7 @@ export default function UsersPage() {
   if (!isAdmin) {
     return (
       <div className="p-8">
-        <EmptyState title={t('users.noAccess')} description={t('users.noAccessDesc')} />
+        <EmptyState title="Ruxsat yo'q" description="Bu sahifani ko'rish uchun ruxsatingiz yetarli emas." />
       </div>
     );
   }
@@ -87,19 +85,19 @@ export default function UsersPage() {
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <ShieldCheck size={22} className="text-primary" />
-            {t('users.title')}
+            Foydalanuvchilar
           </h1>
           <p className="text-sm text-ink-soft">
-            {t('users.subtitle')}
+            Akkountlar, rollar va arxivni boshqarish
           </p>
         </div>
         {tab === 'users' && (
           <div className="flex items-center gap-2">
             <button onClick={() => setShowFromEmployee(true)} className="btn border border-black/10 text-ink hover:bg-black/5">
-              <UserPlus size={16} /> {t('users.fromEmp.btn')}
+              <UserPlus size={16} /> Xodimdan qo'shish
             </button>
             <button onClick={() => setShowCreate(true)} className="btn-primary">
-              <Plus size={16} /> {t('users.newUser')}
+              <Plus size={16} /> Yangi foydalanuvchi
             </button>
           </div>
         )}
@@ -108,13 +106,13 @@ export default function UsersPage() {
       {/* Tabs */}
       <div className="flex gap-1 border-b border-black/5 overflow-x-auto">
         <TabButton active={tab === 'users'} onClick={() => setTab('users')} icon={<UsersIcon size={16} />}>
-          {t('users.tabs.users')}
+          Foydalanuvchilar
         </TabButton>
         <TabButton active={tab === 'roles'} onClick={() => setTab('roles')} icon={<ShieldCheck size={16} />}>
-          {t('users.tabs.roles')}
+          Rollar
         </TabButton>
         <TabButton active={tab === 'archive'} onClick={() => setTab('archive')} icon={<Archive size={16} />}>
-          {t('users.tabs.archive')}
+          Arxiv
         </TabButton>
       </div>
 
@@ -123,7 +121,7 @@ export default function UsersPage() {
           <div className="flex items-center gap-2 mb-4 bg-white border border-black/10 rounded-button px-3 py-1.5">
             <Search size={16} className="text-ink/40" />
             <input
-              placeholder={t('users.search')}
+              placeholder="Telefon yoki ism bo'yicha qidirish..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="bg-transparent outline-none flex-1 text-sm"
@@ -137,17 +135,17 @@ export default function UsersPage() {
               ))}
             </div>
           ) : items.length === 0 ? (
-            <EmptyState title={t('users.noUsers')} />
+            <EmptyState title="Foydalanuvchilar yo'q" />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="text-left text-ink-soft border-b border-black/5">
                   <tr>
-                    <th className="py-2 pr-3">{t('users.table.user')}</th>
-                    <th className="py-2 pr-3">{t('users.table.phoneLogin')}</th>
-                    <th className="py-2 pr-3">{t('users.table.position')}</th>
-                    <th className="py-2 pr-3">{t('users.table.roles')}</th>
-                    <th className="py-2 pr-3 text-right">{t('users.table.actions')}</th>
+                    <th className="py-2 pr-3">Foydalanuvchi</th>
+                    <th className="py-2 pr-3">Telefon (login)</th>
+                    <th className="py-2 pr-3">Lavozim</th>
+                    <th className="py-2 pr-3">Rollar</th>
+                    <th className="py-2 pr-3 text-right">Amallar</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -181,14 +179,14 @@ export default function UsersPage() {
                       <td className="py-2 pr-3">
                         <div className="flex items-center justify-end gap-1">
                           <button
-                            title={t('actions.edit')}
+                            title="Tahrirlash"
                             onClick={() => setEditUser(u)}
                             className="p-1.5 rounded hover:bg-black/5 text-ink/60"
                           >
                             <Pencil size={16} />
                           </button>
                           <button
-                            title={u.id === me?.id ? t('users.selfArchiveTooltip') : t('users.archiveTooltip')}
+                            title={u.id === me?.id ? "O'zingizni arxivga ko'chira olmaysiz" : "Arxivga ko'chirish"}
                             onClick={() => u.id !== me?.id && setDeleteUser(u)}
                             disabled={u.id === me?.id}
                             className="p-1.5 rounded hover:bg-danger/10 text-danger disabled:opacity-30 disabled:cursor-not-allowed"
@@ -234,14 +232,14 @@ export default function UsersPage() {
 
       <ConfirmModal
         open={!!deleteUser}
-        title={t('users.archiveModal.title')}
+        title="Arxivga ko'chirish"
         message={
           <>
             <span className="font-medium">{deleteUser?.full_name}</span> ({deleteUser?.phone})
-            {' '}{t('users.archiveModal.message')}
+            {' '}ni arxivga ko'chirishni tasdiqlaysizmi? Foydalanuvchi nofaol qilinadi, ma'lumotlari saqlanadi. Arxivdan tiklash mumkin.
           </>
         }
-        confirmText={t('users.archiveModal.confirm')}
+        confirmText="Ha, arxivga ko'chirish"
         variant="danger"
         loading={deleting}
         onConfirm={handleArchive}

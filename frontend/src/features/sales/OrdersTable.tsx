@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
 import { usePermissions } from '@/lib/permissions';
 import toast from 'react-hot-toast';
 import { ExternalLink, Plus, Pencil, ListPlus, Check, Printer } from 'lucide-react';
@@ -41,12 +40,12 @@ export interface OrderFull {
   has_stamp_ruc: boolean; has_stamp_avt: boolean; has_online: boolean; has_video: boolean;
 }
 
-// Status option keys — resolved with t() at render time so language switching works live.
+// Status option labels.
 // "ready" (Tayyor) olib tashlandi — buyurtma to'g'ridan-to'g'ri new → delivered ketadi.
-const STATUS_OPTION_KEYS = [
-  { value: 'new', labelKey: 'sales.statusNew' },
-  { value: 'delivered', labelKey: 'sales.statusDelivered' },
-  { value: 'rejected', labelKey: 'sales.statusRejected' },
+const STATUS_OPTIONS = [
+  { value: 'new', label: 'Navbatda' },
+  { value: 'delivered', label: 'Yetkazildi' },
+  { value: 'rejected', label: 'Rad etildi' },
 ];
 
 const STATUS_STYLES: Record<string, string> = {
@@ -92,7 +91,6 @@ export default function OrdersTable({
   onChanged: () => void;
   onPay: (orderId: string) => void;
 }) {
-  const { t } = useTranslation();
   const { canSpecial } = usePermissions();
   // Sotuvchi tanlovi — buyurtma override ruxsati bo'lganlarga (super-admin yoki system:order_override)
   const canOrderOverride = canSpecial('system:order_override');
@@ -153,21 +151,21 @@ export default function OrdersTable({
         <thead className="text-left text-ink-soft border-b border-black/10">
           <tr className="[&>th]:py-2 [&>th]:px-2 [&>th]:font-medium [&>th]:whitespace-nowrap">
             <th></th>
-            <th>{t('sales.colUnitId')}</th>
-            <th>{t('sales.colOrder')}</th>
-            <th>{t('sales.colDelivered')}</th>
-            <th>{t('sales.colCustomer')}</th>
-            <th>{t('sales.colPhone')}</th>
-            <th>{t('sales.colAddress')}</th>
-            <th>{t('sales.colModel')}</th>
-            <th>{t('sales.colDirection')}</th>
-            <th className="text-right">{t('sales.colPriceUsd')}</th>
-            <th className="text-right">{t('sales.colQty')}</th>
-            <th className="text-right">{t('sales.colDiscount')}</th>
-            <th className="text-right">{t('sales.colTotal')}</th>
-            <th className="text-right">{t('sales.colPaid')}</th>
-            <th className="text-right">{t('sales.colBalance')}</th>
-            <th>{t('sales.colStatus')}</th>
+            <th>ID raqami</th>
+            <th>Buyurtma</th>
+            <th>Yetkazilgan</th>
+            <th>Mijoz</th>
+            <th>Telefon</th>
+            <th>Manzil</th>
+            <th>Model</th>
+            <th>Yo'nalish</th>
+            <th className="text-right">Narx $</th>
+            <th className="text-right">Soni</th>
+            <th className="text-right">Chegirma ($)</th>
+            <th className="text-right">Jami</th>
+            <th className="text-right">To'langan</th>
+            <th className="text-right">Qoldiq</th>
+            <th>Status</th>
             <th></th>
           </tr>
         </thead>
@@ -189,7 +187,6 @@ function Row({
   o: OrderFull; products: ProductOpt[]; salespeople: Salesperson[];
   onChanged: () => void; onPay: (id: string) => void;
 }) {
-  const { t } = useTranslation();
   const navigate = useNavigate();
   const { can, canSpecial } = usePermissions();
   const canOrderOverride = canSpecial('system:order_override');
@@ -210,7 +207,7 @@ function Row({
       await api.patch(`/orders/${o.id}`, body);
       onChanged();
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || t('common.error'));
+      toast.error(e?.response?.data?.detail || "Xatolik yuz berdi");
     } finally {
       setSaving(false);
     }
@@ -224,7 +221,7 @@ function Row({
       await api.patch(`/orders/${o.id}/override-amounts`, body);
       onChanged();
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || t('common.error'));
+      toast.error(e?.response?.data?.detail || "Xatolik yuz berdi");
     } finally {
       setSaving(false);
     }
@@ -262,7 +259,7 @@ function Row({
       await api.patch(`/orders/${o.id}/salesperson`, { salesperson_id: id || null });
       onChanged();
     } catch (err: any) {
-      toast.error(err?.response?.data?.detail || t('common.error'));
+      toast.error(err?.response?.data?.detail || "Xatolik yuz berdi");
     } finally {
       setSaving(false);
     }
@@ -279,7 +276,7 @@ function Row({
       await api.patch(url, { unit_uid: v || null });
       onChanged();
     } catch (err: any) {
-      toast.error(err?.response?.data?.detail || t('common.error'));
+      toast.error(err?.response?.data?.detail || "Xatolik yuz berdi");
       e.target.value = o.unit_uid ?? '';
     } finally {
       setSaving(false);
@@ -293,7 +290,7 @@ function Row({
       await api.patch(`/customers/${o.customer.id}`, body);
       onChanged();
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || t('common.error'));
+      toast.error(e?.response?.data?.detail || "Xatolik yuz berdi");
     } finally {
       setSaving(false);
     }
@@ -301,7 +298,7 @@ function Row({
 
   async function onStatusChange(next: string) {
     if (next === 'delivered' && balance > 0 && !o.customer?.is_dealer) {
-      toast.error(t('sales.notPaidError'));
+      toast.error("Buyurtma to'liq to'lanmagan");
       setStatus(o.status);
       return;
     }
@@ -311,7 +308,7 @@ function Row({
       await api.patch(`/orders/${o.id}`, { status: next });
       onChanged();
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || t('common.error'));
+      toast.error(e?.response?.data?.detail || "Xatolik yuz berdi");
       setStatus(o.status);
     } finally {
       setSaving(false);
@@ -328,7 +325,7 @@ function Row({
         // chegirma dollarda — narx ($) × soni dan oshmasligi kerak
         const subtotalUsd = num(main.unit_price_usd) * (main.quantity || 1);
         if (v < 0 || v > subtotalUsd) {
-          toast.error(t('sales.discountExceedsRow'));
+          toast.error("Chegirma mahsulot summasidan oshib ketdi");
           e.target.value = String(num(orig));
           return;
         }
@@ -338,16 +335,15 @@ function Row({
       saveMain({ [key]: v });
     };
 
-  // Status options resolved at render time.
+  // Status options.
   // Eski "ready" buyurtma bo'lsa — uni ham ko'rsatamiz (ko'chirib olish uchun).
-  const statusKeys = status === 'ready'
-    ? [{ value: 'ready', labelKey: 'sales.statusReady' }, ...STATUS_OPTION_KEYS]
-    : STATUS_OPTION_KEYS;
-  const statusOptions = statusKeys.map((s) => ({ value: s.value, label: t(s.labelKey) }));
-  // Direction options resolved at render time
+  const statusOptions = status === 'ready'
+    ? [{ value: 'ready', label: "Tayyor bo'ldi" }, ...STATUS_OPTIONS]
+    : STATUS_OPTIONS;
+  // Direction options
   const dirOptions = [
-    { value: 'right', label: t('sales.dirRightFull') },
-    { value: 'left', label: t('sales.dirLeftFull') },
+    { value: 'right', label: "O'NGA" },
+    { value: 'left', label: "CHAPGA" },
   ];
 
   const cell = 'px-2 py-1 align-middle whitespace-nowrap';
@@ -388,7 +384,7 @@ function Row({
           {/* Aktiv buyurtmada ID'ni menejer (orders:write) tahrirlaydi; YETKAZILGAN
               buyurtmada esa override ruxsatli rol (eski/ombordan chiqib ketgan ID'lar uchun). */}
           {!(locked ? canOrderOverride : can('orders:write')) ? (
-            <span className={ro + ' font-mono text-center flex-1'} title={t('sales.unitIdReadOnly')}>
+            <span className={ro + ' font-mono text-center flex-1'} title="Yetkazilgan — ID raqamini o'zgartirib bo'lmaydi">
               {o.unit_uid || '—'}
             </span>
           ) : (
@@ -396,8 +392,8 @@ function Row({
               key={o.unit_uid ?? ''}
               defaultValue={o.unit_uid ?? ''}
               className={inp + ' text-center font-mono flex-1 min-w-0'}
-              placeholder={t('sales.unitIdPlaceholder')}
-              title={t('sales.unitIdEdit')}
+              placeholder="ID"
+              title="Ombor ID raqami — bo'sh kotyolni band qiladi"
               onBlur={saveUnitUid}
             />
           )}
@@ -427,7 +423,7 @@ function Row({
         )}
       </td>
       {/* Phone — read-only */}
-      <td className={cell + ' text-ink-soft'} title={t('sales.phoneReadOnly')}>
+      <td className={cell + ' text-ink-soft'} title="Telefon raqami (tahrirlanmaydi)">
         {o.customer?.phone ? formatPhone(o.customer.phone) : '—'}
       </td>
       <td className={cell}>
@@ -440,7 +436,7 @@ function Row({
               key={hasDelivery ? 'delivery' : 'customer'}
               defaultValue={shown}
               className={inp}
-              title={hasDelivery ? t('sales.deliveryAddressTitle') : t('sales.customerAddressTitle')}
+              title={hasDelivery ? "Yetkazish manzili (buyurtma)" : "Mijoz manzili"}
               onBlur={(e) => {
                 const v = e.target.value;
                 if (v === shown) return;
@@ -482,7 +478,7 @@ function Row({
           <span className="text-ink-soft">—</span>
         ) : locked ? (
           <span className={ro}>
-            {main?.bunker_direction === 'right' ? t('sales.dirRightFull') : main?.bunker_direction === 'left' ? t('sales.dirLeftFull') : '—'}
+            {main?.bunker_direction === 'right' ? "O'NGA" : main?.bunker_direction === 'left' ? "CHAPGA" : '—'}
           </span>
         ) : (
           <CellSelect
@@ -496,7 +492,7 @@ function Row({
       </td>
 
       {/* Price / qty / discount */}
-      <td className={cell + ' text-right text-ink-soft'} title={t('sales.priceReadOnly')}>
+      <td className={cell + ' text-right text-ink-soft'} title="Narx mahsulotlar bo'limidan olinadi — bu yerda o'zgartirilmaydi">
         {num(main?.unit_price_usd)}
       </td>
       <td className={cell + ' text-right'}>
@@ -520,7 +516,7 @@ function Row({
         {canOrderOverride ? (
           <input type="text" inputMode="numeric" defaultValue={somStr(o.items_total_uzs)}
                  key={'tot-' + o.items_total_uzs} placeholder="0"
-                 title={t('sales.overrideTotalTooltip')}
+                 title="Jami summa (so'm) — super-admin tuzatishi (eski import uchun)"
                  className={inp + ' text-right'}
                  onChange={(e) => { e.target.value = somStr(e.target.value); }}
                  onBlur={(e) => { const v = num(e.target.value.replace(/\s/g, '')); if (v === num(o.items_total_uzs)) return; overrideAmounts({ total_uzs: v }); }} />
@@ -533,11 +529,11 @@ function Row({
         <span className="inline-flex items-center gap-1 justify-end">
           {formatUZS(o.paid_uzs)}
           {canOrderOverride ? (
-            <button onClick={() => onPay(o.id)} className="p-0.5 rounded hover:bg-primary/10 text-primary" title={t('sales.managePaymentsTooltip')}>
+            <button onClick={() => onPay(o.id)} className="p-0.5 rounded hover:bg-primary/10 text-primary" title="To'lovlarni boshqarish (qo'shish/tahrirlash)">
               <Pencil size={13} />
             </button>
           ) : balance > 0 && can('orders:write') ? (
-            <button onClick={() => onPay(o.id)} className="p-0.5 rounded hover:bg-primary/10 text-primary" title={t('sales.addPaymentTooltip')}>
+            <button onClick={() => onPay(o.id)} className="p-0.5 rounded hover:bg-primary/10 text-primary" title="To'lov qo'shish (moliya)">
               <Plus size={13} />
             </button>
           ) : null}
@@ -552,7 +548,7 @@ function Row({
         {locked ? (
           <span className={'inline-block rounded-full px-2.5 py-1 text-xs font-medium ' +
             (STATUS_STYLES[status] ?? 'bg-gray-100 text-gray-700')}
-                title={t('sales.blockedDeliverTitle')}>
+                title="Buyurtma to'liq to'lanmagan">
             {statusOptions.find((st) => st.value === status)?.label ?? status}
           </span>
         ) : (
@@ -569,10 +565,10 @@ function Row({
 
       <td className={cell}>
         <div className="flex items-center justify-center gap-0.5">
-          <button onClick={() => setReceiptOpen(true)} className="p-1 rounded hover:bg-accent/10 text-accent" title={t('sales.printReceiptCheckTitle')}>
+          <button onClick={() => setReceiptOpen(true)} className="p-1 rounded hover:bg-accent/10 text-accent" title="Chek chiqarish (termal printer)">
             <Printer size={14} />
           </button>
-          <button onClick={() => navigate(`/orders/${o.id}`)} className="p-1 rounded hover:bg-black/5 text-ink-soft" title={t('sales.openOrder')}>
+          <button onClick={() => navigate(`/orders/${o.id}`)} className="p-1 rounded hover:bg-black/5 text-ink-soft" title="Ochish">
             <ExternalLink size={14} />
           </button>
         </div>
@@ -583,7 +579,6 @@ function Row({
 }
 
 function QueueButton({ o, onChanged }: { o: OrderFull; onChanged: () => void }) {
-  const { t } = useTranslation();
   const [busy, setBusy] = useState(false);
   if (o.status === 'delivered' || o.status === 'rejected') return null;
 
@@ -595,11 +590,11 @@ function QueueButton({ o, onChanged }: { o: OrderFull; onChanged: () => void }) 
         await api.post(`/orders/${o.id}/from-queue`);
       } else {
         await api.post(`/orders/${o.id}/to-queue`, {});
-        toast.success(t('sales.queueAdded'));
+        toast.success("Navbatga qo'shildi");
       }
       onChanged();
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || t('common.error'));
+      toast.error(e?.response?.data?.detail || "Xatolik yuz berdi");
     } finally {
       setBusy(false);
     }
@@ -608,13 +603,13 @@ function QueueButton({ o, onChanged }: { o: OrderFull; onChanged: () => void }) 
   return o.in_queue ? (
     <button onClick={toggleQueue} disabled={busy}
             className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-emerald-500 text-white shadow-sm ring-1 ring-emerald-600/20 hover:bg-emerald-600 transition disabled:opacity-50"
-            title={t('sales.removeFromQueue')}>
+            title="Navbatdan chiqarish">
       <Check size={16} strokeWidth={3} />
     </button>
   ) : (
     <button onClick={toggleQueue} disabled={busy}
             className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-primary/10 text-primary ring-1 ring-primary/25 hover:bg-primary hover:text-white transition disabled:opacity-50"
-            title={t('sales.addToQueue')}>
+            title="Navbatga o'tkazish">
       <ListPlus size={15} strokeWidth={2.5} />
     </button>
   );

@@ -1,4 +1,3 @@
-import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
 
 export type ServiceStatus = 'new' | 'scheduled' | 'completed' | 'cancelled';
@@ -12,9 +11,15 @@ export const SERVICE_STATUS_CLS: Record<string, string> = {
   cancelled: 'bg-gray-200 text-gray-600',
 };
 
+const SERVICE_STATUS_LABELS: Record<string, string> = {
+  new: 'Yangi',
+  scheduled: 'Rejalashtirilgan',
+  completed: 'Bajarildi',
+  cancelled: 'Bekor qilingan',
+};
+
 export function ServiceStatusBadge({ status, className }: { status: string; className?: string }) {
-  const { t } = useTranslation();
   const cls = SERVICE_STATUS_CLS[status] ?? 'bg-gray-100 text-gray-700';
-  const label = t(`service.status.${status}`, { defaultValue: status });
+  const label = SERVICE_STATUS_LABELS[status] ?? status;
   return <span className={cn('badge', cls, className)}>{label}</span>;
 }

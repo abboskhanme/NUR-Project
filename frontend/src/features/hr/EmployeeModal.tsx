@@ -2,10 +2,16 @@ import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { X, Info } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
-import { useTranslation } from 'react-i18next';
 
 import { api } from '@/api/client';
 import PhoneInput from '@/components/ui/PhoneInput';
+
+const SALARY_TYPES = [
+  { value: 'hourly', label: 'Soatbay' },
+  { value: 'daily', label: 'Kunbay' },
+  { value: 'fixed', label: 'Belgilangan (oylik)' },
+  { value: 'kpi', label: 'KPI' },
+];
 
 export interface EmployeeMonthSummary {
   year: number;
@@ -82,7 +88,6 @@ export default function EmployeeModal({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const { t } = useTranslation();
   const isCreate = employee === null;
   const isOffice = !!employee?.has_account || employee?.employment_type === 'office';
 
@@ -99,13 +104,6 @@ export default function EmployeeModal({
   const [status, setStatus] = useState(employee?.status ?? 'active');
   const [saving, setSaving] = useState(false);
 
-  const SALARY_TYPES = [
-    { value: 'hourly', label: t('hr.salaryType.hourly') },
-    { value: 'daily', label: t('hr.salaryType.daily') },
-    { value: 'fixed', label: t('hr.salaryType.fixedFull') },
-    { value: 'kpi', label: t('hr.salaryType.kpi') },
-  ];
-
   const positionsQ = useQuery<Position[]>({
     queryKey: ['hr', 'positions'],
     queryFn: () => api.get('/hr/positions').then((r) => r.data),
@@ -120,7 +118,7 @@ export default function EmployeeModal({
 
   async function handleSave() {
     if (!isOffice && !fullName.trim()) {
-      toast.error(t('hr.modal.errorRequired'));
+      toast.error('Ism-familiya majburiy');
       return;
     }
     setSaving(true);
@@ -140,7 +138,7 @@ export default function EmployeeModal({
           salary_amount: salaryAmount || '0',
           status,
         });
-        toast.success(t('hr.modal.created'));
+        toast.success("Xodim qo'shildi");
       } else {
         const payload: Record<string, unknown> = {
           secondary_phone: secondaryPhone || null,
@@ -158,12 +156,12 @@ export default function EmployeeModal({
           payload.department_type = departmentType;
         }
         await api.patch(`/hr/employees/${employee!.id}`, payload);
-        toast.success(t('hr.modal.updated'));
+        toast.success('Yangilandi');
       }
       onSaved();
       onClose();
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || t('hr.modal.errorGeneric'));
+      toast.error(e?.response?.data?.detail || 'Xatolik');
     } finally {
       setSaving(false);
     }
@@ -181,8 +179,8 @@ export default function EmployeeModal({
         <div className="flex items-center justify-between px-5 py-3 border-b border-black/5 shrink-0">
           <h3 className="font-semibold">
             {isCreate
-              ? t('hr.modal.createTitle')
-              : t('hr.modal.editTitle', { name: employee?.full_name })}
+              ? 'Yangi xodim (Oddiy ishchi)'
+              : `Xodimni tahrirlash — ${employee?.full_name}`}
           </h3>
           <button onClick={onClose} className="p-1 rounded hover:bg-black/5">
             <X size={18} />
@@ -193,27 +191,27 @@ export default function EmployeeModal({
           {isOffice && (
             <div className="flex items-start gap-2 text-sm bg-primary/5 text-ink/80 rounded-button px-3 py-2.5">
               <Info size={16} className="text-primary mt-0.5 shrink-0" />
-              <span dangerouslySetInnerHTML={{ __html: t('hr.modal.officeInfo') }} />
+              <span dangerouslySetInnerHTML={{ __html: "Bu — <strong>Ofis xodimi</strong> (tizim foydalanuvchisi). Ism-familiya, telefon va lavozim <strong>Foydalanuvchilar</strong> bo'limidan boshqariladi. Bu yerda qo'shimcha ma'lumot va oylik sozlamalarini kiritishingiz mumkin." }} />
             </div>
           )}
 
           {!isOffice && (
             <div>
-              <label className="label">{t('hr.modal.departmentTypeLabel')}</label>
+              <label className="label">Bo'lim turi</label>
               <select
                 className="input"
                 value={departmentType}
                 onChange={(e) => setDepartmentType(e.target.value)}
               >
-                <option value="office">{t('hr.tabs.office')}</option>
-                <option value="assembly">{t('hr.tabs.assembly')}</option>
-                <option value="production">{t('hr.tabs.production')}</option>
+                <option value="office">Ofis xodimlari</option>
+                <option value="assembly">Yig'uv bo'limi</option>
+                <option value="production">Ishlab chiqarish</option>
               </select>
             </div>
           )}
 
           <div>
-            <label className="label">{t('hr.modal.fullNameLabel')}</label>
+            <label className="label">Ism-familiya *</label>
             <input
               className="input"
               value={fullName}
@@ -224,18 +222,18 @@ export default function EmployeeModal({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="label">{t('hr.modal.phoneLabel')}</label>
+              <label className="label">Telefon</label>
               <PhoneInput value={phone} onChange={setPhone} disabled={isOffice} />
             </div>
             <div>
-              <label className="label">{t('hr.modal.secondaryPhoneLabel')}</label>
+              <label className="label">Qo'shimcha telefon</label>
               <PhoneInput value={secondaryPhone} onChange={setSecondaryPhone} />
             </div>
           </div>
 
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="label">{t('hr.modal.birthDateLabel')}</label>
+              <label className="label">Tug'ilgan sana</label>
               <input
                 type="date"
                 className="input"
@@ -244,7 +242,7 @@ export default function EmployeeModal({
               />
             </div>
             <div>
-              <label className="label">{t('hr.modal.hireDateLabel')}</label>
+              <label className="label">Ish boshlagan sana</label>
               <input
                 type="date"
                 className="input"
@@ -254,14 +252,14 @@ export default function EmployeeModal({
               />
             </div>
             <div>
-              <label className="label">{t('hr.modal.positionLabel')}</label>
+              <label className="label">Lavozim</label>
               <select
                 className="input"
                 value={positionId ?? ''}
                 disabled={isOffice}
                 onChange={(e) => setPositionId(e.target.value)}
               >
-                <option value="">{t('hr.modal.positionNone')}</option>
+                <option value="">— tanlanmagan —</option>
                 {positions.map((p) => (
                   <option key={p.id} value={p.id}>{p.name}</option>
                 ))}
@@ -270,7 +268,7 @@ export default function EmployeeModal({
           </div>
 
           <div>
-            <label className="label">{t('hr.modal.addressLabel')}</label>
+            <label className="label">Manzil</label>
             <textarea
               className="input min-h-[64px]"
               value={address ?? ''}
@@ -280,7 +278,7 @@ export default function EmployeeModal({
 
           <div className="pt-3 border-t border-black/5 grid grid-cols-2 gap-3">
             <div>
-              <label className="label">{t('hr.modal.salaryTypeLabel')}</label>
+              <label className="label">Oylik turi</label>
               <select
                 className="input"
                 value={salaryType}
@@ -292,7 +290,7 @@ export default function EmployeeModal({
               </select>
             </div>
             <div>
-              <label className="label">{t('hr.modal.salaryAmountLabel', { currency: employee?.currency ?? 'UZS' })}</label>
+              <label className="label">{`Summa (${employee?.currency ?? 'UZS'})`}</label>
               <input
                 type="text"
                 inputMode="decimal"
@@ -306,14 +304,14 @@ export default function EmployeeModal({
 
           {!isCreate && (
             <div>
-              <label className="label">{t('hr.modal.statusLabel')}</label>
+              <label className="label">Status</label>
               <select
                 className="input"
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
               >
-                <option value="active">{t('hr.status.active')}</option>
-                <option value="terminated">{t('hr.status.terminated')}</option>
+                <option value="active">Faol</option>
+                <option value="terminated">Ishdan ketgan</option>
               </select>
             </div>
           )}
@@ -321,14 +319,14 @@ export default function EmployeeModal({
 
         <div className="px-5 py-3 border-t border-black/5 flex justify-end gap-2 shrink-0">
           <button onClick={onClose} className="px-3 py-1.5 text-sm rounded-button hover:bg-black/5">
-            {t('actions.cancel')}
+            Bekor qilish
           </button>
           <button
             onClick={handleSave}
             disabled={saving}
             className="btn-primary disabled:opacity-50"
           >
-            {saving ? t('hr.modal.saving') : t('actions.save')}
+            {saving ? 'Saqlanmoqda...' : 'Saqlash'}
           </button>
         </div>
       </div>

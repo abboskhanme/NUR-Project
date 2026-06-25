@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { useTranslation } from 'react-i18next';
 import { Search, X, User, FileText, Package, Wrench, Loader2 } from 'lucide-react';
 
 import { api } from '@/api/client';
@@ -17,15 +16,14 @@ interface SearchItem {
 interface SearchGroup { type: string; items: SearchItem[] }
 interface SearchResponse { query: string; groups: SearchGroup[] }
 
-const GROUP_META: Record<string, { icon: typeof User; titleKey: string }> = {
-  customers: { icon: User, titleKey: 'ui.search.groups.customers' },
-  orders: { icon: FileText, titleKey: 'ui.search.groups.orders' },
-  products: { icon: Package, titleKey: 'ui.search.groups.products' },
-  service: { icon: Wrench, titleKey: 'ui.search.groups.service' },
+const GROUP_META: Record<string, { icon: typeof User; title: string }> = {
+  customers: { icon: User, title: 'Mijozlar' },
+  orders: { icon: FileText, title: 'Buyurtmalar' },
+  products: { icon: Package, title: 'Mahsulotlar' },
+  service: { icon: Wrench, title: 'Servis' },
 };
 
 export default function GlobalSearch({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { t } = useTranslation();
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [debounced, setDebounced] = useState('');
@@ -99,7 +97,7 @@ export default function GlobalSearch({ open, onClose }: { open: boolean; onClose
             ref={inputRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder={t('ui.search.placeholder')}
+            placeholder="Buyurtma, mijoz, mahsulot yoki servis qidiring…"
             className="flex-1 bg-transparent outline-none text-sm text-ink placeholder:text-ink-soft"
           />
           {isFetching && <Loader2 size={16} className="text-ink/40 animate-spin shrink-0" />}
@@ -111,9 +109,9 @@ export default function GlobalSearch({ open, onClose }: { open: boolean; onClose
         {/* Natijalar */}
         <div className="max-h-[55vh] overflow-y-auto">
           {debounced.length < 2 ? (
-            <div className="px-4 py-8 text-center text-sm text-ink-soft">{t('ui.search.hint')}</div>
+            <div className="px-4 py-8 text-center text-sm text-ink-soft">Qidirish uchun kamida 2 ta belgi kiriting</div>
           ) : !hasResults && !isFetching ? (
-            <div className="px-4 py-8 text-center text-sm text-ink-soft">{t('ui.search.empty', { query: debounced })}</div>
+            <div className="px-4 py-8 text-center text-sm text-ink-soft">{`«${debounced}» bo'yicha hech narsa topilmadi`}</div>
           ) : (
             (data?.groups ?? []).map((g) => {
               const meta = GROUP_META[g.type];
@@ -121,7 +119,7 @@ export default function GlobalSearch({ open, onClose }: { open: boolean; onClose
               return (
                 <div key={g.type} className="py-1">
                   <div className="px-4 pt-2 pb-1 text-[11px] font-semibold uppercase tracking-wide text-ink-soft">
-                    {meta ? t(meta.titleKey) : g.type}
+                    {meta ? meta.title : g.type}
                   </div>
                   {g.items.map((item) => {
                     runningIndex += 1;

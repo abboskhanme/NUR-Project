@@ -129,7 +129,7 @@ async def update_me(
             if dup.scalar_one_or_none():
                 raise HTTPException(status_code=409, detail="Bu telefon raqam allaqachon ishlatilgan")
         user.phone = new_phone
-    for field in ("full_name", "avatar_url", "position", "locale", "theme", "telegram_chat_id"):
+    for field in ("full_name", "avatar_url", "position", "theme", "telegram_chat_id"):
         val = getattr(payload, field, None)
         if val is not None:
             setattr(user, field, val)

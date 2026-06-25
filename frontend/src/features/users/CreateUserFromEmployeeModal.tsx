@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import { X, UserPlus, RefreshCw, Eye, EyeOff, Check, Search } from 'lucide-react';
 
@@ -34,8 +33,6 @@ export default function CreateUserFromEmployeeModal({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const { t } = useTranslation();
-
   const [empId, setEmpId] = useState('');
   const [search, setSearch] = useState('');
   const [fullName, setFullName] = useState('');
@@ -88,9 +85,9 @@ export default function CreateUserFromEmployeeModal({
   }
 
   async function handleSave() {
-    if (!empId) { toast.error(t('users.fromEmp.pickFirst')); return; }
-    if (!phone || !fullName) { toast.error(t('users.modal.phoneRequired')); return; }
-    if (password.length < 8) { toast.error(t('users.modal.passwordMinLength')); return; }
+    if (!empId) { toast.error('Avval xodimni tanlang'); return; }
+    if (!phone || !fullName) { toast.error("Telefon raqam va to'liq ism majburiy"); return; }
+    if (password.length < 8) { toast.error('Parol kamida 8 ta belgi bo\'lishi kerak'); return; }
     setSaving(true);
     try {
       await api.post(`/users/from-employee/${empId}`, {
@@ -100,11 +97,11 @@ export default function CreateUserFromEmployeeModal({
         position: position || null,
         role_names: selectedRoles,
       });
-      toast.success(t('users.fromEmp.createdSuccess'));
+      toast.success("Foydalanuvchi yaratildi va xodimga bog'landi");
       onSaved();
       onClose();
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || t('common.error'));
+      toast.error(e?.response?.data?.detail || 'Xatolik yuz berdi');
     } finally {
       setSaving(false);
     }
@@ -119,7 +116,7 @@ export default function CreateUserFromEmployeeModal({
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-black/5 shrink-0">
           <h3 className="font-semibold flex items-center gap-2">
-            <UserPlus size={18} className="text-primary" /> {t('users.fromEmp.title')}
+            <UserPlus size={18} className="text-primary" /> Xodimdan foydalanuvchi yaratish
           </h3>
           <button onClick={onClose} className="p-1 rounded hover:bg-black/5"><X size={18} /></button>
         </div>
@@ -128,11 +125,11 @@ export default function CreateUserFromEmployeeModal({
         <div className="flex-1 overflow-y-auto p-5 space-y-5">
           {/* Xodim tanlash */}
           <div>
-            <label className="label">{t('users.fromEmp.employeeLabel')}</label>
+            <label className="label">Xodimni tanlang *</label>
             <div className="flex items-center gap-2 mb-2 bg-white border border-black/10 rounded-button px-3 py-1.5">
               <Search size={15} className="text-ink/40" />
               <input
-                placeholder={t('users.fromEmp.searchEmp')}
+                placeholder="Xodim qidirish (ism yoki telefon)..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="bg-transparent outline-none flex-1 text-sm"
@@ -143,7 +140,7 @@ export default function CreateUserFromEmployeeModal({
                 {Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-10 rounded-button bg-black/5 animate-pulse" />)}
               </div>
             ) : employees.length === 0 ? (
-              <p className="text-sm text-ink-soft py-3 text-center">{t('users.fromEmp.noEmployees')}</p>
+              <p className="text-sm text-ink-soft py-3 text-center">Akkauntsiz xodim yo'q. Hamma xodimlarda allaqachon foydalanuvchi bor.</p>
             ) : (
               <div className="border border-black/10 rounded-button divide-y divide-black/5 max-h-44 overflow-y-auto">
                 {filtered.map((e) => (
@@ -178,19 +175,19 @@ export default function CreateUserFromEmployeeModal({
           {empId && (
             <div className="space-y-3 pt-1 border-t border-black/5">
               <div>
-                <label className="label">{t('users.modal.phoneLabel')}</label>
+                <label className="label">Telefon raqam (login) *</label>
                 <PhoneInput value={phone} onChange={setPhone} />
               </div>
               <div>
-                <label className="label">{t('users.modal.fullNameLabel')}</label>
+                <label className="label">To'liq ism *</label>
                 <input className="input" value={fullName} onChange={(e) => setFullName(e.target.value)} />
               </div>
               <div>
-                <label className="label">{t('users.modal.positionLabel')}</label>
+                <label className="label">Lavozim</label>
                 <input className="input" value={position} onChange={(e) => setPosition(e.target.value)} />
               </div>
               <div>
-                <label className="label">{t('users.modal.initialPasswordLabel')}</label>
+                <label className="label">Boshlang'ich parol *</label>
                 <div className="flex gap-2">
                   <div className="flex-1 relative">
                     <input
@@ -198,7 +195,7 @@ export default function CreateUserFromEmployeeModal({
                       className="input pr-10"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      placeholder={t('users.modal.passwordPlaceholder')}
+                      placeholder="kamida 8 ta belgi"
                     />
                     <button
                       type="button"
@@ -212,26 +209,26 @@ export default function CreateUserFromEmployeeModal({
                     type="button"
                     onClick={generatePwd}
                     className="px-3 rounded-button border border-black/10 hover:bg-black/5 text-sm flex items-center gap-1"
-                    title={t('users.modal.generateTitle')}
+                    title="Tasodifiy 12-belgili parol"
                   >
-                    <RefreshCw size={14} /> {t('users.modal.generateBtn')}
+                    <RefreshCw size={14} /> Generatsiya
                   </button>
                 </div>
                 {password && showPwd && (
-                  <p className="mt-2 text-xs text-warn">{t('users.modal.pwdVisible')}</p>
+                  <p className="mt-2 text-xs text-warn">Parolni eslab qoling yoki nusxa oling — modal yopilgach ko'rinmaydi.</p>
                 )}
               </div>
 
               {/* Roles */}
               <div className="pt-2 border-t border-black/5">
                 <div className="flex items-center justify-between mb-2">
-                  <label className="label !mb-0">{t('users.modal.rolesLabel')}</label>
+                  <label className="label !mb-0">Rollar</label>
                   <span className="text-xs text-ink-soft">
-                    {t('users.modal.rolesSelected', { count: selectedRoles.length })}
+                    {`${selectedRoles.length} ta tanlangan`}
                   </span>
                 </div>
                 {roles.length === 0 ? (
-                  <p className="text-sm text-ink-soft py-2">{t('users.modal.noRoles')}</p>
+                  <p className="text-sm text-ink-soft py-2">Rollar mavjud emas</p>
                 ) : (
                   <div className="border border-black/10 rounded-button divide-y divide-black/5 max-h-48 overflow-y-auto">
                     {roles.map((r) => {
@@ -271,10 +268,10 @@ export default function CreateUserFromEmployeeModal({
         {/* Footer */}
         <div className="px-5 py-3 border-t border-black/5 flex justify-end gap-2 shrink-0">
           <button onClick={onClose} className="px-3 py-1.5 text-sm rounded-button hover:bg-black/5">
-            {t('actions.cancel')}
+            Bekor qilish
           </button>
           <button onClick={handleSave} disabled={saving || !empId} className="btn-primary disabled:opacity-50">
-            {saving ? t('users.modal.saving') : t('users.fromEmp.submit')}
+            {saving ? 'Saqlanmoqda...' : "Yaratish va bog'lash"}
           </button>
         </div>
       </div>

@@ -365,7 +365,7 @@ async def update_user(
 
     for field in (
         "full_name", "avatar_url", "position",
-        "locale", "theme", "is_active", "is_superadmin", "telegram_chat_id",
+        "theme", "is_active", "is_superadmin", "telegram_chat_id",
     ):
         val = getattr(payload, field, None)
         if val is not None:

@@ -1,5 +1,15 @@
-import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
+
+const STATUS_LABELS: Record<string, string> = {
+  new: 'Navbatda',
+  ready: "Tayyor bo'ldi",
+  delivered: 'Yetkazildi',
+  rejected: 'Rad etildi',
+  confirmed: 'Tasdiqlangan',
+  in_production: 'Ishlab chiqarishda',
+  paid: "To'langan",
+  cancelled: 'Bekor qilingan',
+};
 
 const STATUS_STYLES: Record<string, string> = {
   new: 'bg-blue-100 text-blue-700',
@@ -19,9 +29,8 @@ interface Props {
 }
 
 export default function StatusBadge({ status, className }: Props) {
-  const { t } = useTranslation();
   const style = STATUS_STYLES[status] || 'bg-gray-100 text-gray-700';
-  const label = t(`ui.statusBadge.${status}`, { defaultValue: status });
+  const label = STATUS_LABELS[status] ?? status;
   return (
     <span className={cn('badge', style, className)}>
       {label}

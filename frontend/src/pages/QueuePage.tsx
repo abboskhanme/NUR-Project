@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import { ChevronsUp, ChevronUp, ChevronDown, ListOrdered, Search, Wallet, Coins } from 'lucide-react';
 
@@ -36,13 +35,12 @@ function itemSummary(o: QueueOrder, dirRight: string, dirLeft: string): string {
 }
 
 export default function QueuePage() {
-  const { t } = useTranslation();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [search, setSearch] = useState('');
 
-  const dirRight = t('sales.dirRight');
-  const dirLeft = t('sales.dirLeft');
+  const dirRight = "O'NG";
+  const dirLeft = "CHAP";
 
   const { data, isLoading } = useQuery<QueueOrder[]>({
     queryKey: ['orders', 'queue'],
@@ -85,7 +83,7 @@ export default function QueuePage() {
       qc.invalidateQueries({ queryKey: ['orders', 'queue'] });
       qc.invalidateQueries({ queryKey: ['orders'] });
     } catch (err: any) {
-      toast.error(err?.response?.data?.detail || t('common.error'));
+      toast.error(err?.response?.data?.detail || "Xatolik yuz berdi");
     }
   }
 
@@ -96,14 +94,14 @@ export default function QueuePage() {
           <thead className="text-left text-ink-soft border-b border-black/5">
             <tr>
               <th className="py-2 pr-3 w-10">#</th>
-              <th className="py-2 pr-3">{t('orders.code')}</th>
-              <th className="py-2 pr-3">{t('sales.colCustomer')}</th>
-              <th className="py-2 pr-3">{t('sales.sectionItems')}</th>
-              <th className="py-2 pr-3">{t('common.date')}</th>
-              <th className="py-2 pr-3">{t('sales.colPickup')}</th>
-              <th className="py-2 pr-3 text-right">{t('common.amount')}</th>
-              <th className="py-2 pr-3">{t('common.status')}</th>
-              {reorderable && <th className="py-2 pr-3 text-right">{t('sales.colQueue')}</th>}
+              <th className="py-2 pr-3">Kod</th>
+              <th className="py-2 pr-3">Mijoz</th>
+              <th className="py-2 pr-3">Mahsulotlar</th>
+              <th className="py-2 pr-3">Sana</th>
+              <th className="py-2 pr-3">Chiqib ketish</th>
+              <th className="py-2 pr-3 text-right">Summa</th>
+              <th className="py-2 pr-3">Status</th>
+              {reorderable && <th className="py-2 pr-3 text-right">Navbat</th>}
             </tr>
           </thead>
           <tbody>
@@ -129,15 +127,15 @@ export default function QueuePage() {
                   <td className="py-2 pr-3">
                     <div className="flex items-center gap-1 justify-end">
                       <button onClick={(e) => move(o.id, 'top', e)} disabled={idx === 0}
-                              className="p-1.5 rounded hover:bg-primary/10 text-primary disabled:opacity-30" title={t('sales.moveTop')}>
+                              className="p-1.5 rounded hover:bg-primary/10 text-primary disabled:opacity-30" title="Eng yuqoriga">
                         <ChevronsUp size={16} />
                       </button>
                       <button onClick={(e) => move(o.id, 'up', e)} disabled={idx === 0}
-                              className="p-1.5 rounded hover:bg-black/5 text-ink/60 disabled:opacity-30" title={t('sales.moveUp')}>
+                              className="p-1.5 rounded hover:bg-black/5 text-ink/60 disabled:opacity-30" title="Yuqoriga">
                         <ChevronUp size={16} />
                       </button>
                       <button onClick={(e) => move(o.id, 'down', e)} disabled={idx === rows.length - 1}
-                              className="p-1.5 rounded hover:bg-black/5 text-ink/60 disabled:opacity-30" title={t('sales.moveDown')}>
+                              className="p-1.5 rounded hover:bg-black/5 text-ink/60 disabled:opacity-30" title="Pastga">
                         <ChevronDown size={16} />
                       </button>
                     </div>
@@ -155,13 +153,13 @@ export default function QueuePage() {
     <div className="space-y-4">
       <div className="flex items-end justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold">{t('sales.queueTitle')}</h1>
-          <p className="text-sm text-ink-soft">{t('sales.queueSubtitle')}</p>
+          <h1 className="text-2xl font-bold">Navbat</h1>
+          <p className="text-sm text-ink-soft">Ishlab chiqarish navbati — yuqorida turgan buyurtmalar oldin bajariladi. Shoshilinch buyurtmani strelka tugmalari bilan yuqoriga ko'taring.</p>
         </div>
         <div className="flex items-center gap-2 w-full sm:w-72 bg-white border border-black/10 rounded-button px-3 py-1.5">
           <Search size={16} className="text-ink/40 shrink-0" />
           <input
-            placeholder={t('sales.queueSearch')}
+            placeholder="Navbatdan qidirish..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="bg-transparent outline-none flex-1 text-sm min-w-0"
@@ -177,7 +175,7 @@ export default function QueuePage() {
           {/* Berilgan zaklad — yashil */}
           <div className="rounded-card border border-success/25 bg-success/10 p-4 flex items-start justify-between">
             <div>
-              <div className="text-sm font-medium text-success/90">{t('sales.queuePaidTotal')}</div>
+              <div className="text-sm font-medium text-success/90">Berilgan zaklad summasi</div>
               <div className="text-2xl font-bold mt-2 text-success">{formatUZS(totals.paid)}</div>
             </div>
             <div className="w-10 h-10 rounded-button bg-success/20 text-success flex items-center justify-center shrink-0">
@@ -187,7 +185,7 @@ export default function QueuePage() {
           {/* Qarz — qizil */}
           <div className="rounded-card border border-danger/25 bg-danger/10 p-4 flex items-start justify-between">
             <div>
-              <div className="text-sm font-medium text-danger/90">{t('sales.queueDueTotal')}</div>
+              <div className="text-sm font-medium text-danger/90">Qarz (to‘lanishi kerak)</div>
               <div className="text-2xl font-bold mt-2 text-danger">{formatUZS(totals.due)}</div>
             </div>
             <div className="w-10 h-10 rounded-button bg-danger/20 text-danger flex items-center justify-center shrink-0">
@@ -205,21 +203,21 @@ export default function QueuePage() {
         </Card>
       ) : queue.length === 0 ? (
         <Card>
-          <EmptyState title={t('sales.queueEmpty')} description={t('sales.queueEmptyDesc')} />
+          <EmptyState title="Navbat bo'sh" description="Faol (yetkazilmagan) buyurtmalar shu yerda navbat bo'yicha ko'rinadi" />
         </Card>
       ) : (
         <>
           <Card title={searching
-            ? t('sales.queueSectionSearch', { shown: pendingShown.length, total: allPending.length })
-            : t('sales.queueSection', { count: allPending.length })}>
+            ? `Navbatda — qidiruv natijasi (${pendingShown.length} / ${allPending.length})`
+            : `Navbatda (${allPending.length})`}>
             {allPending.length === 0
-              ? <EmptyState title={t('sales.queuePendingEmpty')} description={t('sales.queuePendingEmptyDesc')} />
+              ? <EmptyState title="Navbatda buyurtma yo'q" description="Yangi buyurtmalar shu yerda ko'rinadi" />
               : pendingShown.length === 0
-                ? <EmptyState title={t('sales.queueNotFound')} description={t('sales.queueNotFoundDesc')} />
+                ? <EmptyState title="Topilmadi" description="Qidiruv bo'yicha navbatda buyurtma topilmadi" />
                 : renderTable(pendingShown, !searching)}
             {searching && pendingShown.length > 0 && (
               <p className="text-xs text-ink-soft mt-3">
-                {t('sales.queueSearchMode')}
+                Qidiruv rejimida tartibni o'zgartirish tugmalari yashiriladi — raqam buyurtmaning haqiqiy navbat o'rni.
               </p>
             )}
           </Card>
@@ -227,7 +225,7 @@ export default function QueuePage() {
       )}
 
       <div className="flex items-center gap-2 text-xs text-ink-soft">
-        <ListOrdered size={14} /> {t('sales.queueHint')}
+        <ListOrdered size={14} /> Navbatga faqat faol buyurtmalar kiradi: Navbatda va Tayyor bo'ldi. Tartib har guruh ichida alohida.
       </div>
     </div>
   );

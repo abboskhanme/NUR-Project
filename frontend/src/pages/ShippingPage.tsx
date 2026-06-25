@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import {
   Plus, Trash2, Truck, BarChart3, ClipboardList, Package, Coins,
@@ -73,13 +72,49 @@ const GROUP_DEFS = [
 
 const DIR_VALUES = ['right', 'left'] as const;
 const DRIVER_LIST_ID = 'ship-drivers';
+
+const SHIP_MONTHS: Record<string, string> = {
+  '1': 'Yanvar', '2': 'Fevral', '3': 'Mart', '4': 'Aprel', '5': 'May', '6': 'Iyun',
+  '7': 'Iyul', '8': 'Avgust', '9': 'Sentabr', '10': 'Oktabr', '11': 'Noyabr', '12': 'Dekabr',
+};
+const SHIP_DIR: Record<string, string> = { right: "O'ng", left: 'Chap' };
+
+// shipping.* literal lug'at (dinamik kalitlar uchun)
+const SHIP_TEXT: Record<string, string> = {
+  grpCargo: 'Yuk',
+  grpDriver: 'Shofyor',
+  grpPayment: "To'lov",
+  grpStatus: 'Holat',
+  colDate: 'Sana',
+  colQty: 'Soni',
+  colCountry: 'Davlat',
+  colRegion: 'Viloyat',
+  colDestination: 'Manzil',
+  colKvm: 'KVM',
+  colDirection: "Yo'nalish",
+  colProduct: 'Mahsulot',
+  colProductPrice: 'Mahsulot narxi',
+  colDriverName: 'Shofyor',
+  colDriverPhone: 'Shofyor tel',
+  colFreight: "Yo'l kira",
+  colCardNumber: 'Karta raqami',
+  colCardHolder: 'Karta egasi',
+  colReason: 'Izoh',
+};
+const SHIP_STATS_GB: Record<string, string> = {
+  gbRegion: "Viloyat bo'yicha",
+  gbCountry: "Davlat bo'yicha",
+  gbDirection: "Yo'nalish bo'yicha",
+  gbDriver: "Shofyor bo'yicha",
+  gbMonth: "Oylar bo'yicha",
+  gbYear: "Yillar bo'yicha",
+};
 const INP = 'w-full bg-transparent outline-none px-2 py-1.5 text-sm rounded placeholder:text-ink-soft/40 focus:bg-accent/5 focus:ring-1 focus:ring-accent/40';
 const SEL = 'w-full bg-transparent outline-none px-1.5 py-1.5 text-sm rounded cursor-pointer hover:bg-black/[0.03] focus:bg-accent/5 focus:ring-1 focus:ring-accent/40';
 
 type Tab = 'journal' | 'stats';
 
 export default function ShippingPage() {
-  const { t } = useTranslation();
   const [tab, setTab] = useState<Tab>('journal');
 
   return (
@@ -89,17 +124,17 @@ export default function ShippingPage() {
           <Truck size={22} />
         </div>
         <div>
-          <h1 className="text-2xl font-bold">{t('shipping.title')}</h1>
-          <p className="text-sm text-ink-soft">{t('shipping.subtitle')}</p>
+          <h1 className="text-2xl font-bold">Yuk chiqarish</h1>
+          <p className="text-sm text-ink-soft">Yetkazib berilgan yuklar, haydovchi to'lovlari va muammolar tarixi</p>
         </div>
       </div>
 
       <div className="flex gap-1 border-b border-black/5 overflow-x-auto">
         <TabBtn active={tab === 'journal'} onClick={() => setTab('journal')} icon={<ClipboardList size={16} />}>
-          {t('shipping.tabJournal')}
+          Jurnal
         </TabBtn>
         <TabBtn active={tab === 'stats'} onClick={() => setTab('stats')} icon={<BarChart3 size={16} />}>
-          {t('shipping.tabStats')}
+          Statistika
         </TabBtn>
       </div>
 
@@ -126,7 +161,6 @@ function TabBtn({ active, onClick, icon, children }: {
 /* ─────────────────────────── JURNAL ─────────────────────────── */
 
 function Journal() {
-  const { t } = useTranslation();
   const qc = useQueryClient();
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
@@ -179,7 +213,7 @@ function Journal() {
       await api.post('/shipping', { date: iso, qty: 1 });
       refresh();
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || t('common.error'));
+      toast.error(e?.response?.data?.detail || 'Xatolik yuz berdi');
     } finally {
       setAdding(false);
     }
@@ -190,11 +224,11 @@ function Journal() {
     setDeleting(true);
     try {
       await api.delete(`/shipping/${delRow.id}`);
-      toast.success(t('shipping.deleted'));
+      toast.success('O\'chirildi');
       setDelRow(null);
       refresh();
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || t('common.error'));
+      toast.error(e?.response?.data?.detail || 'Xatolik yuz berdi');
     } finally {
       setDeleting(false);
     }
@@ -206,17 +240,17 @@ function Journal() {
     <div className="space-y-4">
       {/* KPI chiplar */}
       <div className="grid grid-cols-2 gap-3">
-        <Kpi icon={<Package size={16} />} label={t('shipping.colQty')} value={formatNumberInput(String(totalQty))} tone="warning" />
-        <Kpi icon={<Coins size={16} />} label={t('shipping.totalFreight')} value={formatUZS(totalFreight)} tone="success" />
+        <Kpi icon={<Package size={16} />} label="Soni" value={formatNumberInput(String(totalQty))} tone="warning" />
+        <Kpi icon={<Coins size={16} />} label="Jami yo'l kira" value={formatUZS(totalFreight)} tone="success" />
       </div>
 
       {/* Filter + qo'shish */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-2">
           <select className="input !w-auto" value={month} onChange={(e) => setMonth(Number(e.target.value))}>
-            <option value={0}>{t('shipping.allMonths')}</option>
+            <option value={0}>Butun yil</option>
             {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-              <option key={m} value={m}>{t(`shipping.months.${m}`)}</option>
+              <option key={m} value={m}>{SHIP_MONTHS[String(m)]}</option>
             ))}
           </select>
           <select className="input !w-auto" value={year} onChange={(e) => setYear(Number(e.target.value))}>
@@ -224,7 +258,7 @@ function Journal() {
           </select>
         </div>
         <button className="btn-primary" onClick={addRow} disabled={adding}>
-          <Plus size={16} /> {t('shipping.addRow')}
+          <Plus size={16} /> Qator qo'shish
         </button>
       </div>
 
@@ -239,7 +273,7 @@ function Journal() {
             {Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-9 rounded bg-black/5 animate-pulse" />)}
           </div>
         ) : rows.length === 0 ? (
-          <div className="p-6"><EmptyState title={t('shipping.empty')} description={t('shipping.emptyDesc')} /></div>
+          <div className="p-6"><EmptyState title="Yozuvlar yo'q" description="Yangi qator qo'shing va joyida to'ldiring (Excel kabi)" /></div>
         ) : (
           <div className="overflow-auto max-h-[72vh]">
             <table className="text-sm border-collapse table-fixed" style={{ width: tableWidth }}>
@@ -252,7 +286,7 @@ function Journal() {
                   {GROUP_DEFS.map((g) => (
                     <th key={g.key} colSpan={g.span}
                         className={`h-9 px-2 text-left text-[11px] font-bold uppercase tracking-wider bg-primary-50 border-b-2 ${g.border} ${g.text}`}>
-                      {t(`shipping.${g.key}`)}
+                      {SHIP_TEXT[g.key]}
                     </th>
                   ))}
                   <th className="bg-primary-50 border-b-2 border-black/10" />
@@ -261,7 +295,7 @@ function Journal() {
                   {COLS.map((c) => (
                     <th key={c.key}
                         className={`h-8 px-2 font-semibold text-[11px] uppercase tracking-wide text-ink-soft bg-bg border-b border-black/10 border-r border-black/5 whitespace-nowrap ${c.align ?? 'text-left'}`}>
-                      {t(`shipping.${c.label}`)}
+                      {SHIP_TEXT[c.label]}
                     </th>
                   ))}
                   <th className="bg-bg border-b border-black/10" />
@@ -275,7 +309,7 @@ function Journal() {
               </tbody>
               <tfoot>
                 <tr className="sticky bottom-0 z-10 font-bold bg-primary-50 [&>td]:py-2 [&>td]:px-2 [&>td]:border-t-2 [&>td]:border-black/10">
-                  <td>{t('shipping.total')}</td>
+                  <td>Jami</td>
                   <td className="tabular-nums">{formatNumberInput(String(totalQty))}</td>
                   <td colSpan={3} />
                   <td />
@@ -292,8 +326,8 @@ function Journal() {
 
       <ConfirmModal
         open={!!delRow}
-        title={t('shipping.deleteTitle')}
-        message={t('shipping.deleteConfirm')}
+        title="Yozuvni o'chirish"
+        message="Ushbu yuk yozuvi o'chiriladi. Davom etamizmi?"
         loading={deleting}
         onConfirm={confirmDelete}
         onCancel={() => setDelRow(null)}
@@ -325,7 +359,6 @@ function Row({ s, zebra, drivers, products, rate, onChanged, onDelete }: {
   s: Shipment; zebra: boolean; drivers: Driver[]; products: ShipProduct[]; rate: number;
   onChanged: () => void; onDelete: (s: Shipment) => void;
 }) {
-  const { t } = useTranslation();
   const td = 'align-middle border-r border-black/5';
 
   async function patch(body: Record<string, unknown>) {
@@ -333,7 +366,7 @@ function Row({ s, zebra, drivers, products, rate, onChanged, onDelete }: {
       await api.patch(`/shipping/${s.id}`, body);
       onChanged();
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || t('common.error'));
+      toast.error(e?.response?.data?.detail || 'Xatolik yuz berdi');
     }
   }
 
@@ -415,7 +448,7 @@ function Row({ s, zebra, drivers, products, rate, onChanged, onDelete }: {
               <select className={SEL} value={cur} onChange={(e) => patchField(c, e.target.value)}>
                 <option value="">—</option>
                 {!known && cur && <option value={cur}>{cur}</option>}
-                {DIR_VALUES.map((d) => <option key={d} value={d}>{t(`shipping.dir.${d}`)}</option>)}
+                {DIR_VALUES.map((d) => <option key={d} value={d}>{SHIP_DIR[d]}</option>)}
               </select>
             </td>
           );
@@ -497,14 +530,13 @@ const GROUPS: { v: GroupBy; label: string }[] = [
   { v: 'year', label: 'gbYear' },
 ];
 const METRICS: { v: Metric; key: string }[] = [
-  { v: 'freight', key: 'shipping.colFreight' },
-  { v: 'count', key: 'shipping.stats.count' },
-  { v: 'qty', key: 'shipping.colQty' },
+  { v: 'freight', key: "Yo'l kira" },
+  { v: 'count', key: 'Yozuvlar' },
+  { v: 'qty', key: 'Soni' },
 ];
 const BAR_COLORS = ['#2980B9', '#27AE60', '#F39C12', '#E74C3C', '#1E3A5F', '#8E44AD', '#16A085', '#D35400'];
 
 function Stats() {
-  const { t } = useTranslation();
   const now = new Date();
   const [groupBy, setGroupBy] = useState<GroupBy>('region');
   const [metric, setMetric] = useState<Metric>('freight');
@@ -527,10 +559,10 @@ function Stats() {
   const data = q.data;
 
   function keyLabel(key: string): string {
-    if (key === '—' || key === '') return t('shipping.stats.none');
-    if (groupBy === 'month') return t(`shipping.months.${key}`);
+    if (key === '—' || key === '') return '(belgilanmagan)';
+    if (groupBy === 'month') return SHIP_MONTHS[key];
     if (groupBy === 'country') return CENTRAL_ASIA.find((c) => c.value === key)?.label ?? key;
-    if (groupBy === 'direction') return (key === 'right' || key === 'left') ? t(`shipping.dir.${key}`) : key;
+    if (groupBy === 'direction') return (key === 'right' || key === 'left') ? SHIP_DIR[key] : key;
     return key;
   }
   const grp = (n: number) => formatNumberInput(String(n || 0));
@@ -551,23 +583,23 @@ function Stats() {
       {/* Boshqaruv paneli */}
       <div className="rounded-card border border-black/5 bg-card p-3 flex flex-wrap items-center gap-x-6 gap-y-3">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-ink-soft">{t('shipping.stats.groupBy')}</span>
+          <span className="text-sm font-medium text-ink-soft">Guruhlash</span>
           <select className="input !w-auto" value={groupBy} onChange={(e) => setGroupBy(e.target.value as GroupBy)}>
-            {GROUPS.map((g) => <option key={g.v} value={g.v}>{t(`shipping.stats.${g.label}`)}</option>)}
+            {GROUPS.map((g) => <option key={g.v} value={g.v}>{SHIP_STATS_GB[g.label]}</option>)}
           </select>
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-ink-soft">{t('shipping.stats.period')}</span>
+          <span className="text-sm font-medium text-ink-soft">Davr</span>
           {!useRange ? (
             <>
               <select className="input !w-auto" value={year} onChange={(e) => setYear(Number(e.target.value))}>
                 {yearOptions.map((y) => <option key={y} value={y}>{y}</option>)}
               </select>
               <select className="input !w-auto" value={month} onChange={(e) => setMonth(Number(e.target.value))}>
-                <option value={0}>{t('shipping.allMonths')}</option>
+                <option value={0}>Butun yil</option>
                 {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-                  <option key={m} value={m}>{t(`shipping.months.${m}`)}</option>
+                  <option key={m} value={m}>{SHIP_MONTHS[String(m)]}</option>
                 ))}
               </select>
             </>
@@ -581,38 +613,38 @@ function Stats() {
           <button onClick={() => setUseRange((x) => !x)}
                   className={`px-3 py-1.5 text-sm rounded-button border transition ${
                     useRange ? 'border-accent text-accent bg-accent/5' : 'border-black/10 text-ink-soft hover:bg-black/5'}`}>
-            {t('shipping.stats.customRange')}
+            Oraliq
           </button>
         </div>
       </div>
 
       {/* KPI kartalar */}
       <div className="grid grid-cols-2 gap-3">
-        <Kpi icon={<Package size={16} />} label={t('shipping.colQty')} value={grp(data?.total.qty ?? 0)} tone="warning" />
-        <Kpi icon={<Coins size={16} />} label={t('shipping.colFreight')} value={formatUZS(Number(data?.total.freight ?? 0))} tone="success" />
+        <Kpi icon={<Package size={16} />} label="Soni" value={grp(data?.total.qty ?? 0)} tone="warning" />
+        <Kpi icon={<Coins size={16} />} label="Yo'l kira" value={formatUZS(Number(data?.total.freight ?? 0))} tone="success" />
       </div>
 
       {q.isLoading ? (
         <Card><div className="h-64 rounded bg-black/5 animate-pulse" /></Card>
       ) : !data || data.rows.length === 0 ? (
-        <Card><EmptyState title={t('shipping.stats.empty')} description={t('shipping.stats.emptyDesc')} /></Card>
+        <Card><EmptyState title="Ma'lumot yo'q" description="Tanlangan davr uchun yuk yozuvlari topilmadi" /></Card>
       ) : (
         <div className="grid lg:grid-cols-2 gap-4">
           {/* Grafik */}
           <Card>
             <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
-              <h3 className="font-semibold">{t(`shipping.stats.${curGroup.label}`)}</h3>
+              <h3 className="font-semibold">{SHIP_STATS_GB[curGroup.label]}</h3>
               <div className="flex items-center gap-1 rounded-button border border-black/10 p-0.5">
                 {METRICS.map((m) => (
                   <button key={m.v} onClick={() => setMetric(m.v)}
                           className={`px-2.5 py-1 text-xs rounded transition ${metric === m.v ? 'bg-primary text-white' : 'text-ink-soft hover:bg-black/5'}`}>
-                    {t(m.key)}
+                    {m.key}
                   </button>
                 ))}
               </div>
             </div>
             {chartData.length === 0 ? (
-              <div className="h-64 flex items-center justify-center text-sm text-ink-soft">{t('shipping.stats.empty')}</div>
+              <div className="h-64 flex items-center justify-center text-sm text-ink-soft">Ma'lumot yo'q</div>
             ) : (
               <ResponsiveContainer width="100%" height={Math.max(240, chartData.length * 34)}>
                 <BarChart layout="vertical" data={chartData} margin={{ top: 4, right: 16, bottom: 4, left: 8 }}>
@@ -621,7 +653,7 @@ function Stats() {
                          tick={{ fontSize: 12, fill: '#7F8C8D' }} axisLine={false} tickLine={false} />
                   <Tooltip
                     cursor={{ fill: 'rgba(0,0,0,0.04)' }}
-                    formatter={(val: number) => [fmtMetric(val), t(METRICS.find((m) => m.v === metric)!.key)]}
+                    formatter={(val: number) => [fmtMetric(val), METRICS.find((m) => m.v === metric)!.key]}
                   />
                   <Bar dataKey="value" radius={[0, 6, 6, 0]} barSize={20}>
                     {chartData.map((_, i) => <Cell key={i} fill={BAR_COLORS[i % BAR_COLORS.length]} />)}
@@ -637,10 +669,10 @@ function Stats() {
               <table className="w-full text-sm">
                 <thead className="sticky top-0 z-10 text-left text-ink-soft bg-bg">
                   <tr className="[&>th]:py-2.5 [&>th]:px-3 [&>th]:font-semibold [&>th]:text-[11px] [&>th]:uppercase [&>th]:tracking-wide [&>th]:border-b-2 [&>th]:border-black/10">
-                    <th>{t(`shipping.stats.${curGroup.label}`)}</th>
-                    <th className="text-right">{t('shipping.stats.count')}</th>
-                    <th className="text-right">{t('shipping.colQty')}</th>
-                    <th className="text-right">{t('shipping.colFreight')}</th>
+                    <th>{SHIP_STATS_GB[curGroup.label]}</th>
+                    <th className="text-right">Yozuvlar</th>
+                    <th className="text-right">Soni</th>
+                    <th className="text-right">Yo'l kira</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -660,7 +692,7 @@ function Stats() {
                 </tbody>
                 <tfoot>
                   <tr className="sticky bottom-0 font-bold bg-primary-50 [&>td]:py-2.5 [&>td]:px-3 [&>td]:border-t-2 [&>td]:border-black/10">
-                    <td>{t('shipping.total')}</td>
+                    <td>Jami</td>
                     <td className="text-right tabular-nums">{grp(data.total.count)}</td>
                     <td className="text-right tabular-nums">{grp(data.total.qty)}</td>
                     <td className="text-right tabular-nums text-success">{formatUZS(Number(data.total.freight))}</td>

@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import { api } from '@/api/client';
 import Card from '@/components/ui/Card';
@@ -9,7 +8,6 @@ const TIMEOUT_OPTIONS = [1, 2, 5, 10, 15, 30];
 
 /** Sozlamalar > Harakatsizlik PIN-qulfi boshqaruvi. */
 export default function PinSettingsCard() {
-  const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
   const setUser = useAuthStore((s) => s.setUser);
 
@@ -37,15 +35,15 @@ export default function PinSettingsCard() {
 
   async function savePin() {
     if (pin.length !== 4) {
-      toast.error(t('security.pinFourDigits'));
+      toast.error('PIN aniq 4 ta raqamdan iborat bo\'lishi kerak');
       return;
     }
     if (pin !== pin2) {
-      toast.error(t('security.pinMismatch'));
+      toast.error('PIN-kodlar mos kelmadi');
       return;
     }
     if (!password) {
-      toast.error(t('security.passwordRequired'));
+      toast.error('Parolni kiriting');
       return;
     }
     setBusy(true);
@@ -56,10 +54,10 @@ export default function PinSettingsCard() {
         timeout_minutes: timeout,
       });
       setUser(data);
-      toast.success(t('security.pinEnabled'));
+      toast.success('PIN-qulf yoqildi');
       reset();
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || t('common.error'));
+      toast.error(e?.response?.data?.detail || 'Xatolik yuz berdi');
     } finally {
       setBusy(false);
     }
@@ -71,25 +69,25 @@ export default function PinSettingsCard() {
     try {
       const { data } = await api.patch('/auth/me/pin', { timeout_minutes: minutes });
       setUser(data);
-      toast.success(t('security.timeoutSaved'));
+      toast.success('Vaqt saqlandi');
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || t('common.error'));
+      toast.error(e?.response?.data?.detail || 'Xatolik yuz berdi');
     }
   }
 
   async function disablePin() {
     if (!password) {
-      toast.error(t('security.passwordRequired'));
+      toast.error('Parolni kiriting');
       return;
     }
     setBusy(true);
     try {
       const { data } = await api.post('/auth/me/pin/disable', { password });
       setUser(data);
-      toast.success(t('security.pinDisabled'));
+      toast.success("PIN-qulf o'chirildi");
       reset();
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || t('common.error'));
+      toast.error(e?.response?.data?.detail || 'Xatolik yuz berdi');
     } finally {
       setBusy(false);
     }
@@ -97,7 +95,7 @@ export default function PinSettingsCard() {
 
   const timeoutSelect = (
     <div>
-      <label className="label">{t('security.timeoutLabel')}</label>
+      <label className="label">Harakatsizlik vaqti</label>
       <select
         className="input"
         value={timeout}
@@ -105,7 +103,7 @@ export default function PinSettingsCard() {
       >
         {TIMEOUT_OPTIONS.map((m) => (
           <option key={m} value={m}>
-            {t('security.minutes', { count: m })}
+            {`${m} daqiqa`}
           </option>
         ))}
       </select>
@@ -113,14 +111,14 @@ export default function PinSettingsCard() {
   );
 
   return (
-    <Card title={t('security.pinCard')}>
-      <p className="text-xs text-ink-soft mb-3">{t('security.pinDescription')}</p>
+    <Card title="PIN-qulf (harakatsizlik)">
+      <p className="text-xs text-ink-soft mb-3">Belgilangan vaqt davomida harakatsiz bo'lsangiz, sayt qulflanadi va PIN-kod so'raydi. Bu siz kompyuter yonida bo'lmagan paytda boshqalar sizning nomingizdan ish qilishining oldini oladi.</p>
 
       {/* O'CHIQ holat — yoqish formasi */}
       {!enabled && (
         <div className="space-y-3">
           <div>
-            <label className="label">{t('security.newPin')}</label>
+            <label className="label">4 xonali PIN</label>
             <input
               type="password"
               inputMode="numeric"
@@ -132,7 +130,7 @@ export default function PinSettingsCard() {
             />
           </div>
           <div>
-            <label className="label">{t('security.confirmPin')}</label>
+            <label className="label">PIN-ni takrorlang</label>
             <input
               type="password"
               inputMode="numeric"
@@ -145,7 +143,7 @@ export default function PinSettingsCard() {
           </div>
           {timeoutSelect}
           <div>
-            <label className="label">{t('security.confirmPassword')}</label>
+            <label className="label">Joriy parolingiz</label>
             <input
               type="password"
               className="input"
@@ -155,7 +153,7 @@ export default function PinSettingsCard() {
             />
           </div>
           <button className="btn-primary" onClick={savePin} disabled={busy}>
-            {busy ? t('settings.savingBtn') : t('security.enableBtn')}
+            {busy ? 'Saqlanmoqda...' : 'PIN-qulfni yoqish'}
           </button>
         </div>
       )}
@@ -165,7 +163,7 @@ export default function PinSettingsCard() {
         <div className="space-y-3">
           <div className="flex items-center gap-2 text-sm text-success">
             <span className="inline-block h-2 w-2 rounded-full bg-success" />
-            {t('security.statusOn')}
+            PIN-qulf yoqilgan
           </div>
 
           {timeoutSelect}
@@ -173,10 +171,10 @@ export default function PinSettingsCard() {
           {mode === 'idle' && (
             <div className="flex gap-2">
               <button className="btn-ghost" onClick={() => setMode('change')}>
-                {t('security.changePinBtn')}
+                PIN-ni o'zgartirish
               </button>
               <button className="btn-danger" onClick={() => setMode('disable')}>
-                {t('security.disableBtn')}
+                O'chirish
               </button>
             </div>
           )}
@@ -184,7 +182,7 @@ export default function PinSettingsCard() {
           {mode === 'change' && (
             <div className="space-y-3 rounded-button border border-black/10 p-3">
               <div>
-                <label className="label">{t('security.newPin')}</label>
+                <label className="label">4 xonali PIN</label>
                 <input
                   type="password"
                   inputMode="numeric"
@@ -196,7 +194,7 @@ export default function PinSettingsCard() {
                 />
               </div>
               <div>
-                <label className="label">{t('security.confirmPin')}</label>
+                <label className="label">PIN-ni takrorlang</label>
                 <input
                   type="password"
                   inputMode="numeric"
@@ -208,7 +206,7 @@ export default function PinSettingsCard() {
                 />
               </div>
               <div>
-                <label className="label">{t('security.confirmPassword')}</label>
+                <label className="label">Joriy parolingiz</label>
                 <input
                   type="password"
                   className="input"
@@ -219,10 +217,10 @@ export default function PinSettingsCard() {
               </div>
               <div className="flex gap-2">
                 <button className="btn-primary" onClick={savePin} disabled={busy}>
-                  {t('settings.saveBtn')}
+                  Saqlash
                 </button>
                 <button className="btn-ghost" onClick={reset} disabled={busy}>
-                  {t('common.cancel')}
+                  Bekor qilish
                 </button>
               </div>
             </div>
@@ -230,9 +228,9 @@ export default function PinSettingsCard() {
 
           {mode === 'disable' && (
             <div className="space-y-3 rounded-button border border-danger/30 p-3">
-              <p className="text-sm text-ink-soft">{t('security.disableHint')}</p>
+              <p className="text-sm text-ink-soft">PIN-qulfni o'chirish uchun parolingizni tasdiqlang.</p>
               <div>
-                <label className="label">{t('security.confirmPassword')}</label>
+                <label className="label">Joriy parolingiz</label>
                 <input
                   type="password"
                   className="input"
@@ -243,10 +241,10 @@ export default function PinSettingsCard() {
               </div>
               <div className="flex gap-2">
                 <button className="btn-danger" onClick={disablePin} disabled={busy}>
-                  {t('security.disableBtn')}
+                  O'chirish
                 </button>
                 <button className="btn-ghost" onClick={reset} disabled={busy}>
-                  {t('common.cancel')}
+                  Bekor qilish
                 </button>
               </div>
             </div>

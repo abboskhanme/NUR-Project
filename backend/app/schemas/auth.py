@@ -47,7 +47,6 @@ class UserOut(ORMBase):
     full_name: str
     avatar_url: Optional[str] = None
     position: Optional[str] = None
-    locale: str = "uz"
     theme: str = "light"
     is_active: bool = True
     is_superadmin: bool = False
@@ -101,7 +100,6 @@ class UserUpdate(BaseModel):
     full_name: Optional[str] = None
     avatar_url: Optional[str] = None
     position: Optional[str] = None
-    locale: Optional[str] = None
     theme: Optional[str] = None
     is_active: Optional[bool] = None
     is_superadmin: Optional[bool] = None

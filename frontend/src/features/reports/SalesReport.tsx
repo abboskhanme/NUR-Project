@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useTranslation } from 'react-i18next';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell,
 } from 'recharts';
@@ -21,8 +20,12 @@ import type {
 
 const COLORS = ['#1E3A5F', '#2980B9', '#27AE60', '#F39C12', '#E74C3C', '#8E44AD', '#16A085'];
 
+const GRANULARITY_LABELS: Record<'day' | 'month', string> = {
+  day: 'Kunlik',
+  month: 'Oylik',
+};
+
 export default function SalesReport({ range }: { range: DateRange }) {
-  const { t } = useTranslation();
   const [gran, setGran] = useState<'day' | 'month'>('day');
   const params = { date_from: range.from, date_to: range.to };
 
@@ -61,51 +64,51 @@ export default function SalesReport({ range }: { range: DateRange }) {
   });
 
   const modelCols: Column<ByModelRow>[] = [
-    { key: 'model', label: t('reports.sales.cols.model'), render: (r) => r.model },
-    { key: 'count', label: t('reports.sales.cols.count'), align: 'right' },
-    { key: 'total_uzs', label: t('reports.sales.cols.amount'), align: 'right', render: (r) => formatUZS(r.total_uzs) },
+    { key: 'model', label: 'Model', render: (r) => r.model },
+    { key: 'count', label: 'Soni', align: 'right' },
+    { key: 'total_uzs', label: 'Summa', align: 'right', render: (r) => formatUZS(r.total_uzs) },
   ];
   const regionCols: Column<ByRegionRow>[] = [
-    { key: 'region', label: t('reports.sales.cols.region') },
-    { key: 'count', label: t('reports.sales.cols.order'), align: 'right' },
-    { key: 'total_uzs', label: t('reports.sales.cols.amount'), align: 'right', render: (r) => formatUZS(r.total_uzs) },
+    { key: 'region', label: 'Viloyat' },
+    { key: 'count', label: 'Buyurtma', align: 'right' },
+    { key: 'total_uzs', label: 'Summa', align: 'right', render: (r) => formatUZS(r.total_uzs) },
   ];
   const sellerCols: Column<BySellerRow>[] = [
-    { key: 'seller', label: t('reports.sales.cols.seller') },
-    { key: 'count', label: t('reports.sales.cols.order'), align: 'right' },
-    { key: 'total_uzs', label: t('reports.sales.cols.amount'), align: 'right', render: (r) => formatUZS(r.total_uzs) },
+    { key: 'seller', label: 'Sotuvchi' },
+    { key: 'count', label: 'Buyurtma', align: 'right' },
+    { key: 'total_uzs', label: 'Summa', align: 'right', render: (r) => formatUZS(r.total_uzs) },
   ];
   const statusCols: Column<StatusRow>[] = [
-    { key: 'status', label: t('reports.sales.cols.status'), value: (r) => orderStatusLabel(r.status),
+    { key: 'status', label: 'Holat', value: (r) => orderStatusLabel(r.status),
       render: (r) => (
         <span className="inline-flex items-center gap-2">
           <span className="w-2.5 h-2.5 rounded-full" style={{ background: orderStatusColor(r.status) }} />
           {orderStatusLabel(r.status)}
         </span>
       ) },
-    { key: 'count', label: t('reports.sales.cols.count'), align: 'right' },
-    { key: 'total_uzs', label: t('reports.sales.cols.amount'), align: 'right', render: (r) => formatUZS(r.total_uzs) },
+    { key: 'count', label: 'Soni', align: 'right' },
+    { key: 'total_uzs', label: 'Summa', align: 'right', render: (r) => formatUZS(r.total_uzs) },
   ];
   const customerCols: Column<ByCustomerRow>[] = [
-    { key: 'customer', label: t('reports.sales.cols.customer'), render: (r) => r.customer },
-    { key: 'phone', label: t('reports.sales.cols.phone'), render: (r) => (r.phone ? formatPhone(r.phone) : '—') },
-    { key: 'count', label: t('reports.sales.cols.order'), align: 'right' },
-    { key: 'total_uzs', label: t('reports.sales.cols.amount'), align: 'right', render: (r) => formatUZS(r.total_uzs) },
+    { key: 'customer', label: 'Mijoz', render: (r) => r.customer },
+    { key: 'phone', label: 'Telefon', render: (r) => (r.phone ? formatPhone(r.phone) : '—') },
+    { key: 'count', label: 'Buyurtma', align: 'right' },
+    { key: 'total_uzs', label: 'Summa', align: 'right', render: (r) => formatUZS(r.total_uzs) },
   ];
   const receivableCols: Column<ReceivableRow>[] = [
-    { key: 'customer', label: t('reports.sales.cols.customer'),
+    { key: 'customer', label: 'Mijoz',
       render: (r) => (
         <span className="inline-flex items-center gap-1.5">
           {r.customer}
-          {r.is_dealer && <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-700">{t('reports.sales.dealerShort')}</span>}
+          {r.is_dealer && <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-700">Diller</span>}
         </span>
       ) },
-    { key: 'code', label: t('reports.sales.cols.orderCode'), render: (r) => r.code },
-    { key: 'days', label: t('reports.sales.cols.daysOpen'), align: 'right',
+    { key: 'code', label: 'Buyurtma', render: (r) => r.code },
+    { key: 'days', label: 'Kun', align: 'right',
       value: (r) => r.days ?? 0,
-      render: (r) => (r.days != null ? t('reports.sales.daysValue', { count: r.days }) : '—') },
-    { key: 'paid_uzs', label: t('reports.sales.cols.paid'), align: 'right', render: (r) => formatUZS(r.paid_uzs) },
-    { key: 'balance_uzs', label: t('reports.sales.cols.balance'), align: 'right',
+      render: (r) => (r.days != null ? `${r.days} kun` : '—') },
+    { key: 'paid_uzs', label: 'To\'langan', align: 'right', render: (r) => formatUZS(r.paid_uzs) },
+    { key: 'balance_uzs', label: 'Qoldiq', align: 'right',
       render: (r) => <span className="font-semibold text-danger">{formatUZS(r.balance_uzs)}</span> },
   ];
 
@@ -113,15 +116,15 @@ export default function SalesReport({ range }: { range: DateRange }) {
     <div className="space-y-4">
       {/* KPI tiles */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-        <StatTile label={t('reports.sales.kpi.orders')} value={kpi.data ? String(kpi.data.orders_total) : '—'} />
-        <StatTile label={t('reports.sales.kpi.delivered')} value={kpi.data ? String(kpi.data.orders_delivered) : '—'} tone="success" />
-        <StatTile label={t('reports.sales.kpi.rejected')} value={kpi.data ? String(kpi.data.orders_rejected) : '—'} tone="danger" />
-        <StatTile label={t('reports.sales.kpi.totalAmount')} value={kpi.data ? formatUZS(kpi.data.total_uzs) : '—'} tone="primary" />
-        <StatTile label={t('reports.sales.kpi.avgCheck')} value={kpi.data ? formatUZS(kpi.data.avg_check_uzs) : '—'} />
+        <StatTile label="Buyurtmalar" value={kpi.data ? String(kpi.data.orders_total) : '—'} />
+        <StatTile label="Yetkazilgan" value={kpi.data ? String(kpi.data.orders_delivered) : '—'} tone="success" />
+        <StatTile label="Rad etilgan" value={kpi.data ? String(kpi.data.orders_rejected) : '—'} tone="danger" />
+        <StatTile label="Umumiy summa" value={kpi.data ? formatUZS(kpi.data.total_uzs) : '—'} tone="primary" />
+        <StatTile label="O'rtacha chek" value={kpi.data ? formatUZS(kpi.data.avg_check_uzs) : '—'} />
       </div>
 
       <Card
-        title={t('reports.sales.cards.revenueTrend')}
+        title="Tushum dinamikasi"
         action={
           <div className="flex gap-1">
             {(['day', 'month'] as const).map((g) => (
@@ -132,7 +135,7 @@ export default function SalesReport({ range }: { range: DateRange }) {
                   gran === g ? 'bg-primary text-white border-primary' : 'bg-white border-black/10'
                 }`}
               >
-                {t(`reports.granularity.${g}`)}
+                {GRANULARITY_LABELS[g]}
               </button>
             ))}
           </div>
@@ -142,14 +145,14 @@ export default function SalesReport({ range }: { range: DateRange }) {
       </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card title={t('reports.sales.cards.byModel')}>
+        <Card title="Model bo'yicha sotuv">
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={byModel.data ?? []}>
               <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
               <XAxis dataKey="model" fontSize={11} />
               <YAxis fontSize={11} />
-              <Tooltip formatter={(v: number, _n, p: any) => p?.dataKey === 'count' ? t('reports.sales.chart.countUnit', { count: v }) : formatUZS(v)} />
-              <Bar dataKey="count" name={t('reports.sales.cols.count')} radius={[4, 4, 0, 0]}>
+              <Tooltip formatter={(v: number, _n, p: any) => p?.dataKey === 'count' ? `${v} ta` : formatUZS(v)} />
+              <Bar dataKey="count" name="Soni" radius={[4, 4, 0, 0]}>
                 {(byModel.data ?? []).map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
               </Bar>
             </BarChart>
@@ -159,14 +162,14 @@ export default function SalesReport({ range }: { range: DateRange }) {
           </div>
         </Card>
 
-        <Card title={t('reports.sales.cards.byRegion')}>
+        <Card title="Viloyat bo'yicha sotuv">
           <ResponsiveContainer width="100%" height={Math.max(240, (byRegion.data?.length ?? 1) * 32)}>
             <BarChart data={byRegion.data ?? []} layout="vertical" margin={{ left: 8 }}>
               <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
               <XAxis type="number" fontSize={11} allowDecimals={false} />
               <YAxis type="category" dataKey="region" fontSize={11} width={120} interval={0} />
-              <Tooltip formatter={(v: number, _n, p: any) => p?.dataKey === 'count' ? t('reports.sales.chart.countUnit', { count: v }) : formatUZS(v)} />
-              <Bar dataKey="count" name={t('reports.sales.cols.count')} radius={[0, 4, 4, 0]}>
+              <Tooltip formatter={(v: number, _n, p: any) => p?.dataKey === 'count' ? `${v} ta` : formatUZS(v)} />
+              <Bar dataKey="count" name="Soni" radius={[0, 4, 4, 0]}>
                 {(byRegion.data ?? []).map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
               </Bar>
             </BarChart>
@@ -178,31 +181,31 @@ export default function SalesReport({ range }: { range: DateRange }) {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card title={t('reports.sales.cards.bySeller')}>
+        <Card title="Sotuvchi bo'yicha">
           <ReportTable rows={bySeller.data} columns={sellerCols} filename="sotuv-sotuvchi"
-            emptyText={t('reports.sales.empty.noSeller')} />
+            emptyText="Sotuvchi biriktirilmagan" />
         </Card>
-        <Card title={t('reports.sales.cards.byStatus')}>
+        <Card title="Holat bo'yicha taqsimot">
           <ReportTable rows={byStatus.data} columns={statusCols} filename="sotuv-holat" />
         </Card>
       </div>
 
-      <Card title={t('reports.sales.cards.topCustomers')}>
+      <Card title="Eng yaxshi mijozlar">
         <ReportTable rows={byCustomer.data} columns={customerCols} filename="top-mijozlar"
-          emptyText={t('reports.sales.empty.noCustomer')} />
+          emptyText="Mijoz topilmadi" />
       </Card>
 
       <Card
-        title={t('reports.sales.cards.receivables')}
+        title="Qarzdorlik (to'lanmagan buyurtmalar)"
         action={
           <div className="flex items-center gap-3">
             <span className="text-sm font-semibold text-danger">
-              {t('reports.sales.totalDebt')}: {receivables.data ? formatUZS(receivables.data.total_balance_uzs) : '—'}
+              Jami qarz: {receivables.data ? formatUZS(receivables.data.total_balance_uzs) : '—'}
             </span>
             <button
               onClick={() => downloadFile('/reports/sales/receivables.xlsx', 'qarzdorlik.xlsx').catch(() => {})}
               className="inline-flex items-center gap-1.5 text-sm text-primary hover:text-primary-700"
-              title={t('reports.sales.exportExcel')}
+              title="Excelga yuklab olish"
             >
               <FileSpreadsheet size={15} /> Excel
             </button>
@@ -210,7 +213,7 @@ export default function SalesReport({ range }: { range: DateRange }) {
         }
       >
         <ReportTable rows={receivables.data?.items} columns={receivableCols} filename="qarzdorlik"
-          emptyText={t('reports.sales.empty.noDebt')} />
+          emptyText="Qarzdorlik yo'q — hammasi to'langan" />
       </Card>
     </div>
   );

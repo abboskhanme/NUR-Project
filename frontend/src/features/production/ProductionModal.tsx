@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import { X, Factory } from 'lucide-react';
 
@@ -10,6 +9,18 @@ export type Category = 'kotyol' | 'bunker' | 'garelka' | 'tana';
 
 // Kotyol tanasi o'lchamlari — base ishlab chiqarishda faqat shu 5 xil bor
 export const TANA_SIZES = ['150', '200', '300', '400', '500'] as const;
+
+// Modal sarlavhalari — kategoriya + qo'shish/tahrirlash bo'yicha
+const MODAL_TITLES: Record<string, string> = {
+  addKotyol: 'Kotyol qoʻshish',
+  editKotyol: 'Kotyolni tahrirlash',
+  addBunker: 'Bunker qoʻshish',
+  editBunker: 'Bunkerni tahrirlash',
+  addGarelka: 'Garelka qoʻshish',
+  editGarelka: 'Garelkani tahrirlash',
+  addTana: 'Kotyol tanasi olib kelindi',
+  editTana: 'Kotyol tanasini tahrirlash',
+};
 
 export interface ProductionRecord {
   id: string;
@@ -47,7 +58,6 @@ export default function ProductionModal({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const { t } = useTranslation();
   const isKotyol = category === 'kotyol';
   const isTana = category === 'tana';
 
@@ -74,16 +84,16 @@ export default function ProductionModal({
 
   async function submit() {
     if (isKotyol) {
-      if (!productId) { toast.error(t('production.modal.needModel')); return; }
-      if (!unitCode.trim()) { toast.error(t('production.modal.needId')); return; }
+      if (!productId) { toast.error("Modelni tanlang"); return; }
+      if (!unitCode.trim()) { toast.error("ID raqami kerak"); return; }
     } else if (isTana) {
-      if (!bodySize.trim()) { toast.error(t('production.modal.needSize')); return; }
+      if (!bodySize.trim()) { toast.error("Oʻlcham kerak"); return; }
       if (direction !== 'right' && direction !== 'left') {
-        toast.error(t('production.modal.needDirection')); return;
+        toast.error("Yoʻnalishni tanlang (oʻng/chap)"); return;
       }
-      if (!qty || Number(qty) < 1) { toast.error(t('production.modal.needQty')); return; }
+      if (!qty || Number(qty) < 1) { toast.error("Soni kamida 1 boʻlishi kerak"); return; }
     } else if (!qty || Number(qty) < 1) {
-      toast.error(t('production.modal.needQty')); return;
+      toast.error("Soni kamida 1 boʻlishi kerak"); return;
     }
     setSaving(true);
     try {
@@ -107,33 +117,33 @@ export default function ProductionModal({
       } else {
         await api.post('/production/records', { ...payload, category });
       }
-      toast.success(t('production.modal.saved'));
+      toast.success("Saqlandi");
       onSaved();
       onClose();
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || t('common.error'));
+      toast.error(e?.response?.data?.detail || "Xatolik yuz berdi");
     } finally {
       setSaving(false);
     }
   }
 
-  const titleKey = record
-    ? (`production.modal.edit${cap(category)}` as const)
-    : (`production.modal.add${cap(category)}` as const);
+  const title = record
+    ? MODAL_TITLES[`edit${cap(category)}`]
+    : MODAL_TITLES[`add${cap(category)}`];
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div className="bg-card rounded-lg shadow-xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-black/5">
           <h3 className="font-semibold text-base flex items-center gap-2">
-            <Factory size={18} className="text-primary" /> {t(titleKey)}
+            <Factory size={18} className="text-primary" /> {title}
           </h3>
           <button onClick={onClose} className="p-1 rounded hover:bg-black/5 text-ink/50"><X size={18} /></button>
         </div>
 
         <div className="px-5 py-4 space-y-3">
           <div>
-            <label className="text-xs text-ink-soft">{t('production.modal.date')}</label>
+            <label className="text-xs text-ink-soft">Ishlab chiqarilgan sana</label>
             <input type="date" className="input w-full mt-1" value={date}
                    onChange={(e) => setDate(e.target.value)} />
           </div>
@@ -141,74 +151,74 @@ export default function ProductionModal({
           {isKotyol ? (
             <>
               <div>
-                <label className="text-xs text-ink-soft">{t('production.modal.model')}</label>
+                <label className="text-xs text-ink-soft">Model</label>
                 <select className="input w-full mt-1" value={productId}
                         onChange={(e) => setProductId(e.target.value)}>
-                  <option value="">{t('production.modal.pickModel')}</option>
+                  <option value="">Modelni tanlang</option>
                   {models.map((p) => <option key={p.id} value={p.id}>{label(p)}</option>)}
                 </select>
               </div>
               <div>
-                <label className="text-xs text-ink-soft">{t('production.modal.direction')}</label>
+                <label className="text-xs text-ink-soft">Yoʻnalish</label>
                 <select className="input w-full mt-1" value={direction}
                         onChange={(e) => setDirection(e.target.value)}>
-                  <option value="">{t('production.dir.any')}</option>
-                  <option value="right">{t('production.dir.right')}</option>
-                  <option value="left">{t('production.dir.left')}</option>
+                  <option value="">— tanlanmagan —</option>
+                  <option value="right">Oʻngga</option>
+                  <option value="left">Chapga</option>
                 </select>
               </div>
               <div>
-                <label className="text-xs text-ink-soft">{t('production.modal.id')}</label>
-                <input className="input w-full mt-1 font-mono" placeholder={t('production.modal.idPlaceholder')}
+                <label className="text-xs text-ink-soft">ID raqami</label>
+                <input className="input w-full mt-1 font-mono" placeholder="masalan: KT-001"
                        value={unitCode} onChange={(e) => setUnitCode(e.target.value)} />
               </div>
             </>
           ) : isTana ? (
             <>
               <div>
-                <label className="text-xs text-ink-soft">{t('production.modal.size')}</label>
+                <label className="text-xs text-ink-soft">Oʻlcham</label>
                 <select className="input w-full mt-1" value={bodySize}
                         onChange={(e) => setBodySize(e.target.value)}>
-                  <option value="">{t('production.modal.pickSize')}</option>
+                  <option value="">Oʻlchamni tanlang</option>
                   {TANA_SIZES.map((sz) => <option key={sz} value={sz}>{sz}</option>)}
                 </select>
               </div>
               <div>
-                <label className="text-xs text-ink-soft">{t('production.modal.direction')}</label>
+                <label className="text-xs text-ink-soft">Yoʻnalish</label>
                 <select className="input w-full mt-1" value={direction}
                         onChange={(e) => setDirection(e.target.value)}>
-                  <option value="">{t('production.modal.pickDirection')}</option>
-                  <option value="right">{t('production.dir.right')}</option>
-                  <option value="left">{t('production.dir.left')}</option>
+                  <option value="">Yoʻnalishni tanlang</option>
+                  <option value="right">Oʻngga</option>
+                  <option value="left">Chapga</option>
                 </select>
               </div>
               <div>
-                <label className="text-xs text-ink-soft">{t('production.modal.qty')}</label>
+                <label className="text-xs text-ink-soft">Soni</label>
                 <input type="number" min={1} className="input w-full mt-1" value={qty}
                        onChange={(e) => setQty(e.target.value === '' ? '' : Number(e.target.value))} />
               </div>
             </>
           ) : (
             <div>
-              <label className="text-xs text-ink-soft">{t('production.modal.qty')}</label>
+              <label className="text-xs text-ink-soft">Soni</label>
               <input type="number" min={1} className="input w-full mt-1" value={qty}
                      onChange={(e) => setQty(e.target.value === '' ? '' : Number(e.target.value))} />
             </div>
           )}
 
           <div>
-            <label className="text-xs text-ink-soft">{t('production.modal.note')}</label>
+            <label className="text-xs text-ink-soft">Izoh (ixtiyoriy)</label>
             <input className="input w-full mt-1" value={notes} onChange={(e) => setNotes(e.target.value)} />
           </div>
         </div>
 
         <div className="px-5 py-3 border-t border-black/5 flex justify-end gap-2">
           <button onClick={onClose} className="px-3 py-1.5 text-sm rounded-button border border-black/10 hover:bg-black/5">
-            {t('actions.cancel')}
+            Bekor qilish
           </button>
           <button onClick={submit} disabled={saving}
                   className="px-4 py-1.5 text-sm rounded-button font-medium bg-primary text-white hover:bg-primary/90 disabled:opacity-50">
-            {saving ? t('common.saving', { defaultValue: 'Saqlanyapti…' }) : t('actions.save', { defaultValue: 'Saqlash' })}
+            {saving ? 'Saqlanyapti…' : 'Saqlash'}
           </button>
         </div>
       </div>

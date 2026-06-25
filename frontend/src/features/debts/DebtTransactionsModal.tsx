@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { X, Trash2, PackagePlus, Wallet } from 'lucide-react';
@@ -23,7 +22,6 @@ interface Tx {
 export default function DebtTransactionsModal({
   product, onClose, onChanged,
 }: { product: DebtProduct; onClose: () => void; onChanged: () => void }) {
-  const { t } = useTranslation();
   const [delId, setDelId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -44,12 +42,12 @@ export default function DebtTransactionsModal({
     setDeleting(true);
     try {
       await api.delete(`/debts/transactions/${delId}`);
-      toast.success(t('debts.toast.deleted'));
+      toast.success("O'chirildi");
       setDelId(null);
       txQ.refetch();
       onChanged();
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || t('debts.toast.error'));
+      toast.error(e?.response?.data?.detail || 'Xatolik yuz berdi');
     } finally {
       setDeleting(false);
     }
@@ -62,7 +60,7 @@ export default function DebtTransactionsModal({
         <div className="flex items-center justify-between px-5 py-3 border-b border-black/5 sticky top-0 bg-card z-10">
           <div>
             <h3 className="font-semibold">{product.name}</h3>
-            <p className="text-xs text-ink-soft">{t('debts.tx.title')}</p>
+            <p className="text-xs text-ink-soft">Tranzaksiyalar</p>
           </div>
           <button onClick={onClose} className="p-1 rounded hover:bg-black/5"><X size={18} /></button>
         </div>
@@ -70,16 +68,16 @@ export default function DebtTransactionsModal({
         {/* Qarz qoldig'i */}
         <div className="px-5 pt-4">
           <div className="rounded-button bg-danger/10 border border-danger/20 px-4 py-3 flex items-center justify-between">
-            <span className="text-sm font-medium text-danger/90">{t('debts.table.balance')}</span>
+            <span className="text-sm font-medium text-danger/90">Qarz qoldig'i</span>
             <span className="text-xl font-bold text-danger">{formatMoney(product.balance, product.currency)}</span>
           </div>
           <div className="grid grid-cols-2 gap-3 mt-2 text-sm">
             <div className="rounded-button bg-black/[0.03] px-3 py-2 flex justify-between">
-              <span className="text-ink-soft">{t('debts.kpi.purchased')}</span>
+              <span className="text-ink-soft">Olib kelingan</span>
               <span className="font-medium">{formatMoney(product.total_purchased, product.currency)}</span>
             </div>
             <div className="rounded-button bg-black/[0.03] px-3 py-2 flex justify-between">
-              <span className="text-ink-soft">{t('debts.kpi.paid')}</span>
+              <span className="text-ink-soft">To'langan</span>
               <span className="font-medium text-success">{formatMoney(product.total_paid, product.currency)}</span>
             </div>
           </div>
@@ -93,7 +91,7 @@ export default function DebtTransactionsModal({
               ))}
             </div>
           ) : txs.length === 0 ? (
-            <div className="text-sm text-ink-soft text-center py-8">{t('debts.tx.empty')}</div>
+            <div className="text-sm text-ink-soft text-center py-8">Tranzaksiyalar yo'q</div>
           ) : (
             <div className="divide-y divide-black/5 border border-black/10 rounded-button overflow-hidden">
               {txs.map((tx) => {
@@ -107,8 +105,8 @@ export default function DebtTransactionsModal({
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-medium">
                         {purchase
-                          ? (product.debt_type === 'product' ? t('debts.tx.purchase') : t('debts.tx.addDebt'))
-                          : t('debts.tx.payment')}
+                          ? (product.debt_type === 'product' ? 'Olib kelish' : "Qarz qo'shish")
+                          : "To'lov"}
                         {purchase && product.debt_type === 'product' && (
                           <span className="text-ink-soft font-normal">
                             {' '}· {tx.qty} × {formatMoney(tx.unit_price, tx.currency)}
@@ -136,8 +134,8 @@ export default function DebtTransactionsModal({
 
       <ConfirmModal
         open={!!delId}
-        title={t('debts.tx.title')}
-        message={t('debts.tx.deleteConfirm')}
+        title="Tranzaksiyalar"
+        message="Ushbu tranzaksiyani o'chirasizmi?"
         loading={deleting}
         onConfirm={confirmDelete}
         onCancel={() => setDelId(null)}

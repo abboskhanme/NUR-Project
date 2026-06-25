@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import { Receipt, Check } from 'lucide-react';
 
@@ -23,7 +22,6 @@ const fmt = (v: string) => (Number(v) ? grp(String(Math.round(Number(v)))) : '')
  * "Safarni yakunlash" — barcha rejalashtirilgan arizalarni "bajarildi" ga o'tkazadi.
  */
 export default function ServiceTripPanel({ onChanged }: { onChanged: () => void }) {
-  const { t } = useTranslation();
   const tripQ = useQuery<Trip>({
     queryKey: ['service-trip'],
     queryFn: () => api.get('/service/trips/current').then((r) => r.data),
@@ -63,7 +61,7 @@ export default function ServiceTripPanel({ onChanged }: { onChanged: () => void 
       setSaved(true);
       setTimeout(() => setSaved(false), 1500);
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || t('common.error'));
+      toast.error(e?.response?.data?.detail || 'Xatolik yuz berdi');
     }
   }
 
@@ -72,11 +70,11 @@ export default function ServiceTripPanel({ onChanged }: { onChanged: () => void 
     setBusy(true);
     try {
       await api.post(`/service/trips/${trip.id}/close`);
-      toast.success(t('service.trip.closed'));
+      toast.success('Safar yakunlandi');
       tripQ.refetch();
       onChanged();
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || t('common.error'));
+      toast.error(e?.response?.data?.detail || 'Xatolik yuz berdi');
     } finally {
       setBusy(false);
     }
@@ -88,38 +86,38 @@ export default function ServiceTripPanel({ onChanged }: { onChanged: () => void 
     <div className="rounded-card border border-primary/20 bg-primary/[0.04] p-4 space-y-3">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="font-semibold flex items-center gap-2">
-          <Receipt size={16} className="text-primary" /> {t('service.trip.title')}
-          {saved && <span className="text-xs font-normal text-success">✓ {t('service.trip.saved')}</span>}
+          <Receipt size={16} className="text-primary" /> Servis safari
+          {saved && <span className="text-xs font-normal text-success">✓ saqlandi</span>}
         </div>
         <div className="text-xs text-ink-soft">
-          {t('service.trip.ticketCount', { n: trip?.scheduled_count ?? 0 })}
+          {`${trip?.scheduled_count ?? 0} ta rejalashtirilgan ariza`}
         </div>
       </div>
 
       <div>
-        <label className="text-xs text-ink-soft">{t('service.trip.name')}</label>
-        <input className="input w-full mt-1" placeholder={t('service.trip.namePlaceholder')}
+        <label className="text-xs text-ink-soft">Safar nomi</label>
+        <input className="input w-full mt-1" placeholder="Masalan: Farg'ona — 12-iyun"
                value={name}
                onChange={(e) => { dirty.current = true; setName(e.target.value); }} />
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <Field label={t('service.trip.collected')} value={collected} accent="text-success"
+        <Field label="Olingan (ketishdan oldin)" value={collected} accent="text-success"
                onChange={(v) => { dirty.current = true; setCollected(grp(v)); }} />
-        <Field label={t('service.trip.spent')} value={spent} accent="text-danger"
+        <Field label="Sarflangan (kelgandan keyin)" value={spent} accent="text-danger"
                onChange={(v) => { dirty.current = true; setSpent(grp(v)); }} />
       </div>
 
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="text-sm text-ink-soft">
-          {t('service.trip.net')}:{' '}
+          Sof:{' '}
           <span className={net >= 0 ? 'text-success font-semibold' : 'text-danger font-semibold'}>
             {formatUZS(net)}
           </span>
         </div>
         <button onClick={finalize} disabled={busy}
                 className="px-3 py-1.5 text-sm rounded-button border border-success/30 text-success hover:bg-success/10 disabled:opacity-50 inline-flex items-center gap-1">
-          <Check size={15} /> {t('service.trip.finalize')}
+          <Check size={15} /> Safarni yakunlash
         </button>
       </div>
     </div>

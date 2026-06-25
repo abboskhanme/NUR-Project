@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import { X, Boxes } from 'lucide-react';
 
@@ -16,7 +15,6 @@ interface ProductOpt {
  * Har bir ID raqami alohida birlik bo'ladi (har qatorda yoki vergul bilan).
  */
 export default function AddUnitsModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
-  const { t } = useTranslation();
   const [productId, setProductId] = useState('');
   const [idsText, setIdsText] = useState('');
   const [notes, setNotes] = useState('');
@@ -39,19 +37,19 @@ export default function AddUnitsModal({ onClose, onSaved }: { onClose: () => voi
   );
 
   async function submit() {
-    if (!productId) { toast.error(t('warehouse.add.pickModel')); return; }
-    if (ids.length === 0) { toast.error(t('warehouse.add.needIds')); return; }
+    if (!productId) { toast.error("Modelni tanlang"); return; }
+    if (ids.length === 0) { toast.error("Kamida bitta ID raqami kerak"); return; }
     setSaving(true);
     try {
       const r = await api.post('/inventory/units', {
         product_id: productId, unique_ids: ids, notes: notes.trim() || null,
         bunker_direction: direction || null,
       });
-      toast.success(t('warehouse.add.created', { count: r.data.created }));
+      toast.success(`${r.data.created} ta birlik qoʻshildi`);
       onSaved();
       onClose();
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || t('common.error'));
+      toast.error(e?.response?.data?.detail || "Xatolik yuz berdi");
     } finally {
       setSaving(false);
     }
@@ -65,50 +63,50 @@ export default function AddUnitsModal({ onClose, onSaved }: { onClose: () => voi
       <div className="bg-card rounded-lg shadow-xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-black/5">
           <h3 className="font-semibold text-base flex items-center gap-2">
-            <Boxes size={18} className="text-primary" /> {t('warehouse.add.title')}
+            <Boxes size={18} className="text-primary" /> Birlik qoʻshish
           </h3>
           <button onClick={onClose} className="p-1 rounded hover:bg-black/5 text-ink/50"><X size={18} /></button>
         </div>
 
         <div className="px-5 py-4 space-y-3">
           <div>
-            <label className="text-xs text-ink-soft">{t('warehouse.add.model')}</label>
+            <label className="text-xs text-ink-soft">Model (kotyol)</label>
             <select className="input w-full mt-1" value={productId} onChange={(e) => setProductId(e.target.value)}>
-              <option value="">{t('warehouse.add.pickModel')}</option>
+              <option value="">Modelni tanlang</option>
               {mainProducts.map((p) => <option key={p.id} value={p.id}>{label(p)}</option>)}
             </select>
           </div>
           <div>
-            <label className="text-xs text-ink-soft">{t('warehouse.add.ids')}</label>
+            <label className="text-xs text-ink-soft">ID raqamlari</label>
             <textarea
               className="input w-full mt-1 h-28 font-mono text-sm"
-              placeholder={t('warehouse.add.idsPlaceholder')}
+              placeholder="Har qatorda yoki vergul bilan: SKL-001, SKL-002 …"
               value={idsText}
               onChange={(e) => setIdsText(e.target.value)}
             />
-            <div className="text-xs text-ink-soft mt-1">{t('warehouse.add.count', { count: ids.length })}</div>
+            <div className="text-xs text-ink-soft mt-1">{`${ids.length} ta ID`}</div>
           </div>
           <div>
-            <label className="text-xs text-ink-soft">{t('warehouse.add.direction')}</label>
+            <label className="text-xs text-ink-soft">Yoʻnalish</label>
             <select className="input w-full mt-1" value={direction} onChange={(e) => setDirection(e.target.value)}>
-              <option value="">{t('warehouse.dir.any')}</option>
-              <option value="right">{t('warehouse.dir.right')}</option>
-              <option value="left">{t('warehouse.dir.left')}</option>
+              <option value="">— tanlanmagan —</option>
+              <option value="right">Oʻngga</option>
+              <option value="left">Chapga</option>
             </select>
           </div>
           <div>
-            <label className="text-xs text-ink-soft">{t('warehouse.add.note')}</label>
+            <label className="text-xs text-ink-soft">Izoh (ixtiyoriy)</label>
             <input className="input w-full mt-1" value={notes} onChange={(e) => setNotes(e.target.value)} />
           </div>
         </div>
 
         <div className="px-5 py-3 border-t border-black/5 flex justify-end gap-2">
           <button onClick={onClose} className="px-3 py-1.5 text-sm rounded-button border border-black/10 hover:bg-black/5">
-            {t('actions.cancel')}
+            Bekor qilish
           </button>
           <button onClick={submit} disabled={saving}
                   className="px-4 py-1.5 text-sm rounded-button font-medium bg-primary text-white hover:bg-primary/90 disabled:opacity-50">
-            {saving ? t('common.saving', { defaultValue: 'Saqlanyapti…' }) : t('warehouse.add.submit')}
+            {saving ? 'Saqlanyapti…' : "Qoʻshish"}
           </button>
         </div>
       </div>

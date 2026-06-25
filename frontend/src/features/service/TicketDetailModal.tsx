@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import {
@@ -40,7 +39,6 @@ const toNum = (s: string) => parseInt(s.replace(/[^\d]/g, ''), 10) || 0;
 export default function TicketDetailModal({
   ticketId, onClose, onChanged,
 }: { ticketId: string; onClose: () => void; onChanged: () => void }) {
-  const { t } = useTranslation();
   const qc = useQueryClient();
   const ticketQ = useQuery<Ticket>({
     queryKey: ['service-ticket', ticketId],
@@ -78,15 +76,12 @@ export default function TicketDetailModal({
     return () => window.removeEventListener('keydown', esc);
   }, [onClose]);
 
-  // Warranty label resolved at render time
+  // Warranty label — literal o'zbekcha matnlar
   function warrantyLabel(status: string): string {
-    const key = `service.warranty.${
-      status === 'active_full' ? 'wmetaActiveFull'
-      : status === 'active_service_only' ? 'wmetaActiveServiceOnly'
-      : status === 'expired' ? 'wmetaExpired'
-      : 'wmetaNotDelivered'
-    }`;
-    return t(key);
+    return status === 'active_full' ? '1-yil — to\'liq bepul (ish + ehtiyot qism)'
+      : status === 'active_service_only' ? '2–3-yil — faqat ish bepul, ehtiyot qism mijoz hisobidan'
+      : status === 'expired' ? 'Kafolat tugagan — hammasi mijoz hisobidan'
+      : 'Mahsulot hali yetkazilmagan';
   }
 
   async function patch(body: Record<string, unknown>, msg: string) {
@@ -97,7 +92,7 @@ export default function TicketDetailModal({
       onChanged();
       toast.success(msg);
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || t('service.toast.errorGeneric'));
+      toast.error(e?.response?.data?.detail || 'Xatolik yuz berdi');
     } finally {
       setBusy(false);
     }
@@ -105,7 +100,7 @@ export default function TicketDetailModal({
 
   function saveDetails() {
     patch({ resolution: resolution.trim() || null, client_cost: toNum(cost), parts_used: partsUsed },
-          t('service.toast.saved'));
+          'Saqlandi');
   }
 
   function togglePart(name: string) {
@@ -113,7 +108,7 @@ export default function TicketDetailModal({
   }
 
   async function addNote() {
-    if (!newNote.trim()) { toast.error(t('service.toast.errorNote')); return; }
+    if (!newNote.trim()) { toast.error('Izoh yozing'); return; }
     setBusy(true);
     try {
       await api.post(`/service/tickets/${ticketId}/visits`, {
@@ -122,9 +117,9 @@ export default function TicketDetailModal({
       setNewNote('');
       await qc.invalidateQueries({ queryKey: ['service-ticket', ticketId] });
       onChanged();
-      toast.success(t('service.toast.noteAdded'));
+      toast.success('Izoh qo\'shildi');
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || t('service.toast.errorGeneric'));
+      toast.error(e?.response?.data?.detail || 'Xatolik yuz berdi');
     } finally {
       setBusy(false);
     }
@@ -140,7 +135,7 @@ export default function TicketDetailModal({
            onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3 border-b border-black/5 sticky top-0 bg-card z-10">
           <div className="flex items-center gap-2">
-            <h3 className="font-semibold">{tk?.code ?? t('service.ticket')}</h3>
+            <h3 className="font-semibold">{tk?.code ?? 'Ariza'}</h3>
             {tk && <ServiceStatusBadge status={tk.status} />}
           </div>
           <button onClick={onClose} className="p-1 rounded hover:bg-black/5"><X size={18} /></button>
@@ -163,7 +158,7 @@ export default function TicketDetailModal({
               {tk.order && (
                 <div className="text-ink-soft inline-flex items-center gap-1">
                   <Package size={13} /> {tk.order.code}
-                  {tk.order.delivered_at && ` ${t('service.detail.deliveredNote')} ${formatDate(tk.order.delivered_at)}`}
+                  {tk.order.delivered_at && ` — yetkazildi ${formatDate(tk.order.delivered_at)}`}
                 </div>
               )}
               {tk.address && <div className="text-ink-soft">{tk.address}</div>}
@@ -179,9 +174,9 @@ export default function TicketDetailModal({
 
             {/* Problem */}
             <div>
-              <div className="label">{t('service.detail.problem')}</div>
+              <div className="label">Muammo</div>
               <div className="text-sm bg-black/[0.03] rounded-button p-3 whitespace-pre-wrap">{tk.problem}</div>
-              <div className="text-xs text-ink-soft mt-1">{t('service.detail.opened')} {formatDateTime(tk.opened_at)}</div>
+              <div className="text-xs text-ink-soft mt-1">Ochildi: {formatDateTime(tk.opened_at)}</div>
             </div>
 
             {/* Status actions */}
@@ -189,20 +184,20 @@ export default function TicketDetailModal({
               <div className="flex flex-wrap gap-2">
                 {tk.status === 'new' && (
                   <button disabled={busy}
-                    onClick={() => patch({ status: 'scheduled' }, t('service.toast.scheduled'))}
+                    onClick={() => patch({ status: 'scheduled' }, 'Rejalashtirildi')}
                     className="btn-action bg-amber-100 text-amber-700 hover:bg-amber-200">
-                    <CalendarClock size={15} /> {t('service.detail.schedule')}
+                    <CalendarClock size={15} /> Rejalashtirish
                   </button>
                 )}
                 <button disabled={busy}
-                  onClick={() => patch({ status: 'completed' }, t('service.toast.completed'))}
+                  onClick={() => patch({ status: 'completed' }, 'Bajarildi deb belgilandi')}
                   className="btn-action bg-emerald-100 text-emerald-700 hover:bg-emerald-200">
-                  <Check size={15} /> {t('service.detail.markCompleted')}
+                  <Check size={15} /> Bajarildi
                 </button>
                 <button disabled={busy}
-                  onClick={() => patch({ status: 'cancelled' }, t('service.toast.cancelled'))}
+                  onClick={() => patch({ status: 'cancelled' }, 'Bekor qilindi')}
                   className="btn-action bg-gray-100 text-gray-600 hover:bg-gray-200">
-                  <Ban size={15} /> {t('service.detail.markCancelled')}
+                  <Ban size={15} /> Bekor qilish
                 </button>
               </div>
             )}
@@ -210,7 +205,7 @@ export default function TicketDetailModal({
             {/* Ishlatilgan ehtiyot qismlar — ko'p tanlov */}
             {allParts.length > 0 && (
               <div>
-                <label className="label">{t('service.detail.partsUsed')}</label>
+                <label className="label">Ishlatilgan ehtiyot qismlar</label>
                 <div className="flex flex-wrap gap-1.5 mt-1">
                   {allParts.map((p) => {
                     const on = partsUsed.includes(p.name);
@@ -229,27 +224,27 @@ export default function TicketDetailModal({
 
             {/* Resolution / cost */}
             <div>
-              <label className="label">{t('service.detail.resolution')}</label>
-              <textarea className="input min-h-[60px]" placeholder={t('service.detail.resolutionPlaceholder')}
+              <label className="label">Yechim (muammo hal bo'ldimi?)</label>
+              <textarea className="input min-h-[60px]" placeholder="Nima qilindi, hal bo'ldimi…"
                         value={resolution} onChange={(e) => setResolution(e.target.value)} />
             </div>
 
             <div>
-              <label className="label">{t('service.detail.cost')}</label>
+              <label className="label">Servis xarajati (so'm, ixtiyoriy)</label>
               <input inputMode="numeric" className="input" placeholder="0"
                      value={cost} onChange={(e) => setCost(fmtCost(e.target.value))} />
             </div>
 
             <button disabled={busy} onClick={saveDetails} className="btn-primary w-full disabled:opacity-50">
-              {t('service.detail.save')}
+              Saqlash
             </button>
 
             {/* Notes / visits journal */}
             <div className="pt-2 border-t border-black/5">
-              <div className="label">{t('service.detail.notesTitle')}</div>
+              <div className="label">Izohlar jurnali</div>
               <div className="space-y-2 mb-3">
                 {tk.visits.length === 0 ? (
-                  <div className="text-xs text-ink-soft">{t('service.detail.noNotes')}</div>
+                  <div className="text-xs text-ink-soft">Hozircha izoh yo'q.</div>
                 ) : (
                   [...tk.visits]
                     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
@@ -257,14 +252,14 @@ export default function TicketDetailModal({
                       <div key={v.id} className="text-sm bg-black/[0.03] rounded-button p-2">
                         {v.note && <div className="whitespace-pre-wrap">{v.note}</div>}
                         <div className="text-xs text-ink-soft mt-0.5">
-                          {v.planned_at ? `${t('service.detail.reja')} ${formatDateTime(v.planned_at)} · ` : ''}{formatDateTime(v.created_at)}
+                          {v.planned_at ? `Reja: ${formatDateTime(v.planned_at)} · ` : ''}{formatDateTime(v.created_at)}
                         </div>
                       </div>
                     ))
                 )}
               </div>
               <div className="flex gap-2">
-                <input className="input flex-1" placeholder={t('service.detail.newNotePlaceholder')}
+                <input className="input flex-1" placeholder="Yangi izoh qo'shish…"
                        value={newNote} onChange={(e) => setNewNote(e.target.value)}
                        onKeyDown={(e) => e.key === 'Enter' && addNote()} />
                 <button disabled={busy} onClick={addNote} className="btn-primary px-3 disabled:opacity-50"><Plus size={16} /></button>
@@ -273,8 +268,8 @@ export default function TicketDetailModal({
 
             {tk.closed_at && (
               <div className="text-xs text-ink-soft">
-                {t('service.detail.closedAt')} {formatDateTime(tk.closed_at)}
-                {Number(tk.client_cost) > 0 && ` ${t('service.detail.costLabel')} ${formatUZS(tk.client_cost)}`}
+                Yopildi: {formatDateTime(tk.closed_at)}
+                {Number(tk.client_cost) > 0 && ` · Xarajat: ${formatUZS(tk.client_cost)}`}
               </div>
             )}
           </div>

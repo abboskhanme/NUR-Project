@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import { api } from '@/api/client';
 import Card from '@/components/ui/Card';
@@ -9,7 +8,6 @@ import AvatarUploader from '@/features/users/AvatarUploader';
 import PinSettingsCard from '@/features/security/PinSettingsCard';
 
 export default function SettingsPage() {
-  const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
   const setUser = useAuthStore((s) => s.setUser);
   const setTokens = useAuthStore((s) => s.setTokens);
@@ -37,16 +35,16 @@ export default function SettingsPage() {
   async function saveProfile() {
     if (!profileChanged) return;
     if (!phone.trim()) {
-      toast.error(t('settings.phoneRequired'));
+      toast.error("Login telefon raqami bo'sh bo'lishi mumkin emas");
       return;
     }
     setSavingProfile(true);
     try {
       const { data } = await api.patch('/auth/me', { full_name: fullName, phone });
       setUser(data);
-      toast.success(t('settings.profileSaved'));
+      toast.success('Profil yangilandi');
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || t('common.error'));
+      toast.error(e?.response?.data?.detail || 'Xatolik yuz berdi');
     } finally {
       setSavingProfile(false);
     }
@@ -63,11 +61,11 @@ export default function SettingsPage() {
       if (data?.access_token && data?.refresh_token) {
         setTokens(data.access_token, data.refresh_token);
       }
-      toast.success(t('settings.passwordSaved'));
+      toast.success('Parol yangilandi');
       setOldPwd('');
       setNewPwd('');
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || t('common.error'));
+      toast.error(e?.response?.data?.detail || 'Xatolik yuz berdi');
     } finally {
       setSavingPwd(false);
     }
@@ -75,9 +73,9 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-4 max-w-3xl">
-      <h1 className="text-2xl font-bold">{t('settings.title')}</h1>
+      <h1 className="text-2xl font-bold">Sozlamalar</h1>
 
-      <Card title={t('settings.avatarCard')}>
+      <Card title="Profil rasmi">
         {user && (
           <AvatarUploader
             user={user}
@@ -91,17 +89,17 @@ export default function SettingsPage() {
         )}
       </Card>
 
-      <Card title={t('settings.profileCard')}>
+      <Card title="Profil">
         <div className="space-y-3">
           <div>
-            <label className="label">{t('settings.phoneLabel')}</label>
+            <label className="label">Telefon raqam (login)</label>
             <PhoneInput value={phone} onChange={setPhone} defaultCountry="UZ" />
             <p className="mt-1 text-xs text-ink-soft">
-              {t('settings.phoneHint')}
+              Bu raqam tizimga kirish uchun ishlatiladi.
             </p>
           </div>
           <div>
-            <label className="label">{t('settings.fullNameLabel')}</label>
+            <label className="label">To'liq ism</label>
             <input
               className="input"
               value={fullName}
@@ -113,15 +111,15 @@ export default function SettingsPage() {
             onClick={saveProfile}
             disabled={!profileChanged || savingProfile}
           >
-            {savingProfile ? t('settings.savingBtn') : t('settings.saveBtn')}
+            {savingProfile ? 'Saqlanmoqda...' : 'Saqlash'}
           </button>
         </div>
       </Card>
 
-      <Card title={t('settings.changePasswordCard')}>
+      <Card title="Parolni o'zgartirish">
         <div className="space-y-3">
           <div>
-            <label className="label">{t('settings.oldPasswordLabel')}</label>
+            <label className="label">Eski parol</label>
             <input
               type="password"
               className="input"
@@ -131,13 +129,13 @@ export default function SettingsPage() {
             />
           </div>
           <div>
-            <label className="label">{t('settings.newPasswordLabel')}</label>
+            <label className="label">Yangi parol</label>
             <input
               type="password"
               className="input"
               value={newPwd}
               onChange={(e) => setNewPwd(e.target.value)}
-              placeholder={t('settings.newPasswordPlaceholder')}
+              placeholder="kamida 8 ta belgi"
               autoComplete="new-password"
             />
           </div>
@@ -146,7 +144,7 @@ export default function SettingsPage() {
             onClick={changePassword}
             disabled={!passwordReady || savingPwd}
           >
-            {savingPwd ? t('settings.changingBtn') : t('settings.changeBtn')}
+            {savingPwd ? 'Yangilanmoqda...' : "O'zgartirish"}
           </button>
         </div>
       </Card>

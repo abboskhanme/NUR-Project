@@ -1,9 +1,16 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useTranslation } from 'react-i18next';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 import { api } from '@/api/client';
+
+const HR_MONTHS_SHORT: Record<string, string> = {
+  '1': 'Yan', '2': 'Fev', '3': 'Mar', '4': 'Apr', '5': 'May', '6': 'Iyn',
+  '7': 'Iyl', '8': 'Avg', '9': 'Sen', '10': 'Okt', '11': 'Noy', '12': 'Dek',
+};
+const HR_WEEKDAYS_SHORT: Record<string, string> = {
+  '0': '', '1': 'Du', '2': '', '3': 'Cho', '4': '', '5': 'Ju', '6': '',
+};
 
 interface AttRow {
   work_date: string;
@@ -27,7 +34,6 @@ function isoKey(d: Date): string {
 }
 
 export default function AttendanceHeatmap({ employeeId }: { employeeId: string }) {
-  const { t } = useTranslation();
   const [year, setYear] = useState(new Date().getFullYear());
 
   const { data } = useQuery<AttRow[]>({
@@ -103,7 +109,7 @@ export default function AttendanceHeatmap({ employeeId }: { employeeId: string }
       <div className="flex items-center justify-between mb-3">
         <div className="text-sm text-ink-soft">
           <span className="font-semibold text-ink">{presentDays}</span>
-          {' '}{t('hr.heatmapSummary', { days: presentDays, hours: totalHours.toFixed(1), year })}
+          {' '}{`ish kuni · ${totalHours.toFixed(1)} soat (${year})`}
         </div>
         <div className="flex items-center gap-1">
           <button onClick={() => setYear((y) => y - 1)} className="p-1 rounded hover:bg-black/5">
@@ -128,7 +134,7 @@ export default function AttendanceHeatmap({ employeeId }: { employeeId: string }
                   style={{ width: CELL + GAP }}
                   className="text-[10px] text-ink-soft"
                 >
-                  {label ? t(`hr.monthsShort.${label.moKey}`) : ''}
+                  {label ? HR_MONTHS_SHORT[label.moKey] : ''}
                 </div>
               );
             })}
@@ -139,7 +145,7 @@ export default function AttendanceHeatmap({ employeeId }: { employeeId: string }
             <div className="flex flex-col gap-[3px] mr-1" style={{ width: 22 }}>
               {weekdayKeys.map((dayNum, i) => (
                 <div key={i} style={{ height: CELL }} className="text-[10px] text-ink-soft leading-none flex items-center">
-                  {t(`hr.weekdaysShort.${dayNum}`)}
+                  {HR_WEEKDAYS_SHORT[String(dayNum)]}
                 </div>
               ))}
             </div>
@@ -152,8 +158,8 @@ export default function AttendanceHeatmap({ employeeId }: { employeeId: string }
                     title={
                       cell.inYear
                         ? cell.hours
-                          ? t('hr.heatmapTooltipWorked', { date: isoKey(cell.date), hours: cell.hours.toFixed(1) })
-                          : t('hr.heatmapTooltipOff', { date: isoKey(cell.date) })
+                          ? `${isoKey(cell.date)}: ${cell.hours.toFixed(1)} soat`
+                          : `${isoKey(cell.date)}: ishlamadi`
                         : ''
                     }
                     style={{
@@ -170,11 +176,11 @@ export default function AttendanceHeatmap({ employeeId }: { employeeId: string }
 
           {/* Legend */}
           <div className="flex items-center gap-1 justify-end mt-1 text-[10px] text-ink-soft">
-            <span>{t('hr.heatmapLess')}</span>
+            <span>Kam</span>
             {LEVELS.map((c) => (
               <div key={c} style={{ width: 11, height: 11, borderRadius: 2, backgroundColor: c }} />
             ))}
-            <span>{t('hr.heatmapMore')}</span>
+            <span>Ko'p</span>
           </div>
         </div>
       </div>

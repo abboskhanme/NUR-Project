@@ -1,10 +1,19 @@
 import { useEffect, useState } from 'react';
-import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import { X } from 'lucide-react';
 
 import { api } from '@/api/client';
 import MoneyInput from '@/components/ui/MoneyInput';
+
+const DEBTS_UNITS: Record<string, string> = {
+  dona: 'dona', kg: 'kg', metr: 'metr', list: 'list',
+};
+const DEBTS_CURRENCY: Record<string, string> = {
+  UZS: "so'm", USD: 'dollar',
+};
+const DEBTS_TYPE: Record<string, string> = {
+  product: 'Mahsulot', credit: 'Kredit', loan: 'Qarz (shaxsdan)',
+};
 
 export interface DebtProduct {
   id: string;
@@ -29,7 +38,6 @@ const PRESET_TYPES = ['product', 'credit', 'loan'];
 export default function DebtProductModal({
   product, onClose, onSaved,
 }: { product?: DebtProduct | null; onClose: () => void; onSaved: () => void }) {
-  const { t } = useTranslation();
   const editing = !!product;
   const initType = product?.debt_type ?? 'product';
   const initIsPreset = PRESET_TYPES.includes(initType);
@@ -53,9 +61,9 @@ export default function DebtProductModal({
   }, [onClose]);
 
   async function handleSave() {
-    if (!name.trim()) { toast.error(t('debts.product.name')); return; }
+    if (!name.trim()) { toast.error('Nomi'); return; }
     if (typeChoice === '__custom__' && !customType.trim()) {
-      toast.error(t('debts.product.customTypePlaceholder')); return;
+      toast.error('Tur nomini kiriting (masalan: Ijara)'); return;
     }
     setSaving(true);
     try {
@@ -70,11 +78,11 @@ export default function DebtProductModal({
       };
       if (editing) await api.patch(`/debts/products/${product!.id}`, payload);
       else await api.post('/debts/products', payload);
-      toast.success(t('debts.toast.saved'));
+      toast.success('Saqlandi');
       onSaved();
       onClose();
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || t('debts.toast.error'));
+      toast.error(e?.response?.data?.detail || 'Xatolik yuz berdi');
     } finally {
       setSaving(false);
     }
@@ -84,26 +92,26 @@ export default function DebtProductModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div className="bg-card rounded-lg shadow-xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3 border-b border-black/5">
-          <h3 className="font-semibold">{editing ? t('debts.product.edit') : t('debts.product.new')}</h3>
+          <h3 className="font-semibold">{editing ? 'Tahrirlash' : 'Yangi qarz'}</h3>
           <button onClick={onClose} className="p-1 rounded hover:bg-black/5"><X size={18} /></button>
         </div>
 
         <div className="p-5 space-y-4">
           <div>
-            <label className="label">{t('debts.product.name')} *</label>
-            <input className="input" placeholder={t('debts.product.namePlaceholder')}
+            <label className="label">Nomi *</label>
+            <input className="input" placeholder="Masalan: Podshipnik 6204"
                    value={name} onChange={(e) => setName(e.target.value)} autoFocus />
           </div>
 
           {/* Qarz turi: tayyor variantlar yoki ixtiyoriy nom */}
           <div>
-            <label className="label">{t('debts.product.typeLabel')}</label>
+            <label className="label">Turi</label>
             <select className="input" value={typeChoice} onChange={(e) => setTypeChoice(e.target.value)}>
-              {PRESET_TYPES.map((tp) => <option key={tp} value={tp}>{t(`debts.type.${tp}`)}</option>)}
-              <option value="__custom__">{t('debts.product.typeCustom')}</option>
+              {PRESET_TYPES.map((tp) => <option key={tp} value={tp}>{DEBTS_TYPE[String(tp)]}</option>)}
+              <option value="__custom__">Boshqa (ixtiyoriy)</option>
             </select>
             {typeChoice === '__custom__' && (
-              <input className="input mt-2" placeholder={t('debts.product.customTypePlaceholder')}
+              <input className="input mt-2" placeholder="Tur nomini kiriting (masalan: Ijara)"
                      value={customType} onChange={(e) => setCustomType(e.target.value)} />
             )}
           </div>
@@ -111,47 +119,47 @@ export default function DebtProductModal({
           <div className={isProduct ? 'grid grid-cols-2 gap-3' : ''}>
             {isProduct && (
               <div>
-                <label className="label">{t('debts.product.unit')}</label>
+                <label className="label">Birlik</label>
                 <select className="input" value={unit} onChange={(e) => setUnit(e.target.value)}>
-                  {UNITS.map((u) => <option key={u} value={u}>{t(`debts.units.${u}`)}</option>)}
+                  {UNITS.map((u) => <option key={u} value={u}>{DEBTS_UNITS[String(u)]}</option>)}
                 </select>
               </div>
             )}
             <div>
-              <label className="label">{t('debts.product.currency')}</label>
+              <label className="label">Valyuta</label>
               <select className="input" value={currency} onChange={(e) => setCurrency(e.target.value)}>
-                {CURRENCIES.map((c) => <option key={c} value={c}>{t(`debts.currency.${c}`)}</option>)}
+                {CURRENCIES.map((c) => <option key={c} value={c}>{DEBTS_CURRENCY[String(c)]}</option>)}
               </select>
             </div>
           </div>
 
           {isProduct && (
             <div>
-              <label className="label">{t('debts.product.unitPrice')}</label>
+              <label className="label">Birlik narxi</label>
               <MoneyInput value={unitPrice} onChange={setUnitPrice}
-                          suffix={t(`debts.currency.${currency}`)} />
+                          suffix={DEBTS_CURRENCY[String(currency)]} />
             </div>
           )}
 
           <div>
-            <label className="label">{isProduct ? t('debts.product.supplier') : t('debts.product.source')}</label>
+            <label className="label">{isProduct ? "Ta'minotchi" : 'Kimdan / qayerdan'}</label>
             <input className="input"
-                   placeholder={isProduct ? t('debts.product.supplierPlaceholder') : t('debts.product.sourcePlaceholder')}
+                   placeholder={isProduct ? "Ta'minotchi ismi" : 'Masalan: bank nomi yoki ism'}
                    value={supplier} onChange={(e) => setSupplier(e.target.value)} />
           </div>
 
           <div>
-            <label className="label">{t('debts.product.note')}</label>
+            <label className="label">Izoh</label>
             <textarea className="input min-h-[60px]" value={note} onChange={(e) => setNote(e.target.value)} />
           </div>
         </div>
 
         <div className="px-5 py-3 border-t border-black/5 flex justify-end gap-2">
           <button onClick={onClose} className="px-3 py-1.5 text-sm rounded-button hover:bg-black/5">
-            {t('actions.cancel')}
+            Bekor qilish
           </button>
           <button onClick={handleSave} disabled={saving} className="btn-primary disabled:opacity-50">
-            {saving ? '...' : t('actions.save', { defaultValue: 'Saqlash' })}
+            {saving ? '...' : 'Saqlash'}
           </button>
         </div>
       </div>

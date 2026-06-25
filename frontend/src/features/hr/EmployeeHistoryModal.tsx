@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import { X, Lock, Wallet, Clock, Coins, Scale, Plus, Trash2 } from 'lucide-react';
 
@@ -12,6 +11,17 @@ import { usePermissions } from '@/lib/permissions';
 import type { EmployeeRow, EmployeeMonthSummary } from '@/features/hr/EmployeeModal';
 
 export type HistoryKind = 'salary' | 'advance' | 'remaining' | 'hours';
+
+const HR_MONTHS: Record<string, string> = {
+  '1': 'Yanvar', '2': 'Fevral', '3': 'Mart', '4': 'Aprel', '5': 'May', '6': 'Iyun',
+  '7': 'Iyul', '8': 'Avgust', '9': 'Sentyabr', '10': 'Oktyabr', '11': 'Noyabr', '12': 'Dekabr',
+};
+const HIST_TITLE: Record<HistoryKind, string> = {
+  salary: 'Hisoblangan oylik',
+  advance: 'Olingan avanslar',
+  remaining: 'Qoldiq (qolgan oylik)',
+  hours: 'Ishlangan soatlar',
+};
 
 // Faqat raqamlarni qoldiradi (boshidagi keraksiz nollarsiz)
 const onlyDigits = (s: string) => s.replace(/[^\d]/g, '').replace(/^0+(?=\d)/, '');
@@ -86,7 +96,6 @@ export default function EmployeeHistoryModal({
   month: number;
   onClose: () => void;
 }) {
-  const { t } = useTranslation();
   const qc = useQueryClient();
   const { canSpecial } = usePermissions();
   const editable = kind === 'advance';
@@ -164,7 +173,7 @@ export default function EmployeeHistoryModal({
         note: note || null,
         override,
       });
-      toast.success(t('hr.histModal.advanceSaved'));
+      toast.success("To'lov yozildi");
       setAmount('');
       setNote('');
       setAdvDate(defaultAdvDate);
@@ -172,7 +181,7 @@ export default function EmployeeHistoryModal({
       advQ.refetch();
       invalidateAll();
     } catch (e: any) {
-      toast.error(errText(e, t('hr.histModal.saveError')));
+      toast.error(errText(e, "To'lovni saqlab bo'lmadi"));
     } finally {
       setSaving(false);
       setOverrideConfirm(null);
@@ -181,7 +190,7 @@ export default function EmployeeHistoryModal({
 
   function handleAddAdvance() {
     const amt = toNum(amount);
-    if (!amt || amt <= 0) { toast.error(t('hr.histModal.amountRequired')); return; }
+    if (!amt || amt <= 0) { toast.error('Summani kiriting'); return; }
 
     // Tahminiy oylik limiti: max_gross. Joriy avanslar — modaldagi jonli ro'yxatdan
     // (har qo'shilgandan keyin yangilanadi). Backend ham shu cheklovni majburlaydi.
@@ -193,7 +202,7 @@ export default function EmployeeHistoryModal({
     if (maxGross > 0 && wouldBe > maxGross) {
       if (!canOverrideAdvance) {
         const remaining = Math.max(0, maxGross - curAdv);
-        toast.error(t('hr.histModal.advanceBlocked', { remaining: formatUZS(remaining) }));
+        toast.error(`Avans tahminiy oylikdan oshib ketadi. Berish mumkin bo'lgan qoldiq: ${formatUZS(remaining)}. Oylikdan ortiq avans berishni faqat super-admin tasdiqlay oladi.`);
         return;
       }
       // admin/director — tasdiq so'raymiz, so'ng override bilan yuboramiz
@@ -208,19 +217,19 @@ export default function EmployeeHistoryModal({
     setVoiding(true);
     try {
       await api.delete(`/hr/advances/${confirmVoid.id}`);
-      toast.success(t('hr.histModal.voided'));
+      toast.success('To\'lov bekor qilindi');
       setConfirmVoid(null);
       advQ.refetch();
       invalidateAll();
     } catch (e: any) {
-      toast.error(errText(e, t('hr.histModal.saveError')));
+      toast.error(errText(e, "To'lovni saqlab bo'lmadi"));
     } finally {
       setVoiding(false);
     }
   }
 
-  const monthLabel = t(`hr.months.${month}`);
-  const title = `${employee.full_name} — ${t(`hr.histModal.title.${kind}`)} · ${monthLabel} ${year}`;
+  const monthLabel = HR_MONTHS[String(month)];
+  const title = `${employee.full_name} — ${HIST_TITLE[kind]} · ${monthLabel} ${year}`;
 
   const isLoading = (needsAdvances && advQ.isLoading) || (needsAttendance && attQ.isLoading);
 
@@ -243,7 +252,7 @@ export default function EmployeeHistoryModal({
               <h3 className="font-semibold text-base leading-tight">{title}</h3>
               {!editable && (
                 <p className="text-xs text-ink-soft mt-0.5 flex items-center gap-1">
-                  <Lock size={11} /> {t('hr.histModal.readonly')}
+                  <Lock size={11} /> Faqat ko'rish uchun
                 </p>
               )}
             </div>
@@ -256,10 +265,10 @@ export default function EmployeeHistoryModal({
         {editable && (
           <div className="px-5 pt-4">
             <div className="rounded-button border border-primary/15 bg-primary/5 p-3">
-              <div className="text-sm font-medium mb-2">{t('hr.histModal.addAdvanceTitle')}</div>
+              <div className="text-sm font-medium mb-2">Avans / oylik berish</div>
               <div className="flex items-end gap-2 flex-wrap">
                 <div className="flex-1 min-w-[140px]">
-                  <label className="text-xs text-ink-soft">{t('hr.histModal.amountLabel')}</label>
+                  <label className="text-xs text-ink-soft">Summa</label>
                   <input
                     type="text"
                     inputMode="decimal"
@@ -270,7 +279,7 @@ export default function EmployeeHistoryModal({
                   />
                 </div>
                 <div className="min-w-[140px]">
-                  <label className="text-xs text-ink-soft">{t('hr.histModal.dateLabel')}</label>
+                  <label className="text-xs text-ink-soft">Sana</label>
                   <input
                     type="date"
                     className="input"
@@ -281,12 +290,12 @@ export default function EmployeeHistoryModal({
                   />
                 </div>
                 <div className="flex-1 min-w-[140px]">
-                  <label className="text-xs text-ink-soft">{t('hr.histModal.noteLabel')}</label>
+                  <label className="text-xs text-ink-soft">Izoh</label>
                   <input
                     className="input"
                     value={note}
                     onChange={(e) => setNote(e.target.value)}
-                    placeholder={t('hr.histModal.notePlaceholder')}
+                    placeholder="Avans"
                   />
                 </div>
                 <button
@@ -294,7 +303,7 @@ export default function EmployeeHistoryModal({
                   disabled={saving}
                   className="btn-primary disabled:opacity-50"
                 >
-                  <Plus size={16} /> {saving ? t('hr.histModal.saving') : t('hr.histModal.give')}
+                  <Plus size={16} /> {saving ? 'Saqlanmoqda…' : 'Berish'}
                 </button>
               </div>
               <label className="flex items-center gap-2 mt-2.5 cursor-pointer select-none w-fit">
@@ -304,10 +313,10 @@ export default function EmployeeHistoryModal({
                   checked={affectFinance}
                   onChange={(e) => setAffectFinance(e.target.checked)}
                 />
-                <span className="text-sm font-medium">{t('hr.histModal.affectFinanceLabel')}</span>
+                <span className="text-sm font-medium">Moliyadan ayirilsin</span>
               </label>
               <p className="text-[11px] text-ink-soft mt-1">
-                {affectFinance ? t('hr.histModal.financeHint') : t('hr.histModal.financeHintOff')}
+                {affectFinance ? 'Bu to\'lov moliya bo\'limidan ham chiqim sifatida ayiriladi.' : 'Faqat xodim tarixiga yoziladi — moliya balansidan ayirilmaydi.'}
               </p>
             </div>
           </div>
@@ -336,14 +345,11 @@ export default function EmployeeHistoryModal({
 
     <ConfirmModal
       open={!!confirmVoid}
-      title={t('hr.histModal.voidTitle')}
+      title="To'lovni bekor qilish"
       message={confirmVoid
-        ? t('hr.histModal.voidConfirm', {
-            amount: formatUZS(confirmVoid.amount),
-            date: formatDate(confirmVoid.advance_date),
-          })
+        ? `${formatDate(confirmVoid.advance_date)} sanadagi ${formatUZS(confirmVoid.amount)} to'lov bekor qilinsinmi? Tarixda o'chirilgan holatda qoladi va moliyadagi tegishli chiqim teskari qaytariladi.`
         : ''}
-      confirmText={t('hr.histModal.voidConfirmBtn')}
+      confirmText="Ha, bekor qilish"
       loading={voiding}
       onConfirm={handleVoid}
       onCancel={() => setConfirmVoid(null)}
@@ -351,14 +357,11 @@ export default function EmployeeHistoryModal({
 
     <ConfirmModal
       open={!!overrideConfirm}
-      title={t('hr.histModal.overrideTitle')}
+      title="Oylikdan ortiq avans"
       message={overrideConfirm
-        ? t('hr.histModal.overrideConfirm', {
-            maxGross: formatUZS(overrideConfirm.maxGross),
-            wouldBe: formatUZS(overrideConfirm.wouldBe),
-          })
+        ? `Bu avans tahminiy oylikdan (${formatUZS(overrideConfirm.maxGross)}) oshib ketadi — jami avans ${formatUZS(overrideConfirm.wouldBe)} bo'ladi. Baribir berilsinmi?`
         : ''}
-      confirmText={t('hr.histModal.overrideConfirmBtn')}
+      confirmText="Ha, baribir berish"
       variant="danger"
       loading={saving}
       onConfirm={() => { if (overrideConfirm) submitAdvance(overrideConfirm.amt, true); }}
@@ -378,21 +381,19 @@ function Body({
   salaryType: string;
   onVoid?: (a: Advance) => void;
 }) {
-  const { t } = useTranslation();
-
   if (kind === 'advance') {
     // Bekor qilingan (void) avanslar jamiga kirmaydi — real holat emas
     const total = advances.reduce((s, a) => s + (a.status === 'void' ? 0 : (parseFloat(a.amount) || 0)), 0);
     if (advances.length === 0) {
-      return <EmptyState title={t('hr.histModal.emptyAdvanceTitle')} description={t('hr.histModal.emptyAdvanceDesc')} />;
+      return <EmptyState title="Avans yo'q" description="Bu oyda avans olinmagan." />;
     }
     return (
       <table className="w-full text-sm">
         <thead className="text-left text-ink-soft border-b border-black/5">
           <tr>
-            <th className="py-2 pr-4">{t('hr.histModal.colDate')}</th>
-            <th className="py-2 px-4 text-right">{t('hr.histModal.colAmount')}</th>
-            <th className="py-2 pl-4 w-full">{t('hr.histModal.colNote')}</th>
+            <th className="py-2 pr-4">Sana</th>
+            <th className="py-2 px-4 text-right">Summa</th>
+            <th className="py-2 pl-4 w-full">Izoh</th>
             <th className="py-2 pl-2 w-8"></th>
           </tr>
         </thead>
@@ -407,7 +408,7 @@ function Body({
                 </td>
                 <td className="py-2 pl-4">
                   {voided ? (
-                    <span className="badge bg-danger/10 text-danger">{t('hr.histModal.voidedBadge')}</span>
+                    <span className="badge bg-danger/10 text-danger">O'chirilgan</span>
                   ) : (
                     <span className="text-ink/70">{a.note || '—'}</span>
                   )}
@@ -415,7 +416,7 @@ function Body({
                 <td className="py-2 pl-2 text-right">
                   {onVoid && !voided && (
                     <button
-                      title={t('hr.histModal.voidTitle')}
+                      title="To'lovni bekor qilish"
                       onClick={() => onVoid(a)}
                       className="p-1.5 rounded hover:bg-danger/10 text-ink/40 hover:text-danger transition-colors"
                     >
@@ -429,7 +430,7 @@ function Body({
         </tbody>
         <tfoot>
           <tr className="border-t border-black/10 font-semibold">
-            <td className="py-2 pr-4">{t('hr.histModal.total')}</td>
+            <td className="py-2 pr-4">Jami</td>
             <td className="py-2 px-4 text-right tabular-nums whitespace-nowrap">{formatUZS(total)}</td>
             <td colSpan={2} />
           </tr>
@@ -442,16 +443,16 @@ function Body({
     const worked = attendance.filter((d) => (parseFloat(d.hours_worked) || 0) > 0);
     const total = worked.reduce((s, d) => s + (parseFloat(d.hours_worked) || 0), 0);
     if (worked.length === 0) {
-      return <EmptyState title={t('hr.histModal.emptyHoursTitle')} description={t('hr.histModal.emptyHoursDesc')} />;
+      return <EmptyState title="Soat yo'q" description="Bu oyda ishlangan kunlar qayd etilmagan." />;
     }
     return (
       <table className="w-full text-sm">
         <thead className="text-left text-ink-soft border-b border-black/5">
           <tr>
-            <th className="py-2 pr-4">{t('hr.histModal.colDate')}</th>
-            <th className="py-2 px-4">{t('hr.histModal.colCheckIn')}</th>
-            <th className="py-2 px-4">{t('hr.histModal.colCheckOut')}</th>
-            <th className="py-2 pl-4 text-right">{t('hr.histModal.colHours')}</th>
+            <th className="py-2 pr-4">Sana</th>
+            <th className="py-2 px-4">Keldi</th>
+            <th className="py-2 px-4">Ketdi</th>
+            <th className="py-2 pl-4 text-right">Soat</th>
           </tr>
         </thead>
         <tbody>
@@ -466,8 +467,8 @@ function Body({
         </tbody>
         <tfoot>
           <tr className="border-t border-black/10 font-semibold">
-            <td className="py-2 pr-4" colSpan={3}>{t('hr.histModal.total')}</td>
-            <td className="py-2 pl-4 text-right tabular-nums">{total.toFixed(1)} {t('hr.histModal.hoursUnit')}</td>
+            <td className="py-2 pr-4" colSpan={3}>Jami</td>
+            <td className="py-2 pl-4 text-right tabular-nums">{total.toFixed(1)} soat</td>
           </tr>
         </tfoot>
       </table>
@@ -482,22 +483,22 @@ function Body({
       return (
         <div className="text-sm">
           <div className="border-t border-black/10 pt-2">
-            <Line label={t('hr.histModal.lineGross')} value={formatUZS(summary?.gross ?? 0)} bold />
+            <Line label="Hisoblangan oylik" value={formatUZS(summary?.gross ?? 0)} bold />
           </div>
-          <p className="text-xs text-ink-soft mt-3">{t('hr.histModal.fixedHint')}</p>
+          <p className="text-xs text-ink-soft mt-3">Bu xodimning oylik maoshi fiksatsiyalangan; kunlik taqsimot yo'q.</p>
         </div>
       );
     }
     if (paid.length === 0) {
-      return <EmptyState title={t('hr.histModal.emptySalaryTitle')} description={t('hr.histModal.emptySalaryDesc')} />;
+      return <EmptyState title="Hisoblanmagan" description="Bu oyda hali oylik hisoblanmagan." />;
     }
     return (
       <table className="w-full text-sm">
         <thead className="text-left text-ink-soft border-b border-black/5">
           <tr>
-            <th className="py-2 pr-4">{t('hr.histModal.colDate')}</th>
-            <th className="py-2 px-4 text-right">{t('hr.histModal.colHours')}</th>
-            <th className="py-2 pl-4 text-right">{t('hr.histModal.colDailyPay')}</th>
+            <th className="py-2 pr-4">Sana</th>
+            <th className="py-2 px-4 text-right">Soat</th>
+            <th className="py-2 pl-4 text-right">To'lov</th>
           </tr>
         </thead>
         <tbody>
@@ -511,7 +512,7 @@ function Body({
         </tbody>
         <tfoot>
           <tr className="border-t border-black/10 font-semibold">
-            <td className="py-2 pr-4" colSpan={2}>{t('hr.histModal.total')}</td>
+            <td className="py-2 pr-4" colSpan={2}>Jami</td>
             <td className="py-2 pl-4 text-right tabular-nums whitespace-nowrap">{formatUZS(total)}</td>
           </tr>
         </tfoot>
@@ -530,12 +531,12 @@ function Body({
   const net = summary ? (parseFloat(summary.net) || 0) : gross - advTotal;
   return (
     <div className="text-sm">
-      <p className="text-xs text-ink-soft mb-3">{t('hr.histModal.remainingHint')}</p>
+      <p className="text-xs text-ink-soft mb-3">Qoldiq = hisoblangan oylik − olingan avanslar (joriy oy).</p>
       <div className="space-y-1">
-        <Line label={t('hr.histModal.lineGross')} value={formatUZS(gross)} />
-        <Line label={t('hr.histModal.lineAdvance')} value={'− ' + formatUZS(advTotal)} negative />
+        <Line label="Hisoblangan oylik" value={formatUZS(gross)} />
+        <Line label="Olingan avans" value={'− ' + formatUZS(advTotal)} negative />
         <div className="border-t border-black/10 mt-1 pt-2">
-          <Line label={t('hr.histModal.lineRemaining')} value={formatUZS(net)} bold />
+          <Line label="Qoldiq" value={formatUZS(net)} bold />
         </div>
       </div>
     </div>

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { useTranslation } from 'react-i18next';
 import { X, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
 
 import { api } from '@/api/client';
@@ -39,7 +38,6 @@ function resolveAccountId(accounts: Account[], currency: string, gazna: boolean)
 export default function TransactionModal({
   onClose, onSaved,
 }: { onClose: () => void; onSaved: () => void }) {
-  const { t } = useTranslation();
   const [mode, setMode] = useState<Mode>('expense');
   const [date, setDate] = useState(today());
   const [categoryId, setCategoryId] = useState('');
@@ -73,16 +71,16 @@ export default function TransactionModal({
     return () => window.removeEventListener('keydown', esc);
   }, [onClose]);
 
-  const MODE_TABS: Array<{ key: Mode; labelKey: string; icon: typeof ArrowDownLeft; cls: string }> = [
-    { key: 'income', labelKey: 'finance.type.income', icon: ArrowDownLeft, cls: 'border-success bg-success/10 text-success' },
-    { key: 'expense', labelKey: 'finance.type.expense', icon: ArrowUpRight, cls: 'border-danger bg-danger/10 text-danger' },
+  const MODE_TABS: Array<{ key: Mode; label: string; icon: typeof ArrowDownLeft; cls: string }> = [
+    { key: 'income', label: 'Kirim', icon: ArrowDownLeft, cls: 'border-success bg-success/10 text-success' },
+    { key: 'expense', label: 'Chiqim', icon: ArrowUpRight, cls: 'border-danger bg-danger/10 text-danger' },
   ];
 
   async function handleSave() {
     setSaving(true);
     try {
       const amt = toNum(amount);
-      if (!amt || amt <= 0) { toast.error(t('finance.txModal.amountRequired')); setSaving(false); return; }
+      if (!amt || amt <= 0) { toast.error("To'g'ri summa kiriting"); setSaving(false); return; }
       await api.post('/finance/transactions', {
         date, type: mode,
         category_id: categoryId || null,
@@ -90,11 +88,11 @@ export default function TransactionModal({
         account_id: resolveAccountId(accounts, currency, gazna),
         note: note || null,
       });
-      toast.success(t('finance.txModal.savedSuccess'));
+      toast.success('Tranzaksiya saqlandi');
       onSaved();
       onClose();
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || t('finance.error'));
+      toast.error(e?.response?.data?.detail || 'Xatolik');
     } finally {
       setSaving(false);
     }
@@ -105,7 +103,7 @@ export default function TransactionModal({
       <div className="bg-card rounded-lg shadow-xl w-full max-w-md overflow-hidden flex flex-col"
            onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3 border-b border-black/5">
-          <h3 className="font-semibold">{t('finance.txModal.title')}</h3>
+          <h3 className="font-semibold">Yangi tranzaksiya</h3>
           <button onClick={onClose} className="p-1 rounded hover:bg-black/5"><X size={18} /></button>
         </div>
 
@@ -120,7 +118,7 @@ export default function TransactionModal({
                   onClick={() => { setMode(tt.key); setCategoryId(''); }}
                   className={`flex flex-col items-center gap-1 py-2 rounded-button border text-sm font-medium transition ${
                     active ? tt.cls : 'border-black/10 text-ink-soft hover:bg-black/5'}`}>
-                  <Icon size={18} /> {t(tt.labelKey)}
+                  <Icon size={18} /> {tt.label}
                 </button>
               );
             })}
@@ -128,13 +126,13 @@ export default function TransactionModal({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="label">{t('finance.txModal.dateLabel')}</label>
+              <label className="label">Sana</label>
               <input type="date" className="input" value={date} onChange={(e) => setDate(e.target.value)} />
             </div>
             <div>
-              <label className="label">{t('finance.txModal.categoryLabel')}</label>
+              <label className="label">Kategoriya</label>
               <select className="input" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-                <option value="">{t('finance.txModal.categoryNone')}</option>
+                <option value="">— Belgilanmagan —</option>
                 {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
@@ -142,12 +140,12 @@ export default function TransactionModal({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="label">{t('finance.txModal.amountLabel')}</label>
+              <label className="label">Summa *</label>
               <input type="text" inputMode="decimal" className="input" placeholder="0"
                      value={amount} onChange={(e) => setAmount(formatAmount(e.target.value))} />
             </div>
             <div>
-              <label className="label">{t('finance.txModal.currencyLabel')}</label>
+              <label className="label">Valyuta</label>
               <select className="input" value={currency} onChange={(e) => setCurrency(e.target.value)}>
                 <option value="UZS">UZS</option>
                 <option value="USD">USD</option>
@@ -159,20 +157,20 @@ export default function TransactionModal({
             <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
               <input type="checkbox" checked={gazna} onChange={(e) => setGazna(e.target.checked)}
                      className="w-4 h-4 accent-warning" />
-              {t('finance.txModal.gaznaLabel')}
+              G'aznaga (naqd dollar jamg'armasi)
             </label>
           )}
 
           <div>
-            <label className="label">{t('finance.txModal.noteLabel')}</label>
+            <label className="label">Izoh</label>
             <textarea className="input min-h-[56px]" value={note} onChange={(e) => setNote(e.target.value)} />
           </div>
         </div>
 
         <div className="px-5 py-3 border-t border-black/5 flex justify-end gap-2">
-          <button onClick={onClose} className="px-3 py-1.5 text-sm rounded-button hover:bg-black/5">{t('actions.cancel')}</button>
+          <button onClick={onClose} className="px-3 py-1.5 text-sm rounded-button hover:bg-black/5">Bekor qilish</button>
           <button onClick={handleSave} disabled={saving} className="btn-primary disabled:opacity-50">
-            {saving ? t('finance.saving') : t('actions.save')}
+            {saving ? 'Saqlanmoqda…' : 'Saqlash'}
           </button>
         </div>
       </div>

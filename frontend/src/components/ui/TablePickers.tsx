@@ -1,7 +1,16 @@
 import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useTranslation } from 'react-i18next';
 import { Check, ChevronDown, ChevronLeft, ChevronRight, Search } from 'lucide-react';
+
+// Kalendar oy/hafta nomlari (lug'atdan)
+const CALENDAR_MONTHS: Record<string, string> = {
+  '0': 'Yanvar', '1': 'Fevral', '2': 'Mart', '3': 'Aprel',
+  '4': 'May', '5': 'Iyun', '6': 'Iyul', '7': 'Avgust',
+  '8': 'Sentyabr', '9': 'Oktyabr', '10': 'Noyabr', '11': 'Dekabr',
+};
+const CALENDAR_WEEKDAYS: Record<string, string> = {
+  '0': 'Du', '1': 'Se', '2': 'Ch', '3': 'Pa', '4': 'Ju', '5': 'Sh', '6': 'Ya',
+};
 
 /**
  * Jadval kataklari uchun ixcham, chiroyli popover'li tanlagichlar:
@@ -86,7 +95,6 @@ export function CellSelect({
   valueClassName?: string;
   hideChevron?: boolean;
 }) {
-  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const btnRef = useRef<HTMLButtonElement>(null);
@@ -119,7 +127,7 @@ export function CellSelect({
             <div className="flex items-center gap-2 px-3 py-2 border-b border-black/5">
               <Search size={14} className="text-ink/40 shrink-0" />
               <input autoFocus value={query} onChange={(e) => setQuery(e.target.value)}
-                     placeholder={t('ui.tablePickers.searchPlaceholder')}
+                     placeholder="Qidirish..."
                      className="w-full bg-transparent outline-none text-sm" />
             </div>
           )}
@@ -133,7 +141,7 @@ export function CellSelect({
               </button>
             )}
             {filtered.length === 0 ? (
-              <p className="px-3 py-3 text-sm text-ink-soft text-center">{t('ui.tablePickers.notFound')}</p>
+              <p className="px-3 py-3 text-sm text-ink-soft text-center">Topilmadi</p>
             ) : filtered.map((o) => {
               const active = o.value === value;
               return (
@@ -162,11 +170,10 @@ export function CellDate({
   placeholder?: string;
   triggerClassName?: string;
 }) {
-  const { t } = useTranslation();
-  const resolvedPlaceholder = placeholder ?? t('ui.tablePickers.datePlaceholder');
+  const resolvedPlaceholder = placeholder ?? 'kun.oy.yil';
 
-  const MONTHS = MONTH_KEYS.map((k) => t(`ui.calendar.months.${k}`));
-  const WEEKDAYS = WEEKDAY_KEYS.map((k) => t(`ui.calendar.weekdays.${k}`));
+  const MONTHS = MONTH_KEYS.map((k) => CALENDAR_MONTHS[k]);
+  const WEEKDAYS = WEEKDAY_KEYS.map((k) => CALENDAR_WEEKDAYS[k]);
 
   const [open, setOpen] = useState(false);
   const btnRef = useRef<HTMLButtonElement>(null);
@@ -242,12 +249,12 @@ export function CellDate({
               {clearable && value ? (
                 <button type="button" onClick={() => { onChange(''); setOpen(false); }}
                         className="text-xs text-ink/50 hover:text-danger px-1.5 py-1 rounded">
-                  {t('ui.tablePickers.clearDate')}
+                  Tozalash
                 </button>
               ) : <span />}
               <button type="button" onClick={() => { onChange(todayIso()); setOpen(false); }}
                       className="text-xs text-primary font-medium px-1.5 py-1 rounded hover:bg-primary/10">
-                {t('ui.tablePickers.today')}
+                Bugun
               </button>
             </div>
           </div>

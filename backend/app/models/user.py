@@ -40,7 +40,6 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     position: Mapped[Optional[str]] = mapped_column(String(100))
 
     # Preferences
-    locale: Mapped[str] = mapped_column(String(5), default="uz")
     theme: Mapped[str] = mapped_column(String(10), default="light")  # light/dark/auto
 
     # Status

@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import { X } from 'lucide-react';
 
@@ -37,7 +36,6 @@ export default function CustomerModal({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const { t } = useTranslation();
   const isCreate = customer === null;
 
   const [fullName, setFullName] = useState(customer?.full_name ?? '');
@@ -59,11 +57,11 @@ export default function CustomerModal({
 
   async function handleSave() {
     if (!fullName.trim()) {
-      toast.error(t('customers.modal.fullNameRequired'));
+      toast.error('Ism-familiya majburiy');
       return;
     }
     if (!phone.trim()) {
-      toast.error(t('customers.modal.phoneRequired'));
+      toast.error('Telefon majburiy');
       return;
     }
     setSaving(true);
@@ -81,15 +79,15 @@ export default function CustomerModal({
     try {
       if (isCreate) {
         await api.post('/customers', body);
-        toast.success(t('customers.modal.toastAdded'));
+        toast.success('Mijoz qo\'shildi');
       } else {
         await api.patch(`/customers/${customer!.id}`, body);
-        toast.success(t('customers.modal.toastUpdated'));
+        toast.success('Yangilandi');
       }
       onSaved();
       onClose();
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || t('customers.modal.toastError'));
+      toast.error(e?.response?.data?.detail || 'Xatolik');
     } finally {
       setSaving(false);
     }
@@ -101,33 +99,33 @@ export default function CustomerModal({
            onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3 border-b border-black/5 shrink-0">
           <h3 className="font-semibold">
-            {isCreate ? t('customers.modal.createTitle') : t('customers.modal.editTitle')}
+            {isCreate ? 'Yangi mijoz' : 'Mijozni tahrirlash'}
           </h3>
-          <button onClick={onClose} className="p-1 rounded hover:bg-black/5" aria-label={t('common.close')}>
+          <button onClick={onClose} className="p-1 rounded hover:bg-black/5" aria-label="Yopish">
             <X size={18} />
           </button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
           <div>
-            <label className="label">{t('customers.modal.fullNameLabel')}</label>
+            <label className="label">Ism familiya *</label>
             <input className="input" value={fullName} onChange={(e) => setFullName(e.target.value)} />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="label">{t('customers.modal.phoneLabel')}</label>
+              <label className="label">Telefon *</label>
               <PhoneInput value={phone} onChange={setPhone} />
             </div>
             <div>
-              <label className="label">{t('customers.modal.phone2Label')}</label>
+              <label className="label">Qo'shimcha telefon</label>
               <PhoneInput value={phone2} onChange={setPhone2} />
             </div>
           </div>
 
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="label">{t('customers.modal.countryLabel')}</label>
+              <label className="label">Davlat</label>
               <Select
                 value={country}
                 onChange={(v) => { setCountry(v); setRegion(''); }}
@@ -137,7 +135,7 @@ export default function CustomerModal({
               />
             </div>
             <div>
-              <label className="label">{t('customers.modal.regionLabel')}</label>
+              <label className="label">Viloyat</label>
               <Select
                 value={region}
                 onChange={setRegion}
@@ -151,34 +149,34 @@ export default function CustomerModal({
               />
             </div>
             <div>
-              <label className="label">{t('customers.modal.cityLabel')}</label>
+              <label className="label">Shahar / tuman</label>
               <input className="input" value={city} onChange={(e) => setCity(e.target.value)} />
             </div>
           </div>
 
           <div>
-            <label className="label">{t('customers.modal.addressLabel')}</label>
+            <label className="label">Manzil</label>
             <textarea className="input min-h-[56px]" value={address} onChange={(e) => setAddress(e.target.value)} />
           </div>
 
           <div>
-            <label className="label">{t('customers.modal.noteLabel')}</label>
+            <label className="label">Izoh</label>
             <textarea className="input min-h-[56px]" value={note} onChange={(e) => setNote(e.target.value)} />
           </div>
 
           <label className="flex items-center gap-2 cursor-pointer select-none">
             <input type="checkbox" className="h-4 w-4 accent-primary"
                    checked={isDealer} onChange={(e) => setIsDealer(e.target.checked)} />
-            <span className="text-sm">{t('customers.modal.dealerLabel')}</span>
+            <span className="text-sm">Diller mijoz (to'lovsiz yetkazishga ruxsat)</span>
           </label>
         </div>
 
         <div className="px-5 py-3 border-t border-black/5 flex justify-end gap-2 shrink-0">
           <button onClick={onClose} className="px-3 py-1.5 text-sm rounded-button hover:bg-black/5">
-            {t('actions.cancel')}
+            Bekor qilish
           </button>
           <button onClick={handleSave} disabled={saving} className="btn-primary disabled:opacity-50">
-            {saving ? t('customers.modal.saving') : t('actions.save')}
+            {saving ? 'Saqlanmoqda...' : 'Saqlash'}
           </button>
         </div>
       </div>

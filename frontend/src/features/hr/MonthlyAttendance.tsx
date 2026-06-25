@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { useTranslation } from 'react-i18next';
 import { ChevronLeft, ChevronRight, Wand2, Eraser, Save } from 'lucide-react';
 
 import { api } from '@/api/client';
@@ -9,6 +8,15 @@ import Card from '@/components/ui/Card';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import TimeInput24 from '@/components/ui/TimeInput24';
 import { formatUZS } from '@/lib/format';
+
+const HR_MONTHS: Record<string, string> = {
+  '1': 'Yanvar', '2': 'Fevral', '3': 'Mart', '4': 'Aprel', '5': 'May', '6': 'Iyun',
+  '7': 'Iyul', '8': 'Avgust', '9': 'Sentyabr', '10': 'Oktyabr', '11': 'Noyabr', '12': 'Dekabr',
+};
+const HR_WEEKDAYS: Record<string, string> = {
+  '0': 'Yakshanba', '1': 'Dushanba', '2': 'Seshanba', '3': 'Chorshanba',
+  '4': 'Payshanba', '5': 'Juma', '6': 'Shanba',
+};
 
 interface AttRow {
   work_date: string;
@@ -58,7 +66,6 @@ export default function MonthlyAttendance({
   onShiftMonth: (delta: number) => void;
   onChanged?: () => void;
 }) {
-  const { t } = useTranslation();
   const qc = useQueryClient();
   const [rows, setRows] = useState<DayRow[]>([]);
   const [defIn, setDefIn] = useState('08:30');
@@ -151,20 +158,20 @@ export default function MonthlyAttendance({
           note: null,
         }));
       await api.post('/hr/attendance/batch', { entries });
-      toast.success(t('hr.attendance.saved'));
+      toast.success('Davomat saqlandi');
       qc.invalidateQueries({ queryKey: ['hr', 'attendance', employeeId] });
       qc.invalidateQueries({ queryKey: ['hr', 'heatmap', employeeId] });
       qc.invalidateQueries({ queryKey: ['hr', 'summary', employeeId] });
       qc.invalidateQueries({ queryKey: ['hr', 'history', employeeId] });
       onChanged?.();
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || t('hr.modal.errorGeneric'));
+      toast.error(e?.response?.data?.detail || 'Xatolik');
     } finally {
       setSaving(false);
     }
   }
 
-  const monthName = t(`hr.months.${month}`);
+  const monthName = HR_MONTHS[String(month)];
 
   return (
     <Card>
@@ -179,24 +186,24 @@ export default function MonthlyAttendance({
           </button>
         </div>
         <button onClick={handleSave} disabled={saving} className="btn-primary disabled:opacity-50">
-          <Save size={16} /> {saving ? t('hr.modal.saving') : t('actions.save')}
+          <Save size={16} /> {saving ? 'Saqlanmoqda...' : 'Saqlash'}
         </button>
       </div>
 
       {/* Quick fill */}
       <div className="flex items-end gap-x-6 gap-y-3 flex-wrap mb-4 p-4 bg-black/[0.02] rounded-button">
         <div className="flex flex-col gap-1">
-          <label className="label !mb-0">{t('hr.attendance.checkIn')}</label>
+          <label className="label !mb-0">Kelish</label>
           <TimeInput24 value={defIn} onChange={setDefIn} className="!w-28" />
         </div>
         <div className="flex flex-col gap-1">
-          <label className="label !mb-0">{t('hr.attendance.checkOut')}</label>
+          <label className="label !mb-0">Ketish</label>
           <TimeInput24 value={defOut} onChange={setDefOut} className="!w-28" />
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <button onClick={fillFirstHalf} className="btn-ghost"><Wand2 size={15} /> {t('hr.attendance.fillFirstHalf')}</button>
-          <button onClick={fillSecondHalf} className="btn-ghost"><Wand2 size={15} /> {t('hr.attendance.fillSecondHalf')}</button>
-          <button onClick={() => setConfirmClear(true)} className="btn-ghost"><Eraser size={15} /> {t('hr.attendance.clearAll')}</button>
+          <button onClick={fillFirstHalf} className="btn-ghost"><Wand2 size={15} /> 1–15 kun</button>
+          <button onClick={fillSecondHalf} className="btn-ghost"><Wand2 size={15} /> 16–oy oxiri</button>
+          <button onClick={() => setConfirmClear(true)} className="btn-ghost"><Eraser size={15} /> Tozalash</button>
         </div>
       </div>
 
@@ -211,11 +218,11 @@ export default function MonthlyAttendance({
           <table className="w-full text-sm">
             <thead className="text-left text-ink-soft border-b border-black/5">
               <tr>
-                <th className="py-2 pr-6">{t('hr.attendance.colDay')}</th>
-                <th className="py-2 px-3">{t('hr.attendance.colCheckIn')}</th>
-                <th className="py-2 px-3">{t('hr.attendance.colCheckOut')}</th>
-                <th className="py-2 pl-3 text-right">{t('hr.attendance.colWorked')}</th>
-                {salaryType === 'hourly' && <th className="py-2 pl-6 text-right">{t('hr.attendance.colDailyPay')}</th>}
+                <th className="py-2 pr-6">Kun</th>
+                <th className="py-2 px-3">Ishga keldi</th>
+                <th className="py-2 px-3">Ishdan ketti</th>
+                <th className="py-2 pl-3 text-right">Ishladi</th>
+                {salaryType === 'hourly' && <th className="py-2 pl-6 text-right">Bir kunlik</th>}
               </tr>
             </thead>
             <tbody>
@@ -233,7 +240,7 @@ export default function MonthlyAttendance({
                   >
                     <td className="py-1.5 pr-6 whitespace-nowrap min-w-[160px]">
                       <span className="font-medium">{r.day} {monthName}</span>
-                      <span className="text-ink-soft text-xs ml-2">{t(`hr.weekdays.${r.weekday}`)}</span>
+                      <span className="text-ink-soft text-xs ml-2">{HR_WEEKDAYS[String(r.weekday)]}</span>
                     </td>
                     <td className="py-1.5 px-3">
                       <TimeInput24
@@ -265,9 +272,9 @@ export default function MonthlyAttendance({
             </tbody>
             <tfoot>
               <tr className="border-t-2 border-black/10 font-semibold">
-                <td className="py-2 pr-6">{t('hr.attendance.totalRow')}</td>
+                <td className="py-2 pr-6">Jami</td>
                 <td className="px-3"></td>
-                <td className="px-3 text-right text-ink-soft text-xs">{t('hr.attendance.colHours')}</td>
+                <td className="px-3 text-right text-ink-soft text-xs">soat:</td>
                 <td className="py-2 pl-3 text-right tabular-nums">{totals.hours.toFixed(1)}</td>
                 {salaryType === 'hourly' && (
                   <td className="py-2 pl-6 text-right tabular-nums">{formatUZS(totals.pay)}</td>
@@ -280,9 +287,9 @@ export default function MonthlyAttendance({
 
       <ConfirmModal
         open={confirmClear}
-        title={t('hr.attendance.confirmClearTitle')}
-        message={t('hr.attendance.confirmClearMsg', { month: monthName, year })}
-        confirmText={t('hr.attendance.confirmClearBtn')}
+        title="Davomatni tozalash"
+        message={`${monthName} ${year} oyidagi barcha kelish-ketish vaqtlari tozalanadi. Davom etasizmi? (O'zgarish "Saqlash" bosilgandan keyin kuchga kiradi)`}
+        confirmText="Ha, tozalash"
         variant="danger"
         onConfirm={clearAll}
         onCancel={() => setConfirmClear(false)}

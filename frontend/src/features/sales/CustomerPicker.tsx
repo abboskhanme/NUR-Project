@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import { Search, UserPlus, Check, X } from 'lucide-react';
 
@@ -26,7 +25,6 @@ export default function CustomerPicker({
   value: CustomerLite | null;
   onChange: (c: CustomerLite | null) => void;
 }) {
-  const { t } = useTranslation();
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -48,7 +46,7 @@ export default function CustomerPicker({
 
   async function handleCreate() {
     if (!name.trim() || !phone.trim()) {
-      toast.error(t('sales.errNamePhone'));
+      toast.error("Ism va telefon majburiy");
       return;
     }
     setSaving(true);
@@ -59,12 +57,12 @@ export default function CustomerPicker({
         region: region.trim() || null,
       });
       onChange(r.data);
-      toast.success(t('sales.customerCreated'));
+      toast.success("Mijoz qo'shildi");
       setCreating(false);
       setOpen(false);
       setName(''); setPhone(''); setRegion('');
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || t('common.error'));
+      toast.error(e?.response?.data?.detail || "Xatolik yuz berdi");
     } finally {
       setSaving(false);
     }
@@ -83,7 +81,7 @@ export default function CustomerPicker({
           type="button"
           onClick={() => onChange(null)}
           className="p-1 rounded hover:bg-black/5 text-ink/50 shrink-0"
-          title={t('sales.changeCustomerTitle')}
+          title="Boshqa mijoz tanlash"
         >
           <X size={16} />
         </button>
@@ -99,7 +97,7 @@ export default function CustomerPicker({
             <Search size={16} className="text-ink/40" />
             <input
               autoFocus
-              placeholder={t('sales.customerPickerPlaceholder')}
+              placeholder="Mijoz ismi yoki telefoni..."
               value={search}
               onFocus={() => setOpen(true)}
               onChange={(e) => { setSearch(e.target.value); setOpen(true); }}
@@ -110,14 +108,14 @@ export default function CustomerPicker({
               onClick={() => setCreating(true)}
               className="text-xs text-primary font-medium flex items-center gap-1 shrink-0"
             >
-              <UserPlus size={14} /> {t('sales.customerPickerNew')}
+              <UserPlus size={14} /> Yangi
             </button>
           </div>
           {open && (
             <div className="max-h-52 overflow-y-auto border-t border-black/5">
               {results.length === 0 ? (
                 <div className="px-3 py-3 text-sm text-ink-soft">
-                  {t('sales.customerNotFound')} <button type="button" className="text-primary" onClick={() => setCreating(true)}>{t('sales.addNewCustomer')}</button>
+                  Topilmadi. <button type="button" className="text-primary" onClick={() => setCreating(true)}>Yangi mijoz qo'shish</button>
                 </div>
               ) : (
                 results.map((c) => (
@@ -139,21 +137,21 @@ export default function CustomerPicker({
         </>
       ) : (
         <div className="p-3 space-y-2">
-          <div className="text-sm font-medium flex items-center gap-1.5"><UserPlus size={15} className="text-primary" /> {t('sales.newCustomerTitle')}</div>
-          <input className="input" placeholder={t('sales.labelFullName')} value={name} onChange={(e) => setName(e.target.value)} />
+          <div className="text-sm font-medium flex items-center gap-1.5"><UserPlus size={15} className="text-primary" /> Yangi mijoz</div>
+          <input className="input" placeholder="Ism familiya *" value={name} onChange={(e) => setName(e.target.value)} />
           <PhoneInput value={phone} onChange={setPhone} />
           <Select
             value={region}
             onChange={setRegion}
             allowEmpty
-            emptyLabel={t('sales.regionPlaceholder')}
-            placeholder={t('sales.labelRegion')}
+            emptyLabel="Viloyat —"
+            placeholder="Viloyat"
             options={regionsOf('Uzbekistan').map((r) => ({ value: r, label: r }))}
           />
           <div className="flex justify-end gap-2 pt-1">
-            <button type="button" onClick={() => setCreating(false)} className="btn-ghost text-sm py-1.5">{t('sales.cancelBtnShort')}</button>
+            <button type="button" onClick={() => setCreating(false)} className="btn-ghost text-sm py-1.5">Bekor</button>
             <button type="button" onClick={handleCreate} disabled={saving} className="btn-primary text-sm py-1.5">
-              <Check size={15} /> {saving ? t('sales.saving') : t('sales.addBtn')}
+              <Check size={15} /> {saving ? "Saqlanmoqda..." : "Qo'shish"}
             </button>
           </div>
         </div>

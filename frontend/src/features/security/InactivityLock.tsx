@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useTranslation } from 'react-i18next';
 import { api } from '@/api/client';
 import { useAuthStore } from '@/stores/auth';
 import { usePinLockStore } from '@/stores/pinLock';
@@ -18,7 +17,6 @@ const MAX_ATTEMPTS = 5;
  * Komponent AppLayout ichida bir marta mount qilinadi.
  */
 export default function InactivityLock() {
-  const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const locked = usePinLockStore((s) => s.locked);
@@ -71,7 +69,6 @@ export default function InactivityLock() {
         unlock();
         logout();
       }}
-      t={t}
     />
   );
 }
@@ -80,12 +77,10 @@ function PinOverlay({
   userName,
   onUnlocked,
   onLogout,
-  t,
 }: {
   userName: string;
   onUnlocked: () => void;
   onLogout: () => void;
-  t: (k: string, o?: any) => string;
 }) {
   const [digits, setDigits] = useState('');
   const [error, setError] = useState(false);
@@ -162,9 +157,9 @@ function PinOverlay({
             <path d="M8 11V7a4 4 0 1 1 8 0v4" />
           </svg>
         </div>
-        <h2 className="text-lg font-bold">{t('security.lockedTitle')}</h2>
+        <h2 className="text-lg font-bold">Ekran qulflangan</h2>
         <p className="mt-1 text-sm text-ink-soft">{userName}</p>
-        <p className="mt-0.5 text-xs text-ink-soft">{t('security.enterPin')}</p>
+        <p className="mt-0.5 text-xs text-ink-soft">Davom etish uchun PIN-kodni kiriting</p>
 
         {/* PIN nuqtalari */}
         <div className={cn('my-5 flex justify-center gap-3', error && 'animate-shake')}>
@@ -185,7 +180,7 @@ function PinOverlay({
 
         {error && attempts < MAX_ATTEMPTS && (
           <p className="-mt-3 mb-2 text-xs text-danger">
-            {t('security.wrongPin', { count: remaining })}
+            {`PIN-kod noto'g'ri. Qolgan urinishlar: ${remaining}`}
           </p>
         )}
 
@@ -209,7 +204,7 @@ function PinOverlay({
           onClick={onLogout}
           className="mt-5 text-xs text-ink-soft underline hover:text-ink"
         >
-          {t('security.forgotLogout')}
+          PIN-ni unutdingizmi? Tizimdan chiqish
         </button>
       </div>
     </div>

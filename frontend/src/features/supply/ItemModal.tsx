@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import { X } from 'lucide-react';
 
@@ -21,7 +20,6 @@ export default function ItemModal({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const { t } = useTranslation();
   const editing = !!item;
   const [name, setName] = useState(item?.name ?? '');
   const [vendorId, setVendorId] = useState(item?.vendor_id ?? fixedVendorId ?? '');
@@ -39,7 +37,7 @@ export default function ItemModal({
   }, [onClose]);
 
   async function handleSave() {
-    if (!name.trim()) { toast.error(t('supply.itemModal.nameRequired')); return; }
+    if (!name.trim()) { toast.error('Nomini kiriting'); return; }
     setSaving(true);
     try {
       const body: any = {
@@ -55,11 +53,11 @@ export default function ItemModal({
         body.stock_qty = toNum(stock);
         await api.post('/supply/items', body);
       }
-      toast.success(editing ? t('supply.itemModal.savedEdit') : t('supply.itemModal.savedNew'));
+      toast.success(editing ? 'Yangilandi' : "Mahsulot qo'shildi");
       onSaved();
       onClose();
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || t('supply.error'));
+      toast.error(e?.response?.data?.detail || 'Xatolik');
     } finally {
       setSaving(false);
     }
@@ -71,23 +69,23 @@ export default function ItemModal({
            onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3 border-b border-black/5">
           <h3 className="font-semibold">
-            {editing ? t('supply.itemModal.titleEdit') : t('supply.itemModal.titleNew')}
+            {editing ? 'Mahsulotni tahrirlash' : 'Yangi mahsulot'}
           </h3>
           <button onClick={onClose} className="p-1 rounded hover:bg-black/5"><X size={18} /></button>
         </div>
 
         <div className="p-5 space-y-3">
           <div>
-            <label className="label">{t('supply.itemModal.labelName')}</label>
+            <label className="label">Nomi *</label>
             <input className="input" value={name} onChange={(e) => setName(e.target.value)}
-                   placeholder={t('supply.itemModal.placeholderName')} />
+                   placeholder="Masalan: Profil truba 40x40" />
           </div>
 
           {!fixedVendorId && (
             <div>
-              <label className="label">{t('supply.itemModal.labelVendor')}</label>
+              <label className="label">Taminotchi</label>
               <select className="input" value={vendorId} onChange={(e) => setVendorId(e.target.value)}>
-                <option value="">{t('supply.itemModal.optionNone')}</option>
+                <option value="">— Tanlanmagan —</option>
                 {vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
               </select>
             </div>
@@ -95,13 +93,13 @@ export default function ItemModal({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="label">{t('supply.itemModal.labelUnit')}</label>
+              <label className="label">O'lchov birligi</label>
               <select className="input" value={unit} onChange={(e) => setUnit(e.target.value)}>
                 {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
               </select>
             </div>
             <div>
-              <label className="label">{t('supply.itemModal.labelUnitPrice')}</label>
+              <label className="label">Birlik narxi (so'm)</label>
               <input className="input" inputMode="decimal" value={unitPrice}
                      onChange={(e) => setUnitPrice(formatAmount(e.target.value))} placeholder="0" />
             </div>
@@ -110,33 +108,33 @@ export default function ItemModal({
           <div className="grid grid-cols-2 gap-3">
             {!editing && (
               <div>
-                <label className="label">{t('supply.itemModal.labelInitialStock')}</label>
+                <label className="label">Boshlang'ich qoldiq</label>
                 <input className="input" inputMode="decimal" value={stock}
                        onChange={(e) => setStock(e.target.value)} placeholder="0" />
               </div>
             )}
             <div>
-              <label className="label">{t('supply.itemModal.labelMinQty')}</label>
+              <label className="label">Minimum qoldiq</label>
               <input className="input" inputMode="decimal" value={minQty}
                      onChange={(e) => setMinQty(e.target.value)} placeholder="0" />
             </div>
           </div>
           <p className="text-xs text-ink-soft">
-            {t('supply.itemModal.hintLowStock')}
+            Qoldiq minimumdan past tushganda «Kam» belgisi va bildirishnoma chiqadi.
           </p>
 
           <div>
-            <label className="label">{t('supply.itemModal.labelNote')}</label>
+            <label className="label">Izoh</label>
             <textarea className="input min-h-[48px]" value={note} onChange={(e) => setNote(e.target.value)} />
           </div>
         </div>
 
         <div className="px-5 py-3 border-t border-black/5 flex justify-end gap-2">
           <button onClick={onClose} className="px-3 py-1.5 text-sm rounded-button hover:bg-black/5">
-            {t('supply.cancel')}
+            Bekor
           </button>
           <button onClick={handleSave} disabled={saving} className="btn-primary disabled:opacity-50">
-            {saving ? t('supply.itemModal.saving') : t('supply.save')}
+            {saving ? 'Saqlanmoqda…' : 'Saqlash'}
           </button>
         </div>
       </div>

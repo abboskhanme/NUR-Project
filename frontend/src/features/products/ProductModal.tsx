@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import { Camera, Trash2, X } from 'lucide-react';
 
@@ -40,7 +39,6 @@ export default function ProductModal({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const { t } = useTranslation();
   const isCreate = product === null;
   const type: ProductType = product?.product_type ?? defaultType;
 
@@ -80,8 +78,8 @@ export default function ProductModal({
   }, [isAdditional, product]);
 
   function pickImage(file: File) {
-    if (!file.type.startsWith('image/')) { toast.error(t('products.modal.imageOnlyImage')); return; }
-    if (file.size > MAX_IMAGE_BYTES) { toast.error(t('products.modal.imageTooLarge')); return; }
+    if (!file.type.startsWith('image/')) { toast.error("Faqat rasm fayli yuklash mumkin"); return; }
+    if (file.size > MAX_IMAGE_BYTES) { toast.error("Rasm 5 MB dan kichik bo'lishi kerak"); return; }
     setPreview((old) => { if (old) URL.revokeObjectURL(old); return URL.createObjectURL(file); });
     setImageFile(file);
     setRemoveExisting(false);
@@ -97,11 +95,11 @@ export default function ProductModal({
 
   async function handleSave() {
     if (!isAdditional && !model.trim()) {
-      toast.error(t('products.modal.modelRequired'));
+      toast.error("Model majburiy");
       return;
     }
     if (isAdditional && !name.trim()) {
-      toast.error(t('products.modal.nameRequired'));
+      toast.error("Mahsulot nomi majburiy");
       return;
     }
 
@@ -145,19 +143,19 @@ export default function ProductModal({
         }
       }
 
-      toast.success(isCreate ? t('products.modal.toastAdded') : t('products.modal.toastUpdated'));
+      toast.success(isCreate ? "Mahsulot qo'shildi" : "Yangilandi");
       onSaved();
       onClose();
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || t('products.modal.toastError'));
+      toast.error(e?.response?.data?.detail || "Xatolik");
     } finally {
       setSaving(false);
     }
   }
 
   const modalTitle = isCreate
-    ? (isAdditional ? t('products.modal.createAdditional') : t('products.modal.createMain'))
-    : (isAdditional ? t('products.modal.editAdditional') : t('products.modal.editMain'));
+    ? (isAdditional ? "Yangi qo'shimcha mahsulot" : "Yangi kotyol")
+    : (isAdditional ? "Tahrirlash — qo'shimcha mahsulot" : "Tahrirlash — kotyol");
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
@@ -165,7 +163,7 @@ export default function ProductModal({
            onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3 border-b border-black/5 shrink-0">
           <h3 className="font-semibold">{modalTitle}</h3>
-          <button onClick={onClose} className="p-1 rounded hover:bg-black/5" aria-label={t('common.close')}>
+          <button onClick={onClose} className="p-1 rounded hover:bg-black/5" aria-label="Yopish">
             <X size={18} />
           </button>
         </div>
@@ -174,25 +172,25 @@ export default function ProductModal({
           {!isAdditional ? (
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="label">{t('products.modal.modelLabel')}</label>
-                <input className="input" placeholder={t('products.modal.modelPlaceholder')} value={model}
+                <label className="label">Model *</label>
+                <input className="input" placeholder="PREMIUM 3 / ULTRA ..." value={model}
                        onChange={(e) => setModel(e.target.value)} />
               </div>
               <div>
-                <label className="label">{t('products.modal.kvmLabel')}</label>
-                <input type="number" min={0} className="input" placeholder={t('products.modal.kvmPlaceholder')} value={kvm}
+                <label className="label">Kvadratura (kvm)</label>
+                <input type="number" min={0} className="input" placeholder="200" value={kvm}
                        onChange={(e) => setKvm(e.target.value)} />
               </div>
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2">
-                <label className="label">{t('products.modal.nameLabel')}</label>
-                <input className="input" placeholder={t('products.modal.namePlaceholder')} value={name}
+                <label className="label">Mahsulot nomi *</label>
+                <input className="input" placeholder="Turba, defizor ..." value={name}
                        onChange={(e) => setName(e.target.value)} />
               </div>
               <div>
-                <label className="label">{t('products.modal.unitLabel')}</label>
+                <label className="label">O'lchov birligi</label>
                 <select className="input" value={unit} onChange={(e) => setUnit(e.target.value)}>
                   {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
                 </select>
@@ -201,21 +199,21 @@ export default function ProductModal({
           )}
 
           <div>
-            <label className="label">{t('products.modal.priceLabel')}</label>
-            <input type="text" inputMode="decimal" className="input" placeholder={t('products.modal.pricePlaceholder')}
+            <label className="label">Narx (USD)</label>
+            <input type="text" inputMode="decimal" className="input" placeholder="0"
                    value={price}
                    onChange={(e) => setPrice(e.target.value.replace(/[^\d.]/g, ''))} />
           </div>
 
           <div>
-            <label className="label">{t('products.modal.descriptionLabel')}</label>
+            <label className="label">Izoh</label>
             <textarea className="input min-h-[56px]" value={description}
                       onChange={(e) => setDescription(e.target.value)} />
           </div>
 
           {isAdditional && (
             <div>
-              <label className="label">{t('products.modal.imageLabel')}</label>
+              <label className="label">Rasm</label>
               <div className="flex items-center gap-3">
                 {shownImage ? (
                   <img src={shownImage} alt=""
@@ -228,15 +226,15 @@ export default function ProductModal({
                 <div className="flex flex-col gap-2">
                   <button type="button" onClick={() => fileRef.current?.click()}
                           className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-button border border-black/10 hover:bg-black/5">
-                    <Camera size={14} /> {t('products.modal.imageUpload')}
+                    <Camera size={14} /> Rasm tanlash
                   </button>
                   {shownImage && (
                     <button type="button" onClick={clearImage}
                             className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-button text-danger hover:bg-danger/5">
-                      <Trash2 size={14} /> {t('products.modal.imageRemove')}
+                      <Trash2 size={14} /> Rasmni o'chirish
                     </button>
                   )}
-                  <p className="text-xs text-ink-soft">{t('products.modal.imageHint')}</p>
+                  <p className="text-xs text-ink-soft">PNG / JPEG / WEBP, 5 MB gacha</p>
                 </div>
                 <input ref={fileRef} type="file"
                        accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
@@ -252,17 +250,17 @@ export default function ProductModal({
 
           {!isAdditional && (
             <p className="text-xs text-ink-soft">
-              {t('products.modal.directionHint')}
+              Yo'nalish (o'ng/chap) buyurtma qilishda tanlanadi — narxga ta'sir qilmaydi.
             </p>
           )}
         </div>
 
         <div className="px-5 py-3 border-t border-black/5 flex justify-end gap-2 shrink-0">
           <button onClick={onClose} className="px-3 py-1.5 text-sm rounded-button hover:bg-black/5">
-            {t('actions.cancel')}
+            Bekor qilish
           </button>
           <button onClick={handleSave} disabled={saving} className="btn-primary disabled:opacity-50">
-            {saving ? t('products.modal.saving') : t('actions.save')}
+            {saving ? "Saqlanmoqda..." : "Saqlash"}
           </button>
         </div>
       </div>

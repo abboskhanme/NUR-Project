@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import { Plus, Search, Pencil, Trash2, Users } from 'lucide-react';
 
@@ -12,7 +11,6 @@ import { formatPhone } from '@/lib/format';
 import CustomerModal, { CustomerFull } from '@/features/customers/CustomerModal';
 
 export default function CustomersPage() {
-  const { t } = useTranslation();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [search, setSearch] = useState('');
@@ -35,13 +33,13 @@ export default function CustomersPage() {
 
   async function handleDelete(c: CustomerFull, e: React.MouseEvent) {
     e.stopPropagation();
-    if (!window.confirm(t('customers.confirmDelete', { name: c.full_name }))) return;
+    if (!window.confirm(`"${c.full_name}" o'chirilsinmi?`)) return;
     try {
       await api.delete(`/customers/${c.id}`);
-      toast.success(t('customers.toastDeleted'));
+      toast.success("O'chirildi");
       refresh();
     } catch (err: any) {
-      toast.error(err?.response?.data?.detail || t('customers.toastError'));
+      toast.error(err?.response?.data?.detail || "Xatolik");
     }
   }
 
@@ -49,18 +47,18 @@ export default function CustomersPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold">{t('customers.title')}</h1>
-          <p className="text-sm text-ink-soft">{t('customers.subtitle')}</p>
+          <h1 className="text-2xl font-bold">Mijozlar</h1>
+          <p className="text-sm text-ink-soft">Barcha mijozlar bazasi</p>
         </div>
         <button className="btn-primary" onClick={() => setShowCreate(true)}>
-          <Plus size={16} /> {t('customers.addButton')}
+          <Plus size={16} /> Yangi mijoz
         </button>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="card !p-4">
           <div className="flex items-center gap-2 text-ink-soft text-xs">
-            <span className="text-primary"><Users size={18} /></span> {t('customers.totalLabel')}
+            <span className="text-primary"><Users size={18} /></span> Jami mijozlar
           </div>
           <div className="text-xl font-bold mt-1">{total}</div>
         </div>
@@ -71,12 +69,12 @@ export default function CustomersPage() {
           <div className="flex items-center gap-2 flex-1 min-w-[200px] bg-white border border-black/10 rounded-button px-3 py-1.5">
             <Search size={16} className="text-ink/40" />
             <input
-              placeholder={t('customers.searchPlaceholder')}
+              placeholder="Ism yoki telefon bo'yicha qidirish..."
               value={search} onChange={(e) => setSearch(e.target.value)}
               className="bg-transparent outline-none flex-1 text-sm"
             />
           </div>
-          <input className="input max-w-[200px]" placeholder={t('customers.regionPlaceholder')}
+          <input className="input max-w-[200px]" placeholder="Viloyat bo'yicha"
                  value={region} onChange={(e) => setRegion(e.target.value)} />
         </div>
 
@@ -85,17 +83,17 @@ export default function CustomersPage() {
             {Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-12 rounded-button bg-black/5 animate-pulse" />)}
           </div>
         ) : items.length === 0 ? (
-          <EmptyState title={t('customers.empty')} description={t('customers.emptyDesc')} />
+          <EmptyState title="Mijozlar yo'q" description="'Yangi mijoz' tugmasi orqali qo'shing" />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="text-left text-ink-soft border-b border-black/5">
                 <tr>
-                  <th className="py-2 pr-3">{t('customers.table.fullName')}</th>
-                  <th className="py-2 pr-3">{t('customers.table.phone')}</th>
-                  <th className="py-2 pr-3">{t('customers.table.country')}</th>
-                  <th className="py-2 pr-3">{t('customers.table.region')}</th>
-                  <th className="py-2 pr-3">{t('customers.table.city')}</th>
+                  <th className="py-2 pr-3">Ism familiya</th>
+                  <th className="py-2 pr-3">Telefon</th>
+                  <th className="py-2 pr-3">Davlat</th>
+                  <th className="py-2 pr-3">Viloyat</th>
+                  <th className="py-2 pr-3">Shahar</th>
                   <th className="py-2 pr-3"></th>
                 </tr>
               </thead>
@@ -112,12 +110,12 @@ export default function CustomersPage() {
                       <div className="flex items-center gap-1 justify-end">
                         <button onClick={(e) => { e.stopPropagation(); setEdit(c); }}
                                 className="p-1.5 rounded hover:bg-black/5 text-ink/60"
-                                title={t('customers.editTooltip')}>
+                                title="Tahrirlash">
                           <Pencil size={15} />
                         </button>
                         <button onClick={(e) => handleDelete(c, e)}
                                 className="p-1.5 rounded hover:bg-danger/10 text-danger"
-                                title={t('customers.deleteTooltip')}>
+                                title="O'chirish">
                           <Trash2 size={15} />
                         </button>
                       </div>

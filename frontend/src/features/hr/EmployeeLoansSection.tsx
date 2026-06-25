@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import {
   Plus, Pencil, Trash2, Coins, X, ChevronDown, ChevronRight, HandCoins, History,
@@ -52,13 +51,13 @@ const DEPT_DOT: Record<string, string> = {
 };
 const SOURCES = ['director', 'firma', 'other'] as const;
 
-function useSourceLabel() {
-  const { t } = useTranslation();
-  return (s: string) =>
-    t(`hr.loans.source.${s}`, {
-      defaultValue: s === 'director' ? 'Direktordan' : s === 'firma' ? 'Firmadan' : 'Boshqa',
-    });
-}
+const SOURCE_LABELS: Record<string, string> = {
+  director: 'Direktordan',
+  firma: 'Firmadan',
+  other: 'Boshqa',
+};
+const sourceLabel = (s: string) =>
+  SOURCE_LABELS[s] ?? (s === 'director' ? 'Direktordan' : s === 'firma' ? 'Firmadan' : 'Boshqa');
 
 /**
  * Bizdan qarzdor xodimlar — director/firmadan olingan alohida qarzlar (oylikdan tashqari).
@@ -66,7 +65,6 @@ function useSourceLabel() {
  * Qoldiq = asosiy summa − so'ndirilganlar. Qoldiq 0 bo'lsa qarz ro'yxatdan tushadi (tarix qoladi).
  */
 export default function EmployeeLoansSection() {
-  const { t } = useTranslation();
   const qc = useQueryClient();
   const { can } = usePermissions();
   const canWrite = can('hr:write');
@@ -100,11 +98,11 @@ export default function EmployeeLoansSection() {
       } else {
         await api.delete(`/hr/employee-loans/${confirm.loanId}/payments/${confirm.payment.id}`);
       }
-      toast.success(t('common.deleted', { defaultValue: "O'chirildi" }));
+      toast.success("O'chirildi");
       refresh();
       setConfirm(null);
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || t('common.error'));
+      toast.error(e?.response?.data?.detail || 'Xatolik yuz berdi');
     } finally {
       setBusy(false);
     }
@@ -116,17 +114,17 @@ export default function EmployeeLoansSection() {
       <div className="rounded-card border border-danger/20 bg-danger/5 p-4">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-2 font-semibold text-danger">
-            <Coins size={18} /> {t('hr.loans.grandTitle', { defaultValue: 'Bizdan qarzdor xodimlar — jami' })}
+            <Coins size={18} /> Bizdan qarzdor xodimlar — jami
           </div>
           {canWrite && (
             <button onClick={() => { setEditing(null); setShowForm(true); }} className="btn-primary">
-              <Plus size={16} /> {t('hr.loans.add', { defaultValue: "Qarz qo'shish" })}
+              <Plus size={16} /> Qarz qo'shish
             </button>
           )}
         </div>
         <div className="mt-2 text-2xl font-bold tabular-nums text-danger">{formatUZS(grandTotal)}</div>
         <p className="text-xs text-ink-soft mt-1">
-          {t('hr.loans.grandHint', { defaultValue: "Director/firmadan olingan qarzlar qoldig'i (oylikdan tashqari)." })}
+          Director/firmadan olingan alohida qarzlar yig'indisi (oylikdan tashqari).
         </p>
       </div>
 
@@ -137,7 +135,7 @@ export default function EmployeeLoansSection() {
           ))}
         </div>
       ) : groups.length === 0 ? (
-        <EmptyState title={t('hr.loans.empty', { defaultValue: "Qarzdor xodimlar yo'q" })} />
+        <EmptyState title="Qarzdor xodimlar yo'q" />
       ) : (
         groups.map((g) => (
           <EmpBlock
@@ -169,15 +167,15 @@ export default function EmployeeLoansSection() {
         open={!!confirm}
         title={
           confirm?.kind === 'payment'
-            ? t('hr.loans.deletePaymentTitle', { defaultValue: "So'ndirishni bekor qilish" })
-            : t('hr.loans.deleteTitle', { defaultValue: "Qarzni o'chirish" })
+            ? "So'ndirishni bekor qilish"
+            : "Qarzni o'chirish"
         }
         message={
           confirm?.kind === 'payment'
-            ? t('hr.loans.deletePaymentMessage', { defaultValue: 'Bu so\'ndirish yozuvi o\'chiriladi, qoldiq qaytadi.' })
-            : t('hr.loans.deleteMessage', { defaultValue: "Qarz va uning butun so'ndirish tarixi o'chiriladi." })
+            ? 'Bu so\'ndirish yozuvi o\'chiriladi, qoldiq qaytadi.'
+            : "Qarz va uning butun so'ndirish tarixi o'chiriladi."
         }
-        confirmText={t('actions.delete', { defaultValue: "O'chirish" })}
+        confirmText="O'chirish"
         variant="danger"
         loading={busy}
         onConfirm={doConfirm}
@@ -198,7 +196,6 @@ function EmpBlock({
   onDeleteLoan: (l: Loan) => void;
   onDeletePayment: (loanId: string, p: Payment) => void;
 }) {
-  const { t } = useTranslation();
   const [open, setOpen] = useState(true);
 
   return (
@@ -212,7 +209,7 @@ function EmpBlock({
           <span className={`inline-block w-2 h-2 rounded-full ${DEPT_DOT[g.department_type] ?? 'bg-gray-400'}`} />
           {g.full_name}
           <span className="text-xs px-2 py-0.5 rounded-full bg-black/5 text-ink-soft">
-            {g.items.length} {t('hr.loans.count', { defaultValue: 'ta qarz' })}
+            {g.items.length} ta qarz
           </span>
         </div>
         <span className="tabular-nums font-bold text-danger">{formatUZS(g.total)}</span>
@@ -249,8 +246,6 @@ function LoanRow({
   onDeleteLoan: (l: Loan) => void;
   onDeletePayment: (loanId: string, p: Payment) => void;
 }) {
-  const { t } = useTranslation();
-  const sourceLabel = useSourceLabel();
   const [showHistory, setShowHistory] = useState(false);
   const hasPayments = loan.payments.length > 0;
   const balance = parseFloat(loan.balance) || 0;
@@ -265,15 +260,15 @@ function LoanRow({
             {loan.note && <span className="text-sm text-ink/70 truncate">· {loan.note}</span>}
           </div>
           <div className="mt-1 text-xs text-ink-soft tabular-nums">
-            {t('hr.loans.principal', { defaultValue: 'Asosiy' })}: {formatUZS(loan.amount)}
+            Asosiy: {formatUZS(loan.amount)}
             {' · '}
-            {t('hr.loans.paid', { defaultValue: "So'ndirilgan" })}: <span className="text-success">{formatUZS(loan.paid)}</span>
+            So'ndirilgan: <span className="text-success">{formatUZS(loan.paid)}</span>
           </div>
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
           <div className="text-right">
-            <div className="text-[11px] text-ink-soft">{t('hr.loans.balance', { defaultValue: 'Qoldiq' })}</div>
+            <div className="text-[11px] text-ink-soft">Qoldiq</div>
             <div className="tabular-nums font-bold text-danger">{formatUZS(balance)}</div>
           </div>
           {canWrite && balance > 0 && (
@@ -281,17 +276,17 @@ function LoanRow({
               onClick={() => onRepay(loan)}
               className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-button text-xs font-medium bg-success/10 text-success hover:bg-success/20"
             >
-              <HandCoins size={14} /> {t('hr.loans.repay', { defaultValue: "So'ndirish" })}
+              <HandCoins size={14} /> So'ndirish
             </button>
           )}
           {canWrite && (
-            <button title={t('actions.edit')} onClick={() => onEdit(loan)}
+            <button title="Tahrirlash" onClick={() => onEdit(loan)}
                     className="p-1.5 rounded hover:bg-black/5 text-ink/60">
               <Pencil size={15} />
             </button>
           )}
           {canDelete && (
-            <button title={t('actions.delete')} onClick={() => onDeleteLoan(loan)}
+            <button title="O'chirish" onClick={() => onDeleteLoan(loan)}
                     className="p-1.5 rounded hover:bg-danger/10 text-danger">
               <Trash2 size={15} />
             </button>
@@ -306,7 +301,7 @@ function LoanRow({
             className="inline-flex items-center gap-1 text-xs text-ink-soft hover:text-ink"
           >
             <History size={13} />
-            {t('hr.loans.history', { defaultValue: "So'ndirish tarixi" })} ({loan.payments.length})
+            So'ndirish tarixi ({loan.payments.length})
             {showHistory ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
           </button>
 
@@ -321,7 +316,7 @@ function LoanRow({
                       <td className="py-1.5 px-2 text-right tabular-nums font-medium text-success">{formatUZS(p.amount)}</td>
                       <td className="py-1.5 pr-3 pl-2 text-right w-[40px]">
                         {canDelete && (
-                          <button title={t('actions.delete')} onClick={() => onDeletePayment(loan.id, p)}
+                          <button title="O'chirish" onClick={() => onDeletePayment(loan.id, p)}
                                   className="p-1 rounded hover:bg-danger/10 text-danger/70">
                             <Trash2 size={13} />
                           </button>
@@ -346,7 +341,6 @@ function RepayForm({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const { t } = useTranslation();
   const balance = parseFloat(loan.balance) || 0;
   const [amount, setAmount] = useState(balance);
   const [payDate, setPayDate] = useState('');
@@ -361,11 +355,11 @@ function RepayForm({
 
   async function save() {
     if (!amount || amount <= 0) {
-      toast.error(t('hr.loans.amountRequired', { defaultValue: "Summa 0 dan katta bo'lishi kerak" }));
+      toast.error("Summa 0 dan katta bo'lishi kerak");
       return;
     }
     if (amount > balance) {
-      toast.error(t('hr.loans.overBalance', { defaultValue: 'Summa qoldiqdan oshib ketdi' }));
+      toast.error('Summa qoldiqdan oshib ketdi');
       return;
     }
     setSaving(true);
@@ -375,11 +369,11 @@ function RepayForm({
         pay_date: payDate || null,
         note: note || null,
       });
-      toast.success(t('hr.loans.repaid', { defaultValue: "So'ndirildi" }));
+      toast.success("So'ndirildi");
       onSaved();
       onClose();
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || t('common.error'));
+      toast.error(e?.response?.data?.detail || 'Xatolik yuz berdi');
     } finally {
       setSaving(false);
     }
@@ -389,7 +383,7 @@ function RepayForm({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-[2px] p-4" onClick={onClose}>
       <div className="bg-card rounded-xl shadow-2xl w-full max-w-sm flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-black/5">
-          <h3 className="font-semibold">{t('hr.loans.repay', { defaultValue: "Qarzni so'ndirish" })}</h3>
+          <h3 className="font-semibold">So'ndirish</h3>
           <button onClick={onClose} className="p-2 rounded-lg text-ink/40 hover:text-ink hover:bg-black/5">
             <X size={18} />
           </button>
@@ -397,30 +391,30 @@ function RepayForm({
 
         <div className="px-5 py-4 space-y-3">
           <div className="text-sm text-ink-soft">
-            {t('hr.loans.balance', { defaultValue: 'Qoldiq' })}:{' '}
+            Qoldiq:{' '}
             <span className="font-semibold text-danger tabular-nums">{formatUZS(balance)}</span>
           </div>
           <div>
-            <label className="label">{t('hr.loans.repayAmount', { defaultValue: "So'ndirish summasi" })}</label>
+            <label className="label">So'ndirish summasi</label>
             <MoneyInput value={amount} onChange={setAmount} suffix="so'm" autoFocus />
           </div>
           <div>
-            <label className="label">{t('hr.loans.colDate', { defaultValue: 'Sana' })}</label>
+            <label className="label">Sana</label>
             <DateInput value={payDate} onChange={setPayDate} />
           </div>
           <div>
-            <label className="label">{t('hr.loans.colNote', { defaultValue: 'Izoh' })}</label>
+            <label className="label">Izoh</label>
             <input className="input" value={note} onChange={(e) => setNote(e.target.value)}
-                   placeholder={t('hr.loans.notePlaceholder', { defaultValue: 'Ixtiyoriy izoh' })} />
+                   placeholder="Ixtiyoriy izoh" />
           </div>
         </div>
 
         <div className="px-5 py-4 border-t border-black/5 flex justify-end gap-2 bg-black/[0.015]">
           <button onClick={onClose} className="px-4 py-2 text-sm font-medium rounded-button border border-black/10 text-ink/70 hover:bg-black/5">
-            {t('actions.cancel')}
+            Bekor qilish
           </button>
           <button onClick={save} disabled={saving} className="btn-primary disabled:opacity-50">
-            {saving ? t('users.roles.saving', { defaultValue: 'Saqlanmoqda…' }) : t('hr.loans.repay', { defaultValue: "So'ndirish" })}
+            {saving ? 'Saqlanmoqda…' : "So'ndirish"}
           </button>
         </div>
       </div>
@@ -435,7 +429,6 @@ function LoanForm({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const { t } = useTranslation();
   const isCreate = loan === null;
 
   const [employeeId, setEmployeeId] = useState(loan?.employee_id ?? '');
@@ -460,11 +453,11 @@ function LoanForm({
 
   async function save() {
     if (isCreate && !employeeId) {
-      toast.error(t('hr.loans.pickEmployee', { defaultValue: 'Xodimni tanlang' }));
+      toast.error('Xodimni tanlang');
       return;
     }
     if (!amount || amount <= 0) {
-      toast.error(t('hr.loans.amountRequired', { defaultValue: "Summa 0 dan katta bo'lishi kerak" }));
+      toast.error("Summa 0 dan katta bo'lishi kerak");
       return;
     }
     setSaving(true);
@@ -473,17 +466,17 @@ function LoanForm({
         await api.post('/hr/employee-loans', {
           employee_id: employeeId, amount, source, loan_date: loanDate || null, note: note || null,
         });
-        toast.success(t('common.created', { defaultValue: "Qo'shildi" }));
+        toast.success("Qo'shildi");
       } else {
         await api.patch(`/hr/employee-loans/${loan!.id}`, {
           amount, source, loan_date: loanDate || null, note: note || null,
         });
-        toast.success(t('common.updated', { defaultValue: 'Yangilandi' }));
+        toast.success('Yangilandi');
       }
       onSaved();
       onClose();
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || t('common.error'));
+      toast.error(e?.response?.data?.detail || 'Xatolik yuz berdi');
     } finally {
       setSaving(false);
     }
@@ -491,9 +484,7 @@ function LoanForm({
 
   const sourceOptions = SOURCES.map((s) => ({
     value: s,
-    label: t(`hr.loans.source.${s}`, {
-      defaultValue: s === 'director' ? 'Direktordan' : s === 'firma' ? 'Firmadan' : 'Boshqa',
-    }),
+    label: sourceLabel(s),
   }));
   const empName = loan ? employees.find((e) => e.id === loan.employee_id)?.full_name : undefined;
 
@@ -503,8 +494,8 @@ function LoanForm({
         <div className="flex items-center justify-between px-5 py-4 border-b border-black/5">
           <h3 className="font-semibold">
             {isCreate
-              ? t('hr.loans.add', { defaultValue: "Qarz qo'shish" })
-              : t('hr.loans.edit', { defaultValue: 'Qarzni tahrirlash' })}
+              ? "Qarz qo'shish"
+              : 'Qarzni tahrirlash'}
           </h3>
           <button onClick={onClose} className="p-2 rounded-lg text-ink/40 hover:text-ink hover:bg-black/5">
             <X size={18} />
@@ -514,49 +505,49 @@ function LoanForm({
         <div className="px-5 py-4 space-y-3">
           {isCreate ? (
             <div>
-              <label className="label">{t('hr.loans.employee', { defaultValue: 'Xodim' })}</label>
+              <label className="label">Xodim</label>
               <Select
                 value={employeeId}
                 onChange={setEmployeeId}
                 options={employees.map((e) => ({ value: e.id, label: e.full_name }))}
-                placeholder={t('hr.loans.pickEmployee', { defaultValue: 'Xodimni tanlang' })}
+                placeholder="Xodimni tanlang"
               />
             </div>
           ) : empName ? (
             <div className="text-sm text-ink-soft">
-              {t('hr.loans.employee', { defaultValue: 'Xodim' })}: <span className="font-medium text-ink">{empName}</span>
+              Xodim: <span className="font-medium text-ink">{empName}</span>
             </div>
           ) : null}
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="label">{t('hr.loans.principal', { defaultValue: 'Asosiy summa' })}</label>
+              <label className="label">Asosiy</label>
               <MoneyInput value={amount} onChange={setAmount} suffix="so'm" autoFocus={!isCreate} />
             </div>
             <div>
-              <label className="label">{t('hr.loans.colSource', { defaultValue: 'Manba' })}</label>
+              <label className="label">Manba</label>
               <Select value={source} onChange={setSource} options={sourceOptions} />
             </div>
           </div>
 
           <div>
-            <label className="label">{t('hr.loans.colDate', { defaultValue: 'Sana' })}</label>
+            <label className="label">Sana</label>
             <DateInput value={loanDate} onChange={setLoanDate} />
           </div>
 
           <div>
-            <label className="label">{t('hr.loans.colNote', { defaultValue: 'Izoh' })}</label>
+            <label className="label">Izoh</label>
             <input className="input" value={note} onChange={(e) => setNote(e.target.value)}
-                   placeholder={t('hr.loans.notePlaceholder', { defaultValue: 'Ixtiyoriy izoh' })} />
+                   placeholder="Ixtiyoriy izoh" />
           </div>
         </div>
 
         <div className="px-5 py-4 border-t border-black/5 flex justify-end gap-2 bg-black/[0.015]">
           <button onClick={onClose} className="px-4 py-2 text-sm font-medium rounded-button border border-black/10 text-ink/70 hover:bg-black/5">
-            {t('actions.cancel')}
+            Bekor qilish
           </button>
           <button onClick={save} disabled={saving} className="btn-primary disabled:opacity-50">
-            {saving ? t('users.roles.saving', { defaultValue: 'Saqlanmoqda…' }) : t('actions.save')}
+            {saving ? 'Saqlanmoqda…' : 'Saqlash'}
           </button>
         </div>
       </div>

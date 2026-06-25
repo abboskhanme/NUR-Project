@@ -4,7 +4,6 @@ import {
   Coins, PackageOpen, Factory,
   type LucideIcon,
 } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
 import { usePermissions } from '@/lib/permissions';
 
 export interface NavItem {
@@ -22,25 +21,24 @@ export interface NavItem {
  * Foydalanuvchining ruxsati bo'yicha avtomatik filtrlanadi.
  */
 export function useNavItems(): NavItem[] {
-  const { t } = useTranslation();
   const { canModule } = usePermissions();
   const items: NavItem[] = [
-    { to: '/', label: t('nav.dashboard'), icon: LayoutDashboard, exact: true, module: 'reports' },
-    { to: '/orders', label: t('nav.sales'), icon: ShoppingCart, module: 'orders' },
-    { to: '/queue', label: t('nav.queue', { defaultValue: 'Navbat' }), icon: ListOrdered, module: 'orders' },
-    { to: '/shipping', label: t('nav.shipping', { defaultValue: 'Yuk chiqarish' }), icon: PackageOpen, module: 'shipping' },
-    { to: '/customers', label: t('nav.customers'), icon: Users, module: 'customers' },
-    { to: '/products', label: t('nav.products'), icon: Package, module: 'products' },
-    { to: '/warehouse', label: t('nav.warehouse', { defaultValue: 'Ombor' }), icon: Warehouse, module: 'inventory' },
-    { to: '/production', label: t('nav.production', { defaultValue: 'Ishlab chiqarish' }), icon: Factory, module: 'production' },
-    { to: '/service', label: t('nav.service'), icon: Wrench, module: 'service' },
-    { to: '/finance', label: t('nav.finance'), icon: Wallet, module: 'finance' },
-    { to: '/debts', label: t('nav.debts', { defaultValue: 'Bizning qarzlar' }), icon: Coins, module: 'debts' },
-    { to: '/hr', label: t('nav.hr'), icon: UserSquare2, module: 'hr' },
-    { to: '/supply', label: t('nav.supply'), icon: Truck, module: 'supply' },
-    { to: '/reports', label: t('nav.reports'), icon: BarChart3, module: 'reports' },
-    { to: '/users', label: t('nav.users', { defaultValue: 'Foydalanuvchilar' }), icon: ShieldCheck, module: 'users' },
-    { to: '/settings', label: t('nav.settings'), icon: Settings },
+    { to: '/', label: 'Bosh sahifa', icon: LayoutDashboard, exact: true, module: 'reports' },
+    { to: '/orders', label: 'Sotuv', icon: ShoppingCart, module: 'orders' },
+    { to: '/queue', label: 'Navbat', icon: ListOrdered, module: 'orders' },
+    { to: '/shipping', label: 'Yuk chiqarish', icon: PackageOpen, module: 'shipping' },
+    { to: '/customers', label: 'Mijozlar', icon: Users, module: 'customers' },
+    { to: '/products', label: 'Mahsulotlar', icon: Package, module: 'products' },
+    { to: '/warehouse', label: 'Ombor', icon: Warehouse, module: 'inventory' },
+    { to: '/production', label: 'Ishlab chiqarish', icon: Factory, module: 'production' },
+    { to: '/service', label: 'Servis', icon: Wrench, module: 'service' },
+    { to: '/finance', label: 'Moliya', icon: Wallet, module: 'finance' },
+    { to: '/debts', label: 'Bizning qarzlar', icon: Coins, module: 'debts' },
+    { to: '/hr', label: 'Xodimlar', icon: UserSquare2, module: 'hr' },
+    { to: '/supply', label: "Ta'minot", icon: Truck, module: 'supply' },
+    { to: '/reports', label: 'Hisobotlar', icon: BarChart3, module: 'reports' },
+    { to: '/users', label: 'Foydalanuvchilar', icon: ShieldCheck, module: 'users' },
+    { to: '/settings', label: 'Sozlamalar', icon: Settings },
   ];
   return items.filter((it) => !it.module || canModule(it.module));
 }

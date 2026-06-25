@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import { Plus, Boxes, PackageCheck, PackageX, Search, Trash2, Pencil, Wallet } from 'lucide-react';
 
@@ -41,7 +40,6 @@ const STATUS_STYLE: Record<string, string> = {
 type Tab = 'types' | 'list';
 
 export default function WarehousePage() {
-  const { t } = useTranslation();
   const qc = useQueryClient();
   const { can } = usePermissions();
   const [tab, setTab] = useState<Tab>('types');
@@ -92,10 +90,10 @@ export default function WarehousePage() {
   }, [s]);
 
   const statusLabel = useMemo(() => ({
-    available: t('warehouse.status.available'),
-    reserved: t('warehouse.status.reserved'),
-    sold: t('warehouse.status.sold'),
-  } as Record<string, string>), [t]);
+    available: 'Boʻsh',
+    reserved: 'Band',
+    sold: 'Sotilgan',
+  } as Record<string, string>), []);
 
   function refresh() {
     qc.invalidateQueries({ queryKey: ['wh-summary'] });
@@ -107,10 +105,10 @@ export default function WarehousePage() {
     if (!deleteUnit) return;
     try {
       await api.delete(`/inventory/units/${deleteUnit.id}`);
-      toast.success(t('common.deleted'));
+      toast.success("O'chirildi");
       refresh();
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || t('common.error'));
+      toast.error(e?.response?.data?.detail || 'Xatolik yuz berdi');
     } finally {
       setDeleteUnit(null);
     }
@@ -120,10 +118,10 @@ export default function WarehousePage() {
     if (!deleteType) return;
     try {
       await api.delete(`/products/${deleteType.id}`);
-      toast.success(t('common.deleted'));
+      toast.success("O'chirildi");
       refresh();
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || t('common.error'));
+      toast.error(e?.response?.data?.detail || 'Xatolik yuz berdi');
     } finally {
       setDeleteType(null);
     }
@@ -131,25 +129,25 @@ export default function WarehousePage() {
 
   const STATUS_FILTERS = ['', 'available', 'reserved', 'sold'] as const;
   const TABS: Array<{ key: Tab; label: string }> = [
-    { key: 'types', label: t('warehouse.tabs.types') },
-    { key: 'list', label: t('warehouse.tabs.list') },
+    { key: 'types', label: 'Turlari' },
+    { key: 'list', label: 'Roʻyxat' },
   ];
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold">{t('warehouse.title')}</h1>
-          <p className="text-sm text-ink-soft">{t('warehouse.subtitle')}</p>
+          <h1 className="text-2xl font-bold">Ombor</h1>
+          <p className="text-sm text-ink-soft">Kotyol skladi — ID raqamli birliklar</p>
         </div>
         {can('inventory:write') && (
           tab === 'list' ? (
             <button className="btn-primary" onClick={() => setAdding(true)}>
-              <Plus size={16} /> {t('warehouse.addBtn')}
+              <Plus size={16} /> Birlik qoʻshish
             </button>
           ) : (
             <button className="btn-primary" onClick={() => { setEditingType(null); setTypeModalOpen(true); }}>
-              <Plus size={16} /> {t('warehouse.types.addBtn')}
+              <Plus size={16} /> Model qoʻshish
             </button>
           )
         )}
@@ -157,18 +155,18 @@ export default function WarehousePage() {
 
       {/* KPI */}
       <div className="grid grid-cols-2 lg:grid-cols-7 gap-3">
-        <BalanceCard title={t('warehouse.status.available')} accent="success"
+        <BalanceCard title="Boʻsh" accent="success"
           value={String(s?.total_available ?? 0)} icon={<PackageCheck size={18} />} />
-        <BalanceCard title={t('warehouse.status.reserved')} accent="warning"
+        <BalanceCard title="Band" accent="warning"
           value={String(s?.total_reserved ?? 0)} icon={<Boxes size={18} />} />
-        <BalanceCard title={t('warehouse.status.sold')} accent="primary"
+        <BalanceCard title="Sotilgan" accent="primary"
           value={String(s?.total_sold ?? 0)} icon={<PackageX size={18} />} />
         <div className="lg:col-span-2">
-          <BalanceCard title={t('warehouse.totalValue')} accent="primary"
+          <BalanceCard title="Ombor qiymati ($)" accent="primary"
             value={formatUSD(totalValueUsd)} icon={<Wallet size={18} />} />
         </div>
         <div className="col-span-2">
-          <BalanceCard title={t('warehouse.totalValueUzs')} accent="success"
+          <BalanceCard title="Ombor qiymati (soʻm)" accent="success"
             value={rate > 0 ? formatUZS(totalValueUsd * rate) : '—'} icon={<Wallet size={18} />} />
         </div>
       </div>
@@ -190,23 +188,23 @@ export default function WarehousePage() {
 
       {tab === 'types' ? (
         /* Turlari — kotyol modellari (qoʻshish / tahrir / oʻchirish) */
-        <Card title={t('warehouse.tabs.types')}>
+        <Card title="Turlari">
           {typesQ.isLoading ? (
             <div className="space-y-2">
               {Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-10 rounded-button bg-black/5 animate-pulse" />)}
             </div>
           ) : types.length === 0 ? (
-            <EmptyState title={t('warehouse.types.empty')} description={t('warehouse.types.emptyDesc')} />
+            <EmptyState title="Hozircha model yoʻq" description="Kotyol modellarini shu yerda qoʻshing" />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="text-left text-ink-soft border-b border-black/5">
                   <tr>
-                    <th className="py-2 pr-3">{t('warehouse.types.col.model')}</th>
-                    <th className="py-2 pr-3">{t('warehouse.types.col.kvm')}</th>
-                    <th className="py-2 pr-3 text-right">{t('warehouse.types.col.price')}</th>
-                    <th className="py-2 pr-3 text-right">{t('warehouse.types.col.available')}</th>
-                    <th className="py-2 pr-3 text-right">{t('warehouse.types.col.reserved')}</th>
+                    <th className="py-2 pr-3">Model</th>
+                    <th className="py-2 pr-3">Oʻlcham</th>
+                    <th className="py-2 pr-3 text-right">Narx</th>
+                    <th className="py-2 pr-3 text-right">Boʻsh</th>
+                    <th className="py-2 pr-3 text-right">Band</th>
                     <th className="py-2 pr-3"></th>
                   </tr>
                 </thead>
@@ -224,13 +222,13 @@ export default function WarehousePage() {
                           <div className="flex items-center justify-end gap-1">
                             {can('inventory:write') && (
                               <button onClick={() => { setEditingType(p); setTypeModalOpen(true); }}
-                                      className="p-1 rounded hover:bg-primary/10 text-primary" title={t('actions.edit')}>
+                                      className="p-1 rounded hover:bg-primary/10 text-primary" title="Tahrirlash">
                                 <Pencil size={14} />
                               </button>
                             )}
                             {can('inventory:delete') && (
                               <button onClick={() => setDeleteType(p)}
-                                      className="p-1 rounded hover:bg-danger/10 text-danger" title={t('actions.delete')}>
+                                      className="p-1 rounded hover:bg-danger/10 text-danger" title="O'chirish">
                                 <Trash2 size={14} />
                               </button>
                             )}
@@ -246,20 +244,20 @@ export default function WarehousePage() {
         </Card>
       ) : (
         /* Roʻyxat — ID raqamli birliklar */
-        <Card title={t('warehouse.units')}>
+        <Card title="Birliklar">
           <div className="flex flex-wrap gap-3 mb-4 items-center justify-between">
             <div className="flex flex-wrap gap-1.5">
               {STATUS_FILTERS.map((k) => (
                 <button key={k} onClick={() => setStatus(k)}
                   className={`px-3 py-1.5 rounded-button text-sm font-medium transition ${
                     status === k ? 'bg-primary text-white' : 'bg-black/5 text-ink-soft hover:bg-black/10'}`}>
-                  {k === '' ? t('warehouse.filterAll') : statusLabel[k]}
+                  {k === '' ? 'Hammasi' : statusLabel[k]}
                 </button>
               ))}
             </div>
             <div className="relative">
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft" />
-              <input className="input pl-9 w-52" placeholder={t('warehouse.searchId')}
+              <input className="input pl-9 w-52" placeholder="ID raqami boʻyicha qidirish"
                      value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
           </div>
@@ -269,19 +267,19 @@ export default function WarehousePage() {
               {Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-10 rounded-button bg-black/5 animate-pulse" />)}
             </div>
           ) : units.length === 0 ? (
-            <EmptyState title={t('warehouse.emptyUnits')} description={t('warehouse.emptyUnitsDesc')} />
+            <EmptyState title="Birlik topilmadi" description="Ishlab chiqarilgan kotyollarni ID bilan qoʻshing" />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="text-left text-ink-soft border-b border-black/5">
                   <tr>
-                    <th className="py-2 pr-3">{t('warehouse.col.id')}</th>
-                    <th className="py-2 pr-3">{t('warehouse.col.model')}</th>
-                    <th className="py-2 pr-3">{t('warehouse.col.kvm')}</th>
-                    <th className="py-2 pr-3">{t('warehouse.col.direction')}</th>
-                    <th className="py-2 pr-3">{t('warehouse.col.status')}</th>
-                    <th className="py-2 pr-3">{t('warehouse.col.added')}</th>
-                    <th className="py-2 pr-3">{t('warehouse.col.order')}</th>
+                    <th className="py-2 pr-3">ID raqami</th>
+                    <th className="py-2 pr-3">Model</th>
+                    <th className="py-2 pr-3">Oʻlcham</th>
+                    <th className="py-2 pr-3">Yoʻnalish</th>
+                    <th className="py-2 pr-3">Holat</th>
+                    <th className="py-2 pr-3">Qoʻshilgan</th>
+                    <th className="py-2 pr-3">Buyurtma / mijoz</th>
                     <th className="py-2 pr-3"></th>
                   </tr>
                 </thead>
@@ -292,8 +290,8 @@ export default function WarehousePage() {
                       <td className="py-2 pr-3">{u.model ?? '—'}</td>
                       <td className="py-2 pr-3">{u.kvm ? `${u.kvm} kvm` : '—'}</td>
                       <td className="py-2 pr-3">
-                        {u.bunker_direction === 'right' ? t('warehouse.dir.right')
-                          : u.bunker_direction === 'left' ? t('warehouse.dir.left')
+                        {u.bunker_direction === 'right' ? 'Oʻngga'
+                          : u.bunker_direction === 'left' ? 'Chapga'
                           : <span className="text-ink-soft">—</span>}
                       </td>
                       <td className="py-2 pr-3">
@@ -308,12 +306,12 @@ export default function WarehousePage() {
                       <td className="py-2 pr-3 text-right">
                         <div className="flex items-center justify-end gap-1">
                           {u.status !== 'sold' && can('inventory:write') && (
-                            <button onClick={() => setEditUnit(u)} className="p-1 rounded hover:bg-primary/10 text-primary" title={t('actions.edit')}>
+                            <button onClick={() => setEditUnit(u)} className="p-1 rounded hover:bg-primary/10 text-primary" title="Tahrirlash">
                               <Pencil size={14} />
                             </button>
                           )}
                           {u.status === 'available' && can('inventory:delete') && (
-                            <button onClick={() => setDeleteUnit(u)} className="p-1 rounded hover:bg-danger/10 text-danger" title={t('actions.delete')}>
+                            <button onClick={() => setDeleteUnit(u)} className="p-1 rounded hover:bg-danger/10 text-danger" title="O'chirish">
                               <Trash2 size={14} />
                             </button>
                           )}
@@ -346,18 +344,18 @@ export default function WarehousePage() {
       )}
       <ConfirmModal
         open={deleteUnit !== null}
-        title={t('warehouse.deleteTitle')}
-        message={t('warehouse.deleteMessage', { id: deleteUnit?.unique_id ?? '' })}
-        confirmText={t('actions.delete')}
+        title="Birlikni oʻchirish"
+        message={`«${deleteUnit?.unique_id ?? ''}» birligini oʻchirishni tasdiqlaysizmi?`}
+        confirmText="O'chirish"
         variant="danger"
         onConfirm={confirmDelete}
         onCancel={() => setDeleteUnit(null)}
       />
       <ConfirmModal
         open={deleteType !== null}
-        title={t('warehouse.types.deleteTitle')}
-        message={t('warehouse.types.deleteMessage', { name: deleteType?.display_name ?? deleteType?.model ?? '' })}
-        confirmText={t('actions.delete')}
+        title="Modelni oʻchirish"
+        message={`«${deleteType?.display_name ?? deleteType?.model ?? ''}» modelini oʻchirishni tasdiqlaysizmi?`}
+        confirmText="O'chirish"
         variant="danger"
         onConfirm={confirmDeleteType}
         onCancel={() => setDeleteType(null)}

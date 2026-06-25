@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import {
   X, Check, ShieldCheck, Sparkles, Lock, ShieldAlert,
@@ -19,6 +18,14 @@ export interface RoleRow {
   description?: string | null;
   permissions?: Record<string, any>;
 }
+
+const PERM_VERBS: Record<string, string> = {
+  read: "Ko'rish",
+  write: 'Tahrirlash',
+  delete: "O'chirish",
+  approve: 'Tasdiqlash',
+  export: 'Eksport',
+};
 
 const MODULE_ICONS: Record<Module, LucideIcon> = {
   users: UserCog,
@@ -82,7 +89,6 @@ export default function RoleModal({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const { t } = useTranslation();
   const { isSuperadmin: editorIsSuper } = usePermissions();
   const isCreate = role === null;
   const isSuperAdminRole = role?.name === 'super_admin';
@@ -97,21 +103,21 @@ export default function RoleModal({
   const [special, setSpecial] = useState<Set<string>>(initial.special);
 
   const moduleLabels: Record<Module, string> = {
-    users: t('nav.users', { defaultValue: 'Foydalanuvchilar' }),
-    customers: t('nav.customers'),
-    orders: t('nav.sales'),
-    products: t('nav.products'),
-    inventory: t('nav.warehouse', { defaultValue: 'Ombor' }),
-    production: t('nav.production', { defaultValue: 'Ishlab chiqarish' }),
-    service: t('nav.service'),
-    finance: t('nav.finance'),
-    hr: t('nav.hr'),
-    supply: t('nav.supply'),
-    reports: t('nav.reports'),
+    users: 'Foydalanuvchilar',
+    customers: 'Mijozlar',
+    orders: 'Sotuv',
+    products: 'Mahsulotlar',
+    inventory: 'Ombor',
+    production: 'Ishlab chiqarish',
+    service: 'Servis',
+    finance: 'Moliya',
+    hr: 'Xodimlar',
+    supply: "Ta'minot",
+    reports: 'Hisobotlar',
     telegram: 'Telegram',
-    debts: t('nav.debts', { defaultValue: 'Qarzlar' }),
-    shipping: t('nav.shipping', { defaultValue: 'Yuk chiqarish' }),
-    settings: t('nav.settings'),
+    debts: 'Bizning qarzlar',
+    shipping: 'Yuk chiqarish',
+    settings: 'Sozlamalar',
   };
 
   useEffect(() => {
@@ -165,7 +171,7 @@ export default function RoleModal({
 
   async function save() {
     if (name.trim().length < 2) {
-      toast.error(t('users.roles.nameMinLength'));
+      toast.error('Nom kamida 2 ta belgi bo\'lishi kerak');
       return;
     }
     setSaving(true);
@@ -177,15 +183,15 @@ export default function RoleModal({
     try {
       if (isCreate) {
         await api.post('/users/roles', payload);
-        toast.success(t('users.roles.createdSuccess'));
+        toast.success('Rol yaratildi');
       } else {
         await api.patch(`/users/roles/${role!.id}`, payload);
-        toast.success(t('common.updated'));
+        toast.success('Yangilandi');
       }
       onSaved();
       onClose();
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || t('common.error'));
+      toast.error(e?.response?.data?.detail || 'Xatolik yuz berdi');
     } finally {
       setSaving(false);
     }
@@ -218,15 +224,12 @@ export default function RoleModal({
             </div>
             <div>
               <h3 className="font-semibold leading-tight">
-                {isCreate ? t('users.roles.newTitle') : t('users.roles.editTitle')}
+                {isCreate ? 'Yangi rol' : 'Rolni tahrirlash'}
               </h3>
               <p className="text-xs text-ink-soft">
                 {full || isSuperAdminRole
-                  ? t('perm.allEnabled', { defaultValue: "Barcha modullar — to'liq ruxsat" })
-                  : t('perm.activeCount', {
-                      defaultValue: '{{count}} ta modulga ruxsat berilgan',
-                      count: activeModules,
-                    })}
+                  ? "Barcha modullar — to'liq ruxsat"
+                  : `${activeModules} ta modulga ruxsat berilgan`}
               </p>
             </div>
           </div>
@@ -243,25 +246,25 @@ export default function RoleModal({
           {/* Name / Description */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="label">{t('users.roles.nameLabel')}</label>
+              <label className="label">Nomi *</label>
               <input
                 className="input"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder={t('users.roles.namePlaceholder')}
+                placeholder="masalan: warehouse_manager"
                 disabled={isSuperAdminRole}
               />
               <p className="text-[11px] text-ink-soft mt-1">
-                {t('users.roles.nameHint')}
+                Lotin harflari, raqam va pastki chiziq (snake_case).
               </p>
             </div>
             <div>
-              <label className="label">{t('users.roles.descLabel')}</label>
+              <label className="label">Tavsif</label>
               <input
                 className="input"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder={t('users.roles.descPlaceholder')}
+                placeholder="Foydalanuvchilarga ko'rinadigan tushuntirish"
               />
             </div>
           </div>
@@ -274,16 +277,12 @@ export default function RoleModal({
               </div>
               <div className="min-w-0">
                 <div className="text-sm font-medium">
-                  {t('perm.fullAccess', { defaultValue: "Barcha modullarga to'liq ruxsat" })}
+                  Barcha modullarga to'liq ruxsat
                 </div>
                 <div className="text-xs text-ink-soft truncate">
                   {isSuperAdminRole
-                    ? t('perm.superAdminNote', {
-                        defaultValue: "super_admin har doim to'liq ruxsatga ega.",
-                      })
-                    : t('perm.fullAccessHint', {
-                        defaultValue: 'Yoqilsa, quyidagi matritsa inobatga olinmaydi.',
-                      })}
+                    ? 'super_admin har doim to\'liq ruxsatga ega.'
+                    : 'Yoqilsa, quyidagi matritsa inobatga olinmaydi.'}
                 </div>
               </div>
             </div>
@@ -312,9 +311,7 @@ export default function RoleModal({
           {full || isSuperAdminRole ? (
             <div className="flex items-center gap-3 rounded-xl bg-success/10 text-success px-4 py-3.5 text-sm font-medium">
               <Check size={16} strokeWidth={3} />
-              {t('perm.allEnabledLong', {
-                defaultValue: 'Barcha modullar uchun barcha amallar yoqilgan.',
-              })}
+              Barcha modullar uchun barcha amallar yoqilgan.
             </div>
           ) : (
             <div className="rounded-xl border border-black/[0.06] overflow-hidden">
@@ -323,17 +320,17 @@ export default function RoleModal({
                   <thead>
                     <tr className="bg-black/[0.025]">
                       <th className="text-left text-[11px] font-semibold uppercase tracking-wider text-ink/40 py-2.5 pl-4 pr-2">
-                        {t('perm.module', { defaultValue: 'Modul' })}
+                        Modul
                       </th>
                       <th className="text-left text-[11px] font-semibold uppercase tracking-wider text-ink/40 py-2.5 px-2">
-                        {t('perm.quick', { defaultValue: 'Tezkor tanlov' })}
+                        Tezkor tanlov
                       </th>
                       {VERBS.map((v) => (
                         <th
                           key={v}
                           className="text-center text-[11px] font-semibold uppercase tracking-wider text-ink/40 py-2.5 px-1.5 whitespace-nowrap"
                         >
-                          {t(`perm.verbs.${v}`, { defaultValue: v })}
+                          {PERM_VERBS[String(v)] ?? v}
                         </th>
                       ))}
                     </tr>
@@ -379,9 +376,9 @@ export default function RoleModal({
                           <td className="py-2 px-2 whitespace-nowrap">
                             <div className="inline-flex rounded-lg bg-black/[0.05] p-0.5">
                               {([
-                                ['none', t('perm.none', { defaultValue: "Yo'q" })],
-                                ['view', t('perm.view', { defaultValue: "Ko'rish" })],
-                                ['full', t('perm.full', { defaultValue: "To'liq" })],
+                                ['none', "Yo'q"],
+                                ['view', "Ko'rish"],
+                                ['full', "To'liq"],
                               ] as const).map(([key, label]) => (
                                 <button
                                   key={key}
@@ -436,10 +433,7 @@ export default function RoleModal({
               </div>
               <div className="px-4 py-2.5 bg-black/[0.02] border-t border-black/[0.05]">
                 <p className="text-[11px] text-ink-soft">
-                  {t('perm.hint', {
-                    defaultValue:
-                      "Modul belgilanmagan bo'lsa — u rol egasiga menyuda ko'rinmaydi va API yopiq bo'ladi.",
-                  })}
+                  Modul belgilanmagan bo'lsa — u rol egasiga menyuda ko'rinmaydi va API yopiq bo'ladi.
                 </p>
               </div>
             </div>
@@ -453,13 +447,10 @@ export default function RoleModal({
               </div>
               <div className="min-w-0">
                 <div className="text-sm font-semibold">
-                  {t('perm.special.title', { defaultValue: 'Maxsus (super-admin) huquqlar' })}
+                  Maxsus (super-admin) huquqlar
                 </div>
                 <div className="text-[11px] text-ink-soft">
-                  {t('perm.special.hint', {
-                    defaultValue:
-                      "Faqat shu yerdan ANIQ biriktirilsa ochiladi — \"barcha modullar\" ruxsati buni bermaydi.",
-                  })}
+                  Faqat shu yerdan ANIQ biriktirilsa ochiladi — "barcha modullar" ruxsati buni bermaydi.
                 </div>
               </div>
             </div>
@@ -467,9 +458,7 @@ export default function RoleModal({
             {!editorIsSuper && !isSuperAdminRole && (
               <div className="flex items-center gap-2 px-4 py-2.5 bg-warning/10 text-warning text-[11px] font-medium border-b border-black/[0.05]">
                 <Lock size={13} className="shrink-0" />
-                {t('perm.special.locked', {
-                  defaultValue: 'Bu huquqlarni faqat super-admin biriktira oladi.',
-                })}
+                Bu huquqlarni faqat super-admin biriktira oladi.
               </div>
             )}
 
@@ -485,7 +474,7 @@ export default function RoleModal({
                       </span>
                       {s.danger && (
                         <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-danger/90 bg-danger/10 px-1.5 py-0.5 rounded">
-                          {t('perm.special.danger', { defaultValue: 'Muhim' })}
+                          Muhim
                         </span>
                       )}
                     </div>
@@ -521,14 +510,14 @@ export default function RoleModal({
             onClick={onClose}
             className="px-4 py-2 text-sm font-medium rounded-button border border-black/10 text-ink/70 hover:bg-black/5 hover:text-ink transition-colors"
           >
-            {t('actions.cancel')}
+            Bekor qilish
           </button>
           <button
             onClick={save}
             disabled={saving}
             className="btn-primary disabled:opacity-50 transition-opacity"
           >
-            {saving ? t('users.roles.saving') : t('actions.save')}
+            {saving ? 'Saqlanmoqda…' : 'Saqlash'}
           </button>
         </div>
       </div>

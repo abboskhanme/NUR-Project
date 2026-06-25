@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useTranslation } from 'react-i18next';
 import { ShoppingCart, Wallet, Wrench, Truck } from 'lucide-react';
 
 import DateRangeFilter, { presetRange } from '@/features/reports/DateRangeFilter';
@@ -20,8 +19,14 @@ const TAB_KEYS: Array<{ key: Tab; icon: typeof ShoppingCart }> = [
   { key: 'supply', icon: Truck },
 ];
 
+const REPORTS_TABS: Record<string, string> = {
+  sales: 'Sotuv',
+  finance: 'Moliya',
+  service: 'Servis',
+  supply: "Ta'minot",
+};
+
 export default function ReportsPage() {
-  const { t } = useTranslation();
   const [tab, setTab] = useState<Tab>('sales');
   const [preset, setPreset] = useState<Preset | null>('this_month');
   const [range, setRange] = useState<DateRange>(() => presetRange('this_month'));
@@ -39,7 +44,7 @@ export default function ReportsPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold">{t('reports.title')}</h1>
+          <h1 className="text-2xl font-bold">Hisobotlar</h1>
           <p className="text-sm text-ink-soft">
             {formatDate(range.from)} — {formatDate(range.to)}
           </p>
@@ -70,7 +75,7 @@ export default function ReportsPage() {
                   : 'border-transparent text-ink-soft hover:text-ink'
               }`}
             >
-              <Icon size={16} /> {t(`reports.tabs.${tab_def.key}`)}
+              <Icon size={16} /> {REPORTS_TABS[tab_def.key]}
             </button>
           );
         })}

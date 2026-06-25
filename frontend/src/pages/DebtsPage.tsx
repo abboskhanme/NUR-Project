@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import {
@@ -27,8 +26,27 @@ interface Summary {
   product_count: number;
 }
 
+const DEBTS_TYPES: Record<string, string> = {
+  product: 'Mahsulot',
+  credit: 'Kredit',
+  loan: 'Qarz (shaxsdan)',
+};
+const DEBTS_TABS: Record<string, string> = {
+  debts: 'Qarzlar',
+  products: 'Ehtiyot qismlar',
+};
+const DEBTS_CURRENCY: Record<string, string> = {
+  UZS: "so'm",
+  USD: 'dollar',
+};
+const DEBTS_UNITS: Record<string, string> = {
+  dona: 'dona',
+  kg: 'kg',
+  metr: 'metr',
+  list: 'list',
+};
+
 export default function DebtsPage() {
-  const { t } = useTranslation();
   const qc = useQueryClient();
   const [tab, setTab] = useState<'debts' | 'products'>('debts');
   const [search, setSearch] = useState('');
@@ -57,7 +75,7 @@ export default function DebtsPage() {
 
   // Tur nomi: tayyor kalitlar tarjima qilinadi, ixtiyoriy nom o'zicha ko'rsatiladi
   const typeLabel = (type: string) =>
-    ['product', 'credit', 'loan'].includes(type) ? t(`debts.type.${type}`) : type;
+    ['product', 'credit', 'loan'].includes(type) ? DEBTS_TYPES[type] : type;
 
   // Ochiq tranzaksiyalar modalini yangilangan ma'lumot bilan sinxronlash
   useEffect(() => {
@@ -77,11 +95,11 @@ export default function DebtsPage() {
     setDeleting(true);
     try {
       await api.delete(`/debts/products/${delProduct.id}`);
-      toast.success(t('debts.toast.deleted'));
+      toast.success("O'chirildi");
       setDelProduct(null);
       refetchAll();
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || t('debts.toast.error'));
+      toast.error(e?.response?.data?.detail || 'Xatolik yuz berdi');
     } finally {
       setDeleting(false);
     }
@@ -92,11 +110,11 @@ export default function DebtsPage() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold">{t('debts.title')}</h1>
-          <p className="text-sm text-ink-soft">{t('debts.subtitle')}</p>
+          <h1 className="text-2xl font-bold">Bizning qarzlar</h1>
+          <p className="text-sm text-ink-soft">Qarzga olinadigan ehtiyot qismlar va to'lovlar</p>
         </div>
         <button className="btn-primary" onClick={() => setEditProduct(null)}>
-          <Plus size={16} /> {t('debts.product.new')}
+          <Plus size={16} /> Yangi qarz
         </button>
       </div>
 
@@ -106,25 +124,25 @@ export default function DebtsPage() {
           <div key={c.currency}>
             {(s?.by_currency?.length ?? 0) > 1 && (
               <div className="text-xs font-medium text-ink-soft mb-1.5">
-                {t(`debts.currency.${c.currency}`, { defaultValue: c.currency })}
+                {DEBTS_CURRENCY[c.currency] ?? c.currency}
               </div>
             )}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <KpiCard
                 tone="primary"
-                label={t('debts.kpi.purchased')}
+                label="Olib kelingan"
                 value={formatMoney(c.total_purchased, c.currency)}
                 icon={<PackagePlus size={18} />}
               />
               <KpiCard
                 tone="success"
-                label={t('debts.kpi.paid')}
+                label="To'langan"
                 value={formatMoney(c.total_paid, c.currency)}
                 icon={<Wallet size={18} />}
               />
               <KpiCard
                 tone="danger"
-                label={t('debts.kpi.remaining')}
+                label="Qarz qoldi"
                 value={formatMoney(c.total_balance, c.currency)}
                 icon={<Coins size={18} />}
               />
@@ -140,7 +158,7 @@ export default function DebtsPage() {
             <button key={key} onClick={() => setTab(key)}
               className={`px-3 py-1.5 rounded-button text-sm font-medium transition ${
                 tab === key ? 'bg-primary text-white' : 'bg-black/5 text-ink-soft hover:bg-black/10'}`}>
-              {t(`debts.tabs.${key}`)}
+              {DEBTS_TABS[key]}
             </button>
           ))}
         </div>
@@ -148,12 +166,12 @@ export default function DebtsPage() {
           {tab === 'debts' && (
             <label className="flex items-center gap-1.5 text-sm text-ink-soft cursor-pointer select-none">
               <input type="checkbox" checked={onlyDebt} onChange={(e) => setOnlyDebt(e.target.checked)} />
-              {t('debts.onlyDebt')}
+              Faqat qarzi borlar
             </label>
           )}
           <div className="relative">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft" />
-            <input className="input pl-9 w-56" placeholder={t('debts.search')}
+            <input className="input pl-9 w-56" placeholder="Qidirish..."
                    value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
         </div>
@@ -168,7 +186,7 @@ export default function DebtsPage() {
             ))}
           </div>
         ) : products.length === 0 ? (
-          <EmptyState title={t('debts.product.empty')} description={t('debts.product.emptyDesc')} />
+          <EmptyState title="Hali ehtiyot qism qo'shilmagan" description={'"Yangi ehtiyot qism" tugmasi orqali birinchisini qo\'shing'} />
         ) : tab === 'debts' ? (
           /* ===================== QARZLAR ===================== */
           <div className="divide-y divide-black/5">
@@ -198,12 +216,12 @@ export default function DebtsPage() {
                 <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
                   <button onClick={() => setAction({ product: p, kind: 'purchase' })}
                           className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-button text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 transition">
-                    <PackagePlus size={14} /> {p.debt_type === 'product' ? t('debts.actions.purchase') : t('debts.actions.addDebt')}
+                    <PackagePlus size={14} /> {p.debt_type === 'product' ? 'Olib kelish' : "Qo'shish"}
                   </button>
                   <button onClick={() => setAction({ product: p, kind: 'payment' })}
                           disabled={p.balance <= 0}
                           className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-button text-xs font-medium bg-success/10 text-success hover:bg-success/20 transition disabled:opacity-40">
-                    <Wallet size={14} /> {t('debts.actions.pay')}
+                    <Wallet size={14} /> Qarz to'lash
                   </button>
                   <ChevronRight size={16} className="text-ink-soft" />
                 </div>
@@ -216,10 +234,10 @@ export default function DebtsPage() {
             <table className="w-full text-sm">
               <thead className="text-left text-ink-soft border-b border-black/5">
                 <tr>
-                  <th className="py-2 pr-3">{t('debts.table.name')}</th>
-                  <th className="py-2 pr-3">{t('debts.table.supplier')}</th>
-                  <th className="py-2 pr-3 text-right">{t('debts.table.unitPrice')}</th>
-                  <th className="py-2 pr-3 text-right">{t('debts.table.balance')}</th>
+                  <th className="py-2 pr-3">Mahsulot</th>
+                  <th className="py-2 pr-3">Ta'minotchi</th>
+                  <th className="py-2 pr-3 text-right">Birlik narxi</th>
+                  <th className="py-2 pr-3 text-right">Qarz qoldig'i</th>
                   <th className="py-2 pl-3 w-20"></th>
                 </tr>
               </thead>
@@ -229,7 +247,7 @@ export default function DebtsPage() {
                     <td className="py-2.5 pr-3 font-medium">
                       {p.name}
                       {p.debt_type === 'product' ? (
-                        <span className="text-ink-soft font-normal"> · {t(`debts.units.${p.unit}`, { defaultValue: p.unit })}</span>
+                        <span className="text-ink-soft font-normal"> · {DEBTS_UNITS[p.unit] ?? p.unit}</span>
                       ) : (
                         <span className="ml-2 badge bg-primary/10 text-primary text-[10px] font-medium">{typeLabel(p.debt_type)}</span>
                       )}
@@ -273,7 +291,7 @@ export default function DebtsPage() {
       <ConfirmModal
         open={!!delProduct}
         title={delProduct?.name ?? ''}
-        message={t('debts.product.deleteConfirm')}
+        message="Ushbu mahsulot va uning barcha tranzaksiyalari o'chiriladi. Davom etamizmi?"
         loading={deleting}
         onConfirm={confirmDeleteProduct}
         onCancel={() => setDelProduct(null)}

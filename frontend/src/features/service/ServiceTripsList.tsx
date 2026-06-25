@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 
 import { api } from '@/api/client';
@@ -17,7 +16,6 @@ interface Trip {
 
 /** Yakunlangan (yopilgan) servis safarlari ro'yxati. Qatorni bosish — arizalar modali. */
 export default function ServiceTripsList({ dateFrom, dateTo }: { dateFrom?: string; dateTo?: string } = {}) {
-  const { t } = useTranslation();
   const [openTrip, setOpenTrip] = useState<Trip | null>(null);
   const q = useQuery<Trip[]>({
     queryKey: ['service-trips-history', dateFrom ?? '', dateTo ?? ''],
@@ -34,18 +32,18 @@ export default function ServiceTripsList({ dateFrom, dateTo }: { dateFrom?: stri
           {Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-12 rounded-button bg-black/5 animate-pulse" />)}
         </div>
       ) : trips.length === 0 ? (
-        <EmptyState title={t('service.trip.empty')} description={t('service.trip.emptyDesc')} />
+        <EmptyState title="Yakunlangan safarlar yo'q" description="Safarni yakunlaganingizda shu yerda ko'rinadi" />
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="text-left text-ink-soft border-b border-black/5">
               <tr>
-                <th className="py-2 pr-3">{t('service.trip.colName')}</th>
-                <th className="py-2 pr-3">{t('service.trip.colDate')}</th>
-                <th className="py-2 pr-3 text-right">{t('service.trip.colTickets')}</th>
-                <th className="py-2 pr-3 text-right">{t('service.trip.collected')}</th>
-                <th className="py-2 pr-3 text-right">{t('service.trip.spent')}</th>
-                <th className="py-2 pr-3 text-right">{t('service.trip.net')}</th>
+                <th className="py-2 pr-3">Safar nomi</th>
+                <th className="py-2 pr-3">Sana</th>
+                <th className="py-2 pr-3 text-right">Arizalar</th>
+                <th className="py-2 pr-3 text-right">Olingan</th>
+                <th className="py-2 pr-3 text-right">Sarflangan</th>
+                <th className="py-2 pr-3 text-right">Sof</th>
               </tr>
             </thead>
             <tbody>
@@ -82,7 +80,6 @@ interface TripTicket {
 }
 
 function TripTicketsModal({ trip, onClose }: { trip: Trip; onClose: () => void }) {
-  const { t } = useTranslation();
   const q = useQuery<TripTicket[]>({
     queryKey: ['trip-tickets', trip.id],
     queryFn: () => api.get(`/service/trips/${trip.id}/tickets`).then((r) => r.data),
@@ -95,9 +92,9 @@ function TripTicketsModal({ trip, onClose }: { trip: Trip; onClose: () => void }
            onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3 border-b border-black/5">
           <div>
-            <h3 className="font-semibold">{trip.name || t('service.trip.title')}</h3>
+            <h3 className="font-semibold">{trip.name || 'Servis safari'}</h3>
             <p className="text-xs text-ink-soft">
-              {formatDate(trip.closed_at || trip.opened_at)} · {t('service.trip.ticketsTitle')} ({trip.ticket_count})
+              {formatDate(trip.closed_at || trip.opened_at)} · Safardagi arizalar ({trip.ticket_count})
             </p>
           </div>
           <button onClick={onClose} className="p-1 rounded hover:bg-black/5 text-ink/50"><X size={18} /></button>
@@ -107,7 +104,7 @@ function TripTicketsModal({ trip, onClose }: { trip: Trip; onClose: () => void }
           {q.isLoading ? (
             Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-14 rounded-button bg-black/5 animate-pulse" />)
           ) : tickets.length === 0 ? (
-            <EmptyState title={t('service.trip.empty')} />
+            <EmptyState title="Yakunlangan safarlar yo'q" />
           ) : (
             tickets.map((tk) => (
               <div key={tk.id} className="rounded-button border border-black/5 bg-black/[0.02] p-3 text-sm">

@@ -1,13 +1,11 @@
 import { Inbox } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
 
 export default function EmptyState({
   title,
   description,
 }: { title?: string; description?: string }) {
-  const { t } = useTranslation();
-  const resolvedTitle = title ?? t('ui.emptyState.title');
-  const resolvedDescription = description ?? t('ui.emptyState.description');
+  const resolvedTitle = title ?? "Ma'lumot yo'q";
+  const resolvedDescription = description ?? "Hozircha bu yerda hech narsa yo'q";
 
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">

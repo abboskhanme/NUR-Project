@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import {
   ArrowLeft, Pencil, Phone, MapPin, User, Package, Plus, Trash2, ExternalLink, ShieldCheck,
@@ -42,29 +41,42 @@ interface OrderDetail {
   items_total_uzs: string; paid_uzs: string; balance_uzs: string;
 }
 
-// Next-status option keys — resolved with t() at render time
-const NEXT_STATUS_KEYS: Record<string, Array<{ value: string; labelKey: string; danger?: boolean }>> = {
+// Next-status options
+const NEXT_STATUS_KEYS: Record<string, Array<{ value: string; label: string; danger?: boolean }>> = {
   new: [
-    { value: 'delivered', labelKey: 'sales.actionDeliver' },
-    { value: 'rejected', labelKey: 'sales.actionReject', danger: true },
+    { value: 'delivered', label: "Yetkazildi" },
+    { value: 'rejected', label: "Rad etish", danger: true },
   ],
   ready: [
-    { value: 'delivered', labelKey: 'sales.actionDeliver' },
-    { value: 'rejected', labelKey: 'sales.actionReject', danger: true },
+    { value: 'delivered', label: "Yetkazildi" },
+    { value: 'rejected', label: "Rad etish", danger: true },
   ],
   delivered: [],
   rejected: [],
 };
 
-// Payment method label keys — resolved with t() at render time
-const METHOD_LABEL_KEYS: Record<string, string> = {
-  cash: 'sales.methodCash',
-  card: 'sales.methodCard',
-  transfer: 'sales.methodTransfer',
+// Payment method labels
+const METHOD_LABELS: Record<string, string> = {
+  cash: "Naqd",
+  card: "Karta",
+  transfer: "O'tkazma",
+};
+
+const WARRANTY_SHORT: Record<string, string> = {
+  active_full: "1-yil — bepul",
+  active_service_only: "2–3-yil — faqat ish",
+  expired: "Kafolat tugagan",
+  not_delivered: "Yetkazilmagan",
+};
+
+const WARRANTY_LONG: Record<string, string> = {
+  active_full: "1-yil kafolat — ish va ehtiyot qism bepul",
+  active_service_only: "2–3-yil kafolat — faqat ish bepul, ehtiyot qism mijoz hisobidan",
+  expired: "Kafolat muddati tugagan — xizmat va ehtiyot qism mijoz hisobidan",
+  not_delivered: "Mahsulot hali yetkazilmagan — kafolat boshlanmagan",
 };
 
 export default function OrderDetailPage() {
-  const { t } = useTranslation();
   const { orderId } = useParams<{ orderId: string }>();
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -95,7 +107,7 @@ export default function OrderDetailPage() {
     try {
       await downloadPdf(url, filename);
     } catch {
-      toast.error(t('common.error'));
+      toast.error("Xatolik yuz berdi");
     } finally {
       setDownloading(null);
     }
@@ -103,13 +115,13 @@ export default function OrderDetailPage() {
 
   function askChangeStatus(status: string, label: string) {
     setConfirm({
-      title: t('sales.changeStatusTitle'),
-      message: t('sales.changeStatusMessage', { label }),
+      title: "Statusni o'zgartirish",
+      message: `Buyurtma statusi "${label}" ga o'zgartirilsinmi?`,
       confirmText: label,
       variant: 'primary',
       action: async () => {
         await api.post(`/orders/${orderId}/status`, { status });
-        toast.success(t('sales.changeStatusUpdated'));
+        toast.success("Status yangilandi");
         refresh();
       },
     });
@@ -117,13 +129,13 @@ export default function OrderDetailPage() {
 
   function askDeletePayment(pid: string) {
     setConfirm({
-      title: t('sales.deletePaymentTitle'),
-      message: t('sales.deletePaymentMessage'),
-      confirmText: t('actions.delete'),
+      title: "To'lovni o'chirish",
+      message: "Ushbu to'lov o'chirilsinmi?",
+      confirmText: "O'chirish",
       variant: 'danger',
       action: async () => {
         await api.delete(`/orders/${orderId}/payments/${pid}`);
-        toast.success(t('common.deleted'));
+        toast.success("O'chirildi");
         refresh();
       },
     });
@@ -131,13 +143,13 @@ export default function OrderDetailPage() {
 
   function askDeleteOrder() {
     setConfirm({
-      title: t('sales.deleteOrderTitle'),
-      message: t('sales.deleteOrderMessage'),
-      confirmText: t('actions.delete'),
+      title: "Buyurtmani o'chirish",
+      message: "Ushbu buyurtma butunlay o'chiriladi. To'lovlar, moliya yozuvlari qaytariladi va inventar bo'shatiladi. Bu amalni qaytarib bo'lmaydi.",
+      confirmText: "O'chirish",
       variant: 'danger',
       action: async () => {
         await api.delete(`/orders/${orderId}`);
-        toast.success(t('common.deleted'));
+        toast.success("O'chirildi");
         qc.invalidateQueries({ queryKey: ['orders'] });
         navigate('/orders');
       },
@@ -151,7 +163,7 @@ export default function OrderDetailPage() {
       await confirm.action();
       setConfirm(null);
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || t('common.error'));
+      toast.error(e?.response?.data?.detail || "Xatolik yuz berdi");
     } finally {
       setConfirmLoading(false);
     }
@@ -173,27 +185,17 @@ export default function OrderDetailPage() {
 
   const w = computeWarranty(o.delivered_at);
   const wm = WARRANTY_META[w.status];
-  const wmShort = t(`service.warranty.${
-    w.status === 'active_full' ? 'activeFull_short'
-    : w.status === 'active_service_only' ? 'activeServiceOnly_short'
-    : w.status === 'expired' ? 'expired_short'
-    : 'notDelivered_short'
-  }`);
-  const wmLong = t(`service.warranty.${
-    w.status === 'active_full' ? 'activeFull_long'
-    : w.status === 'active_service_only' ? 'activeServiceOnly_long'
-    : w.status === 'expired' ? 'expired_long'
-    : 'notDelivered_long'
-  }`);
+  const wmShort = WARRANTY_SHORT[w.status];
+  const wmLong = WARRANTY_LONG[w.status];
   const wDays =
-    w.status === 'active_full' ? ` · ${w.daysYear1} ${t('sales.daysRemaining')}`
-    : w.status === 'active_service_only' ? ` · ${w.daysYear3} ${t('sales.daysRemaining')}`
+    w.status === 'active_full' ? ` · ${w.daysYear1} kun qoldi`
+    : w.status === 'active_service_only' ? ` · ${w.daysYear3} kun qoldi`
     : '';
 
   return (
     <div className="space-y-4">
       <button onClick={() => navigate('/orders')} className="flex items-center gap-1.5 text-sm text-ink-soft hover:text-ink">
-        <ArrowLeft size={16} /> {t('sales.backToOrders')}
+        <ArrowLeft size={16} /> Buyurtmalarga qaytish
       </button>
 
       {/* Header */}
@@ -205,12 +207,12 @@ export default function OrderDetailPage() {
               <StatusBadge status={o.status} />
             </div>
             <div className="text-sm text-ink-soft mt-1">
-              {t('sales.orderDate')}: {formatDate(o.order_date)}
-              {o.delivered_at && ` • ${t('sales.deliveryDate')}: ${formatDate(o.delivered_at)}`}
+              Sana: {formatDate(o.order_date)}
+              {o.delivered_at && ` • Yetkazilgan: ${formatDate(o.delivered_at)}`}
             </div>
             <div className="mt-2">
               <span className={`badge ${wm.cls}`} title={wmLong}>
-                <ShieldCheck size={12} className="mr-1" /> {t('sales.warrantyLabel')}: {wmShort}{wDays}
+                <ShieldCheck size={12} className="mr-1" /> Servis kafolati: {wmShort}{wDays}
               </span>
             </div>
           </div>
@@ -219,28 +221,28 @@ export default function OrderDetailPage() {
               onClick={() => downloadDoc('invoice', `/orders/${orderId}/invoice.pdf`, `faktura-${o.code}.pdf`)}
               disabled={downloading === 'invoice'}
               className="btn-ghost disabled:opacity-50"
-              title={t('sales.printInvoiceTitle')}
+              title="Buyurtma fakturasini PDF yuklab olish"
             >
-              <FileText size={15} /> {t('sales.printInvoice')}
+              <FileText size={15} /> Faktura
             </button>
             <button
               onClick={() => downloadDoc('warranty', `/orders/${orderId}/warranty.pdf`, `kafolat-${o.code}.pdf`)}
               disabled={downloading === 'warranty'}
               className="btn-ghost disabled:opacity-50"
-              title={t('sales.printWarrantyTitle')}
+              title="Kafolat sertifikatini PDF yuklab olish"
             >
-              <ShieldCheck size={15} /> {t('sales.printWarranty')}
+              <ShieldCheck size={15} /> Kafolat
             </button>
             {!locked && (
-              <button onClick={() => setEditing(true)} className="btn-ghost"><Pencil size={15} /> {t('actions.edit')}</button>
+              <button onClick={() => setEditing(true)} className="btn-ghost"><Pencil size={15} /> Tahrirlash</button>
             )}
             {can('orders:delete') && (
               <button
                 onClick={askDeleteOrder}
                 className="btn-ghost text-danger hover:bg-danger/10"
-                title={t('sales.deleteOrderTitle')}
+                title="Buyurtmani o'chirish"
               >
-                <Trash2 size={15} /> {t('actions.delete')}
+                <Trash2 size={15} /> O'chirish
               </button>
             )}
           </div>
@@ -250,12 +252,12 @@ export default function OrderDetailPage() {
         {nexts.length > 0 && (
           <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-black/5">
             {nexts.map((n) => {
-              const label = t(n.labelKey);
+              const label = n.label;
               const blockedDeliver = n.value === 'delivered' && balance > 0 && !isDealer;
               return (
                 <button key={n.value}
                         disabled={blockedDeliver}
-                        title={blockedDeliver ? t('sales.blockedDeliverTitle') : undefined}
+                        title={blockedDeliver ? "Buyurtma to'liq to'lanmagan" : undefined}
                         onClick={() => askChangeStatus(n.value, label)}
                         className={(n.danger ? 'btn-danger' : 'btn-primary') + ' text-sm py-1.5 disabled:opacity-50 disabled:cursor-not-allowed'}>
                   {label}
@@ -264,7 +266,7 @@ export default function OrderDetailPage() {
             })}
             {nexts.some((n) => n.value === 'delivered') && balance > 0 && !isDealer && (
               <span className="text-xs text-danger self-center">
-                {t('sales.blockedDeliverHint', { amount: formatUZS(o.balance_uzs) })}
+                {`"Yetkazildi" uchun qoldiq to'liq to'lanishi kerak (${formatUZS(o.balance_uzs)})`}
               </span>
             )}
           </div>
@@ -274,36 +276,36 @@ export default function OrderDetailPage() {
       {/* Customer + spec */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card
-          title={t('sales.sectionCustomer')}
+          title="Mijoz"
           action={o.customer && (
             <button
               type="button"
               onClick={() => navigate(`/customers/${o.customer!.id}`)}
               className="btn-ghost text-sm flex items-center gap-1.5"
-              title={t('sales.openProfileTitle')}
+              title="Mijoz haqida batafsil"
             >
-              <ExternalLink size={14} /> {t('sales.openProfile')}
+              <ExternalLink size={14} /> Profilni ochish
             </button>
           )}
         >
           {o.customer ? (
             <div className="space-y-1.5 text-sm">
-              <div className="flex items-center gap-2 font-medium"><User size={14} className="text-ink/40" /> {o.customer.full_name}{o.customer.is_dealer && <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-700">{t('customers.dealerShort')}</span>}</div>
+              <div className="flex items-center gap-2 font-medium"><User size={14} className="text-ink/40" /> {o.customer.full_name}{o.customer.is_dealer && <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-700">Diller</span>}</div>
               <div className="flex items-center gap-2"><Phone size={14} className="text-ink/40" /> {formatPhone(o.customer.phone)}</div>
               <div className="flex items-center gap-2"><MapPin size={14} className="text-ink/40" />
                 {[o.customer.region, o.customer.city].filter(Boolean).join(', ') || '—'}
               </div>
               {o.delivery_address && (
-                <div className="flex items-start gap-2 text-ink-soft"><MapPin size={14} className="text-ink/40 mt-0.5" /> {t('sales.deliveryAddress', { address: o.delivery_address })}</div>
+                <div className="flex items-start gap-2 text-ink-soft"><MapPin size={14} className="text-ink/40 mt-0.5" /> {`Yetkazish: ${o.delivery_address}`}</div>
               )}
             </div>
           ) : <div className="text-sm text-ink-soft">—</div>}
         </Card>
 
-        <Card title={t('sales.sectionDetails')}>
+        <Card title="Tafsilotlar">
           <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-sm">
-            <Detail label={t('sales.exchangeRate')} value={parseFloat(o.exchange_rate) ? formatUZS(o.exchange_rate) : '—'} />
-            <Detail label={t('sales.itemsCount')} value={String(o.items.length)} />
+            <Detail label="Valyuta kursi" value={parseFloat(o.exchange_rate) ? formatUZS(o.exchange_rate) : '—'} />
+            <Detail label="Mahsulotlar soni" value={String(o.items.length)} />
             <UnitIdEditor orderId={orderId!} value={o.unit_uid ?? ''} locked={locked} onSaved={refresh} />
           </div>
           {o.note && <div className="mt-3 pt-3 border-t border-black/5 text-sm text-ink-soft whitespace-pre-line">{o.note}</div>}
@@ -311,19 +313,19 @@ export default function OrderDetailPage() {
       </div>
 
       {/* Items */}
-      <Card title={t('sales.sectionItems')}>
+      <Card title="Mahsulotlar">
         {o.items.length === 0 ? (
-          <div className="text-sm text-ink-soft">{t('sales.noItems')}</div>
+          <div className="text-sm text-ink-soft">Mahsulot yo'q</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="text-left text-ink-soft border-b border-black/5">
                 <tr>
-                  <th className="py-2 pr-3">{t('sales.colItemName')}</th>
-                  <th className="py-2 pr-3 text-center">{t('sales.colItemQty')}</th>
-                  <th className="py-2 pr-3 text-right">{t('sales.colUnitPrice')}</th>
-                  <th className="py-2 pr-3 text-right">{t('sales.colItemDiscount')}</th>
-                  <th className="py-2 pr-3 text-right">{t('sales.colItemTotal')}</th>
+                  <th className="py-2 pr-3">Mahsulot</th>
+                  <th className="py-2 pr-3 text-center">Soni</th>
+                  <th className="py-2 pr-3 text-right">Dona narxi</th>
+                  <th className="py-2 pr-3 text-right">Chegirma ($)</th>
+                  <th className="py-2 pr-3 text-right">Jami</th>
                 </tr>
               </thead>
               <tbody>
@@ -334,7 +336,7 @@ export default function OrderDetailPage() {
                         {it.product ? (it.product.display_name ?? it.product.model ?? it.product.name ?? '—') : it.product_id.slice(0, 8)}
                         {it.product?.product_type !== 'additional' && it.bunker_direction && (
                           <span className="text-ink-soft">
-                            {it.bunker_direction === 'right' ? t('sales.dirRightFull') : it.bunker_direction === 'left' ? t('sales.dirLeftFull') : '—'}
+                            {it.bunker_direction === 'right' ? "O'NGA" : it.bunker_direction === 'left' ? "CHAPGA" : '—'}
                           </span>
                         )}
                       </span>
@@ -350,30 +352,30 @@ export default function OrderDetailPage() {
           </div>
         )}
         <div className="mt-4 pt-3 border-t border-black/5 grid grid-cols-3 gap-3 text-sm">
-          <Total label={t('sales.totalLabel')} value={formatUZS(o.items_total_uzs)} accent="text-ink" />
-          <Total label={t('sales.paidLabel')} value={formatUZS(o.paid_uzs)} accent="text-success" />
-          <Total label={t('sales.balanceLabel')} value={formatUZS(o.balance_uzs)} accent={balance > 0 ? 'text-danger' : 'text-ink-soft'} />
+          <Total label="Umumiy" value={formatUZS(o.items_total_uzs)} accent="text-ink" />
+          <Total label="To'langan" value={formatUZS(o.paid_uzs)} accent="text-success" />
+          <Total label="Qoldiq" value={formatUZS(o.balance_uzs)} accent={balance > 0 ? 'text-danger' : 'text-ink-soft'} />
         </div>
       </Card>
 
       {/* Payments */}
-      <Card title={t('sales.sectionPayments')} action={
+      <Card title="To'lovlar" action={
         balance <= 0
-          ? <span className="text-xs text-success font-medium">{t('sales.fullyPaid')}</span>
+          ? <span className="text-xs text-success font-medium">To'liq to'langan</span>
           : can('orders:write')
-            ? <button onClick={() => setAddingPayment(true)} className="btn-primary text-sm py-1.5"><Plus size={15} /> {t('sales.addPaymentBtn')}</button>
-            : <span className="text-xs text-ink-soft">{t('sales.financeOnly')}</span>
+            ? <button onClick={() => setAddingPayment(true)} className="btn-primary text-sm py-1.5"><Plus size={15} /> To'lov</button>
+            : <span className="text-xs text-ink-soft">To'lovni moliya bo'limi kiritadi</span>
       }>
         {o.payments.length === 0 ? (
-          <div className="text-sm text-ink-soft">{t('sales.noPayments')}</div>
+          <div className="text-sm text-ink-soft">To'lovlar yo'q</div>
         ) : (
           <table className="w-full text-sm">
             <thead className="text-left text-ink-soft border-b border-black/5">
               <tr>
-                <th className="py-2 pr-3">{t('sales.colPayDate')}</th>
-                <th className="py-2 pr-3 text-right">{t('sales.colPayAmount')}</th>
-                <th className="py-2 pr-3">{t('sales.colPayMethod')}</th>
-                <th className="py-2 pr-3">{t('sales.colPayNote')}</th>
+                <th className="py-2 pr-3">Sana</th>
+                <th className="py-2 pr-3 text-right">Summa</th>
+                <th className="py-2 pr-3">Usul</th>
+                <th className="py-2 pr-3">Izoh</th>
                 <th className="py-2 pr-3"></th>
               </tr>
             </thead>
@@ -384,7 +386,7 @@ export default function OrderDetailPage() {
                   <td className="py-2 pr-3 text-right font-medium">
                     {p.currency === 'USD' ? formatUSD(p.amount) : formatUZS(p.amount)}
                   </td>
-                  <td className="py-2 pr-3">{p.method ? (t(METHOD_LABEL_KEYS[p.method] ?? '') || p.method) : '—'}</td>
+                  <td className="py-2 pr-3">{p.method ? (METHOD_LABELS[p.method] ?? p.method) : '—'}</td>
                   <td className="py-2 pr-3 text-ink-soft">{p.note || '—'}</td>
                   <td className="py-2 pr-3 text-right">
                     <div className="flex items-center justify-end gap-1">
@@ -392,7 +394,7 @@ export default function OrderDetailPage() {
                         onClick={() => downloadDoc(`receipt-${p.id}`, `/orders/${orderId}/payments/${p.id}/receipt.pdf`, `kvitansiya-${o.code}.pdf`)}
                         disabled={downloading === `receipt-${p.id}`}
                         className="p-1 rounded hover:bg-accent/10 text-accent disabled:opacity-50"
-                        title={t('sales.printReceiptTitle')}
+                        title="To'lov kvitansiyasini PDF yuklab olish"
                       >
                         <Receipt size={14} />
                       </button>
@@ -444,7 +446,6 @@ function Detail({ label, value }: { label: string; value: string }) {
 function UnitIdEditor({ orderId, value, locked, onSaved }: {
   orderId: string; value: string; locked: boolean; onSaved: () => void;
 }) {
-  const { t } = useTranslation();
   const [saving, setSaving] = useState(false);
   async function save(e: React.FocusEvent<HTMLInputElement>) {
     const v = e.target.value.trim();
@@ -452,10 +453,10 @@ function UnitIdEditor({ orderId, value, locked, onSaved }: {
     setSaving(true);
     try {
       await api.patch(`/orders/${orderId}`, { unit_uid: v || null });
-      toast.success(t('common.updated'));
+      toast.success("Yangilandi");
       onSaved();
     } catch (err: any) {
-      toast.error(err?.response?.data?.detail || t('common.error'));
+      toast.error(err?.response?.data?.detail || "Xatolik yuz berdi");
       e.target.value = value;
     } finally {
       setSaving(false);
@@ -463,7 +464,7 @@ function UnitIdEditor({ orderId, value, locked, onSaved }: {
   }
   return (
     <div>
-      <div className="text-xs text-ink-soft">{t('sales.colUnitId')}</div>
+      <div className="text-xs text-ink-soft">ID raqami</div>
       {locked ? (
         <div className="font-mono font-medium">{value || '—'}</div>
       ) : (
@@ -471,8 +472,8 @@ function UnitIdEditor({ orderId, value, locked, onSaved }: {
           key={value}
           defaultValue={value}
           disabled={saving}
-          placeholder={t('sales.unitIdPlaceholder')}
-          title={t('sales.unitIdEdit')}
+          placeholder="ID"
+          title="Ombor ID raqami — bo'sh kotyolni band qiladi"
           onBlur={save}
           className="w-28 mt-0.5 font-mono text-sm bg-transparent border border-black/10 hover:border-black/20 focus:border-primary rounded px-1.5 py-0.5 outline-none disabled:opacity-60"
         />

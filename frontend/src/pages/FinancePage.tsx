@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { useTranslation } from 'react-i18next';
 import {
   Plus, Wallet, ArrowDownLeft, ArrowUpRight, Trash2,
   TrendingUp, TrendingDown, Banknote, RefreshCw,
@@ -29,15 +28,28 @@ interface Rate { id: string; date: string; usd_to_uzs: string; source: string }
 const fmtMoney = (amount: string, currency: string) =>
   currency === 'USD' ? formatUSD(amount) : formatUZS(amount);
 
+const MONTH_LABELS: Record<string, string> = {
+  '1': 'Yanvar',
+  '2': 'Fevral',
+  '3': 'Mart',
+  '4': 'Aprel',
+  '5': 'May',
+  '6': 'Iyun',
+  '7': 'Iyul',
+  '8': 'Avgust',
+  '9': 'Sentabr',
+  '10': 'Oktabr',
+  '11': 'Noyabr',
+  '12': 'Dekabr',
+};
+
 function TypeBadge({ type }: { type: string }) {
-  const { t } = useTranslation();
   if (type === 'income')
-    return <span className="badge bg-success/10 text-success"><ArrowDownLeft size={12} /> {t('finance.type.income')}</span>;
-  return <span className="badge bg-danger/10 text-danger"><ArrowUpRight size={12} /> {t('finance.type.expense')}</span>;
+    return <span className="badge bg-success/10 text-success"><ArrowDownLeft size={12} /> Kirim</span>;
+  return <span className="badge bg-danger/10 text-danger"><ArrowUpRight size={12} /> Chiqim</span>;
 }
 
 export default function FinancePage() {
-  const { t } = useTranslation();
   const qc = useQueryClient();
   const [tab, setTab] = useState<Tab>('overview');
 
@@ -107,10 +119,10 @@ export default function FinancePage() {
     setDeleting(true);
     try {
       await api.delete(`/finance/transactions/${delTx.id}`);
-      toast.success(t('finance.transactions.voidedToast'));
+      toast.success("Tranzaksiya bekor qilindi");
       setDelTx(null);
       refreshAll();
-    } catch (e: any) { toast.error(e?.response?.data?.detail || t('finance.error')); }
+    } catch (e: any) { toast.error(e?.response?.data?.detail || "Xatolik"); }
     finally { setDeleting(false); }
   }
   async function confirmDelCat() {
@@ -118,44 +130,44 @@ export default function FinancePage() {
     setDeleting(true);
     try {
       await api.delete(`/finance/categories/${delCat.id}`);
-      toast.success(t('common.deleted'));
+      toast.success("O'chirildi");
       setDelCat(null);
       qc.invalidateQueries({ queryKey: ['categories'] });
-    } catch (e: any) { toast.error(e?.response?.data?.detail || t('finance.error')); }
+    } catch (e: any) { toast.error(e?.response?.data?.detail || "Xatolik"); }
     finally { setDeleting(false); }
   }
 
-  const TABS: Array<{ key: Tab; labelKey: string }> = [
-    { key: 'overview', labelKey: 'finance.tabs.overview' },
-    { key: 'categories', labelKey: 'finance.tabs.categories' },
-    { key: 'rates', labelKey: 'finance.tabs.rates' },
+  const TABS: Array<{ key: Tab; label: string }> = [
+    { key: 'overview', label: "Umumiy ko'rinish" },
+    { key: 'categories', label: 'Kategoriyalar' },
+    { key: 'rates', label: 'Valyuta kursi' },
   ];
 
   const MONTH_KEYS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const;
 
   const TYPE_FILTERS = [
-    { key: '', labelKey: 'finance.filter.all' },
-    { key: 'income', labelKey: 'finance.filter.income' },
-    { key: 'expense', labelKey: 'finance.filter.expense' },
+    { key: '', label: 'Hammasi' },
+    { key: 'income', label: 'Kirim' },
+    { key: 'expense', label: 'Chiqim' },
   ];
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold">{t('finance.title')}</h1>
-          <p className="text-sm text-ink-soft">{t('finance.subtitle')}</p>
+          <h1 className="text-2xl font-bold">Moliya</h1>
+          <p className="text-sm text-ink-soft">Kassa va tranzaksiyalar</p>
         </div>
         <button className="btn-primary" onClick={() => setTxModal(true)}>
-          <Plus size={16} /> {t('finance.newTransaction')}
+          <Plus size={16} /> Yangi tranzaksiya
         </button>
       </div>
 
       {/* Balance cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <BalanceCard title={t('finance.balance.uzs')} value={formatUZS(balance.data?.uzs ?? 0)} icon={<Wallet size={18} />} accent="primary" />
-        <BalanceCard title={t('finance.balance.usd')} value={formatUSD(balance.data?.usd ?? 0)} icon={<Wallet size={18} />} accent="success" />
-        <BalanceCard title={t('finance.balance.gazna')} value={formatUSD(balance.data?.gazna ?? 0)} icon={<Banknote size={18} />} accent="warning" />
+        <BalanceCard title="UZS Balans" value={formatUZS(balance.data?.uzs ?? 0)} icon={<Wallet size={18} />} accent="primary" />
+        <BalanceCard title="USD Balans" value={formatUSD(balance.data?.usd ?? 0)} icon={<Wallet size={18} />} accent="success" />
+        <BalanceCard title="G'azna (USD)" value={formatUSD(balance.data?.gazna ?? 0)} icon={<Banknote size={18} />} accent="warning" />
       </div>
 
       {/* Tabs */}
@@ -164,7 +176,7 @@ export default function FinancePage() {
           <button key={tb.key} onClick={() => setTab(tb.key)}
             className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px whitespace-nowrap transition ${
               tab === tb.key ? 'border-primary text-primary' : 'border-transparent text-ink-soft hover:text-ink'}`}>
-            {t(tb.labelKey)}
+            {tb.label}
           </button>
         ))}
       </div>
@@ -173,10 +185,10 @@ export default function FinancePage() {
       {tab === 'overview' && (
         <div className="space-y-4">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm text-ink-soft">{t('finance.period')}:</span>
+            <span className="text-sm text-ink-soft">Davr:</span>
             <select className="input w-auto" value={month} onChange={(e) => setMonth(Number(e.target.value))}>
               {MONTH_KEYS.map((m) => (
-                <option key={m} value={m}>{t(`finance.months.${m}`)}</option>
+                <option key={m} value={m}>{MONTH_LABELS[String(m)]}</option>
               ))}
             </select>
             <select className="input w-auto" value={year} onChange={(e) => setYear(Number(e.target.value))}>
@@ -186,43 +198,43 @@ export default function FinancePage() {
           </div>
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <BalanceCard title={t('finance.kpi.incomeUZS')} value={formatUZS(summary.data?.income_total ?? 0)}
+            <BalanceCard title="Kirim (UZS)" value={formatUZS(summary.data?.income_total ?? 0)}
                          icon={<TrendingUp size={18} />} accent="success" />
-            <BalanceCard title={t('finance.kpi.expenseUZS')} value={formatUZS(summary.data?.expense_total ?? 0)}
+            <BalanceCard title="Chiqim (UZS)" value={formatUZS(summary.data?.expense_total ?? 0)}
                          icon={<TrendingDown size={18} />} accent="warning" />
-            <BalanceCard title={t('finance.kpi.incomeUSD')} value={formatUSD(summary.data?.usd_income_total ?? 0)}
+            <BalanceCard title="Kirim (USD)" value={formatUSD(summary.data?.usd_income_total ?? 0)}
                          icon={<TrendingUp size={18} />} accent="success" />
-            <BalanceCard title={t('finance.kpi.expenseUSD')} value={formatUSD(summary.data?.usd_expense_total ?? 0)}
+            <BalanceCard title="Chiqim (USD)" value={formatUSD(summary.data?.usd_expense_total ?? 0)}
                          icon={<TrendingDown size={18} />} accent="warning" />
           </div>
 
           {/* Transactions list */}
           <Card>
             <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
-              <h3 className="font-semibold text-base">{t('finance.transactions.title')}</h3>
+              <h3 className="font-semibold text-base">Tranzaksiyalar</h3>
               <div className="flex gap-1 bg-black/5 rounded-button p-0.5">
                 {TYPE_FILTERS.map((f) => (
                   <button key={f.key} onClick={() => setFType(f.key)}
                     className={`px-3 py-1 text-sm rounded-[6px] transition ${
                       fType === f.key ? 'bg-card shadow-sm font-medium' : 'text-ink-soft hover:text-ink'}`}>
-                    {t(f.labelKey)}
+                    {f.label}
                   </button>
                 ))}
               </div>
             </div>
 
             {txItems.length === 0 ? (
-              <EmptyState title={t('finance.transactions.empty')} description={t('finance.transactions.emptyDesc')} />
+              <EmptyState title="Tranzaksiyalar yo'q" description="Yangi tranzaksiya qo'shing" />
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="text-left text-ink-soft border-b border-black/5">
                     <tr>
-                      <th className="py-2 pr-3 whitespace-nowrap">{t('finance.transactions.colDate')}</th>
-                      <th className="py-2 pr-3 whitespace-nowrap">{t('finance.transactions.colType')}</th>
-                      <th className="py-2 pr-[3.75rem] whitespace-nowrap">{t('finance.transactions.colCategory')}</th>
-                      <th className="py-2 pr-[3.75rem] whitespace-nowrap">{t('finance.transactions.colAmount')}</th>
-                      <th className="py-2 pl-2 w-full">{t('finance.transactions.colNote')}</th>
+                      <th className="py-2 pr-3 whitespace-nowrap">Sana</th>
+                      <th className="py-2 pr-3 whitespace-nowrap">Tur</th>
+                      <th className="py-2 pr-[3.75rem] whitespace-nowrap">Kategoriya</th>
+                      <th className="py-2 pr-[3.75rem] whitespace-nowrap">Summa</th>
+                      <th className="py-2 pl-2 w-full">Izoh</th>
                       <th className="py-2 w-8"></th>
                     </tr>
                   </thead>
@@ -239,7 +251,7 @@ export default function FinancePage() {
                           {txItem.type === 'income' ? '+' : '−'}{fmtMoney(txItem.amount, txItem.currency)}
                         </td>
                         <td className="py-2 pl-2 w-full text-ink-soft">
-                          {voided && <span className="badge bg-danger/10 text-danger mr-2">{t('finance.transactions.voided')}</span>}
+                          {voided && <span className="badge bg-danger/10 text-danger mr-2">Bekor qilingan</span>}
                           {txItem.note || (voided ? '' : '—')}
                         </td>
                         <td className="py-2">
@@ -264,18 +276,18 @@ export default function FinancePage() {
       {/* === CATEGORIES === */}
       {tab === 'categories' && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Card title={t('finance.categories.incomeTitle')} action={
+          <Card title="Kirim kategoriyalari" action={
             <button className="btn-primary !py-1.5 !text-sm"
                     onClick={() => { setCatKind('income'); setCatModal(true); }}>
-              <Plus size={15} /> {t('common.add')}
+              <Plus size={15} /> Qo'shish
             </button>
           }>
             <CatList items={incomeCats} onDelete={setDelCat} />
           </Card>
-          <Card title={t('finance.categories.expenseTitle')} action={
+          <Card title="Chiqim kategoriyalari" action={
             <button className="btn-primary !py-1.5 !text-sm"
                     onClick={() => { setCatKind('expense'); setCatModal(true); }}>
-              <Plus size={15} /> {t('common.add')}
+              <Plus size={15} /> Qo'shish
             </button>
           }>
             <CatList items={expenseCats} onDelete={setDelCat} />
@@ -287,24 +299,24 @@ export default function FinancePage() {
       {tab === 'rates' && (
         <div className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <BalanceCard title={t('finance.rates.latestRate')}
+            <BalanceCard title="Eng so'nggi kurs (1 USD)"
               value={latestRate ? formatUZS(latestRate.usd_to_uzs) : '—'}
               icon={<RefreshCw size={18} />} accent="primary" />
           </div>
-          <Card title={t('finance.rates.historyTitle')} action={
+          <Card title="Kurs tarixi" action={
             <button className="btn-primary !py-1.5 !text-sm" onClick={() => setRateModal(true)}>
-              <Plus size={15} /> {t('finance.rates.addButton')}
+              <Plus size={15} /> Kurs kiritish
             </button>
           }>
             {rates.length === 0 ? (
-              <EmptyState title={t('finance.rates.empty')} />
+              <EmptyState title="Kurs ma'lumotlari yo'q" />
             ) : (
               <table className="w-full text-sm">
                 <thead className="text-left text-ink-soft border-b border-black/5">
                   <tr>
-                    <th className="py-2 pr-3">{t('finance.rates.colDate')}</th>
-                    <th className="py-2 pr-3">{t('finance.rates.colRate')}</th>
-                    <th className="py-2 pr-3">{t('finance.rates.colSource')}</th>
+                    <th className="py-2 pr-3">Sana</th>
+                    <th className="py-2 pr-3">1 USD = UZS</th>
+                    <th className="py-2 pr-3">Manba</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -314,7 +326,7 @@ export default function FinancePage() {
                       <td className="py-2 pr-3 font-semibold">{formatUZS(r.usd_to_uzs)}</td>
                       <td className="py-2 pr-3">
                         <span className={`badge ${r.source === 'cbu' ? 'bg-primary/10 text-primary' : 'bg-black/5 text-ink-soft'}`}>
-                          {r.source === 'cbu' ? t('finance.rates.sourceCbu') : t('finance.rates.sourceManual')}
+                          {r.source === 'cbu' ? 'Markaziy bank' : "Qo'lda"}
                         </span>
                       </td>
                     </tr>
@@ -333,19 +345,18 @@ export default function FinancePage() {
       {rateModal && <ExchangeRateModal onClose={() => setRateModal(false)}
                       onSaved={() => qc.invalidateQueries({ queryKey: ['exchange-rates'] })} />}
 
-      <ConfirmModal open={!!delTx} title={t('finance.txModal.deleteTitle')}
-        message={t('finance.txModal.deleteMessage')}
+      <ConfirmModal open={!!delTx} title="Tranzaksiyani bekor qilish"
+        message={`Bu tranzaksiya bekor qilinadi va balans qaytariladi. Yozuv tarixda "bekor qilingan" holatida qoladi. Davom etilsinmi?`}
         loading={deleting} onConfirm={confirmDelTx} onCancel={() => setDelTx(null)} />
-      <ConfirmModal open={!!delCat} title={t('finance.categories.deleteTitle')}
-        message={t('finance.categories.deleteMessage', { name: delCat?.name ?? '' })}
+      <ConfirmModal open={!!delCat} title="Kategoriyani o'chirish"
+        message={`"${delCat?.name ?? ''}" kategoriyasi o'chiriladi. Davom etilsinmi?`}
         loading={deleting} onConfirm={confirmDelCat} onCancel={() => setDelCat(null)} />
     </div>
   );
 }
 
 function CatList({ items, onDelete }: { items: Category[]; onDelete: (c: Category) => void }) {
-  const { t } = useTranslation();
-  if (items.length === 0) return <EmptyState title={t('finance.categories.empty')} />;
+  if (items.length === 0) return <EmptyState title="Kategoriyalar yo'q" />;
   return (
     <div className="space-y-1">
       {items.map((c) => (

@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import { X, Plus, Trash2, RefreshCw } from 'lucide-react';
 
@@ -49,7 +48,6 @@ export default function OrderModal({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const { t } = useTranslation();
   const isCreate = order === null;
 
   const [customer, setCustomer] = useState<CustomerLite | null>(order?.customer ?? null);
@@ -87,14 +85,14 @@ export default function OrderModal({
       if (latest?.usd_to_uzs) {
         setRate(String(num(latest.usd_to_uzs)));
         if (!silent) {
-          const src = latest.source === 'cbu' ? t('sales.rateSourceCbu') : t('sales.rateSourceDefault');
-          toast.success(t('sales.rateSource', { src }));
+          const src = latest.source === 'cbu' ? "CBU joriy kursi" : "Joriy kurs";
+          toast.success(`${src} olindi`);
         }
       } else if (!silent) {
-        toast.error(t('sales.rateNotFound'));
+        toast.error("Kurs topilmadi");
       }
     } catch {
-      if (!silent) toast.error(t('sales.rateFetchError'));
+      if (!silent) toast.error("Kursni olishda xatolik");
     }
   }
 
@@ -149,16 +147,16 @@ export default function OrderModal({
   }
 
   async function handleSave() {
-    if (!customer) { toast.error(t('sales.errNoCustomer')); return; }
-    if (items.length === 0) { toast.error(t('sales.errNoItems')); return; }
-    if (items.some((it) => !it.product_id)) { toast.error(t('sales.errNoProduct')); return; }
-    if (items.some((it) => isMainItem(it) && !it.bunker_direction)) { toast.error(t('sales.errNoBunker')); return; }
+    if (!customer) { toast.error("Mijozni tanlang"); return; }
+    if (items.length === 0) { toast.error("Kamida bitta mahsulot qo'shing"); return; }
+    if (items.some((it) => !it.product_id)) { toast.error("Mahsulotni tanlang"); return; }
+    if (items.some((it) => isMainItem(it) && !it.bunker_direction)) { toast.error("Bunker tomonini tanlang"); return; }
     for (let i = 0; i < items.length; i++) {
       const it = items[i];
       // chegirma ($) mahsulot summasidan ($ × soni) oshmasligi kerak
       const subtotalUsd = num(it.unit_price_usd) * (it.quantity || 1);
       if (num(it.discount) > subtotalUsd) {
-        toast.error(t('sales.errDiscountExceeds', { row: i + 1 }));
+        toast.error(`Chegirma mahsulot summasidan oshib ketdi (${i + 1}-qator)`);
         return;
       }
     }
@@ -196,16 +194,16 @@ export default function OrderModal({
       const n = orderItemLists.length;
       if (isCreate) {
         for (const its of orderItemLists) await api.post('/orders', { ...baseBody, items: its });
-        toast.success(n > 1 ? t('sales.createdMany', { count: n }) : t('sales.createdOne'));
+        toast.success(n > 1 ? `${n} ta buyurtma yaratildi` : "Buyurtma yaratildi");
       } else {
         await api.patch(`/orders/${order!.id}`, { ...baseBody, items: orderItemLists[0] });
         for (const its of orderItemLists.slice(1)) await api.post('/orders', { ...baseBody, items: its });
-        toast.success(n > 1 ? t('sales.updatedMany', { count: n - 1 }) : t('sales.updatedOne'));
+        toast.success(n > 1 ? `Yangilandi (+${n - 1} ta yangi buyurtma)` : "Yangilandi");
       }
       onSaved();
       onClose();
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail || t('common.error'));
+      toast.error(e?.response?.data?.detail || "Xatolik yuz berdi");
     } finally {
       setSaving(false);
     }
@@ -218,7 +216,7 @@ export default function OrderModal({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-5 py-3 border-b border-black/5 shrink-0">
-          <h3 className="font-semibold">{isCreate ? t('sales.modalCreateTitle') : t('sales.modalEditTitle')}</h3>
+          <h3 className="font-semibold">{isCreate ? "Yangi buyurtma" : "Buyurtmani tahrirlash"}</h3>
           <button onClick={onClose} className="p-1 rounded hover:bg-black/5"><X size={18} /></button>
         </div>
 
@@ -226,19 +224,19 @@ export default function OrderModal({
           {/* Customer + date + rate */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="md:col-span-2">
-              <label className="label">{t('sales.labelCustomer')}</label>
+              <label className="label">Mijoz *</label>
               <CustomerPicker value={customer} onChange={setCustomer} />
             </div>
             <div>
-              <label className="label">{t('sales.labelOrderDate')}</label>
+              <label className="label">Buyurtma sanasi *</label>
               <input type="date" className="input" value={orderDate} onChange={(e) => setOrderDate(e.target.value)} />
             </div>
             <div>
-              <label className="label">{t('sales.labelRate')}</label>
+              <label className="label">Valyuta kursi (USD→UZS)</label>
               <div className="flex gap-2">
                 <input type="text" inputMode="decimal" className="input" placeholder="0"
                        value={rate} onChange={(e) => setRate(e.target.value.replace(/[^\d.]/g, ''))} />
-                <button type="button" onClick={() => fetchRate()} className="btn-ghost shrink-0" title={t('sales.labelRateTooltip')}>
+                <button type="button" onClick={() => fetchRate()} className="btn-ghost shrink-0" title="Joriy kursni olish">
                   <RefreshCw size={15} />
                 </button>
               </div>
@@ -248,25 +246,25 @@ export default function OrderModal({
           {/* Items */}
           <div className="border border-black/5 rounded-card p-3">
             <div className="flex items-center justify-between mb-2">
-              <div className="font-medium text-sm">{t('sales.labelItems')}</div>
+              <div className="font-medium text-sm">Mahsulotlar</div>
               <button type="button" onClick={addRow} className="text-xs text-primary font-medium flex items-center gap-1">
-                <Plus size={14} /> {t('sales.addRowBtn')}
+                <Plus size={14} /> Qator qo'shish
               </button>
             </div>
             <p className="text-xs text-ink-soft mb-2">
-              {t('sales.itemsHint')}
+              Har bir kotyol dona alohida buyurtma sifatida saqlanadi. Qo'shimcha mahsulotlar birinchi buyurtmaga qo'shiladi.
             </p>
             {items.length === 0 ? (
-              <div className="text-sm text-ink-soft py-3 text-center">{t('sales.noItemsAdded')}</div>
+              <div className="text-sm text-ink-soft py-3 text-center">Mahsulot qo'shilmagan</div>
             ) : (
               <div className="space-y-2">
                 {/* Column headers */}
                 <div className="grid grid-cols-12 gap-2 px-0.5 text-[11px] font-medium text-ink-soft">
-                  <div className="col-span-3">{t('sales.colItemProduct')}</div>
-                  <div className="col-span-2">{t('sales.colBunker')}</div>
-                  <div className="col-span-2">{t('sales.colItemQtyShort')}</div>
-                  <div className="col-span-2">{t('sales.colPriceUsdShort')}</div>
-                  <div className="col-span-2">{t('sales.colDiscountUsd')}</div>
+                  <div className="col-span-3">Mahsulot *</div>
+                  <div className="col-span-2">Bunker</div>
+                  <div className="col-span-2">Soni</div>
+                  <div className="col-span-2">Narx (USD)</div>
+                  <div className="col-span-2">Chegirma ($)</div>
                   <div className="col-span-1" />
                 </div>
                 {items.map((it, idx) => (
@@ -275,7 +273,7 @@ export default function OrderModal({
                       className={`input col-span-3 ${!it.product_id ? 'border-danger ring-1 ring-danger/40' : ''}`}
                       value={it.product_id} required
                       onChange={(e) => onProductChange(idx, e.target.value)}>
-                      <option value="">{t('sales.selectProduct')}</option>
+                      <option value="">— mahsulot tanlang —</option>
                       {products.map((p) => (
                         <option key={p.id} value={p.id}>
                           {p.display_name ?? p.model ?? p.name ?? '—'}
@@ -286,23 +284,23 @@ export default function OrderModal({
                       <select
                         className={`input col-span-2 ${!it.bunker_direction ? 'border-danger ring-1 ring-danger/40' : ''}`}
                         value={it.bunker_direction} required
-                        onChange={(e) => updateRow(idx, { bunker_direction: e.target.value })} title={t('sales.colBunker')}>
-                        <option value="">{t('sales.dirPlaceholder')}</option>
-                        <option value="right">{t('sales.bunkerRight')}</option>
-                        <option value="left">{t('sales.bunkerLeft')}</option>
+                        onChange={(e) => updateRow(idx, { bunker_direction: e.target.value })} title="Bunker">
+                        <option value="">Bunker</option>
+                        <option value="right">O'NGA</option>
+                        <option value="left">CHAPGA</option>
                       </select>
                     ) : (
                       <div className="col-span-2" />
                     )}
                     <input type="number" min={1} className="input col-span-2" value={it.quantity}
-                           onChange={(e) => updateRow(idx, { quantity: parseInt(e.target.value, 10) || 1 })} title={t('sales.colItemQtyShort')} />
+                           onChange={(e) => updateRow(idx, { quantity: parseInt(e.target.value, 10) || 1 })} title="Soni" />
                     <input type="text" inputMode="decimal" readOnly tabIndex={-1}
                            className="input col-span-2 bg-black/5 text-ink-soft cursor-not-allowed"
                            placeholder="$ narx" value={it.unit_price_usd}
-                           title={t('sales.priceReadOnly')} />
+                           title="Narx mahsulotlar bo'limidan olinadi — bu yerda o'zgartirilmaydi" />
                     <input type="text" inputMode="decimal" className="input col-span-2 text-right" placeholder="$ 0"
                            value={it.discount}
-                           onChange={(e) => updateRow(idx, { discount: decStr(e.target.value) })} title={t('sales.colDiscountUsd')}
+                           onChange={(e) => updateRow(idx, { discount: decStr(e.target.value) })} title="Chegirma ($)"
                            style={rowTotal(it) < 0 ? { borderColor: '#E74C3C', color: '#E74C3C' } : undefined} />
                     <button type="button" onClick={() => removeRow(idx)} className="col-span-1 p-1 rounded hover:bg-danger/10 text-danger justify-self-end">
                       <Trash2 size={15} />
@@ -312,7 +310,7 @@ export default function OrderModal({
               </div>
             )}
             <div className="flex justify-end mt-3 pt-2 border-t border-black/5 text-sm">
-              <span className="text-ink-soft mr-2">{t('sales.grandTotal')}</span>
+              <span className="text-ink-soft mr-2">Jami:</span>
               <span className="font-bold text-primary">{formatUZS(grandTotal)}</span>
             </div>
           </div>
@@ -320,20 +318,20 @@ export default function OrderModal({
           {/* Address + note */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <label className="label">{t('sales.labelAddress')}</label>
+              <label className="label">Yetkazish manzili</label>
               <textarea className="input min-h-[60px]" value={address} onChange={(e) => setAddress(e.target.value)} />
             </div>
             <div>
-              <label className="label">{t('sales.labelNote')}</label>
+              <label className="label">Izoh</label>
               <textarea className="input min-h-[60px]" value={note} onChange={(e) => setNote(e.target.value)} />
             </div>
           </div>
         </div>
 
         <div className="px-5 py-3 border-t border-black/5 flex justify-end gap-2 shrink-0">
-          <button onClick={onClose} className="px-3 py-1.5 text-sm rounded-button hover:bg-black/5">{t('sales.cancelBtn')}</button>
+          <button onClick={onClose} className="px-3 py-1.5 text-sm rounded-button hover:bg-black/5">Bekor qilish</button>
           <button onClick={handleSave} disabled={saving} className="btn-primary disabled:opacity-50">
-            {saving ? t('sales.saving') : t('actions.save')}
+            {saving ? "Saqlanmoqda..." : "Saqlash"}
           </button>
         </div>
       </div>
