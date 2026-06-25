@@ -6,7 +6,10 @@ import { X, Factory } from 'lucide-react';
 
 import { api } from '@/api/client';
 
-export type Category = 'kotyol' | 'bunker' | 'garelka';
+export type Category = 'kotyol' | 'bunker' | 'garelka' | 'tana';
+
+// Kotyol tanasi o'lchamlari — base ishlab chiqarishda faqat shu 5 xil bor
+export const TANA_SIZES = ['150', '200', '300', '400', '500'] as const;
 
 export interface ProductionRecord {
   id: string;
@@ -16,6 +19,7 @@ export interface ProductionRecord {
   product_id?: string | null;
   bunker_direction?: string | null;
   unit_code?: string | null;
+  body_size?: string | null;
   notes?: string | null;
   model?: string | null;
   kvm?: number | null;
@@ -45,11 +49,13 @@ export default function ProductionModal({
 }) {
   const { t } = useTranslation();
   const isKotyol = category === 'kotyol';
+  const isTana = category === 'tana';
 
   const [date, setDate] = useState(record?.production_date ?? today());
   const [productId, setProductId] = useState(record?.product_id ?? '');
   const [direction, setDirection] = useState(record?.bunker_direction ?? '');
   const [unitCode, setUnitCode] = useState(record?.unit_code ?? '');
+  const [bodySize, setBodySize] = useState(record?.body_size ?? '');
   const [qty, setQty] = useState<number | ''>(record?.quantity ?? 1);
   const [notes, setNotes] = useState(record?.notes ?? '');
   const [saving, setSaving] = useState(false);
@@ -70,6 +76,12 @@ export default function ProductionModal({
     if (isKotyol) {
       if (!productId) { toast.error(t('production.modal.needModel')); return; }
       if (!unitCode.trim()) { toast.error(t('production.modal.needId')); return; }
+    } else if (isTana) {
+      if (!bodySize.trim()) { toast.error(t('production.modal.needSize')); return; }
+      if (direction !== 'right' && direction !== 'left') {
+        toast.error(t('production.modal.needDirection')); return;
+      }
+      if (!qty || Number(qty) < 1) { toast.error(t('production.modal.needQty')); return; }
     } else if (!qty || Number(qty) < 1) {
       toast.error(t('production.modal.needQty')); return;
     }
@@ -83,6 +95,10 @@ export default function ProductionModal({
         payload.product_id = productId;
         payload.bunker_direction = direction || null;
         payload.unit_code = unitCode.trim();
+      } else if (isTana) {
+        payload.body_size = bodySize.trim();
+        payload.bunker_direction = direction;
+        payload.quantity = Number(qty);
       } else {
         payload.quantity = Number(qty);
       }
@@ -145,6 +161,31 @@ export default function ProductionModal({
                 <label className="text-xs text-ink-soft">{t('production.modal.id')}</label>
                 <input className="input w-full mt-1 font-mono" placeholder={t('production.modal.idPlaceholder')}
                        value={unitCode} onChange={(e) => setUnitCode(e.target.value)} />
+              </div>
+            </>
+          ) : isTana ? (
+            <>
+              <div>
+                <label className="text-xs text-ink-soft">{t('production.modal.size')}</label>
+                <select className="input w-full mt-1" value={bodySize}
+                        onChange={(e) => setBodySize(e.target.value)}>
+                  <option value="">{t('production.modal.pickSize')}</option>
+                  {TANA_SIZES.map((sz) => <option key={sz} value={sz}>{sz}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-ink-soft">{t('production.modal.direction')}</label>
+                <select className="input w-full mt-1" value={direction}
+                        onChange={(e) => setDirection(e.target.value)}>
+                  <option value="">{t('production.modal.pickDirection')}</option>
+                  <option value="right">{t('production.dir.right')}</option>
+                  <option value="left">{t('production.dir.left')}</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-ink-soft">{t('production.modal.qty')}</label>
+                <input type="number" min={1} className="input w-full mt-1" value={qty}
+                       onChange={(e) => setQty(e.target.value === '' ? '' : Number(e.target.value))} />
               </div>
             </>
           ) : (

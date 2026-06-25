@@ -103,6 +103,7 @@ async def production_summary(
         total_kotyol=sum(d.kotyol for d in days),
         total_bunker=sum(d.bunker for d in days),
         total_garelka=sum(d.garelka for d in days),
+        total_tana=sum(d.tana for d in days),
     )
 
 
@@ -167,6 +168,16 @@ async def create_record(payload: RecordCreate, user: CurrentUser,
         rec.unit_code = code
         rec.bunker_direction = payload.bunker_direction or None
         rec.quantity = 1
+    elif payload.category == "tana":
+        # Kotyol tanasi — model/nom yo'q, faqat o'lcham + yo'nalish + soni
+        size = (payload.body_size or "").strip()
+        if not size:
+            raise HTTPException(422, "Tana uchun o'lcham kerak")
+        if payload.bunker_direction not in ("right", "left"):
+            raise HTTPException(422, "Tana uchun yo'nalish (o'ng/chap) kerak")
+        rec.body_size = size
+        rec.bunker_direction = payload.bunker_direction
+        rec.quantity = payload.quantity or 1
     else:
         # bunker / garelka — faqat soni
         rec.quantity = payload.quantity or 1
@@ -209,6 +220,18 @@ async def update_record(record_id: uuid.UUID, payload: RecordUpdate, _: CurrentU
                 rec.unit_code = code
         if "bunker_direction" in data:
             rec.bunker_direction = data["bunker_direction"] or None
+    elif rec.category == "tana":
+        if "body_size" in data:
+            size = (data["body_size"] or "").strip()
+            if not size:
+                raise HTTPException(422, "O'lcham bo'sh bo'lishi mumkin emas")
+            rec.body_size = size
+        if "bunker_direction" in data and data["bunker_direction"]:
+            if data["bunker_direction"] not in ("right", "left"):
+                raise HTTPException(422, "Yo'nalish o'ng yoki chap bo'lishi kerak")
+            rec.bunker_direction = data["bunker_direction"]
+        if "quantity" in data and data["quantity"]:
+            rec.quantity = data["quantity"]
     else:
         if "quantity" in data and data["quantity"]:
             rec.quantity = data["quantity"]

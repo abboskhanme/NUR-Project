@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
-import { Plus, Pencil, Trash2, Search, Flame, Boxes, Cylinder, Warehouse, CheckCircle2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Flame, Boxes, Cylinder, Warehouse, CheckCircle2, Container } from 'lucide-react';
 
 import { api } from '@/api/client';
 import Card from '@/components/ui/Card';
@@ -15,15 +15,16 @@ import ProductionModal, { Category, ProductionRecord } from '@/features/producti
 import KotyolToWarehouseModal from '@/features/production/KotyolToWarehouseModal';
 
 interface DaySummary {
-  production_date: string; kotyol: number; bunker: number; garelka: number;
+  production_date: string; kotyol: number; bunker: number; garelka: number; tana: number;
 }
 interface Summary {
-  days: DaySummary[]; total_kotyol: number; total_bunker: number; total_garelka: number;
+  days: DaySummary[];
+  total_kotyol: number; total_bunker: number; total_garelka: number; total_tana: number;
 }
 
 type Tab = 'summary' | Category;
 
-const TAB_KEYS: Tab[] = ['summary', 'kotyol', 'bunker', 'garelka'];
+const TAB_KEYS: Tab[] = ['summary', 'kotyol', 'bunker', 'garelka', 'tana'];
 
 export default function ProductionPage() {
   const { t } = useTranslation();
@@ -92,13 +93,15 @@ export default function ProductionPage() {
       </div>
 
       {/* KPI */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <BalanceCard title={t('production.kpi.kotyol')} accent="primary"
           value={String(s?.total_kotyol ?? 0)} icon={<Cylinder size={18} />} />
         <BalanceCard title={t('production.kpi.bunker')} accent="success"
           value={String(s?.total_bunker ?? 0)} icon={<Boxes size={18} />} />
         <BalanceCard title={t('production.kpi.garelka')} accent="warning"
           value={String(s?.total_garelka ?? 0)} icon={<Flame size={18} />} />
+        <BalanceCard title={t('production.kpi.tana')} accent="primary"
+          value={String(s?.total_tana ?? 0)} icon={<Container size={18} />} />
       </div>
 
       {/* Tabs */}
@@ -129,6 +132,7 @@ export default function ProductionPage() {
                     <th className="py-2 pr-3 text-right">{t('production.summary.col.kotyol')}</th>
                     <th className="py-2 pr-3 text-right">{t('production.summary.col.bunker')}</th>
                     <th className="py-2 pr-3 text-right">{t('production.summary.col.garelka')}</th>
+                    <th className="py-2 pr-3 text-right">{t('production.summary.col.tana')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -138,6 +142,7 @@ export default function ProductionPage() {
                       <td className="py-2 pr-3 text-right">{d.kotyol || '—'}</td>
                       <td className="py-2 pr-3 text-right">{d.bunker || '—'}</td>
                       <td className="py-2 pr-3 text-right">{d.garelka || '—'}</td>
+                      <td className="py-2 pr-3 text-right">{d.tana || '—'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -172,6 +177,12 @@ export default function ProductionPage() {
                         <th className="py-2 pr-3">{t('production.col.kvm')}</th>
                         <th className="py-2 pr-3">{t('production.col.direction')}</th>
                       </>
+                    ) : tab === 'tana' ? (
+                      <>
+                        <th className="py-2 pr-3">{t('production.col.size')}</th>
+                        <th className="py-2 pr-3">{t('production.col.direction')}</th>
+                        <th className="py-2 pr-3 text-right">{t('production.col.qty')}</th>
+                      </>
                     ) : (
                       <th className="py-2 pr-3 text-right">{t('production.col.qty')}</th>
                     )}
@@ -189,6 +200,12 @@ export default function ProductionPage() {
                           <td className="py-2 pr-3">{r.model ?? '—'}</td>
                           <td className="py-2 pr-3">{r.kvm ? `${r.kvm} kvm` : '—'}</td>
                           <td className="py-2 pr-3">{dirLabel(r.bunker_direction)}</td>
+                        </>
+                      ) : tab === 'tana' ? (
+                        <>
+                          <td className="py-2 pr-3 font-medium">{r.body_size ?? '—'}</td>
+                          <td className="py-2 pr-3">{dirLabel(r.bunker_direction)}</td>
+                          <td className="py-2 pr-3 text-right font-semibold">{r.quantity}</td>
                         </>
                       ) : (
                         <td className="py-2 pr-3 text-right font-semibold">{r.quantity}</td>

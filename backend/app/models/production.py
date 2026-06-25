@@ -24,10 +24,10 @@ from app.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
 class ProductionRecord(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "production_records"
 
-    # kotyol | bunker | garelka
+    # kotyol | bunker | garelka | tana
     category: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
     production_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
-    # bunker/garelka uchun soni; kotyol uchun doim 1 (har yozuv = 1 dona)
+    # bunker/garelka/tana uchun soni; kotyol uchun doim 1 (har yozuv = 1 dona)
     quantity: Mapped[int] = mapped_column(default=1, server_default="1", nullable=False)
 
     # --- Faqat kotyol uchun ---
@@ -35,8 +35,11 @@ class ProductionRecord(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     product_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("products.id", ondelete="SET NULL"), index=True
     )
-    # Bunker yo'nalishi: right (o'ngga) / left (chapga) — ombor kodi bilan bir xil
+    # Yo'nalish: right (o'ngga) / left (chapga) — kotyol va tana uchun, ombor kodi bilan bir xil
     bunker_direction: Mapped[Optional[str]] = mapped_column(String(10))
+    # --- Faqat tana (kotyol tanasi, base ishlab chiqarishdan) uchun ---
+    # O'lcham — model/nom yo'q, faqat o'lcham + yo'nalish + soni hisoblanadi
+    body_size: Mapped[Optional[str]] = mapped_column(String(50))
     # ID raqami — kotyol uchun unikal
     unit_code: Mapped[Optional[str]] = mapped_column(String(50), unique=True, index=True)
 

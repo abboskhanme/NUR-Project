@@ -4,11 +4,13 @@
   "tabs": {
     "summary": "Daily summary",
     "kotyol": "Boiler",
+    "tana": "Boiler body",
     "bunker": "Bunker",
     "garelka": "Burner"
   },
   "kpi": {
     "kotyol": "Total boilers",
+    "tana": "Total bodies",
     "bunker": "Total bunkers",
     "garelka": "Total burners"
   },
@@ -16,13 +18,15 @@
     "col": {
       "date": "Date",
       "kotyol": "Boiler",
+      "tana": "Body",
       "bunker": "Bunker",
       "garelka": "Burner"
     },
     "empty": "No records yet",
-    "emptyDesc": "Add a boiler, bunker or burner"
+    "emptyDesc": "Add a boiler, body, bunker or burner"
   },
   "addKotyol": "Add boiler",
+  "addTana": "Add body",
   "addBunker": "Add bunker",
   "addGarelka": "Add burner",
   "filter": {
@@ -34,6 +38,7 @@
     "date": "Date",
     "model": "Model",
     "kvm": "Size",
+    "size": "Size",
     "direction": "Direction",
     "id": "ID number",
     "qty": "Qty",
@@ -53,16 +58,23 @@
     "editBunker": "Edit bunker",
     "addGarelka": "Add burner",
     "editGarelka": "Edit burner",
+    "addTana": "Boiler body brought in",
+    "editTana": "Edit boiler body",
     "date": "Production date",
     "model": "Model",
     "pickModel": "Select model",
     "direction": "Direction",
+    "pickDirection": "Select direction",
+    "size": "Size",
+    "pickSize": "Select size",
     "id": "ID number",
     "idPlaceholder": "e.g. KT-001",
     "qty": "Quantity",
     "note": "Note (optional)",
     "needModel": "Select a model",
     "needId": "ID number required",
+    "needSize": "Size required",
+    "needDirection": "Select direction (right/left)",
     "needQty": "Quantity must be at least 1",
     "saved": "Saved"
   },

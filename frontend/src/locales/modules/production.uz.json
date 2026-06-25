@@ -4,11 +4,13 @@
   "tabs": {
     "summary": "Kunlik hisobot",
     "kotyol": "Kotyol",
+    "tana": "Kotyol tanasi",
     "bunker": "Bunker",
     "garelka": "Garelka"
   },
   "kpi": {
     "kotyol": "Jami kotyol",
+    "tana": "Jami tana",
     "bunker": "Jami bunker",
     "garelka": "Jami garelka"
   },
@@ -16,13 +18,15 @@
     "col": {
       "date": "Sana",
       "kotyol": "Kotyol",
+      "tana": "Tana",
       "bunker": "Bunker",
       "garelka": "Garelka"
     },
     "empty": "Hozircha yozuv yoʻq",
-    "emptyDesc": "Kotyol, bunker yoki garelka qoʻshing"
+    "emptyDesc": "Kotyol, tana, bunker yoki garelka qoʻshing"
   },
   "addKotyol": "Kotyol qoʻshish",
+  "addTana": "Tana qoʻshish",
   "addBunker": "Bunker qoʻshish",
   "addGarelka": "Garelka qoʻshish",
   "filter": {
@@ -34,6 +38,7 @@
     "date": "Sana",
     "model": "Model",
     "kvm": "Oʻlcham",
+    "size": "Oʻlcham",
     "direction": "Yoʻnalish",
     "id": "ID raqami",
     "qty": "Soni",
@@ -53,16 +58,23 @@
     "editBunker": "Bunkerni tahrirlash",
     "addGarelka": "Garelka qoʻshish",
     "editGarelka": "Garelkani tahrirlash",
+    "addTana": "Kotyol tanasi olib kelindi",
+    "editTana": "Kotyol tanasini tahrirlash",
     "date": "Ishlab chiqarilgan sana",
     "model": "Model",
     "pickModel": "Modelni tanlang",
     "direction": "Yoʻnalish",
+    "pickDirection": "Yoʻnalishni tanlang",
+    "size": "Oʻlcham",
+    "pickSize": "Oʻlchamni tanlang",
     "id": "ID raqami",
     "idPlaceholder": "masalan: KT-001",
     "qty": "Soni",
     "note": "Izoh (ixtiyoriy)",
     "needModel": "Modelni tanlang",
     "needId": "ID raqami kerak",
+    "needSize": "Oʻlcham kerak",
+    "needDirection": "Yoʻnalishni tanlang (oʻng/chap)",
     "needQty": "Soni kamida 1 boʻlishi kerak",
     "saved": "Saqlandi"
   },

@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 
 from app.schemas.common import ORMBase
 
-CATEGORIES = ("kotyol", "bunker", "garelka")
+CATEGORIES = ("kotyol", "bunker", "garelka", "tana")
 
 
 class RecordCreate(BaseModel):
@@ -18,6 +18,8 @@ class RecordCreate(BaseModel):
     product_id: Optional[uuid.UUID] = None
     bunker_direction: Optional[str] = None
     unit_code: Optional[str] = None
+    # Faqat tana (kotyol tanasi) uchun
+    body_size: Optional[str] = None
     notes: Optional[str] = None
 
 
@@ -27,6 +29,7 @@ class RecordUpdate(BaseModel):
     product_id: Optional[uuid.UUID] = None
     bunker_direction: Optional[str] = None
     unit_code: Optional[str] = None
+    body_size: Optional[str] = None
     notes: Optional[str] = None
 
 
@@ -38,6 +41,7 @@ class RecordOut(ORMBase):
     product_id: Optional[uuid.UUID] = None
     bunker_direction: Optional[str] = None
     unit_code: Optional[str] = None
+    body_size: Optional[str] = None
     notes: Optional[str] = None
     # Model ma'lumotlari (kotyol uchun, product orqali)
     model: Optional[str] = None
@@ -60,6 +64,7 @@ class DaySummary(BaseModel):
     kotyol: int = 0
     bunker: int = 0
     garelka: int = 0
+    tana: int = 0
 
 
 class ProductionSummary(BaseModel):
@@ -67,3 +72,4 @@ class ProductionSummary(BaseModel):
     total_kotyol: int = 0
     total_bunker: int = 0
     total_garelka: int = 0
+    total_tana: int = 0
