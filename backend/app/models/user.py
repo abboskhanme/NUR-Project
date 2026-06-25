@@ -51,6 +51,12 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     # Eski tokenlarda `ver` mos kelmasa, ular yaroqsiz hisoblanadi.
     token_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
 
+    # Harakatsizlik PIN-qulfi — kompyuter egasi tashqarida bo'lganda ekranni qulflash.
+    # pin_hash bcrypt bilan hash'lanadi (parol kabi), ochiq saqlanmaydi.
+    pin_hash: Mapped[Optional[str]] = mapped_column(String(255))
+    pin_enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
+    pin_timeout_minutes: Mapped[int] = mapped_column(Integer, default=5, server_default="5", nullable=False)
+
     # Telegram
     telegram_chat_id: Mapped[Optional[str]] = mapped_column(String(50))
 

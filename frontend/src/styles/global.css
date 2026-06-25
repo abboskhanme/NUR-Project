@@ -48,6 +48,16 @@ body {
   }
 }
 
+/* PIN-qulf — noto'g'ri kiritishda silkinish effekti */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-6px); }
+  40%, 80% { transform: translateX(6px); }
+}
+.animate-shake {
+  animation: shake 0.4s ease-in-out;
+}
+
 /* Termal chek — ekranda kattaroq (o'qish uchun), chop etishda 58mm. */
 #thermal-receipt {
   width: 360px;

@@ -4,11 +4,13 @@ import TopBar from './TopBar';
 import MobileNav from './MobileNav';
 import { useUIStore } from '@/stores/ui';
 import { cn } from '@/lib/cn';
+import InactivityLock from '@/features/security/InactivityLock';
 
 export default function AppLayout() {
   const collapsed = useUIStore((s) => s.sidebarCollapsed);
   return (
     <div className="min-h-screen flex bg-bg">
+      <InactivityLock />
       {/* Desktop sidebar */}
       <div className={cn('hidden md:block transition-all', collapsed ? 'w-16' : 'w-60')}>
         <Sidebar />

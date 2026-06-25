@@ -6,6 +6,7 @@ import Card from '@/components/ui/Card';
 import PhoneInput from '@/components/ui/PhoneInput';
 import { useAuthStore } from '@/stores/auth';
 import AvatarUploader from '@/features/users/AvatarUploader';
+import PinSettingsCard from '@/features/security/PinSettingsCard';
 
 export default function SettingsPage() {
   const { t } = useTranslation();
@@ -149,6 +150,8 @@ export default function SettingsPage() {
           </button>
         </div>
       </Card>
+
+      <PinSettingsCard />
     </div>
   );
 }

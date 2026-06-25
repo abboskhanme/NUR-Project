@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { usePinLockStore } from './pinLock';
 
 export interface User {
   id: string;
@@ -11,6 +12,8 @@ export interface User {
   theme: string;
   is_active: boolean;
   is_superadmin: boolean;
+  pin_enabled?: boolean;
+  pin_timeout_minutes?: number;
   roles: { id: string; name: string; description?: string | null; permissions: Record<string, any> }[];
 }
 
@@ -31,8 +34,11 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       accessToken: null,
       refreshToken: null,
-      setAuth: (user, access, refresh) =>
-        set({ user, accessToken: access, refreshToken: refresh }),
+      setAuth: (user, access, refresh) => {
+        // Yangi login — eski PIN-qulf holatini tozalaymiz.
+        usePinLockStore.getState().unlock();
+        set({ user, accessToken: access, refreshToken: refresh });
+      },
       setTokens: (access, refresh) => set({ accessToken: access, refreshToken: refresh }),
       setUser: (u) => set({ user: u }),
       logout: () => set({ user: null, accessToken: null, refreshToken: null }),

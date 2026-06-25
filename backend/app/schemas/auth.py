@@ -51,6 +51,8 @@ class UserOut(ORMBase):
     theme: str = "light"
     is_active: bool = True
     is_superadmin: bool = False
+    pin_enabled: bool = False
+    pin_timeout_minutes: int = 5
     roles: list[RoleOut] = []
 
 
@@ -64,6 +66,26 @@ class LoginResponse(BaseModel):
 class PasswordChange(BaseModel):
     old_password: str
     new_password: str = Field(min_length=8)
+
+
+class PinSet(BaseModel):
+    """PIN-qulfni yoqish/o'zgartirish — joriy parol tasdiqlash uchun kerak."""
+    password: str
+    pin: str = Field(min_length=4, max_length=4, pattern=r"^\d{4}$")
+    timeout_minutes: int = Field(default=5, ge=1, le=120)
+
+
+class PinDisable(BaseModel):
+    """PIN-qulfni o'chirish — parol bilan tasdiqlanadi."""
+    password: str
+
+
+class PinTimeoutUpdate(BaseModel):
+    timeout_minutes: int = Field(ge=1, le=120)
+
+
+class PinVerify(BaseModel):
+    pin: str = Field(min_length=4, max_length=4, pattern=r"^\d{4}$")
 
 
 class UserCreate(BaseModel):

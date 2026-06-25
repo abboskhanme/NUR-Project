@@ -23,6 +23,10 @@ from app.schemas.auth import (
     LoginRequest,
     LoginResponse,
     PasswordChange,
+    PinDisable,
+    PinSet,
+    PinTimeoutUpdate,
+    PinVerify,
     RefreshRequest,
     TokenResponse,
     UserOut,
@@ -153,6 +157,70 @@ async def change_password(
         "access_token": create_access_token(user.id, user.token_version),
         "refresh_token": create_refresh_token(user.id, user.token_version),
     }
+
+
+# ──────────────────────────── Harakatsizlik PIN-qulfi ────────────────────────────
+
+@router.post("/me/pin", response_model=UserOut, summary="PIN-qulfni yoqish / o'zgartirish")
+async def set_pin(
+    payload: PinSet,
+    user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """4 xonali PIN o'rnatadi (yoki o'zgartiradi) va qulfni yoqadi.
+    Joriy parol bilan tasdiqlanadi."""
+    if not verify_password(payload.password, user.password_hash):
+        raise HTTPException(status_code=400, detail="Parol noto'g'ri")
+    user.pin_hash = hash_password(payload.pin)
+    user.pin_enabled = True
+    user.pin_timeout_minutes = payload.timeout_minutes
+    await db.commit()
+    await db.refresh(user)
+    return user
+
+
+@router.patch("/me/pin", response_model=UserOut, summary="PIN-qulf vaqtini o'zgartirish")
+async def update_pin_timeout(
+    payload: PinTimeoutUpdate,
+    user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    if not user.pin_enabled:
+        raise HTTPException(status_code=400, detail="PIN-qulf yoqilmagan")
+    user.pin_timeout_minutes = payload.timeout_minutes
+    await db.commit()
+    await db.refresh(user)
+    return user
+
+
+@router.post("/me/pin/disable", response_model=UserOut, summary="PIN-qulfni o'chirish")
+async def disable_pin(
+    payload: PinDisable,
+    user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    if not verify_password(payload.password, user.password_hash):
+        raise HTTPException(status_code=400, detail="Parol noto'g'ri")
+    user.pin_hash = None
+    user.pin_enabled = False
+    await db.commit()
+    await db.refresh(user)
+    return user
+
+
+@router.post("/verify-pin", summary="PIN-kodni tekshirish (qulfni ochish)")
+@limiter.limit("15/minute")
+async def verify_pin(
+    request: Request,
+    payload: PinVerify,
+    user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    if not user.pin_enabled or not user.pin_hash:
+        raise HTTPException(status_code=400, detail="PIN-qulf yoqilmagan")
+    if not verify_password(payload.pin, user.pin_hash):
+        raise HTTPException(status_code=400, detail="PIN-kod noto'g'ri")
+    return {"detail": "ok"}
 
 
 @router.post("/me/avatar", response_model=UserOut)
