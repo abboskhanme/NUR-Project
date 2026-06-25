@@ -53,8 +53,14 @@ export default function DashboardPage() {
 
   const kpi = dash.data?.kpi;
   const vsLast = "o'tgan oyga nisbatan";
+  // Summalar uchun — foizda
   const mkTrend = (pct: number | null | undefined, invert = false) =>
     pct != null ? { value: pct, label: vsLast, invert } : undefined;
+  // Sonlar uchun — o'tgan oydan nechta ko'p/kam (son farqi)
+  const mkCountTrend = (cur: number | null | undefined, prev: number | null | undefined) =>
+    cur != null && prev != null
+      ? { value: cur - prev, label: vsLast, kind: 'count' as const }
+      : undefined;
 
   return (
     <div className="space-y-6">
@@ -103,14 +109,14 @@ export default function DashboardPage() {
           title="Buyurtmalar (oy)"
           value={String(kpi?.orders_total ?? '—')}
           icon={<ShoppingCart size={18} />}
-          trend={mkTrend(kpi?.orders_growth_pct)}
+          trend={mkCountTrend(kpi?.orders_total, kpi?.orders_prev)}
         />
         <BalanceCard
           title="Yetkazilgan (oy)"
           value={String(kpi?.orders_delivered ?? '—')}
           icon={<PackageCheck size={18} />}
           accent="success"
-          trend={mkTrend(kpi?.delivered_growth_pct)}
+          trend={mkCountTrend(kpi?.orders_delivered, kpi?.delivered_prev)}
         />
         <BalanceCard
           title="Tushum (oy)"
