@@ -67,5 +67,10 @@
     "saved": "Saqlandi"
   },
   "deleteTitle": "Yozuvni oʻchirish",
-  "deleteMessage": "Ushbu yozuvni oʻchirishni tasdiqlaysizmi?"
+  "deleteMessage": "Ushbu yozuvni oʻchirishni tasdiqlaysizmi?",
+  "transferTitle": "Omborga oʻtkazish",
+  "transferHint": "Tayyor kotyolni ombor skladiga qoʻshadi. Parametrlar yozuvdan olindi — kerak boʻlsa tahrirlang.",
+  "transferSubmit": "Omborga oʻtkazish",
+  "transferred": "Kotyol omborga oʻtkazildi",
+  "inWarehouse": "Omborga oʻtkazilgan"
 }

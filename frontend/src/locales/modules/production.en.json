@@ -67,5 +67,10 @@
     "saved": "Saved"
   },
   "deleteTitle": "Delete record",
-  "deleteMessage": "Confirm deleting this record?"
+  "deleteMessage": "Confirm deleting this record?",
+  "transferTitle": "Transfer to warehouse",
+  "transferHint": "Adds the finished boiler to the warehouse stock. Values are taken from the record — edit if needed.",
+  "transferSubmit": "Transfer to warehouse",
+  "transferred": "Boiler transferred to warehouse",
+  "inWarehouse": "Transferred to warehouse"
 }

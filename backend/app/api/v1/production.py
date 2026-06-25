@@ -5,7 +5,7 @@ shu sabab bu modulda alohida model jadvali yo'q. Kotyol modeli frontend'da
 /products?product_type=warehouse orqali tanlanadi.
 """
 import uuid
-from datetime import date
+from datetime import date, datetime, timezone
 from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.dependencies import CurrentUser
 from app.core.permissions import module_guard, require_permission
 from app.db.session import get_db
-from app.models.product import Product
+from app.models.product import Inventory, Product
 from app.models.production import ProductionRecord
 from app.schemas.production import (
     CATEGORIES,
@@ -23,6 +23,7 @@ from app.schemas.production import (
     ProductionSummary,
     RecordCreate,
     RecordOut,
+    RecordTransfer,
     RecordUpdate,
 )
 
@@ -37,6 +38,7 @@ def _to_out(rec: ProductionRecord, model: Optional[str] = None,
     out = RecordOut.model_validate(rec)
     out.model = model
     out.kvm = kvm
+    out.transferred = rec.transferred_at is not None
     return out
 
 
@@ -211,6 +213,54 @@ async def update_record(record_id: uuid.UUID, payload: RecordUpdate, _: CurrentU
         if "quantity" in data and data["quantity"]:
             rec.quantity = data["quantity"]
 
+    await db.commit()
+    await db.refresh(rec)
+    model, kvm = await _model_info(db, rec.product_id)
+    return _to_out(rec, model, kvm)
+
+
+# --------------------------------------------------------------------------- #
+# Kotyolni ombor skladiga o'tkazish
+# --------------------------------------------------------------------------- #
+@router.post("/records/{record_id}/transfer", response_model=RecordOut,
+             dependencies=[Depends(require_permission("inventory:write"))])
+async def transfer_to_warehouse(record_id: uuid.UUID, payload: RecordTransfer, _: CurrentUser,
+                                db: Annotated[AsyncSession, Depends(get_db)]):
+    """Tayyor kotyolni ombor skladiga o'tkazadi: Inventory birligi yaratadi va
+    yozuvни doimiy «o'tkazilgan» deb belgilaydi (ombor birligi keyin o'chsa ham saqlanadi)."""
+    rec = (await db.execute(
+        select(ProductionRecord).where(ProductionRecord.id == record_id))).scalar_one_or_none()
+    if not rec:
+        raise HTTPException(404, "Yozuv topilmadi")
+    if rec.category != "kotyol":
+        raise HTTPException(400, "Faqat kotyol omborga o'tkaziladi")
+    if rec.transferred_at is not None:
+        raise HTTPException(400, "Bu kotyol allaqachon omborga o'tkazilgan")
+
+    product_id = payload.product_id or rec.product_id
+    if not product_id:
+        raise HTTPException(422, "Model tanlang")
+    prod = await _validate_kotyol_product(db, product_id)
+
+    code = (payload.unique_id or rec.unit_code or "").strip()
+    if not code:
+        raise HTTPException(422, "ID raqami kerak")
+    clash = (await db.execute(
+        select(Inventory.id).where(Inventory.unique_id == code))).scalar_one_or_none()
+    if clash:
+        raise HTTPException(400, f"«{code}» ID raqami allaqachon omborda mavjud")
+
+    db.add(Inventory(
+        product_id=prod.id,
+        unique_id=code,
+        status="available",
+        added_date=payload.added_date or rec.production_date or date.today(),
+        notes=payload.notes if payload.notes is not None else rec.notes,
+        bunker_direction=(payload.bunker_direction
+                          if payload.bunker_direction is not None
+                          else rec.bunker_direction) or None,
+    ))
+    rec.transferred_at = datetime.now(timezone.utc)
     await db.commit()
     await db.refresh(rec)
     model, kvm = await _model_info(db, rec.product_id)

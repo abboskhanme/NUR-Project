@@ -42,6 +42,17 @@ class RecordOut(ORMBase):
     # Model ma'lumotlari (kotyol uchun, product orqali)
     model: Optional[str] = None
     kvm: Optional[int] = None
+    # Ushbu kotyol ombor skladiga o'tkazilganmi (bir marta o'tkazilгач doimiy)
+    transferred: bool = False
+
+
+class RecordTransfer(BaseModel):
+    """Kotyolni omborga o'tkazish payloadi — maydonlar berilmasa yozuvdan olinadi."""
+    product_id: Optional[uuid.UUID] = None
+    unique_id: Optional[str] = None
+    bunker_direction: Optional[str] = None
+    added_date: Optional[date] = None
+    notes: Optional[str] = None
 
 
 class DaySummary(BaseModel):

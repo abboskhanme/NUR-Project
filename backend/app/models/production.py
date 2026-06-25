@@ -11,10 +11,10 @@ Kotyol yozuvi ombor birligi (Inventory) bilan deyarli bir xil tuzilishga ega —
 shu sabab kelajakda "Omborga yuborish" amalini bir tugma bilan qo'shish mumkin.
 """
 import uuid
-from datetime import date
+from datetime import date, datetime
 from typing import Optional
 
-from sqlalchemy import Date, ForeignKey, String, Text
+from sqlalchemy import Date, DateTime, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -41,6 +41,10 @@ class ProductionRecord(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     unit_code: Mapped[Optional[str]] = mapped_column(String(50), unique=True, index=True)
 
     notes: Mapped[Optional[str]] = mapped_column(Text)
+
+    # Kotyol ombor skladiga o'tkazilган vaqti. Bir marta o'tkazilгач doimiy saqlanadi —
+    # ombor birligi keyinchalik sotilib o'chirilsa ham bu belgi o'zgarmaydi.
+    transferred_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
     created_by_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")

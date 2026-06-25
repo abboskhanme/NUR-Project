@@ -19,6 +19,7 @@ export interface ProductionRecord {
   notes?: string | null;
   model?: string | null;
   kvm?: number | null;
+  transferred?: boolean;
 }
 
 interface ProductOpt {

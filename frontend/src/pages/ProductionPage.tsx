@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
-import { Plus, Pencil, Trash2, Search, Flame, Boxes, Cylinder } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Flame, Boxes, Cylinder, Warehouse, CheckCircle2 } from 'lucide-react';
 
 import { api } from '@/api/client';
 import Card from '@/components/ui/Card';
@@ -12,6 +12,7 @@ import ConfirmModal from '@/components/ui/ConfirmModal';
 import { formatDate } from '@/lib/format';
 import { usePermissions } from '@/lib/permissions';
 import ProductionModal, { Category, ProductionRecord } from '@/features/production/ProductionModal';
+import KotyolToWarehouseModal from '@/features/production/KotyolToWarehouseModal';
 
 interface DaySummary {
   production_date: string; kotyol: number; bunker: number; garelka: number;
@@ -32,6 +33,7 @@ export default function ProductionPage() {
   const [search, setSearch] = useState('');
   const [modal, setModal] = useState<{ category: Category; record: ProductionRecord | null } | null>(null);
   const [deleteRec, setDeleteRec] = useState<ProductionRecord | null>(null);
+  const [xferRec, setXferRec] = useState<ProductionRecord | null>(null);
 
   const summaryQ = useQuery<Summary>({
     queryKey: ['prod-summary'],
@@ -194,6 +196,19 @@ export default function ProductionPage() {
                       <td className="py-2 pr-3 text-ink-soft">{r.notes ?? '—'}</td>
                       <td className="py-2 pr-3 text-right">
                         <div className="flex items-center justify-end gap-1">
+                          {tab === 'kotyol' && (
+                            r.transferred ? (
+                              <span className="p-1 inline-flex items-center text-success"
+                                    title={t('production.inWarehouse')}>
+                                <CheckCircle2 size={14} />
+                              </span>
+                            ) : can('inventory:write') ? (
+                              <button onClick={() => setXferRec(r)}
+                                      className="p-1 rounded hover:bg-accent/10 text-accent" title={t('production.transferTitle')}>
+                                <Warehouse size={14} />
+                              </button>
+                            ) : null
+                          )}
                           {can('production:write') && (
                             <button onClick={() => setModal({ category: tab, record: r })}
                                     className="p-1 rounded hover:bg-primary/10 text-primary" title={t('actions.edit')}>
@@ -223,6 +238,18 @@ export default function ProductionPage() {
           record={modal.record}
           onClose={() => setModal(null)}
           onSaved={refresh}
+        />
+      )}
+      {xferRec && (
+        <KotyolToWarehouseModal
+          record={xferRec}
+          onClose={() => setXferRec(null)}
+          onSaved={() => {
+            refresh(); // prod-records yangilanadi → qator "o'tkazilgan" holatiga o'tadi
+            qc.invalidateQueries({ queryKey: ['wh-summary'] });
+            qc.invalidateQueries({ queryKey: ['wh-units'] });
+            qc.invalidateQueries({ queryKey: ['wh-types'] });
+          }}
         />
       )}
       <ConfirmModal
