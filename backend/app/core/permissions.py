@@ -77,6 +77,7 @@ SPECIAL_PERMISSIONS: list[dict] = [
     {"key": "system:user_avatar",      "label": "Foydalanuvchi rasmini boshqarish",       "danger": False},
     {"key": "system:finance_override", "label": "Oylikdan ortiq avans berish",            "danger": True},
     {"key": "system:order_override",   "label": "Buyurtma ID/sotuvchisini tahrirlash",    "danger": False},
+    {"key": "system:goals_manage",     "label": "Oylik maqsadlarni (sotuv/tushum) belgilash", "danger": False},
 ]
 SPECIAL_PERMISSION_KEYS: set[str] = {p["key"] for p in SPECIAL_PERMISSIONS}
 SYSTEM_WILDCARD = "system:*"

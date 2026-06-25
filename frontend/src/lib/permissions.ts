@@ -38,6 +38,7 @@ export const SPECIAL_PERMISSIONS = [
   { key: 'system:user_avatar',      label: 'Foydalanuvchi rasmini boshqarish',      danger: false },
   { key: 'system:finance_override', label: 'Oylikdan ortiq avans berish',           danger: true },
   { key: 'system:order_override',   label: 'Buyurtma ID/sotuvchisini tahrirlash',   danger: false },
+  { key: 'system:goals_manage',     label: 'Oylik maqsadlarni (sotuv/tushum) belgilash', danger: false },
 ] as const;
 
 export const SYSTEM_WILDCARD = 'system:*';

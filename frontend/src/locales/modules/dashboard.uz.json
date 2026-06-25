@@ -15,6 +15,19 @@
     "expenseMonth": "Chiqim (oy)",
     "vsLastMonth": "o'tgan oyga nisbatan"
   },
+  "goal": {
+    "title": "Oylik maqsad",
+    "orders": "Sotuv (soni)",
+    "revenue": "Tushum",
+    "revenueUzs": "Tushum maqsadi (UZS)",
+    "set": "Belgilash",
+    "notSet": "Belgilanmagan",
+    "empty": "Bu oy uchun maqsad hali belgilanmagan.",
+    "emptyManage": "Bu oy uchun maqsad belgilanmagan — «Belgilash» tugmasi orqali qo'ying.",
+    "modalTitle": "Oylik maqsadni belgilash",
+    "modalHint": "Bu oy uchun rejalashtirilgan sotuv soni va tushum summasini kiriting. Bo'sh qoldirilsa — o'sha ko'rsatkich hisobga olinmaydi.",
+    "saved": "Maqsad saqlandi"
+  },
   "cards": {
     "revenueTrend": "Tushum dinamikasi (14 kun)",
     "statusBreakdown": "Buyurtmalar holati (oy)",

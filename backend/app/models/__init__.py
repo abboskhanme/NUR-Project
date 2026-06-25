@@ -28,7 +28,7 @@ from app.models.supply import (
     VendorPayment,
     StockMovement,
 )
-from app.models.system import Notification, AuditLog, FileRecord, TelegramOrder
+from app.models.system import Notification, AuditLog, FileRecord, TelegramOrder, MonthlyGoal
 from app.models.debt import DebtProduct, DebtTransaction
 from app.models.shipping import Shipment
 from app.models.production import ProductionRecord
@@ -69,6 +69,7 @@ __all__ = [
     "AuditLog",
     "FileRecord",
     "TelegramOrder",
+    "MonthlyGoal",
     "DebtProduct",
     "DebtTransaction",
     "Shipment",

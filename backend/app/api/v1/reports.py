@@ -88,26 +88,40 @@ async def dashboard(
     prev_month_end = month_start - timedelta(days=1)
     prev_month_start = prev_month_end.replace(day=1)
 
-    # --- Oylik buyurtma KPI ---
+    # Joriy oyda o'tgan kunlar soni — o'tgan oyni shu kungacha qiyoslash uchun
+    # (masalan oyning 10-kuni bo'lsa, o'tgan oyning ham 1–10 oralig'ini olamiz).
+    prev_cmp_end = min(prev_month_start + timedelta(days=(today - month_start).days),
+                       prev_month_end)
+
+    def _growth(cur: float, prev: float) -> Optional[float]:
+        return round((cur - prev) / prev * 100, 1) if prev else None
+
+    # --- Oylik buyurtma KPI (o'tgan oy bilan qiyos) ---
     cur_cond = and_(Order.order_date >= month_start, Order.order_date <= today)
+    prev_cond = and_(Order.order_date >= prev_month_start, Order.order_date <= prev_cmp_end)
 
     orders_total = int(await _scalar(db, select(func.count(Order.id)).where(cur_cond)))
+    orders_prev = int(await _scalar(db, select(func.count(Order.id)).where(prev_cond)))
     orders_delivered = int(await _scalar(db, select(func.count(Order.id)).where(
         and_(cur_cond, Order.status == "delivered"))))
+    delivered_prev = int(await _scalar(db, select(func.count(Order.id)).where(
+        and_(prev_cond, Order.status == "delivered"))))
     revenue_cur = float(await _scalar(db, _orders_revenue_subq(month_start, today)))
-    revenue_prev = float(await _scalar(db, _orders_revenue_subq(prev_month_start, prev_month_end)))
-    revenue_growth = (
-        round((revenue_cur - revenue_prev) / revenue_prev * 100, 1)
-        if revenue_prev else None
-    )
+    revenue_prev = float(await _scalar(db, _orders_revenue_subq(prev_month_start, prev_cmp_end)))
+    revenue_growth = _growth(revenue_cur, revenue_prev)
 
-    # --- Moliya (joriy oy) ---
-    fin_cond = and_(FinanceTransaction.date >= month_start, FinanceTransaction.date <= today,
+    # --- Moliya (joriy oy, o'tgan oy bilan qiyos) ---
+    fin_cur = and_(FinanceTransaction.date >= month_start, FinanceTransaction.date <= today,
+                   FinanceTransaction.status == "active")
+    fin_prev = and_(FinanceTransaction.date >= prev_month_start,
+                    FinanceTransaction.date <= prev_cmp_end,
                     FinanceTransaction.status == "active")
     income = float(await _scalar(db, select(func.coalesce(func.sum(FinanceTransaction.amount), 0))
-                                 .where(and_(fin_cond, FinanceTransaction.type == "income"))))
+                                 .where(and_(fin_cur, FinanceTransaction.type == "income"))))
     expense = float(await _scalar(db, select(func.coalesce(func.sum(FinanceTransaction.amount), 0))
-                                  .where(and_(fin_cond, FinanceTransaction.type == "expense"))))
+                                  .where(and_(fin_cur, FinanceTransaction.type == "expense"))))
+    expense_prev = float(await _scalar(db, select(func.coalesce(func.sum(FinanceTransaction.amount), 0))
+                                       .where(and_(fin_prev, FinanceTransaction.type == "expense"))))
 
     # --- Eslatmalar (alerts) ---
     # Kafolat 30 kun ichida tugaydigan buyurtmalar (yetkazilgan + 365 kun)
@@ -160,12 +174,18 @@ async def dashboard(
         "as_of": today,
         "kpi": {
             "orders_total": orders_total,
+            "orders_prev": orders_prev,
+            "orders_growth_pct": _growth(orders_total, orders_prev),
             "orders_delivered": orders_delivered,
+            "delivered_prev": delivered_prev,
+            "delivered_growth_pct": _growth(orders_delivered, delivered_prev),
             "revenue_uzs": revenue_cur,
             "revenue_prev_uzs": revenue_prev,
             "revenue_growth_pct": revenue_growth,
             "income_uzs": income,
             "expense_uzs": expense,
+            "expense_prev_uzs": expense_prev,
+            "expense_growth_pct": _growth(expense, expense_prev),
             "net_uzs": income - expense,
         },
         "alerts": {

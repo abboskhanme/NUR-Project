@@ -1,9 +1,10 @@
-"""System: notifications, audit log, files, telegram orders."""
+"""System: notifications, audit log, files, telegram orders, monthly goals."""
 import uuid
-from datetime import datetime
+from datetime import date, datetime
+from decimal import Decimal
 from typing import Any, Optional
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Date, DateTime, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -47,6 +48,23 @@ class FileRecord(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     size: Mapped[int] = mapped_column(Integer, default=0)
     storage_key: Mapped[str] = mapped_column(String(500), nullable=False)
     uploaded_by_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+    )
+
+
+class MonthlyGoal(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    """Oylik maqsad — sotuv soni va tushum (UZS) bo'yicha.
+
+    Har oy uchun bitta yozuv (period_month — oyning 1-kuni, unikal). Bosh
+    sahifada hammaga ko'rinadi, lekin faqat `system:goals_manage` ruxsatli
+    foydalanuvchi belgilaydi/o'zgartiradi.
+    """
+    __tablename__ = "monthly_goals"
+
+    period_month: Mapped[date] = mapped_column(Date, unique=True, index=True)
+    target_orders: Mapped[Optional[int]] = mapped_column(Integer)
+    target_revenue_uzs: Mapped[Optional[Decimal]] = mapped_column(Numeric(18, 2))
+    set_by_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
     )
 

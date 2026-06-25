@@ -16,6 +16,7 @@ import AlertList from '@/features/dashboard/AlertList';
 import RecentOrdersList from '@/features/dashboard/RecentOrdersList';
 import StatusDonut from '@/features/dashboard/StatusDonut';
 import RevenueArea from '@/features/dashboard/RevenueArea';
+import GoalCard from '@/features/dashboard/GoalCard';
 import type { DashboardData } from '@/features/dashboard/types';
 
 interface BalanceSummary { uzs: number; usd: number; gazna: number }
@@ -53,7 +54,9 @@ export default function DashboardPage() {
   });
 
   const kpi = dash.data?.kpi;
-  const growth = kpi?.revenue_growth_pct;
+  const vsLast = t('dashboard.kpi.vsLastMonth');
+  const mkTrend = (pct: number | null | undefined, invert = false) =>
+    pct != null ? { value: pct, label: vsLast, invert } : undefined;
 
   return (
     <div className="space-y-6">
@@ -102,27 +105,33 @@ export default function DashboardPage() {
           title={t('dashboard.kpi.ordersMonth')}
           value={String(kpi?.orders_total ?? '—')}
           icon={<ShoppingCart size={18} />}
+          trend={mkTrend(kpi?.orders_growth_pct)}
         />
         <BalanceCard
           title={t('dashboard.kpi.deliveredMonth')}
           value={String(kpi?.orders_delivered ?? '—')}
           icon={<PackageCheck size={18} />}
           accent="success"
+          trend={mkTrend(kpi?.delivered_growth_pct)}
         />
         <BalanceCard
           title={t('dashboard.kpi.revenueMonth')}
           value={formatUZS(kpi?.revenue_uzs ?? 0)}
           icon={<TrendingUp size={18} />}
           accent="primary"
-          trend={growth != null ? { value: growth, label: t('dashboard.kpi.vsLastMonth') } : undefined}
+          trend={mkTrend(kpi?.revenue_growth_pct)}
         />
         <BalanceCard
           title={t('dashboard.kpi.expenseMonth')}
           value={formatUZS(kpi?.expense_uzs ?? 0)}
           icon={<TrendingDown size={18} />}
           accent="warning"
+          trend={mkTrend(kpi?.expense_growth_pct, true)}
         />
       </div>
+
+      {/* Oylik maqsad — sotuv va tushum (hammaga ko'rinadi, super-admin boshqaradi) */}
+      <GoalCard />
 
       {/* Grafiklar */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

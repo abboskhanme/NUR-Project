@@ -2,13 +2,30 @@
 
 export interface DashboardKpi {
   orders_total: number;
+  orders_prev: number;
+  orders_growth_pct: number | null;
   orders_delivered: number;
+  delivered_prev: number;
+  delivered_growth_pct: number | null;
   revenue_uzs: number;
   revenue_prev_uzs: number;
   revenue_growth_pct: number | null;
   income_uzs: number;
   expense_uzs: number;
+  expense_prev_uzs: number;
+  expense_growth_pct: number | null;
   net_uzs: number;
+}
+
+export interface MonthlyGoal {
+  period_month: string;
+  target_orders: number | null;
+  target_revenue_uzs: number | null;
+  actual_orders: number;
+  actual_revenue_uzs: number;
+  orders_pct: number | null;
+  revenue_pct: number | null;
+  updated_at: string | null;
 }
 
 export interface DashboardAlerts {

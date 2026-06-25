@@ -15,6 +15,19 @@
     "expenseMonth": "Expenses (month)",
     "vsLastMonth": "vs last month"
   },
+  "goal": {
+    "title": "Monthly goal",
+    "orders": "Sales (count)",
+    "revenue": "Revenue",
+    "revenueUzs": "Revenue target (UZS)",
+    "set": "Set",
+    "notSet": "Not set",
+    "empty": "No goal set for this month yet.",
+    "emptyManage": "No goal set for this month — click \"Set\" to add one.",
+    "modalTitle": "Set monthly goal",
+    "modalHint": "Enter the planned number of sales and revenue amount for this month. Leave blank to ignore that metric.",
+    "saved": "Goal saved"
+  },
   "cards": {
     "revenueTrend": "Revenue trend (14 days)",
     "statusBreakdown": "Order status (month)",
