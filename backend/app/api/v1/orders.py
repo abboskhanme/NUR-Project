@@ -21,7 +21,7 @@ from app.schemas.common import Page
 from app.schemas.order import (
     OrderCreate, OrderOut, OrderStatusChange, OrderUpdate, UnitUidUpdate,
     SalespersonUpdate, SalespersonOption, OverrideAmounts,
-    PaymentIn, PaymentOut, SalesSummary, SalespersonCount, QueueItemOut, QueueMove, QueueAdd,
+    PaymentIn, PaymentUpdate, PaymentOut, SalesSummary, SalespersonCount, QueueItemOut, QueueMove, QueueAdd,
 )
 from app.services.order_service import generate_order_code, is_valid_transition
 from app.services import pdf_service
@@ -806,9 +806,72 @@ async def list_payments(order_id: uuid.UUID, _: CurrentUser,
     return [PaymentOut.model_validate(p) for p in res.scalars().all()]
 
 
+@router.patch("/{order_id}/payments/{payment_id}", response_model=PaymentOut,
+              dependencies=[Depends(require_permission("orders:write"))])
+async def update_payment(order_id: uuid.UUID, payment_id: uuid.UUID, payload: PaymentUpdate,
+                         user: CurrentUser, db: Annotated[AsyncSession, Depends(get_db)]):
+    """Mavjud to'lovni (zakladni) tahrirlash — sana/summa/valyuta/usul/izoh.
+
+    Yangi summa buyurtma jamisidan (boshqa to'lovlar bilan birga) oshib ketmasligi
+    kerak.
+
+    - Oddiy zaklad: aktiv buyurtmada `orders:write` egasi tahrirlaydi.
+    - Eski bazadan import qilingan (avtomatik) summa VA yetkazilgan buyurtma to'lovi:
+      faqat super-admin / `system:order_override` egasi tahrirlaydi (holatdan qat'i nazar).
+    """
+    res = await db.execute(
+        select(Order).options(selectinload(Order.payments), selectinload(Order.items))
+        .where(Order.id == order_id))
+    o = res.scalar_one_or_none()
+    if not o:
+        raise HTTPException(404, "Buyurtma topilmadi")
+    p = next((x for x in o.payments if x.id == payment_id), None)
+    if not p:
+        raise HTTPException(404, "To'lov topilmadi")
+    is_correction = (p.note or "") == _IMPORT_CORRECTION_NOTE
+    is_override = has_special(user, "system:order_override")
+    if is_correction and not is_override:
+        raise HTTPException(403, "Import qilingan summani faqat super-admin tahrirlaydi")
+    if o.status == "delivered" and not is_override:
+        raise HTTPException(400, "Yetkazilgan buyurtma to'lovini tahrirlab bo'lmaydi")
+
+    data = payload.model_dump(exclude_unset=True)
+    # Import yozuvining maxsus belgisi (note) saqlanadi — foydalanuvchi uni o'zgartirmaydi
+    if is_correction:
+        data.pop("note", None)
+    # Summa/valyuta o'zgarsa — so'mdagi ekvivalentni qayta hisoblaymiz (aniq berilmasa)
+    new_amount = data.get("amount", p.amount)
+    new_currency = data.get("currency", p.currency)
+    if "amount_uzs_equiv" in data and data["amount_uzs_equiv"]:
+        new_equiv = Decimal(str(data["amount_uzs_equiv"]))
+    elif new_currency == "UZS":
+        new_equiv = Decimal(str(new_amount))
+    elif o.exchange_rate:
+        new_equiv = Decimal(str(new_amount)) * o.exchange_rate
+    else:
+        new_equiv = Decimal(str(new_amount))
+    data["amount_uzs_equiv"] = new_equiv
+
+    # Boshqa to'lovlar yig'indisi + yangi summa jamidan oshmasligi kerak
+    others = sum(
+        ((x.amount_uzs_equiv or x.amount or Decimal(0)) for x in o.payments if x.id != payment_id),
+        Decimal(0))
+    if others + new_equiv > o.items_total_uzs + Decimal("0.01"):
+        remaining = o.items_total_uzs - others
+        raise HTTPException(
+            400, f"To'lov qoldiqdan oshib ketdi — ushbu to'lov uchun maksimum: "
+                 f"{remaining:,.0f} so'm".replace(",", " "))
+
+    for k, v in data.items():
+        setattr(p, k, v)
+    await db.commit()
+    await db.refresh(p)
+    return p
+
+
 @router.delete("/{order_id}/payments/{payment_id}", status_code=204,
                dependencies=[Depends(require_permission("orders:delete"))])
-async def delete_payment(order_id: uuid.UUID, payment_id: uuid.UUID, _: CurrentUser,
+async def delete_payment(order_id: uuid.UUID, payment_id: uuid.UUID, user: CurrentUser,
                          db: Annotated[AsyncSession, Depends(get_db)]):
     res = await db.execute(select(Payment).where(
         Payment.id == payment_id, Payment.order_id == order_id))
@@ -816,9 +879,14 @@ async def delete_payment(order_id: uuid.UUID, payment_id: uuid.UUID, _: CurrentU
     if not p:
         raise HTTPException(404, "To'lov topilmadi")
 
-    # Yetkazilgan buyurtmaning to'lovini o'chirib bo'lmaydi
+    is_correction = (p.note or "") == _IMPORT_CORRECTION_NOTE
+    is_override = has_special(user, "system:order_override")
+    if is_correction and not is_override:
+        raise HTTPException(403, "Import qilingan summani faqat super-admin o'chiradi")
+
+    # Yetkazilgan buyurtma to'lovini faqat super-admin (override) o'chira oladi
     o = (await db.execute(select(Order).where(Order.id == order_id))).scalar_one_or_none()
-    if o and o.status == "delivered":
+    if o and o.status == "delivered" and not is_override:
         raise HTTPException(400, "Yetkazilgan buyurtma to'lovini o'chirib bo'lmaydi")
 
     # Savdo va moliya ajratilgan — to'lovni o'chirish moliyaga tegmaydi.

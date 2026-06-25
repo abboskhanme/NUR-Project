@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { usePermissions } from '@/lib/permissions';
 import toast from 'react-hot-toast';
-import { ExternalLink, Plus, ListPlus, Check, Printer } from 'lucide-react';
+import { ExternalLink, Plus, Pencil, ListPlus, Check, Printer } from 'lucide-react';
 
 import { api } from '@/api/client';
 import { formatUZS, formatPhone, formatDate } from '@/lib/format';
@@ -527,23 +527,21 @@ function Row({
         ) : formatUZS(o.items_total_uzs)}
       </td>
       <td className={cell + ' text-right text-success'}>
-        {canOrderOverride ? (
-          <input type="text" inputMode="numeric" defaultValue={somStr(o.paid_uzs)}
-                 key={'paid-' + o.paid_uzs} placeholder="0"
-                 title={t('sales.overridePaidTooltip')}
-                 className={inp + ' text-right'}
-                 onChange={(e) => { e.target.value = somStr(e.target.value); }}
-                 onBlur={(e) => { const v = num(e.target.value.replace(/\s/g, '')); if (v === num(o.paid_uzs)) return; overrideAmounts({ paid_uzs: v }); }} />
-        ) : (
-          <span className="inline-flex items-center gap-1 justify-end">
-            {formatUZS(o.paid_uzs)}
-            {balance > 0 && can('orders:write') && (
-              <button onClick={() => onPay(o.id)} className="p-0.5 rounded hover:bg-primary/10 text-primary" title={t('sales.addPaymentTooltip')}>
-                <Plus size={13} />
-              </button>
-            )}
-          </span>
-        )}
+        {/* To'langan — barcha to'lovlar (real + eski import) modal orqali boshqariladi.
+            Super-admin (order_override): ✎ tugma HAR DOIM modalni ochadi (yetkazilgan/0
+            qoldiqda ham). Oddiy foydalanuvchi: qarz bo'lsa "+" orqali to'lov qo'shadi. */}
+        <span className="inline-flex items-center gap-1 justify-end">
+          {formatUZS(o.paid_uzs)}
+          {canOrderOverride ? (
+            <button onClick={() => onPay(o.id)} className="p-0.5 rounded hover:bg-primary/10 text-primary" title={t('sales.managePaymentsTooltip')}>
+              <Pencil size={13} />
+            </button>
+          ) : balance > 0 && can('orders:write') ? (
+            <button onClick={() => onPay(o.id)} className="p-0.5 rounded hover:bg-primary/10 text-primary" title={t('sales.addPaymentTooltip')}>
+              <Plus size={13} />
+            </button>
+          ) : null}
+        </span>
       </td>
       <td className={cell + ' text-right ' + (balance > 0 ? 'text-danger font-medium' : 'text-ink-soft')}>
         {formatUZS(o.balance_uzs)}

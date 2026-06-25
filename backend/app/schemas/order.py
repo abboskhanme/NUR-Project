@@ -96,6 +96,16 @@ class PaymentIn(BaseModel):
     note: Optional[str] = None
 
 
+class PaymentUpdate(BaseModel):
+    """Mavjud to'lovni (zakladni) tahrirlash — barcha maydon ixtiyoriy."""
+    date: Optional[date] = None
+    amount: Optional[Decimal] = None
+    currency: Optional[str] = None
+    amount_uzs_equiv: Optional[Decimal] = None
+    method: Optional[str] = None
+    note: Optional[str] = None
+
+
 class PaymentOut(ORMBase):
     id: uuid.UUID
     order_id: uuid.UUID

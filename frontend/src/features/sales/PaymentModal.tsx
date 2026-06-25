@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
-import { X } from 'lucide-react';
+import { X, Pencil, Trash2, Plus } from 'lucide-react';
 
 import { api } from '@/api/client';
-import { formatUZS } from '@/lib/format';
+import { formatUZS, formatUSD, formatDate } from '@/lib/format';
+import { usePermissions } from '@/lib/permissions';
 
 // Payment method keys — resolved with t() at render time
 const METHOD_KEYS = [
@@ -12,8 +13,20 @@ const METHOD_KEYS = [
   { value: 'card', labelKey: 'sales.methodCard' },
   { value: 'transfer', labelKey: 'sales.methodTransfer' },
 ];
+const METHOD_LABEL: Record<string, string> = {
+  cash: 'sales.methodCash', card: 'sales.methodCard', transfer: 'sales.methodTransfer',
+};
+
+// Eski bazadan import qilingan (avtomatik) summa — Payment.note shu belgi bilan
+// (backend bilan bir xil). Bunday yozuv ro'yxatda "Eski baza" deb ko'rsatiladi.
+const IMPORT_CORRECTION_NOTE = '__import_correction__';
 
 const today = () => new Date().toISOString().slice(0, 10);
+
+interface PaymentRow {
+  id: string; date: string; amount: string; currency: string;
+  amount_uzs_equiv: string; method?: string | null; note?: string | null;
+}
 
 function formatAmount(s: string): string {
   const cleaned = s.replace(/[^\d.]/g, '');
@@ -35,18 +48,24 @@ export default function PaymentModal({
   onSaved: () => void;
 }) {
   const { t } = useTranslation();
+  const { can, canSpecial } = usePermissions();
+  const canOverride = canSpecial('system:order_override');
   const [date, setDate] = useState(today());
   const [amount, setAmount] = useState('');
   const [currency, setCurrency] = useState('UZS');
   const [method, setMethod] = useState('cash');
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
-  const [order, setOrder] = useState<{ balance_uzs: string; exchange_rate: string } | null>(null);
+  const [order, setOrder] = useState<{ status?: string; balance_uzs: string; exchange_rate: string; payments?: PaymentRow[] } | null>(null);
   const [isFull, setIsFull] = useState(false);
+  // null = yangi to'lov qo'shish rejimi; aks holda — shu id'li to'lovni tahrirlash
+  const [editingId, setEditingId] = useState<string | null>(null);
 
-  useEffect(() => {
-    api.get(`/orders/${orderId}`).then((r) => setOrder(r.data)).catch(() => {});
+  const refresh = useCallback(() => {
+    return api.get(`/orders/${orderId}`).then((r) => setOrder(r.data)).catch(() => {});
   }, [orderId]);
+
+  useEffect(() => { refresh(); }, [refresh]);
 
   useEffect(() => {
     const esc = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -54,11 +73,66 @@ export default function PaymentModal({
     return () => window.removeEventListener('keydown', esc);
   }, [onClose]);
 
-  const balance = order ? Math.max(0, parseFloat(order.balance_uzs) || 0) : null;
+  // Barcha to'lovlar — real zaklad VA eski import summalar (hammasi ko'rinadi/tahrirlanadi)
+  const payments: PaymentRow[] = order?.payments ?? [];
+  const delivered = order?.status === 'delivered';
+  const isCorrection = (p: PaymentRow) => (p.note || '') === IMPORT_CORRECTION_NOTE;
+
+  // Ruxsatlar: import yozuvini faqat override egasi; yetkazilgan buyurtmani ham faqat override.
+  const canEditRow = (p: PaymentRow) =>
+    (isCorrection(p) ? canOverride : can('orders:write')) && (!delivered || canOverride);
+  const canDeleteRow = (p: PaymentRow) =>
+    (isCorrection(p) ? canOverride : can('orders:delete')) && (!delivered || canOverride);
+
   const rate = order ? parseFloat(order.exchange_rate) || 0 : 0;
+  const rawBalance = order ? Math.max(0, parseFloat(order.balance_uzs) || 0) : null;
+  // Tahrirlashda: ushbu to'lov o'rnini bo'shatadi — ruxsat etilgan maksimum
+  // qoldiq + shu to'lovning so'mdagi qiymati.
+  const editingEquiv = editingId
+    ? parseFloat(payments.find((p) => p.id === editingId)?.amount_uzs_equiv || '0') || 0
+    : 0;
+  const balance = rawBalance == null ? null : rawBalance + editingEquiv;
+
   const amtNum = parseFloat(amount.replace(/[^\d.]/g, '')) || 0;
   const amtUzs = currency === 'USD' ? amtNum * rate : amtNum;
   const exceeds = balance != null && !isFull && amtUzs > balance + 0.01;
+  // Yangi to'lov qo'shib bo'lmaydi — buyurtma to'liq to'langan (faqat tahrirlash qoladi)
+  const addBlocked = !editingId && rawBalance != null && rawBalance <= 0;
+
+  function resetForm() {
+    setEditingId(null);
+    setDate(today());
+    setAmount('');
+    setCurrency('UZS');
+    setMethod('cash');
+    setNote('');
+    setIsFull(false);
+  }
+
+  function startEdit(p: PaymentRow) {
+    setEditingId(p.id);
+    setDate(p.date.slice(0, 10));
+    setAmount(formatAmount(String(p.amount)));
+    setCurrency(p.currency || 'UZS');
+    setMethod(p.method || 'cash');
+    setNote(isCorrection(p) ? '' : (p.note || ''));
+    setIsFull(false);
+  }
+
+  async function removePayment(p: PaymentRow) {
+    if (!window.confirm(t('sales.deletePaymentMessage'))) return;
+    setSaving(true);
+    try {
+      await api.delete(`/orders/${orderId}/payments/${p.id}`);
+      if (editingId === p.id) resetForm();
+      await refresh();
+      onSaved();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || t('common.error'));
+    } finally {
+      setSaving(false);
+    }
+  }
 
   function payFull() {
     if (balance == null) return;
@@ -78,13 +152,23 @@ export default function PaymentModal({
     }
     setSaving(true);
     try {
-      await api.post(`/orders/${orderId}/payments`, {
-        date, amount: amt, currency, method, note: note || null,
+      const editingRow = editingId ? payments.find((p) => p.id === editingId) : null;
+      const body: Record<string, unknown> = {
+        date, amount: amt, currency, method,
         ...(isFull && balance != null ? { amount_uzs_equiv: balance } : {}),
-      });
-      toast.success(t('sales.paymentAdded'));
+      };
+      // Eski import yozuvini tahrirlashda note'ni jo'natmaymiz — backend belgini saqlaydi.
+      if (!(editingRow && isCorrection(editingRow))) body.note = note || null;
+      if (editingId) {
+        await api.patch(`/orders/${orderId}/payments/${editingId}`, body);
+        toast.success(t('sales.paymentUpdated'));
+      } else {
+        await api.post(`/orders/${orderId}/payments`, body);
+        toast.success(t('sales.paymentAdded'));
+      }
+      resetForm();
+      await refresh();
       onSaved();
-      onClose();
     } catch (e: any) {
       toast.error(e?.response?.data?.detail || t('common.error'));
     } finally {
@@ -92,68 +176,142 @@ export default function PaymentModal({
     }
   }
 
+  const methodLabel = (m?: string | null) =>
+    m ? (t(METHOD_LABEL[m] ?? '') || m) : '—';
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="bg-card rounded-lg shadow-xl w-full max-w-md overflow-hidden flex flex-col"
+      <div className="bg-card rounded-lg shadow-xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]"
            onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3 border-b border-black/5">
           <h3 className="font-semibold">{t('sales.payModalTitle')}</h3>
           <button onClick={onClose} className="p-1 rounded hover:bg-black/5"><X size={18} /></button>
         </div>
-        <div className="p-5 space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="label">{t('sales.labelPayDate')}</label>
-              <input type="date" className="input" value={date} onChange={(e) => setDate(e.target.value)} />
-            </div>
-            <div>
-              <label className="label">{t('sales.labelPayCurrency')}</label>
-              <select className="input" value={currency}
-                      onChange={(e) => { setCurrency(e.target.value); setIsFull(false); setAmount(''); }}>
-                <option value="UZS">UZS</option>
-                <option value="USD">USD</option>
-              </select>
-            </div>
-          </div>
+
+        <div className="p-5 space-y-4 overflow-y-auto">
+          {/* Barcha to'lovlar (real zaklad + eski import) — tahrirlash uchun */}
           <div>
-            <label className="label">{t('sales.labelPayAmount')}</label>
-            <input type="text" inputMode="decimal"
-                   className={'input ' + (exceeds ? '!border-danger' : '')} placeholder="0"
-                   value={amount}
-                   onChange={(e) => { setAmount(formatAmount(e.target.value)); setIsFull(false); }} />
-            <div className="flex items-center justify-between mt-1">
-              <span className="text-xs text-ink-soft">
-                {balance != null ? <>{t('sales.remainingBalance')} <b>{formatUZS(balance)}</b></> : ' '}
-              </span>
-              {balance != null && balance > 0 && (
-                <button type="button" onClick={payFull}
-                        className="text-xs font-medium text-primary hover:underline">
-                  {t('sales.payFull')}
-                </button>
-              )}
-            </div>
-            {exceeds && (
-              <p className="text-xs text-danger mt-0.5">
-                {t('sales.exceedsBalance', { amount: formatUZS(balance!) })}
-              </p>
+            <div className="text-xs font-medium text-ink-soft mb-1.5">{t('sales.payListTitle')}</div>
+            {payments.length === 0 ? (
+              <div className="text-sm text-ink-soft py-1">{t('sales.noPaymentsYet')}</div>
+            ) : (
+              <div className="rounded-lg border border-black/5 divide-y divide-black/5">
+                {payments.map((p) => {
+                  const corr = isCorrection(p);
+                  return (
+                    <div key={p.id}
+                         className={'flex items-center gap-2 px-3 py-2 text-sm ' +
+                           (editingId === p.id ? 'bg-primary/5' : '')}>
+                      <div className="w-20 shrink-0 text-ink-soft">{formatDate(p.date)}</div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium">
+                          {p.currency === 'USD' ? formatUSD(p.amount) : formatUZS(p.amount)}
+                          {corr ? (
+                            <span className="ml-1 text-[11px] font-normal text-amber-600">· {t('sales.importedPayment')}</span>
+                          ) : (
+                            <span className="text-ink-soft font-normal"> · {methodLabel(p.method)}</span>
+                          )}
+                        </div>
+                        {!corr && p.note && (
+                          <div className="text-xs text-ink-soft truncate">{p.note}</div>
+                        )}
+                      </div>
+                      {canEditRow(p) && (
+                        <button onClick={() => startEdit(p)} disabled={saving}
+                                className="shrink-0 p-1 rounded hover:bg-primary/10 text-primary disabled:opacity-50"
+                                title={t('sales.editPaymentTooltip')}>
+                          <Pencil size={14} />
+                        </button>
+                      )}
+                      {canDeleteRow(p) && (
+                        <button onClick={() => removePayment(p)} disabled={saving}
+                                className="shrink-0 p-1 rounded hover:bg-danger/10 text-danger disabled:opacity-50"
+                                title={t('sales.deletePaymentTitle')}>
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </div>
-          <div>
-            <label className="label">{t('sales.labelPayMethod')}</label>
-            <select className="input" value={method} onChange={(e) => setMethod(e.target.value)}>
-              {METHOD_KEYS.map((m) => <option key={m.value} value={m.value}>{t(m.labelKey)}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="label">{t('sales.labelPayNote')}</label>
-            <textarea className="input min-h-[56px]" value={note} onChange={(e) => setNote(e.target.value)} />
-          </div>
+
+          {/* Qo'shish / tahrirlash formasi */}
+          {(editingId || !addBlocked) ? (
+            <div className="pt-1">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-medium text-ink-soft">
+                  {editingId ? t('sales.editPaymentSection') : t('sales.addPaymentSection')}
+                </span>
+                {editingId && (
+                  <button onClick={resetForm} className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">
+                    <Plus size={13} /> {t('sales.newPaymentBtn')}
+                  </button>
+                )}
+              </div>
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="label">{t('sales.labelPayDate')}</label>
+                    <input type="date" className="input" value={date} onChange={(e) => setDate(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="label">{t('sales.labelPayCurrency')}</label>
+                    <select className="input" value={currency}
+                            onChange={(e) => { setCurrency(e.target.value); setIsFull(false); }}>
+                      <option value="UZS">UZS</option>
+                      <option value="USD">USD</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="label">{t('sales.labelPayAmount')}</label>
+                  <input type="text" inputMode="decimal"
+                         className={'input ' + (exceeds ? '!border-danger' : '')} placeholder="0"
+                         value={amount}
+                         onChange={(e) => { setAmount(formatAmount(e.target.value)); setIsFull(false); }} />
+                  <div className="flex items-center justify-between mt-1">
+                    <span className="text-xs text-ink-soft">
+                      {balance != null ? <>{t('sales.remainingBalance')} <b>{formatUZS(balance)}</b></> : ' '}
+                    </span>
+                    {balance != null && balance > 0 && (
+                      <button type="button" onClick={payFull}
+                              className="text-xs font-medium text-primary hover:underline">
+                        {t('sales.payFull')}
+                      </button>
+                    )}
+                  </div>
+                  {exceeds && (
+                    <p className="text-xs text-danger mt-0.5">
+                      {t('sales.exceedsBalance', { amount: formatUZS(balance!) })}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label className="label">{t('sales.labelPayMethod')}</label>
+                  <select className="input" value={method} onChange={(e) => setMethod(e.target.value)}>
+                    {METHOD_KEYS.map((m) => <option key={m.value} value={m.value}>{t(m.labelKey)}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="label">{t('sales.labelPayNote')}</label>
+                  <textarea className="input min-h-[56px]" value={note} onChange={(e) => setNote(e.target.value)} />
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="text-xs text-success font-medium pt-1">{t('sales.fullyPaid')}</div>
+          )}
         </div>
+
         <div className="px-5 py-3 border-t border-black/5 flex justify-end gap-2">
           <button onClick={onClose} className="px-3 py-1.5 text-sm rounded-button hover:bg-black/5">{t('sales.cancelBtnShort')}</button>
-          <button onClick={handleSave} disabled={saving || exceeds} className="btn-primary disabled:opacity-50">
-            {saving ? t('sales.saving') : t('actions.save')}
-          </button>
+          {(editingId || !addBlocked) && (
+            <button onClick={handleSave} disabled={saving || exceeds} className="btn-primary disabled:opacity-50">
+              {saving ? t('sales.saving') : editingId ? t('sales.updateBtn') : t('actions.save')}
+            </button>
+          )}
         </div>
       </div>
     </div>
