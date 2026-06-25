@@ -18,8 +18,8 @@ const MODAL_TITLES: Record<string, string> = {
   editBunker: 'Bunkerni tahrirlash',
   addGarelka: 'Garelka qoʻshish',
   editGarelka: 'Garelkani tahrirlash',
-  addTana: 'Kotyol tanasi olib kelindi',
-  editTana: 'Kotyol tanasini tahrirlash',
+  addTana: 'Ishlab chiqarishdan olib kelish',
+  editTana: 'Ishlab chiqarishdan olib kelishni tahrirlash',
 };
 
 export interface ProductionRecord {

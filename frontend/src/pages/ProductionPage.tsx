@@ -30,14 +30,14 @@ const TAB_LABELS: Record<Tab, string> = {
   kotyol: "Kotyol",
   bunker: "Bunker",
   garelka: "Garelka",
-  tana: "Kotyol tanasi",
+  tana: "Ishlab chiqarishdan olib kelish",
 };
 
 const ADD_LABELS: Record<Category, string> = {
   kotyol: "Kotyol qoʻshish",
   bunker: "Bunker qoʻshish",
   garelka: "Garelka qoʻshish",
-  tana: "Tana qoʻshish",
+  tana: "Ishlab chiqarishdan olib kelish",
 };
 
 export default function ProductionPage() {
