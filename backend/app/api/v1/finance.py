@@ -20,7 +20,7 @@ from app.schemas.finance import (
     CategoryCreate, CategoryOut,
     EmployeePaymentIn,
     ExchangeRateBase, ExchangeRateOut,
-    FinanceSummary,
+    FinanceSummary, GaznaTransferIn,
     TransactionCreate, TransactionOut,
 )
 from app.services.finance_service import (
@@ -183,6 +183,52 @@ async def void_transaction(tx_id: uuid.UUID, db: Annotated[AsyncSession, Depends
     await db.commit()
     await db.refresh(tx)
     return tx
+
+
+# ---- USD → G'azna o'tkazma ----
+@router.post("/transfer-to-gazna", status_code=201)
+async def transfer_to_gazna(payload: GaznaTransferIn, user: CurrentUser,
+                            db: Annotated[AsyncSession, Depends(get_db)]):
+    """USD operatsion kassadan G'aznaga (naqd USD zaxira) summa o'tkazadi.
+
+    Natija: USD balansidan ayriladi, G'aznaga qo'shiladi. Tarixda ikkita
+    tranzaksiya qoladi — USD hisobidan chiqim va G'aznaga kirim (ikkalasi ham
+    ro'yxatda alohida ko'rinadi).
+    """
+    if payload.amount is None or payload.amount <= 0:
+        raise HTTPException(status_code=422, detail="Summa 0 dan katta bo'lishi kerak")
+
+    accounts = (await db.execute(select(Account))).scalars().all()
+    usd_acc = next((a for a in accounts if a.currency == "USD" and a.ledger != "gazna"), None)
+    gazna_acc = (next((a for a in accounts if a.ledger == "gazna" and a.currency == "USD"), None)
+                 or next((a for a in accounts if a.ledger == "gazna"), None))
+    if not usd_acc or not gazna_acc:
+        raise HTTPException(status_code=400, detail="USD yoki G'azna hisobi topilmadi")
+
+    avail = usd_acc.balance or Decimal(0)
+    if payload.amount > avail:
+        raise HTTPException(
+            status_code=400,
+            detail=f"USD balansida yetarli mablag' yo'q. Mavjud: ${avail:,.2f}".replace(",", " "))
+
+    tx_date = payload.tx_date or date.today()
+    note = payload.note or "USD → G'azna o'tkazmasi"
+
+    expense = FinanceTransaction(
+        created_by_id=user.id, date=tx_date, type="expense",
+        amount=payload.amount, currency="USD", account_id=usd_acc.id, note=note,
+    )
+    income = FinanceTransaction(
+        created_by_id=user.id, date=tx_date, type="income",
+        amount=payload.amount, currency="USD", account_id=gazna_acc.id, note=note,
+    )
+    db.add(expense)
+    db.add(income)
+    await db.flush()
+    await apply_transaction(db, expense)   # USD balansidan ayiradi
+    await apply_transaction(db, income)    # G'aznaga qo'shadi
+    await db.commit()
+    return {"ok": True, "amount": str(payload.amount)}
 
 
 # ---- Summary (oylik KPI) ----

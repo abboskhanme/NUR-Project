@@ -100,6 +100,15 @@ class BalanceSummary(BaseModel):
     last_updated: datetime
 
 
+class GaznaTransferIn(BaseModel):
+    """USD operatsion kassadan G'aznaga (naqd USD zaxira) o'tkazma."""
+    amount: Decimal
+    # DIQQAT: maydon nomi `date` bo'lsa import qilingan `date` tipini soya qiladi
+    # (EmployeePaymentIn'dagidek) — shuning uchun `tx_date` deb nomlaymiz.
+    tx_date: Optional[date] = None
+    note: Optional[str] = None
+
+
 class EmployeePaymentIn(BaseModel):
     employee_id: uuid.UUID
     kind: str  # 'advance' (avans) | 'salary' (oylik)

@@ -3,7 +3,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import {
   Plus, Wallet, ArrowDownLeft, ArrowUpRight, Trash2,
-  TrendingUp, TrendingDown, Banknote, RefreshCw,
+  TrendingUp, TrendingDown, Banknote, RefreshCw, ArrowRightLeft,
+  ChevronLeft, ChevronRight,
 } from 'lucide-react';
 
 import { api } from '@/api/client';
@@ -15,6 +16,7 @@ import { formatDate, formatUSD, formatUZS } from '@/lib/format';
 import TransactionModal from '@/features/finance/TransactionModal';
 import CategoryModal from '@/features/finance/CategoryModal';
 import ExchangeRateModal from '@/features/finance/ExchangeRateModal';
+import GaznaTransferModal from '@/features/finance/GaznaTransferModal';
 
 type Tab = 'overview' | 'categories' | 'rates';
 
@@ -57,12 +59,15 @@ export default function FinancePage() {
   const [catModal, setCatModal] = useState(false);
   const [catKind, setCatKind] = useState<'income' | 'expense'>('expense');
   const [rateModal, setRateModal] = useState(false);
+  const [transferModal, setTransferModal] = useState(false);
 
   const [delTx, setDelTx] = useState<Tx | null>(null);
   const [delCat, setDelCat] = useState<Category | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   const [fType, setFType] = useState(''); // '', 'income', 'expense'
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 20;
 
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
@@ -85,13 +90,14 @@ export default function FinancePage() {
     queryFn: () => api.get('/finance/exchange-rates', { params: { limit: 30 } }).then((r) => r.data),
   });
   const tx = useQuery({
-    queryKey: ['finance-transactions', fType, year, month],
+    queryKey: ['finance-transactions', fType, year, month, page],
     queryFn: () => {
       const mm = String(month).padStart(2, '0');
       const lastDay = new Date(year, month, 0).getDate();
       return api.get('/finance/transactions', {
         params: {
-          page_size: 50,
+          page,
+          page_size: PAGE_SIZE,
           type: fType || undefined,
           date_from: `${year}-${mm}-01`,
           date_to: `${year}-${mm}-${String(lastDay).padStart(2, '0')}`,
@@ -101,6 +107,15 @@ export default function FinancePage() {
   });
 
   const txItems: Tx[] = tx.data?.items ?? [];
+  const txTotal: number = tx.data?.total ?? 0;
+  const txPageSize: number = tx.data?.page_size ?? PAGE_SIZE;
+  const txTotalPages = Math.max(1, Math.ceil(txTotal / txPageSize));
+  const txFrom = txTotal === 0 ? 0 : (page - 1) * txPageSize + 1;
+  const txTo = Math.min(page * txPageSize, txTotal);
+  // Filtr o'zgarsa — 1-sahifaga qaytamiz
+  const setFilterType = (t: string) => { setFType(t); setPage(1); };
+  const setFilterMonth = (m: number) => { setMonth(m); setPage(1); };
+  const setFilterYear = (y: number) => { setYear(y); setPage(1); };
   const categories = categoriesQ.data ?? [];
   const rates = ratesQ.data ?? [];
   const latestRate = rates[0];
@@ -166,7 +181,13 @@ export default function FinancePage() {
       {/* Balance cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <BalanceCard title="UZS Balans" value={formatUZS(balance.data?.uzs ?? 0)} icon={<Wallet size={18} />} accent="primary" />
-        <BalanceCard title="USD Balans" value={formatUSD(balance.data?.usd ?? 0)} icon={<Wallet size={18} />} accent="success" />
+        <BalanceCard title="USD Balans" value={formatUSD(balance.data?.usd ?? 0)} icon={<Wallet size={18} />} accent="success"
+          action={
+            <button onClick={() => setTransferModal(true)}
+              className="w-full flex items-center justify-center gap-1.5 text-sm border border-black/10 rounded-button py-1.5 hover:bg-black/5 transition">
+              <ArrowRightLeft size={15} /> G'aznaga o'tkazish
+            </button>
+          } />
         <BalanceCard title="G'azna (USD)" value={formatUSD(balance.data?.gazna ?? 0)} icon={<Banknote size={18} />} accent="warning" />
       </div>
 
@@ -186,12 +207,12 @@ export default function FinancePage() {
         <div className="space-y-4">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-sm text-ink-soft">Davr:</span>
-            <select className="input w-auto" value={month} onChange={(e) => setMonth(Number(e.target.value))}>
+            <select className="input w-auto" value={month} onChange={(e) => setFilterMonth(Number(e.target.value))}>
               {MONTH_KEYS.map((m) => (
                 <option key={m} value={m}>{MONTH_LABELS[String(m)]}</option>
               ))}
             </select>
-            <select className="input w-auto" value={year} onChange={(e) => setYear(Number(e.target.value))}>
+            <select className="input w-auto" value={year} onChange={(e) => setFilterYear(Number(e.target.value))}>
               {[now.getFullYear(), now.getFullYear() - 1, now.getFullYear() - 2].map((y) =>
                 <option key={y} value={y}>{y}</option>)}
             </select>
@@ -214,7 +235,7 @@ export default function FinancePage() {
               <h3 className="font-semibold text-base">Tranzaksiyalar</h3>
               <div className="flex gap-1 bg-black/5 rounded-button p-0.5">
                 {TYPE_FILTERS.map((f) => (
-                  <button key={f.key} onClick={() => setFType(f.key)}
+                  <button key={f.key} onClick={() => setFilterType(f.key)}
                     className={`px-3 py-1 text-sm rounded-[6px] transition ${
                       fType === f.key ? 'bg-card shadow-sm font-medium' : 'text-ink-soft hover:text-ink'}`}>
                     {f.label}
@@ -267,6 +288,24 @@ export default function FinancePage() {
                     })}
                   </tbody>
                 </table>
+              </div>
+            )}
+
+            {/* Pagination */}
+            {txTotal > txPageSize && (
+              <div className="flex items-center justify-between mt-4 text-sm">
+                <span className="text-ink-soft">{txFrom}–{txTo} / {txTotal} ta</span>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-button border border-black/10 hover:bg-black/5 disabled:opacity-40 disabled:cursor-not-allowed">
+                    <ChevronLeft size={15} /> Oldingi
+                  </button>
+                  <span className="text-ink-soft">{page} / {txTotalPages}</span>
+                  <button onClick={() => setPage((p) => Math.min(txTotalPages, p + 1))} disabled={page >= txTotalPages}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-button border border-black/10 hover:bg-black/5 disabled:opacity-40 disabled:cursor-not-allowed">
+                    Keyingi <ChevronRight size={15} />
+                  </button>
+                </div>
               </div>
             )}
           </Card>
@@ -344,6 +383,8 @@ export default function FinancePage() {
                      onSaved={() => qc.invalidateQueries({ queryKey: ['categories'] })} />}
       {rateModal && <ExchangeRateModal onClose={() => setRateModal(false)}
                       onSaved={() => qc.invalidateQueries({ queryKey: ['exchange-rates'] })} />}
+      {transferModal && <GaznaTransferModal usdBalance={Number(balance.data?.usd ?? 0)}
+                          onClose={() => setTransferModal(false)} onSaved={refreshAll} />}
 
       <ConfirmModal open={!!delTx} title="Tranzaksiyani bekor qilish"
         message={`Bu tranzaksiya bekor qilinadi va balans qaytariladi. Yozuv tarixda "bekor qilingan" holatida qoladi. Davom etilsinmi?`}
