@@ -70,15 +70,13 @@ export default function ProductionModal({
   const [notes, setNotes] = useState(record?.notes ?? '');
   const [saving, setSaving] = useState(false);
 
-  // Ombor modellari (faqat kotyol uchun kerak)
-  const { data: products } = useQuery<{ items: ProductOpt[] }>({
-    queryKey: ['products', 'warehouse-prod'],
-    queryFn: () => api.get('/products', {
-      params: { product_type: 'warehouse', page_size: 200 },
-    }).then((r) => r.data),
+  // Ombor (kotyol) modellari — ombor moduli endpointidan (inventory:read yetadi)
+  const { data: modelList } = useQuery<ProductOpt[]>({
+    queryKey: ['inventory-models'],
+    queryFn: () => api.get('/inventory/models').then((r) => r.data),
     enabled: isKotyol,
   });
-  const models = useMemo(() => products?.items ?? [], [products]);
+  const models = useMemo(() => modelList ?? [], [modelList]);
   const label = (p: ProductOpt) =>
     p.display_name || [p.model, p.kvm ? `${p.kvm} kvm` : null].filter(Boolean).join(' · ') || '—';
 

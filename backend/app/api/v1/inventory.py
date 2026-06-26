@@ -48,6 +48,14 @@ class WarehouseSummary(BaseModel):
     total_value_usd: Decimal = Decimal(0)
 
 
+class ModelOption(BaseModel):
+    """Ombor (kotyol) modeli — ishlab chiqarish modal'idagi "Model" ro'yxati uchun."""
+    id: uuid.UUID
+    model: Optional[str] = None
+    kvm: Optional[int] = None
+    display_name: Optional[str] = None
+
+
 class UnitOut(ORMBase):
     id: uuid.UUID
     unique_id: str
@@ -146,6 +154,28 @@ async def warehouse_summary(db: Annotated[AsyncSession, Depends(get_db)], _: Cur
         total_sold=sum(r.sold for r in out),
         total_value_usd=total_value,
     )
+
+
+# --------------------------------------------------------------------------- #
+# Models — ombor (kotyol) modellari katalogi
+# --------------------------------------------------------------------------- #
+@router.get("/models", response_model=list[ModelOption])
+async def list_models(db: Annotated[AsyncSession, Depends(get_db)], _: CurrentUser):
+    """Ombor (kotyol) modellari ro'yxati — ishlab chiqarish modal'i shu yerdan model tanlaydi.
+
+    Modellar `products` jadvalida `product_type='warehouse'` sifatida saqlanadi,
+    lekin bu endpoint inventory moduli ostida turadi — shuning uchun ro'yxatni
+    ko'rish uchun `inventory:read` yetadi (alohida `products:read` shart emas).
+    """
+    res = await db.execute(
+        select(Product)
+        .where(Product.product_type == "warehouse", Product.status == "active")
+        .order_by(Product.model, Product.kvm)
+    )
+    return [
+        ModelOption(id=p.id, model=p.model, kvm=p.kvm, display_name=p.display_name)
+        for p in res.scalars().all()
+    ]
 
 
 # --------------------------------------------------------------------------- #
