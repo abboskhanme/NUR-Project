@@ -20,10 +20,10 @@ services:
       # Prod'da bu qatorni olib tashlang va parolni .env orqali bering.
       POSTGRES_HOST_AUTH_METHOD: trust
     ports:
-      # Host 5433 -> container 5432. Boshqa project host'da 5432ni band qilgani uchun
-      # ziddiyatdan qochamiz. Backend baribir ichki tarmoq orqali 'postgres:5432'ga
-      # ulanadi — bu o'zgarish faqat hostdan ulanishga taalluqli.
-      - "5433:5432"
+      # Host 5434 -> container 5432. 5432/5433 boshqa projectlar tomonidan band
+      # qilingani uchun ziddiyatdan qochamiz. Backend baribir ichki tarmoq orqali
+      # 'postgres:5432'ga ulanadi — bu o'zgarish faqat hostdan ulanishga taalluqli.
+      - "5434:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -77,6 +77,30 @@ services:
     depends_on:
       - backend
     command: npm run dev -- --host 0.0.0.0
+
+  # Telegram bot (dev) — odatiy `up` da ishga tushmaydi; faqat profil bilan:
+  #   docker compose --profile bot up -d telegram-bot
+  # TELEGRAM_BOT_TOKEN ni o'rnatib qo'ying (env yoki .env).
+  telegram-bot:
+    profiles: ["bot"]
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: nur-telegram-bot
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/nur_erp
+      SECRET_KEY: dev-secret-change-me-in-production
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_ADMIN_CHAT_IDS: ${TELEGRAM_ADMIN_CHAT_IDS:-}
+      TELEGRAM_REPORT_TIME: ${TELEGRAM_REPORT_TIME:-20:00}
+      TIMEZONE: ${TIMEZONE:-Asia/Tashkent}
+    volumes:
+      - ./backend:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["python", "-m", "app.integrations.telegram"]
 
 volumes:
   postgres_data:

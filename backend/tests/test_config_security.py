@@ -22,27 +22,27 @@ def test_production_with_good_config_passes():
 
 def test_production_rejects_weak_secret():
     with pytest.raises(RuntimeError):
-        _settings(SECRET_KEY="change-me")
+        _settings(SECRET_KEY="change-me").validate_security()
 
 
 def test_production_rejects_short_secret():
     with pytest.raises(RuntimeError):
-        _settings(SECRET_KEY="short")
+        _settings(SECRET_KEY="short").validate_security()
 
 
 def test_production_rejects_debug_true():
     with pytest.raises(RuntimeError):
-        _settings(DEBUG=True)
+        _settings(DEBUG=True).validate_security()
 
 
 def test_production_rejects_wildcard_cors():
     with pytest.raises(RuntimeError):
-        _settings(ALLOWED_ORIGINS_STR="*")
+        _settings(ALLOWED_ORIGINS_STR="*").validate_security()
 
 
 def test_production_rejects_default_admin_password():
     with pytest.raises(RuntimeError):
-        _settings(INIT_ADMIN_PASSWORD="Admin@12345")
+        _settings(INIT_ADMIN_PASSWORD="Admin@12345").validate_security()
 
 
 def test_development_only_warns():

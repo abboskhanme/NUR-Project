@@ -41,6 +41,16 @@ class Settings(BaseSettings):
     # Telegram
     TELEGRAM_BOT_TOKEN: str = ""
     TELEGRAM_WEBHOOK_URL: str = ""
+    # Kunlik hisobot oluvchi xo'jayin(lar) chat_id — vergul bilan: "12345,67890".
+    # Chat_id ni bilish uchun bot'ga /id buyrug'ini yuboring.
+    TELEGRAM_ADMIN_CHAT_IDS: str = ""
+    # Kunlik hisobot yuborish vaqti, HH:MM (TIMEZONE bo'yicha).
+    TELEGRAM_REPORT_TIME: str = "20:00"
+    # Yangi buyurtma kelganda xo'jayinga darhol xabar berilsinmi.
+    TELEGRAM_NOTIFY_NEW_ORDER: bool = True
+
+    # Vaqt mintaqasi — kunlik hisobot va "bugun" chegarasini aniqlash uchun.
+    TIMEZONE: str = "Asia/Tashkent"
 
     # CBU
     CBU_API_URL: str = "https://cbu.uz/uz/arkhiv-kursov-valyut/json/"
@@ -71,6 +81,16 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.APP_ENV.lower() in {"production", "prod"}
+
+    @property
+    def TELEGRAM_ADMIN_IDS(self) -> List[int]:
+        """TELEGRAM_ADMIN_CHAT_IDS string'ini int ro'yxatiga aylantiradi."""
+        out: List[int] = []
+        for part in self.TELEGRAM_ADMIN_CHAT_IDS.split(","):
+            part = part.strip()
+            if part.lstrip("-").isdigit():
+                out.append(int(part))
+        return out
 
     def validate_security(self) -> list[str]:
         """Xavfsizlik sozlamalarini tekshiradi.

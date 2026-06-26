@@ -17,7 +17,10 @@ reportlab>=4.1.0
 loguru>=0.7.2
 python-dotenv>=1.0.1
 
+# Telegram bot (app/integrations/telegram/) — alohida konteynerda ishlaydi.
+aiogram>=3.4.1          # — Telegram bot freymvorki
+apscheduler>=3.10.4     # — kunlik hisobotni rejaga solish (bot ichida)
+
 # Quyidagilar hozir ishlatilmaydi — kerak bo'lganda commentdan oching:
 # redis>=5.0.1          # — kesh / refresh-token blacklist uchun
 # celery>=5.3.6         # — fonda ishlovchi vazifalar uchun (Redis ham kerak)
-# aiogram>=3.4.1        # — Telegram bot uchun (app/integrations/telegram.py)
