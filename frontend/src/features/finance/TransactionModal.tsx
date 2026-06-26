@@ -43,6 +43,7 @@ export default function TransactionModal({
   const [categoryId, setCategoryId] = useState('');
   const [amount, setAmount] = useState('');
   const [currency, setCurrency] = useState('UZS');
+  const [method, setMethod] = useState<'naqd' | 'karta'>('naqd');
   const [gazna, setGazna] = useState(false);
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
@@ -85,6 +86,7 @@ export default function TransactionModal({
         date, type: mode,
         category_id: categoryId || null,
         amount: amt, currency, amount_other_curr: 0,
+        method,
         account_id: resolveAccountId(accounts, currency, gazna),
         note: note || null,
       });
@@ -150,6 +152,19 @@ export default function TransactionModal({
                 <option value="UZS">UZS</option>
                 <option value="USD">USD</option>
               </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="label">To'lov turi</label>
+            <div className="grid grid-cols-2 gap-2">
+              {(['naqd', 'karta'] as const).map((m) => (
+                <button key={m} type="button" onClick={() => setMethod(m)}
+                  className={`py-2 rounded-button border text-sm font-medium capitalize transition ${
+                    method === m ? 'border-primary bg-primary/10 text-primary' : 'border-black/10 text-ink-soft hover:bg-black/5'}`}>
+                  {m === 'naqd' ? 'Naqd' : 'Karta'}
+                </button>
+              ))}
             </div>
           </div>
 

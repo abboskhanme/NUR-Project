@@ -49,6 +49,8 @@ class FinanceTransaction(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     amount: Mapped[Decimal] = mapped_column(Numeric(16, 2), default=0)
     currency: Mapped[str] = mapped_column(String(3), default="UZS")
     amount_other_curr: Mapped[Decimal] = mapped_column(Numeric(16, 2), default=0)
+    # To'lov turi (faqat filtr/hisobot uchun): "naqd" | "karta". Kassani tanlamaydi.
+    method: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
     account_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("accounts.id", ondelete="SET NULL")
     )

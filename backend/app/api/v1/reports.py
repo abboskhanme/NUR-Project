@@ -110,12 +110,14 @@ async def dashboard(
     revenue_prev = float(await _scalar(db, _orders_revenue_subq(prev_month_start, prev_cmp_end)))
     revenue_growth = _growth(revenue_cur, revenue_prev)
 
-    # --- Moliya (joriy oy, o'tgan oy bilan qiyos) ---
+    # --- Moliya (joriy oy, o'tgan oy bilan qiyos) — faqat UZS (valyuta aralashmasin) ---
     fin_cur = and_(FinanceTransaction.date >= month_start, FinanceTransaction.date <= today,
-                   FinanceTransaction.status == "active")
+                   FinanceTransaction.status == "active",
+                   FinanceTransaction.currency == "UZS")
     fin_prev = and_(FinanceTransaction.date >= prev_month_start,
                     FinanceTransaction.date <= prev_cmp_end,
-                    FinanceTransaction.status == "active")
+                    FinanceTransaction.status == "active",
+                    FinanceTransaction.currency == "UZS")
     income = float(await _scalar(db, select(func.coalesce(func.sum(FinanceTransaction.amount), 0))
                                  .where(and_(fin_cur, FinanceTransaction.type == "income"))))
     expense = float(await _scalar(db, select(func.coalesce(func.sum(FinanceTransaction.amount), 0))
@@ -310,7 +312,8 @@ async def income_expense(
                func.coalesce(func.sum(FinanceTransaction.amount), 0))
         .where(and_(FinanceTransaction.date >= start, FinanceTransaction.date <= end,
                     FinanceTransaction.type.in_(["income", "expense"]),
-                    FinanceTransaction.status == "active"))
+                    FinanceTransaction.status == "active",
+                    FinanceTransaction.currency == "UZS"))
         .group_by(FinanceTransaction.date, FinanceTransaction.type)
     )).all()
 
@@ -536,8 +539,10 @@ async def finance_pnl(
     date_from: Optional[date] = None, date_to: Optional[date] = None,
 ):
     date_from, date_to = _resolve_range(date_from, date_to, month_start=True)
+    # Faqat UZS (valyuta aralashmasligi uchun)
     cond = and_(FinanceTransaction.date >= date_from, FinanceTransaction.date <= date_to,
-                FinanceTransaction.status == "active")
+                FinanceTransaction.status == "active",
+                FinanceTransaction.currency == "UZS")
 
     income = float(await _scalar(db, select(func.coalesce(func.sum(FinanceTransaction.amount), 0))
                                  .where(and_(cond, FinanceTransaction.type == "income"))))

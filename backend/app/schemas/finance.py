@@ -53,6 +53,7 @@ class TransactionBase(BaseModel):
     amount: Decimal
     currency: str = "UZS"
     amount_other_curr: Decimal = Decimal(0)
+    method: Optional[str] = None  # "naqd" | "karta" — filtr/hisobot uchun
     account_id: Optional[uuid.UUID] = None
     related_order_id: Optional[uuid.UUID] = None
     note: Optional[str] = None
@@ -70,6 +71,7 @@ class TransactionOut(ORMBase):
     amount: Decimal
     currency: str
     amount_other_curr: Decimal
+    method: Optional[str] = None
     account_id: Optional[uuid.UUID] = None
     related_order_id: Optional[uuid.UUID] = None
     note: Optional[str] = None
@@ -142,3 +144,29 @@ class FinanceSummary(BaseModel):
     usd_income_total: Decimal = Decimal(0)
     usd_expense_total: Decimal = Decimal(0)
     by_category: list[CategoryBreakdown]
+
+
+# ---- Kunlik moliya hisoboti ----
+class DailyAccountRow(BaseModel):
+    account_id: uuid.UUID
+    account_name: str
+    currency: str
+    opening_balance: Decimal      # kun boshidagi qoldiq
+    income: Decimal               # shu kungi kirim
+    expense: Decimal              # shu kungi chiqim
+    closing_balance: Decimal      # kun oxiridagi qoldiq
+
+
+class DailyRow(BaseModel):
+    date: date
+    accounts: list[DailyAccountRow]
+    income_uzs: Decimal = Decimal(0)
+    expense_uzs: Decimal = Decimal(0)
+    income_usd: Decimal = Decimal(0)
+    expense_usd: Decimal = Decimal(0)
+
+
+class DailyReport(BaseModel):
+    year: int
+    month: int
+    days: list[DailyRow]

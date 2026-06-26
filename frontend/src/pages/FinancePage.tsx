@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import {
@@ -17,12 +17,14 @@ import TransactionModal from '@/features/finance/TransactionModal';
 import CategoryModal from '@/features/finance/CategoryModal';
 import ExchangeRateModal from '@/features/finance/ExchangeRateModal';
 import GaznaTransferModal from '@/features/finance/GaznaTransferModal';
+import DailyReport from '@/features/finance/DailyReport';
 
-type Tab = 'overview' | 'categories' | 'rates';
+type Tab = 'overview' | 'daily' | 'categories' | 'rates';
 
 interface Tx {
   id: string; date: string; type: string; amount: string; currency: string;
   note?: string | null; category_name?: string | null; status?: string;
+  method?: string | null;
 }
 interface Category { id: string; name: string; kind: string }
 interface Rate { id: string; date: string; usd_to_uzs: string; source: string }
@@ -66,8 +68,7 @@ export default function FinancePage() {
   const [deleting, setDeleting] = useState(false);
 
   const [fType, setFType] = useState(''); // '', 'income', 'expense'
-  const [page, setPage] = useState(1);
-  const PAGE_SIZE = 20;
+  const [page, setPage] = useState(1); // sahifa = kun indeksi (kunlik pagination)
 
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
@@ -89,15 +90,16 @@ export default function FinancePage() {
     queryKey: ['exchange-rates'],
     queryFn: () => api.get('/finance/exchange-rates', { params: { limit: 30 } }).then((r) => r.data),
   });
+  // Tanlangan oyning BARCHA tranzaksiyalarini bir martda olamiz, keyin kunlik guruhlaymiz.
   const tx = useQuery({
-    queryKey: ['finance-transactions', fType, year, month, page],
+    queryKey: ['finance-transactions', fType, year, month],
     queryFn: () => {
       const mm = String(month).padStart(2, '0');
       const lastDay = new Date(year, month, 0).getDate();
       return api.get('/finance/transactions', {
         params: {
-          page,
-          page_size: PAGE_SIZE,
+          page: 1,
+          page_size: 1000,
           type: fType || undefined,
           date_from: `${year}-${mm}-01`,
           date_to: `${year}-${mm}-${String(lastDay).padStart(2, '0')}`,
@@ -106,13 +108,23 @@ export default function FinancePage() {
     },
   });
 
-  const txItems: Tx[] = tx.data?.items ?? [];
-  const txTotal: number = tx.data?.total ?? 0;
-  const txPageSize: number = tx.data?.page_size ?? PAGE_SIZE;
-  const txTotalPages = Math.max(1, Math.ceil(txTotal / txPageSize));
-  const txFrom = txTotal === 0 ? 0 : (page - 1) * txPageSize + 1;
-  const txTo = Math.min(page * txPageSize, txTotal);
-  // Filtr o'zgarsa — 1-sahifaga qaytamiz
+  const allItems: Tx[] = tx.data?.items ?? [];
+  // Kunlar (backend sana bo'yicha kamayuvchi tartibda qaytaradi — eng yangi kun birinchi)
+  const dayKeys = useMemo(() => {
+    const seen = new Set<string>();
+    const days: string[] = [];
+    for (const t of allItems) {
+      if (!seen.has(t.date)) { seen.add(t.date); days.push(t.date); }
+    }
+    return days;
+  }, [allItems]);
+  const totalDays = dayKeys.length;
+  const curDay = totalDays > 0 ? dayKeys[Math.min(page, totalDays) - 1] : null;
+  const txItems: Tx[] = useMemo(
+    () => allItems.filter((t) => t.date === curDay),
+    [allItems, curDay],
+  );
+  // Filtr o'zgarsa — 1-sahifaga (eng yangi kunga) qaytamiz
   const setFilterType = (t: string) => { setFType(t); setPage(1); };
   const setFilterMonth = (m: number) => { setMonth(m); setPage(1); };
   const setFilterYear = (y: number) => { setYear(y); setPage(1); };
@@ -154,6 +166,7 @@ export default function FinancePage() {
 
   const TABS: Array<{ key: Tab; label: string }> = [
     { key: 'overview', label: "Umumiy ko'rinish" },
+    { key: 'daily', label: 'Kunlik hisobot' },
     { key: 'categories', label: 'Kategoriyalar' },
     { key: 'rates', label: 'Valyuta kursi' },
   ];
@@ -232,7 +245,10 @@ export default function FinancePage() {
           {/* Transactions list */}
           <Card>
             <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
-              <h3 className="font-semibold text-base">Tranzaksiyalar</h3>
+              <h3 className="font-semibold text-base">
+                Tranzaksiyalar
+                {curDay && <span className="ml-2 text-ink-soft font-normal">— {formatDate(curDay)}</span>}
+              </h3>
               <div className="flex gap-1 bg-black/5 rounded-button p-0.5">
                 {TYPE_FILTERS.map((f) => (
                   <button key={f.key} onClick={() => setFilterType(f.key)}
@@ -266,7 +282,12 @@ export default function FinancePage() {
                       <tr key={txItem.id} className={`border-b border-black/5 hover:bg-black/5 group ${voided ? 'opacity-50' : ''}`}>
                         <td className="py-2 pr-3 whitespace-nowrap">{formatDate(txItem.date)}</td>
                         <td className="py-2 pr-3"><TypeBadge type={txItem.type} /></td>
-                        <td className="py-2 pr-[3.75rem] text-ink-soft whitespace-nowrap">{txItem.category_name || '—'}</td>
+                        <td className="py-2 pr-[3.75rem] text-ink-soft whitespace-nowrap">
+                          {txItem.category_name || '—'}
+                          {txItem.method && (
+                            <span className="ml-2 badge bg-black/5 text-ink-soft capitalize">{txItem.method}</span>
+                          )}
+                        </td>
                         <td className={`py-2 pr-[3.75rem] font-semibold whitespace-nowrap ${voided ? 'line-through text-ink-soft' :
                           txItem.type === 'income' ? 'text-success' : 'text-danger'}`}>
                           {txItem.type === 'income' ? '+' : '−'}{fmtMoney(txItem.amount, txItem.currency)}
@@ -291,19 +312,19 @@ export default function FinancePage() {
               </div>
             )}
 
-            {/* Pagination */}
-            {txTotal > txPageSize && (
+            {/* Kunlik pagination — har sahifa bir kun */}
+            {totalDays > 1 && (
               <div className="flex items-center justify-between mt-4 text-sm">
-                <span className="text-ink-soft">{txFrom}–{txTo} / {txTotal} ta</span>
+                <span className="text-ink-soft">{txItems.length} ta tranzaksiya</span>
                 <div className="flex items-center gap-2">
                   <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}
                     className="flex items-center gap-1 px-2.5 py-1.5 rounded-button border border-black/10 hover:bg-black/5 disabled:opacity-40 disabled:cursor-not-allowed">
-                    <ChevronLeft size={15} /> Oldingi
+                    <ChevronLeft size={15} /> Yangiroq
                   </button>
-                  <span className="text-ink-soft">{page} / {txTotalPages}</span>
-                  <button onClick={() => setPage((p) => Math.min(txTotalPages, p + 1))} disabled={page >= txTotalPages}
+                  <span className="text-ink-soft">{page} / {totalDays}-kun</span>
+                  <button onClick={() => setPage((p) => Math.min(totalDays, p + 1))} disabled={page >= totalDays}
                     className="flex items-center gap-1 px-2.5 py-1.5 rounded-button border border-black/10 hover:bg-black/5 disabled:opacity-40 disabled:cursor-not-allowed">
-                    Keyingi <ChevronRight size={15} />
+                    Eskiroq <ChevronRight size={15} />
                   </button>
                 </div>
               </div>
@@ -311,6 +332,9 @@ export default function FinancePage() {
           </Card>
         </div>
       )}
+
+      {/* === DAILY REPORT === */}
+      {tab === 'daily' && <DailyReport />}
 
       {/* === CATEGORIES === */}
       {tab === 'categories' && (

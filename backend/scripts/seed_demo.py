@@ -144,7 +144,7 @@ async def main() -> None:
         # ---------------- Moliya ----------------
         acc_uzs = Account(name="Asosiy kassa (UZS)", currency="UZS", ledger="operational", balance=D(0))
         acc_usd = Account(name="Dollar kassa (USD)", currency="USD", ledger="operational", balance=D(0))
-        acc_gazna = Account(name="GAZNA (zaxira)", currency="UZS", ledger="gazna", balance=D(0))
+        acc_gazna = Account(name="GAZNA (zaxira)", currency="USD", ledger="gazna", balance=D(0))
         db.add_all([acc_uzs, acc_usd, acc_gazna])
         cat_sale = FinanceCategory(name="Buyurtma to'lovi", kind="income", code="order_payment")
         cat_other_inc = FinanceCategory(name="Boshqa kirim", kind="income", code="other_income")

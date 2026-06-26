@@ -5,8 +5,10 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Annotated, Optional
 
+from collections import defaultdict
+
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import and_, select, func
+from sqlalchemy import and_, case, select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import CurrentUser
@@ -18,6 +20,7 @@ from app.schemas.common import Page
 from app.schemas.finance import (
     AccountCreate, AccountOut, BalanceSummary,
     CategoryCreate, CategoryOut,
+    DailyAccountRow, DailyReport, DailyRow,
     EmployeePaymentIn,
     ExchangeRateBase, ExchangeRateOut,
     FinanceSummary, GaznaTransferIn,
@@ -39,7 +42,11 @@ async def list_accounts(db: Annotated[AsyncSession, Depends(get_db)], _: Current
 
 @router.post("/accounts", response_model=AccountOut, status_code=201)
 async def create_account(payload: AccountCreate, db: Annotated[AsyncSession, Depends(get_db)]):
-    a = Account(**payload.model_dump())
+    data = payload.model_dump()
+    # G'azna — naqd dollar zaxirasi: har doim faqat USD bo'ladi (so'm bo'lmaydi).
+    if data.get("ledger") == "gazna":
+        data["currency"] = "USD"
+    a = Account(**data)
     db.add(a)
     await db.commit()
     await db.refresh(a)
@@ -102,14 +109,17 @@ async def delete_category(category_id: uuid.UUID, db: Annotated[AsyncSession, De
 @router.get("/transactions", response_model=Page[TransactionOut])
 async def list_transactions(
     db: Annotated[AsyncSession, Depends(get_db)], _: CurrentUser,
-    page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100),
+    page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=1000),
     type: Optional[str] = None, account_id: Optional[uuid.UUID] = None,
+    method: Optional[str] = None,
     date_from: Optional[date] = None, date_to: Optional[date] = None,
 ):
     q = select(FinanceTransaction)
     conds = []
     if type:
         conds.append(FinanceTransaction.type == type)
+    if method:
+        conds.append(FinanceTransaction.method == method)
     if account_id:
         conds.append(FinanceTransaction.account_id == account_id)
     if date_from:
@@ -180,6 +190,16 @@ async def void_transaction(tx_id: uuid.UUID, db: Annotated[AsyncSession, Depends
         return tx
     tx.status = "void"
     await apply_transaction(db, tx, reverse=True)  # balansni qaytarish
+
+    # Agar bu xodimga to'lov (avans/oylik) tranzaksiyasi bo'lsa — bog'langan HR
+    # avans yozuvini ham bekor qilamiz (aks holda xodimning "qolgan oylik"i
+    # noto'g'ri kam bo'lib qoladi).
+    adv = (await db.execute(
+        select(SalaryAdvance).where(SalaryAdvance.tx_id == tx.id)
+    )).scalar_one_or_none()
+    if adv and adv.status != "void":
+        adv.status = "void"
+
     await db.commit()
     await db.refresh(tx)
     return tx
@@ -236,6 +256,85 @@ async def transfer_to_gazna(payload: GaznaTransferIn, user: CurrentUser,
 async def finance_summary(db: Annotated[AsyncSession, Depends(get_db)], _: CurrentUser,
                           year: int = Query(...), month: int = Query(..., ge=1, le=12)):
     return FinanceSummary(**await month_summary(db, year, month))
+
+
+# ---- Kunlik hisobot (har kuni: kirim/chiqim + har kassa qoldig'i) ----
+@router.get("/daily", response_model=DailyReport)
+async def daily_report(db: Annotated[AsyncSession, Depends(get_db)], _: CurrentUser,
+                       year: int = Query(...), month: int = Query(..., ge=1, le=12)):
+    """Berilgan oy uchun kunlik moliya hisoboti.
+
+    Har bir faol kun uchun har bir kassaning kun boshidagi qoldig'i, shu kungi
+    kirim/chiqimi va kun oxiridagi qoldig'i ko'rsatiladi. Faqat `active`
+    tranzaksiyalar hisoblanadi (ichki o'tkazmalar ham kassa harakati sifatida
+    ko'rinadi).
+    """
+    start = date(year, month, 1)
+    last_day = calendar.monthrange(year, month)[1]
+    end = date(year, month, last_day)
+
+    accounts = (await db.execute(
+        select(Account).order_by(Account.ledger, Account.name)
+    )).scalars().all()
+
+    signed = case((FinanceTransaction.type == "income", FinanceTransaction.amount),
+                  else_=-FinanceTransaction.amount)
+
+    # Kun boshidan oldingi (oy boshigacha) qoldiq — har kassa uchun
+    opening: dict = {}
+    for acc in accounts:
+        val = (await db.execute(
+            select(func.coalesce(func.sum(signed), 0)).where(and_(
+                FinanceTransaction.account_id == acc.id,
+                FinanceTransaction.status == "active",
+                FinanceTransaction.date < start,
+            ))
+        )).scalar() or Decimal(0)
+        opening[acc.id] = Decimal(val)
+
+    # Oy ichidagi kunlik kirim/chiqim — kassa bo'yicha
+    rows = (await db.execute(
+        select(
+            FinanceTransaction.date, FinanceTransaction.account_id, FinanceTransaction.type,
+            func.coalesce(func.sum(FinanceTransaction.amount), 0),
+        ).where(and_(
+            FinanceTransaction.status == "active",
+            FinanceTransaction.date >= start,
+            FinanceTransaction.date <= end,
+            FinanceTransaction.account_id.isnot(None),
+        )).group_by(FinanceTransaction.date, FinanceTransaction.account_id, FinanceTransaction.type)
+    )).all()
+
+    day_acc: dict = defaultdict(lambda: defaultdict(lambda: {"income": Decimal(0), "expense": Decimal(0)}))
+    for d, acc_id, typ, total in rows:
+        day_acc[d][acc_id][typ] = Decimal(total or 0)
+
+    running = dict(opening)
+    days_out: list[DailyRow] = []
+    for d in sorted(day_acc.keys()):
+        acct_rows: list[DailyAccountRow] = []
+        inc_uzs = exp_uzs = inc_usd = exp_usd = Decimal(0)
+        for acc in accounts:
+            ai = day_acc[d].get(acc.id, {}).get("income", Decimal(0))
+            ae = day_acc[d].get(acc.id, {}).get("expense", Decimal(0))
+            open_bal = running[acc.id]
+            close_bal = open_bal + ai - ae
+            running[acc.id] = close_bal
+            acct_rows.append(DailyAccountRow(
+                account_id=acc.id, account_name=acc.name, currency=acc.currency,
+                opening_balance=open_bal, income=ai, expense=ae, closing_balance=close_bal,
+            ))
+            if acc.currency == "USD":
+                inc_usd += ai; exp_usd += ae
+            else:
+                inc_uzs += ai; exp_uzs += ae
+        days_out.append(DailyRow(
+            date=d, accounts=acct_rows,
+            income_uzs=inc_uzs, expense_uzs=exp_uzs,
+            income_usd=inc_usd, expense_usd=exp_usd,
+        ))
+
+    return DailyReport(year=year, month=month, days=days_out)
 
 
 # ---- Employee payments (avans / oylik) ----
