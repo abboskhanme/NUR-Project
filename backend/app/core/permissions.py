@@ -40,7 +40,8 @@ MODULES: list[str] = [
     "service",     # Servis va kafolat
     "finance",     # Moliya
     "hr",          # Xodimlar
-    "supply",      # Ta'minot
+    "supply_ichki",   # Ichki ta'minot (alohida lavozim)
+    "supply_tashqi",  # Tashqi ta'minot (alohida lavozim)
     "reports",     # Hisobotlar
     "telegram",    # Telegram bot
     "debts",       # Bizning qarzlar (mustaqil modul)

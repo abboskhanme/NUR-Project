@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useParams } from 'react-router-dom';
 import { api } from '@/api/client';
 import { useAuthStore } from '@/stores/auth';
 import { usePermissions } from '@/lib/permissions';
@@ -22,7 +22,7 @@ import DebtsPage from '@/pages/DebtsPage';
 import ShippingPage from '@/pages/ShippingPage';
 import HRPage from '@/pages/HRPage';
 import EmployeeDetailPage from '@/pages/EmployeeDetailPage';
-import SupplyPage from '@/pages/SupplyPage';
+import TaminotPage from '@/pages/TaminotPage';
 import ReportsPage from '@/pages/ReportsPage';
 import SettingsPage from '@/pages/SettingsPage';
 import UsersPage from '@/pages/UsersPage';
@@ -38,6 +38,26 @@ function RequireModule({ module, children }: { module: string; children: React.R
   const { canModule } = usePermissions();
   if (!canModule(module)) return <Navigate to="/" replace />;
   return <>{children}</>;
+}
+
+/**
+ * Ta'minot: ichki/tashqi alohida ruxsat. URL scope'iga qarab `supply_<scope>`
+ * modulini tekshiradi. Noto'g'ri scope yoki ruxsat yo'q bo'lsa — bosh sahifaga.
+ */
+function RequireTaminot({ children }: { children: React.ReactNode }) {
+  const { scope } = useParams();
+  const { canModule } = usePermissions();
+  if (scope !== 'ichki' && scope !== 'tashqi') return <Navigate to="/" replace />;
+  if (!canModule(`supply_${scope}`)) return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
+
+/** /supply — foydalanuvchi kira oladigan birinchi ta'minot turiga yo'naltiradi. */
+function SupplyIndexRedirect() {
+  const { canModule } = usePermissions();
+  if (canModule('supply_ichki')) return <Navigate to="/supply/ichki" replace />;
+  if (canModule('supply_tashqi')) return <Navigate to="/supply/tashqi" replace />;
+  return <Navigate to="/" replace />;
 }
 
 /**
@@ -97,7 +117,8 @@ export default function App() {
         <Route path="shipping" element={<RequireModule module="shipping"><ShippingPage /></RequireModule>} />
         <Route path="hr" element={<RequireModule module="hr"><HRPage /></RequireModule>} />
         <Route path="hr/:employeeId" element={<RequireModule module="hr"><EmployeeDetailPage /></RequireModule>} />
-        <Route path="supply" element={<RequireModule module="supply"><SupplyPage /></RequireModule>} />
+        <Route path="supply" element={<SupplyIndexRedirect />} />
+        <Route path="supply/:scope" element={<RequireTaminot><TaminotPage /></RequireTaminot>} />
         <Route path="reports" element={<RequireModule module="reports"><ReportsPage /></RequireModule>} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="users" element={<RequireModule module="users"><UsersPage /></RequireModule>} />

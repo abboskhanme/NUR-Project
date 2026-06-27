@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, ShoppingCart, Users, Package, Wrench, Wallet,
   UserSquare2, Truck, BarChart3, Settings, ShieldCheck, ListOrdered, Warehouse,
-  Coins, PackageOpen, Factory,
+  Coins, PackageOpen, Factory, Building2, Globe,
   type LucideIcon,
 } from 'lucide-react';
 import { usePermissions } from '@/lib/permissions';
@@ -12,6 +12,7 @@ export interface NavItem {
   icon: LucideIcon;
   module?: string;   // ruxsat tekshiriladigan modul (yo'q bo'lsa — hammaga ko'rinadi)
   exact?: boolean;
+  children?: NavItem[];  // quyi-menyu (masalan: Ta'minot → Ichki / Tashqi)
 }
 
 /**
@@ -35,10 +36,17 @@ export function useNavItems(): NavItem[] {
     { to: '/finance', label: 'Moliya', icon: Wallet, module: 'finance' },
     { to: '/debts', label: 'Bizning qarzlar', icon: Coins, module: 'debts' },
     { to: '/hr', label: 'Xodimlar', icon: UserSquare2, module: 'hr' },
-    { to: '/supply', label: "Ta'minot", icon: Truck, module: 'supply' },
+    { to: '/supply', label: "Ta'minot", icon: Truck, children: [
+      { to: '/supply/ichki', label: 'Ichki taʼminot', icon: Building2, module: 'supply_ichki' },
+      { to: '/supply/tashqi', label: 'Tashqi taʼminot', icon: Globe, module: 'supply_tashqi' },
+    ] },
     { to: '/reports', label: 'Hisobotlar', icon: BarChart3, module: 'reports' },
     { to: '/users', label: 'Foydalanuvchilar', icon: ShieldCheck, module: 'users' },
     { to: '/settings', label: 'Sozlamalar', icon: Settings },
   ];
-  return items.filter((it) => !it.module || canModule(it.module));
+  const visible = (it: NavItem) => !it.module || canModule(it.module);
+  return items
+    .map((it) => (it.children ? { ...it, children: it.children.filter(visible) } : it))
+    // Quyi-menyu: kamida bitta ko'rinadigan bola bo'lsa otani ko'rsatamiz
+    .filter((it) => (it.children ? it.children.length > 0 : visible(it)));
 }

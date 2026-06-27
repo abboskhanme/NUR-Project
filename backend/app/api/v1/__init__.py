@@ -12,6 +12,7 @@ from app.api.v1 import (
     finance,
     hr,
     supply,
+    taminot,
     telegram,
     notifications,
     reports,
@@ -34,6 +35,7 @@ api_router.include_router(service.router, prefix="/service", tags=["Service"])
 api_router.include_router(finance.router, prefix="/finance", tags=["Finance"])
 api_router.include_router(hr.router, prefix="/hr", tags=["HR"])
 api_router.include_router(supply.router, prefix="/supply", tags=["Supply"])
+api_router.include_router(taminot.router, prefix="/taminot", tags=["Ta'minot (ichki/tashqi)"])
 api_router.include_router(telegram.router, prefix="/telegram", tags=["Telegram Bot"])
 api_router.include_router(notifications.router, prefix="/notifications", tags=["Notifications"])
 api_router.include_router(reports.router, prefix="/reports", tags=["Reports"])

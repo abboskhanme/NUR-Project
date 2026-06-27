@@ -3,7 +3,8 @@ import toast from 'react-hot-toast';
 import {
   X, Check, ShieldCheck, Sparkles, Lock, ShieldAlert,
   Users, ShoppingCart, Package, Warehouse, Wrench, Wallet,
-  UserSquare2, Truck, BarChart3, Settings, Send, UserCog, Coins, PackageOpen, Factory,
+  UserSquare2, BarChart3, Settings, Send, UserCog, Coins, PackageOpen, Factory,
+  Building2, Globe,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { api } from '@/api/client';
@@ -37,7 +38,8 @@ const MODULE_ICONS: Record<Module, LucideIcon> = {
   service: Wrench,
   finance: Wallet,
   hr: UserSquare2,
-  supply: Truck,
+  supply_ichki: Building2,
+  supply_tashqi: Globe,
   reports: BarChart3,
   telegram: Send,
   debts: Coins,
@@ -112,7 +114,8 @@ export default function RoleModal({
     service: 'Servis',
     finance: 'Moliya',
     hr: 'Xodimlar',
-    supply: "Ta'minot",
+    supply_ichki: "Ichki ta'minot",
+    supply_tashqi: "Tashqi ta'minot",
     reports: 'Hisobotlar',
     telegram: 'Telegram',
     debts: 'Bizning qarzlar',

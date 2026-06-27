@@ -10,7 +10,9 @@ import { useNavItems } from './navItems';
  * belgisi), va joriy sahifaning tugmasi avtomatik ko'rinadigan joyga suriladi.
  */
 export default function MobileNav() {
-  const items = useNavItems();
+  const navItems = useNavItems();
+  // Quyi-menyuli bo'limlarni (Ta'minot → Ichki/Tashqi) alohida tugmalarga yoyamiz
+  const items = navItems.flatMap((it) => (it.children?.length ? it.children : [it]));
   const location = useLocation();
   const scrollRef = useRef<HTMLDivElement>(null);
 
