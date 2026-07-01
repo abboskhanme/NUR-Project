@@ -6,7 +6,7 @@ from decimal import Decimal
 from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import and_, select, func
+from sqlalchemy import and_, case, select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import CurrentUser
@@ -14,7 +14,7 @@ from app.core.permissions import module_guard
 from app.db.session import get_db
 from app.models.hr import (
     Attendance, Department, Employee, EmployeeLoan, EmployeeLoanPayment,
-    PayrollItem, PayrollRun, Position, SalaryAdvance, SalaryRate,
+    PayrollItem, PayrollRun, Position, SalaryAdjustment, SalaryAdvance, SalaryRate,
 )
 from app.schemas.common import Page
 from app.schemas.hr import (
@@ -23,9 +23,11 @@ from app.schemas.hr import (
     EmployeeCreate, EmployeeLoanGroup, EmployeeLoanIn, EmployeeLoanOut,
     EmployeeLoanPaymentIn, EmployeeLoanPaymentOut, EmployeeLoanUpdate,
     EmployeeMonthSummary, EmployeeOut, EmployeeUpdate,
+    LoanRepayFromSalaryIn, LoanRepayFromSalaryOut,
     MonthDebts, MonthHistoryItem, MonthlySummary,
     PayrollRunIn, PayrollRunOut,
     PositionCreate, PositionOut, PositionUpdate,
+    SalaryAdjustmentIn, SalaryAdjustmentOut,
     SalaryAdvanceIn, SalaryAdvanceOut,
     SalaryRateCreate, SalaryRateOut,
 )
@@ -51,17 +53,21 @@ def _working_days(start: date, end: date) -> int:
 
 
 def _max_month_gross(emp: Employee, year: int, month: int, gross_actual: Decimal,
-                     rate_type: str, rate_amount: Decimal) -> Decimal:
+                     rate_type: str, rate_amount: Decimal,
+                     adj_delta: Decimal = Decimal(0)) -> Decimal:
     """Joriy oy uchun olinishi mumkin bo'lgan MAKSIMAL oylik (taxminiy).
 
-    - fixed: belgilangan oylik (o'zgarmas).
+    - fixed: belgilangan oylik (o'zgarmas) + shu oy bonus/jarima tuzatishi.
     - soatbay (va boshqalar): o'tgan kunlardagi haqiqiy hisoblangan haq +
       qolgan ish kunlari to'liq kelganda hisoblanadigan haq.
       To'liq kun haqi = stavka × STANDARD_WORKDAY_HOURS.
       Qolgan kunlar = bugundan keyin oy oxirigacha bo'lgan ish kunlari (yakshanbasiz).
+      Bu holatda `gross_actual` allaqachon bonus/jarima tuzatishini o'z ichiga oladi.
+
+    `adj_delta` — shu oy bonus (musbat) va jarima (manfiy) yig'indisi.
     """
     if emp.salary_type == "fixed" or rate_type == "fixed":
-        return emp.salary_amount or Decimal(0)
+        return (emp.salary_amount or Decimal(0)) + adj_delta
 
     start = date(year, month, 1)
     end = date(year, month, calendar.monthrange(year, month)[1])
@@ -96,16 +102,36 @@ async def _rate_on(db: AsyncSession, emp: Employee, on_date: date):
     return emp.salary_type, (emp.salary_amount or Decimal(0))
 
 
-async def _month_aggregate(db: AsyncSession, emp: Employee, year: int, month: int):
-    """Bir oy uchun: kelgan kunlar, jami soat, gross, avans, net.
+async def _month_adjustments(db: AsyncSession, emp: Employee, year: int, month: int):
+    """Shu oy uchun faol bonus va jarima yig'indilari: (bonus, penalty). Ikkalasi ham musbat."""
+    res = await db.execute(
+        select(
+            func.coalesce(func.sum(
+                case((SalaryAdjustment.kind == "bonus", SalaryAdjustment.amount), else_=0)), 0),
+            func.coalesce(func.sum(
+                case((SalaryAdjustment.kind == "penalty", SalaryAdjustment.amount), else_=0)), 0),
+        ).where(and_(
+            SalaryAdjustment.employee_id == emp.id,
+            SalaryAdjustment.year == year,
+            SalaryAdjustment.month == month,
+            SalaryAdjustment.status == "active",
+        ))
+    )
+    bonus, penalty = res.one()
+    return Decimal(bonus or 0), Decimal(penalty or 0)
 
-    Ish boshlagan sana (hire_date)'dan oldingi kunlar hisobga olinmaydi.
+
+async def _month_aggregate(db: AsyncSession, emp: Employee, year: int, month: int):
+    """Bir oy uchun: kelgan kunlar, jami soat, gross, avans, net, bonus, jarima.
+
+    Ish boshlagan sana (hire_date)'dan oldingi kunlar hisobga olinmaydi. Gross
+    hisoblangan haqqa shu oy bonus qo'shilib, jarima ayirilgan holda qaytariladi.
     """
     start = date(year, month, 1)
     end = date(year, month, calendar.monthrange(year, month)[1])
     eff_start = max(start, emp.hire_date) if emp.hire_date else start
     if eff_start > end:
-        return 0, Decimal(0), Decimal(0), Decimal(0), Decimal(0)
+        return 0, Decimal(0), Decimal(0), Decimal(0), Decimal(0), Decimal(0), Decimal(0)
 
     att_res = await db.execute(
         select(
@@ -124,6 +150,10 @@ async def _month_aggregate(db: AsyncSession, emp: Employee, year: int, month: in
     if emp.salary_type == "fixed":
         gross = emp.salary_amount or Decimal(0)
 
+    # Bonus/jarima tuzatishi — hisoblangan oylikka qo'shiladi/ayiriladi
+    bonus, penalty = await _month_adjustments(db, emp, year, month)
+    gross = gross + bonus - penalty
+
     adv_res = await db.execute(
         select(func.coalesce(func.sum(SalaryAdvance.amount), 0)).where(and_(
             SalaryAdvance.employee_id == emp.id,
@@ -134,17 +164,17 @@ async def _month_aggregate(db: AsyncSession, emp: Employee, year: int, month: in
     )
     advance = Decimal(adv_res.scalar() or 0)
     net = gross - advance
-    return int(present_days or 0), Decimal(hours or 0), gross, advance, net
+    return int(present_days or 0), Decimal(hours or 0), gross, advance, net, bonus, penalty
 
 
 async def advance_cap(db: AsyncSession, emp: Employee, year: int, month: int):
     """Avans limiti uchun: (tahminiy oylik max_gross, joriy faol avanslar yig'indisi).
 
     Ro'yxatdagi `month_summary.max_gross` bilan bir xil hisob — bittadan manba."""
-    _, _, gross, advance, _ = await _month_aggregate(db, emp, year, month)
+    _, _, gross, advance, _, bonus, penalty = await _month_aggregate(db, emp, year, month)
     eom = date(year, month, calendar.monthrange(year, month)[1])
     rate_type, rate_amount = await _rate_on(db, emp, eom)
-    max_gross = _max_month_gross(emp, year, month, gross, rate_type, rate_amount)
+    max_gross = _max_month_gross(emp, year, month, gross, rate_type, rate_amount, bonus - penalty)
     return max_gross, advance
 
 
@@ -199,6 +229,22 @@ async def salary_debts(_: CurrentUser, db: Annotated[AsyncSession, Depends(get_d
     )).all()
     paid_map = {(r[0], int(r[1])): Decimal(r[2] or 0) for r in adv_rows}
 
+    # Bonus/jarima tuzatishlari (emp, oy) bo'yicha — grossga qo'shiladi/ayiriladi
+    adj_rows = (await db.execute(
+        select(
+            SalaryAdjustment.employee_id, SalaryAdjustment.month,
+            func.coalesce(func.sum(
+                case((SalaryAdjustment.kind == "bonus", SalaryAdjustment.amount), else_=0)), 0),
+            func.coalesce(func.sum(
+                case((SalaryAdjustment.kind == "penalty", SalaryAdjustment.amount), else_=0)), 0),
+        ).where(and_(
+            SalaryAdjustment.employee_id.in_(emp_ids),
+            SalaryAdjustment.year == year,
+            SalaryAdjustment.status == "active",
+        )).group_by(SalaryAdjustment.employee_id, SalaryAdjustment.month)
+    )).all()
+    adj_map = {(r[0], int(r[1])): Decimal(r[2] or 0) - Decimal(r[3] or 0) for r in adj_rows}
+
     result: list[MonthDebts] = []
     for m in range(last_month, 0, -1):  # yangi oydan eskisiga
         month_end = date(year, m, calendar.monthrange(year, m)[1])
@@ -211,6 +257,7 @@ async def salary_debts(_: CurrentUser, db: Annotated[AsyncSession, Depends(get_d
                 gross = e.salary_amount or Decimal(0)
             else:
                 gross = gross_map.get((e.id, m), Decimal(0))
+            gross += adj_map.get((e.id, m), Decimal(0))
             paid = paid_map.get((e.id, m), Decimal(0))
             debt = gross - paid
             if debt > 0:
@@ -355,14 +402,14 @@ async def list_employees(
     for e in employees:
         out = _emp_out(e, pos_map.get(e.position_id))
         if with_summary:
-            present, hours, gross, advance, net = await _month_aggregate(db, e, sy, sm)
+            present, hours, gross, advance, net, bonus, penalty = await _month_aggregate(db, e, sy, sm)
             eom = date(sy, sm, calendar.monthrange(sy, sm)[1])
             rate_type, rate_amount = await _rate_on(db, e, eom)
-            max_gross = _max_month_gross(e, sy, sm, gross, rate_type, rate_amount)
+            max_gross = _max_month_gross(e, sy, sm, gross, rate_type, rate_amount, bonus - penalty)
             out.month_summary = EmployeeMonthSummary(
                 year=sy, month=sm, present_days=present, total_hours=hours,
                 gross=gross, advance=advance, net=net, salary_type=rate_type,
-                max_gross=max_gross,
+                bonus=bonus, penalty=penalty, max_gross=max_gross,
             )
         items.append(out)
     return Page[EmployeeOut](
@@ -410,7 +457,7 @@ async def employee_month_summary(
     e = res.scalar_one_or_none()
     if not e:
         raise HTTPException(404, "Xodim topilmadi")
-    present, hours, gross, advance, net = await _month_aggregate(db, e, year, month)
+    present, hours, gross, advance, net, bonus, penalty = await _month_aggregate(db, e, year, month)
     # O'sha oyda amal qilgan stavka (oy oxiriga ko'ra)
     eom = date(year, month, calendar.monthrange(year, month)[1])
     rate_type, rate_amount = await _rate_on(db, e, eom)
@@ -418,6 +465,7 @@ async def employee_month_summary(
         year=year, month=month, present_days=present, total_hours=hours,
         gross=gross, advance=advance, net=net,
         salary_type=rate_type, hourly_rate=rate_amount,
+        bonus=bonus, penalty=penalty,
     )
 
 
@@ -434,10 +482,10 @@ async def employee_history(
     out: list[MonthHistoryItem] = []
     y, m = today.year, today.month
     for _i in range(months):
-        present, hours, gross, advance, net = await _month_aggregate(db, e, y, m)
+        present, hours, gross, advance, net, bonus, penalty = await _month_aggregate(db, e, y, m)
         out.append(MonthHistoryItem(
             year=y, month=m, present_days=present, total_hours=hours,
-            gross=gross, advance=advance, net=net,
+            gross=gross, advance=advance, net=net, bonus=bonus, penalty=penalty,
         ))
         m -= 1
         if m == 0:
@@ -640,6 +688,69 @@ async def void_advance(advance_id: uuid.UUID, _user: CurrentUser,
     return SalaryAdvanceOut.model_validate(adv)
 
 
+# ---- Salary adjustments (jarima / bonus) ----
+@router.get("/adjustments", response_model=list[SalaryAdjustmentOut])
+async def list_adjustments(
+    db: Annotated[AsyncSession, Depends(get_db)], _: CurrentUser,
+    employee_id: Optional[uuid.UUID] = None,
+    year: Optional[int] = None, month: Optional[int] = None,
+    kind: Optional[str] = None,
+):
+    q = select(SalaryAdjustment)
+    if employee_id:
+        q = q.where(SalaryAdjustment.employee_id == employee_id)
+    if year:
+        q = q.where(SalaryAdjustment.year == year)
+    if month:
+        q = q.where(SalaryAdjustment.month == month)
+    if kind:
+        q = q.where(SalaryAdjustment.kind == kind)
+    res = await db.execute(q.order_by(SalaryAdjustment.created_at.desc()).limit(500))
+    return [SalaryAdjustmentOut.model_validate(a) for a in res.scalars().all()]
+
+
+@router.post("/adjustments", response_model=SalaryAdjustmentOut, status_code=201)
+async def create_adjustment(payload: SalaryAdjustmentIn, user: CurrentUser,
+                            db: Annotated[AsyncSession, Depends(get_db)]):
+    if payload.kind not in ("penalty", "bonus"):
+        raise HTTPException(422, "Tur 'penalty' yoki 'bonus' bo'lishi kerak")
+    if not (1 <= payload.month <= 12):
+        raise HTTPException(422, "Oy 1–12 oralig'ida bo'lishi kerak")
+    if not (2000 <= payload.year <= 2100):
+        raise HTTPException(422, "Yil noto'g'ri")
+    if (payload.amount or Decimal(0)) <= 0:
+        raise HTTPException(422, "Summa noldan katta bo'lishi kerak")
+    emp = (await db.execute(
+        select(Employee).where(Employee.id == payload.employee_id)
+    )).scalar_one_or_none()
+    if not emp:
+        raise HTTPException(404, "Xodim topilmadi")
+    adj = SalaryAdjustment(created_by_id=user.id, **payload.model_dump())
+    db.add(adj)
+    await db.commit()
+    await db.refresh(adj)
+    return SalaryAdjustmentOut.model_validate(adj)
+
+
+@router.delete("/adjustments/{adjustment_id}", response_model=SalaryAdjustmentOut)
+async def void_adjustment(adjustment_id: uuid.UUID, _user: CurrentUser,
+                          db: Annotated[AsyncSession, Depends(get_db)]):
+    """Jarima/bonusni bekor qiladi (yumshoq o'chirish — tarixda 'void' bo'lib qoladi).
+
+    Bekor qilingach o'sha oyning hisoblangan oyligiga ta'sir qilmaydi.
+    """
+    res = await db.execute(select(SalaryAdjustment).where(SalaryAdjustment.id == adjustment_id))
+    adj = res.scalar_one_or_none()
+    if not adj:
+        raise HTTPException(404, "Yozuv topilmadi")
+    if adj.status == "void":
+        return SalaryAdjustmentOut.model_validate(adj)
+    adj.status = "void"
+    await db.commit()
+    await db.refresh(adj)
+    return SalaryAdjustmentOut.model_validate(adj)
+
+
 # ---- Employee loans (bizdan qarzdor xodimlar) ----
 def _loan_out(loan: EmployeeLoan, payments: list[EmployeeLoanPayment]) -> EmployeeLoanOut:
     """Qarzni qoldiq va to'lov tarixi bilan chiqarish obyektiga aylantiradi."""
@@ -806,6 +917,89 @@ async def delete_loan_payment(loan_id: uuid.UUID, payment_id: uuid.UUID,
     if loan and loan.status == "closed":
         loan.status = "active"
     await db.commit()
+
+
+# ---- Qarzni oylikdan so'ndirish (moliyaga tegmaydi) ----
+@router.post("/employees/{employee_id}/repay-loan-from-salary",
+             response_model=LoanRepayFromSalaryOut, status_code=201)
+async def repay_loan_from_salary(employee_id: uuid.UUID, payload: LoanRepayFromSalaryIn,
+                                 user: CurrentUser, db: Annotated[AsyncSession, Depends(get_db)]):
+    """Xodim qarzini uning oyligidan so'ndiradi — naqd pul harakati YO'Q, moliyaga tegmaydi.
+
+    Kiritilgan summa:
+    1) xodimning faol qarzlaridan eng eskisidan boshlab taqsimlab so'ndiriladi — har biri
+       uchun qarz to'lovi (EmployeeLoanPayment) yoziladi, to'liq yopilsa qarz "closed" bo'ladi;
+    2) o'sha summa xodim avansi sifatida qo'shiladi ("Qarzga to'landi" izohi bilan) — shunda
+       joriy oyning qolgan oyligidan ayiriladi va avans ro'yxatida ko'rinadi.
+    Moliya balansiga umuman ta'sir qilmaydi (avans tx_id'siz yoziladi).
+    """
+    amount = payload.amount or Decimal(0)
+    if amount <= 0:
+        raise HTTPException(422, "Summa 0 dan katta bo'lishi kerak")
+    emp = (await db.execute(
+        select(Employee).where(Employee.id == employee_id)
+    )).scalar_one_or_none()
+    if not emp:
+        raise HTTPException(404, "Xodim topilmadi")
+
+    loans = (await db.execute(
+        select(EmployeeLoan).where(and_(
+            EmployeeLoan.employee_id == employee_id,
+            EmployeeLoan.status == "active",
+        )).order_by(EmployeeLoan.loan_date, EmployeeLoan.created_at)
+    )).scalars().all()
+    if not loans:
+        raise HTTPException(400, "Xodimda faol qarz yo'q")
+
+    loan_ids = [ln.id for ln in loans]
+    paid_rows = (await db.execute(
+        select(EmployeeLoanPayment.loan_id,
+               func.coalesce(func.sum(EmployeeLoanPayment.amount), 0))
+        .where(EmployeeLoanPayment.loan_id.in_(loan_ids))
+        .group_by(EmployeeLoanPayment.loan_id)
+    )).all()
+    paid_map = {lid: Decimal(s or 0) for lid, s in paid_rows}
+    balances = {ln.id: (ln.amount or Decimal(0)) - paid_map.get(ln.id, Decimal(0)) for ln in loans}
+    total_balance = sum(balances.values(), Decimal(0))
+    if total_balance <= 0:
+        raise HTTPException(400, "Xodimda so'ndiriladigan qarz yo'q")
+    if amount > total_balance:
+        raise HTTPException(
+            400, f"Summa jami qarzdan oshib ketdi. Qoldiq: {total_balance:,.0f}".replace(",", " "))
+
+    pay_date = payload.pay_date or date.today()
+    remaining = amount
+    count = 0
+    for loan in loans:
+        bal = balances[loan.id]
+        if bal <= 0:
+            continue
+        pay_amt = min(bal, remaining)
+        db.add(EmployeeLoanPayment(
+            loan_id=loan.id, amount=pay_amt, pay_date=pay_date,
+            note="Oylikdan so'ndirildi", created_by_id=user.id,
+        ))
+        count += 1
+        if pay_amt >= bal:  # to'liq so'ndirildi — qarz yopiladi
+            loan.status = "closed"
+        remaining -= pay_amt
+        if remaining <= 0:
+            break
+
+    # Oylikdan ayirish uchun avans yozuvi — moliyaga tegmaydi (tx_id yo'q)
+    adv = SalaryAdvance(
+        employee_id=employee_id, advance_date=pay_date, amount=amount,
+        currency=emp.currency or "UZS", note=payload.note or "Qarzga to'landi",
+        status="active", tx_id=None, created_by_id=user.id,
+    )
+    db.add(adv)
+    await db.flush()
+    advance_id = adv.id
+    await db.commit()
+    return LoanRepayFromSalaryOut(
+        paid=amount, remaining_debt=total_balance - amount,
+        advance_id=advance_id, payments_count=count,
+    )
 
 
 # ---- Payroll ----

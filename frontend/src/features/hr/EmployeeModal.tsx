@@ -22,6 +22,8 @@ export interface EmployeeMonthSummary {
   advance: string;
   net: string;
   salary_type: string;
+  bonus?: string;
+  penalty?: string;
   max_gross?: string;
 }
 

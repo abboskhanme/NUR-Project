@@ -18,6 +18,7 @@ from app.models.hr import (
     SalaryRate,
     Attendance,
     SalaryAdvance,
+    SalaryAdjustment,
     PayrollRun,
     PayrollItem,
 )
@@ -59,6 +60,7 @@ __all__ = [
     "SalaryRate",
     "Attendance",
     "SalaryAdvance",
+    "SalaryAdjustment",
     "PayrollRun",
     "PayrollItem",
     "Vendor",

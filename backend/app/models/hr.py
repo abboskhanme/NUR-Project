@@ -4,7 +4,7 @@ from datetime import date, time
 from decimal import Decimal
 from typing import Optional
 
-from sqlalchemy import Boolean, Date, ForeignKey, Numeric, String, Text, Time, UniqueConstraint
+from sqlalchemy import Boolean, Date, ForeignKey, Integer, Numeric, String, Text, Time, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -113,6 +113,34 @@ class SalaryAdvance(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     status: Mapped[str] = mapped_column(String(10), default="active", server_default="active")
     # Bog'liq moliya tranzaksiyasi (bekor qilinganda teskari qaytarish uchun)
     tx_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
+    created_by_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+    )
+
+
+class SalaryAdjustment(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    """Xodim oyligiga tuzatish: jarima (kamaytiradi) yoki bonus/mukofot (oshiradi).
+
+    Bu naqd pul harakati EMAS — faqat tanlangan oyning hisoblangan oyligini
+    o'zgartiradi. Jarima xodimga to'lanadigan summani kamaytiradi, bonus esa
+    oshiradi. Real pul oxirida oylik to'langanda (avans/yakuniy to'lov) moliyadan
+    chiqadi. Summa doim musbat saqlanadi; yo'nalish `kind` bilan aniqlanadi.
+    """
+    __tablename__ = "salary_adjustments"
+
+    employee_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("employees.id", ondelete="CASCADE"), index=True
+    )
+    # Qaysi oyga tegishli (oylik shu oy uchun o'zgaradi)
+    year: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    month: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    # "penalty" (jarima) yoki "bonus" (mukofot)
+    kind: Mapped[str] = mapped_column(String(10), nullable=False)
+    amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
+    currency: Mapped[str] = mapped_column(String(3), default="UZS")
+    note: Mapped[Optional[str]] = mapped_column(Text)
+    # "active" yoki "void" (noto'g'ri kiritilgan — bekor qilingan, tarixda qoladi)
+    status: Mapped[str] = mapped_column(String(10), default="active", server_default="active")
     created_by_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
     )

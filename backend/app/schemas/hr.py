@@ -106,6 +106,9 @@ class EmployeeMonthSummary(BaseModel):
     advance: Decimal
     net: Decimal
     salary_type: str
+    # Oylikka qo'shilgan bonus/jarima (gross allaqachon ularni o'z ichiga oladi)
+    bonus: Decimal = Decimal(0)
+    penalty: Decimal = Decimal(0)
     # Joriy oy uchun olinishi mumkin bo'lgan maksimal oylik (taxminiy).
     # Soatbaylarda: o'tgan kunlar haqiqiy + qolgan ish kunlari to'liq kelsa.
     max_gross: Decimal = Decimal(0)
@@ -176,6 +179,20 @@ class EmployeeLoanOut(ORMBase):
     paid: Decimal = Decimal(0)    # so'ndirilgan (to'lovlar yig'indisi)
     balance: Decimal = Decimal(0) # qoldiq = amount − paid
     payments: list[EmployeeLoanPaymentOut] = []
+
+
+class LoanRepayFromSalaryIn(BaseModel):
+    """Xodim qarzini oyligidan so'ndirish (naqd pul harakati yo'q)."""
+    amount: Decimal
+    note: Optional[str] = None        # avans izohi; default "Qarzga to'landi"
+    pay_date: Optional[date] = None
+
+
+class LoanRepayFromSalaryOut(BaseModel):
+    paid: Decimal                     # so'ndirilgan summa
+    remaining_debt: Decimal           # so'ndirishdan keyingi qoldiq qarz
+    advance_id: uuid.UUID             # yaratilgan avans yozuvi (oylikdan ayirish)
+    payments_count: int               # nechta qarzga taqsimlab yozildi
 
 
 class EmployeeLoanGroup(BaseModel):
@@ -251,6 +268,29 @@ class SalaryAdvanceOut(ORMBase):
     status: str = "active"
 
 
+class SalaryAdjustmentIn(BaseModel):
+    employee_id: uuid.UUID
+    year: int
+    month: int
+    kind: str                       # "penalty" (jarima) | "bonus" (mukofot)
+    amount: Decimal
+    currency: str = "UZS"
+    note: Optional[str] = None
+
+
+class SalaryAdjustmentOut(ORMBase):
+    id: uuid.UUID
+    employee_id: uuid.UUID
+    year: int
+    month: int
+    kind: str
+    amount: Decimal
+    currency: str
+    note: Optional[str] = None
+    status: str = "active"
+    created_at: datetime
+
+
 class PayrollRunIn(BaseModel):
     period_start: date
     period_end: date
@@ -284,6 +324,8 @@ class MonthlySummary(BaseModel):
     net: Decimal
     salary_type: str
     hourly_rate: Decimal
+    bonus: Decimal = Decimal(0)
+    penalty: Decimal = Decimal(0)
 
 
 class MonthHistoryItem(BaseModel):
@@ -294,3 +336,5 @@ class MonthHistoryItem(BaseModel):
     gross: Decimal
     advance: Decimal
     net: Decimal
+    bonus: Decimal = Decimal(0)
+    penalty: Decimal = Decimal(0)

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, Pencil, Users, Briefcase, BadgeCheck, ChevronRight, Wallet, HandCoins, Coins } from 'lucide-react';
+import { Plus, Search, Pencil, Users, Briefcase, BadgeCheck, ChevronRight, Wallet, HandCoins, Coins, Scale } from 'lucide-react';
 
 import { api } from '@/api/client';
 import Card from '@/components/ui/Card';
@@ -12,6 +12,8 @@ import EmployeeHistoryModal, { HistoryKind } from '@/features/hr/EmployeeHistory
 import PositionsSection from '@/features/hr/PositionsSection';
 import SalaryDebtsSection from '@/features/hr/SalaryDebtsSection';
 import EmployeeLoansSection from '@/features/hr/EmployeeLoansSection';
+import SalaryAdjustmentModal from '@/features/hr/SalaryAdjustmentModal';
+import RepayDebtModal from '@/features/hr/RepayDebtModal';
 
 const HR_MONTHS: Record<string, string> = {
   '1': 'Yanvar',
@@ -89,6 +91,8 @@ export default function HRPage() {
   const [status, setStatus] = useState('active');
   const [editEmp, setEditEmp] = useState<EmployeeRow | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [adjust, setAdjust] = useState<{ employeeId?: string } | null>(null);
+  const [repay, setRepay] = useState<{ emp: EmployeeRow; debt: number } | null>(null);
   const [hist, setHist] = useState<{ emp: EmployeeRow; kind: HistoryKind } | null>(null);
 
   const isPositions = tab === 'positions';
@@ -117,6 +121,17 @@ export default function HRPage() {
         .then((r) => r.data),
     enabled: isEmployees,
   });
+
+  // Xodim qarzlari (kompaniya/direktor oldida) — har bir xodimning jami qoldig'i.
+  // Qarzi bor xodimlar qatorida "Qarzni so'ndirish" tugmasini ko'rsatish uchun.
+  const loansQ = useQuery({
+    queryKey: ['employee-loans'],
+    queryFn: () => api.get('/hr/employee-loans').then((r) => r.data),
+    enabled: isEmployees,
+  });
+  const debtMap = new Map<string, number>(
+    (loansQ.data ?? []).map((g: any) => [g.employee_id as string, parseFloat(g.total ?? '0') || 0]),
+  );
 
   const rawItems: EmployeeRow[] = empQ.data?.items ?? [];
   // Turi bo'yicha guruhlaymiz: ofis (qizil) → yig'uv (ko'k) → ishlab chiqarish (yashil).
@@ -159,9 +174,14 @@ export default function HRPage() {
           <p className="text-sm text-ink-soft">Ofis xodimlari, oddiy ishchilar va lavozimlar bazasi</p>
         </div>
         {tab === 'employees' && (
-          <button onClick={() => setShowCreate(true)} className="btn-primary">
-            <Plus size={16} /> Yangi ishchi
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setAdjust({})} className="btn-ghost border border-black/10">
+              <Scale size={16} /> Jarima / Bonus
+            </button>
+            <button onClick={() => setShowCreate(true)} className="btn-primary">
+              <Plus size={16} /> Yangi ishchi
+            </button>
+          </div>
         )}
       </div>
 
@@ -281,6 +301,7 @@ export default function HRPage() {
                   <tr>
                     <th className="py-2 pl-3 pr-3 border-l-4 border-l-transparent">Ism familiya</th>
                     <th className="py-2 px-3 text-left">Oylik</th>
+                    <th className="py-2 px-3 text-left">Jarima/Bonus</th>
                     <th className="py-2 px-3 text-left">Avans</th>
                     <th className="py-2 px-3 text-left">Qoldiq</th>
                     <th className="py-2 px-3 text-left">Soat</th>
@@ -291,6 +312,13 @@ export default function HRPage() {
                   {items.map((e) => {
                     const s = e.month_summary;
                     const isHourly = (s?.salary_type || e.salary_type) === 'hourly';
+                    // Jarima/bonus grossga qo'shilgan; "Oylik" ustunida asosiy (tuzatishsiz)
+                    // haqni, alohida ustunda esa sof tuzatishni (bonus − jarima) ko'rsatamiz.
+                    const bonus = parseFloat(s?.bonus ?? '0') || 0;
+                    const penalty = parseFloat(s?.penalty ?? '0') || 0;
+                    const adj = bonus - penalty;
+                    const baseGross = (parseFloat(s?.gross ?? '0') || 0) - adj;
+                    const debt = debtMap.get(e.id) ?? 0;
                     // Xodim turini rang bilan ajratamiz: ofis — qizil, yig'uv — ko'k, ishlab chiqarish — yashil
                     const style = GROUP_STYLE[groupOf(e)];
                     const rowTint = style.rowTint;
@@ -313,9 +341,15 @@ export default function HRPage() {
                         </td>
 
                         <NumCell
-                          value={formatUZS(s?.gross ?? 0)}
+                          value={formatUZS(baseGross)}
                           onClick={() => setHist({ emp: e, kind: 'salary' })}
-                          title="Hisoblangan oylik"
+                          title="Hisoblangan oylik (jarima/bonusdan oldin)"
+                        />
+                        <NumCell
+                          value={adj === 0 ? '—' : `${adj > 0 ? '+' : '−'}${formatUZS(Math.abs(adj))}`}
+                          className={adj > 0 ? 'text-green-700' : adj < 0 ? 'text-danger' : 'text-ink/30'}
+                          onClick={() => setAdjust({ employeeId: e.id })}
+                          title="Jarima / bonus — ro'yxatni ochish"
                         />
                         <NumCell
                           value={formatUZS(s?.advance ?? 0)}
@@ -341,6 +375,16 @@ export default function HRPage() {
 
                         <td className="py-2 pr-3">
                           <div className="flex items-center justify-end gap-1">
+                            {debt > 0 && (
+                              <button
+                                title={`Qarzni so'ndirish · ${formatUZS(debt)}`}
+                                onClick={(ev) => { ev.stopPropagation(); setRepay({ emp: e, debt }); }}
+                                className="flex items-center gap-1 px-1.5 py-1 rounded text-amber-600 hover:bg-amber-500/10"
+                              >
+                                <HandCoins size={16} />
+                                <span className="text-xs font-medium tabular-nums hidden sm:inline">{formatUZS(debt)}</span>
+                              </button>
+                            )}
                             <button
                               title="Tahrirlash"
                               onClick={(ev) => { ev.stopPropagation(); setEditEmp(e); }}
@@ -369,6 +413,25 @@ export default function HRPage() {
             setEditEmp(null);
           }}
           onSaved={refresh}
+        />
+      )}
+
+      {adjust && (
+        <SalaryAdjustmentModal
+          defaultEmployeeId={adjust.employeeId}
+          defaultYear={curYear}
+          defaultMonth={curMonth}
+          onClose={() => setAdjust(null)}
+        />
+      )}
+
+      {repay && (
+        <RepayDebtModal
+          employeeId={repay.emp.id}
+          fullName={repay.emp.full_name}
+          debt={repay.debt}
+          remainingSalary={parseFloat(repay.emp.month_summary?.net ?? '0') || 0}
+          onClose={() => setRepay(null)}
         />
       )}
 

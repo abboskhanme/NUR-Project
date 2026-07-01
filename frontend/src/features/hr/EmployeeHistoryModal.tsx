@@ -475,21 +475,31 @@ function Body({
     );
   }
 
-  // salary (gross breakdown) — kunlik to'lovlar
+  // salary (gross breakdown) — kunlik to'lovlar + bonus/jarima tuzatishlari
   if (kind === 'salary') {
     const paid = attendance.filter((d) => (parseFloat(d.daily_pay) || 0) > 0);
-    const total = paid.reduce((s, d) => s + (parseFloat(d.daily_pay) || 0), 0);
+    const base = paid.reduce((s, d) => s + (parseFloat(d.daily_pay) || 0), 0);
+    const bonus = parseFloat(summary?.bonus ?? '0') || 0;
+    const penalty = parseFloat(summary?.penalty ?? '0') || 0;
+    // Hisoblangan oylik = summary.gross (bonus qo'shilib, jarima ayirilgan)
+    const gross = summary ? (parseFloat(summary.gross) || 0) : base + bonus - penalty;
+    const hasAdj = bonus > 0 || penalty > 0;
+
     if (salaryType === 'fixed') {
+      const fixedBase = gross - bonus + penalty;
       return (
-        <div className="text-sm">
-          <div className="border-t border-black/10 pt-2">
-            <Line label="Hisoblangan oylik" value={formatUZS(summary?.gross ?? 0)} bold />
+        <div className="text-sm space-y-1">
+          <Line label="Belgilangan oylik" value={formatUZS(fixedBase)} />
+          {bonus > 0 && <Line label="Bonus" value={'+ ' + formatUZS(bonus)} positive />}
+          {penalty > 0 && <Line label="Jarima" value={'− ' + formatUZS(penalty)} negative />}
+          <div className="border-t border-black/10 mt-1 pt-2">
+            <Line label="Hisoblangan oylik" value={formatUZS(gross)} bold />
           </div>
           <p className="text-xs text-ink-soft mt-3">Bu xodimning oylik maoshi fiksatsiyalangan; kunlik taqsimot yo'q.</p>
         </div>
       );
     }
-    if (paid.length === 0) {
+    if (paid.length === 0 && !hasAdj) {
       return <EmptyState title="Hisoblanmagan" description="Bu oyda hali oylik hisoblanmagan." />;
     }
     return (
@@ -509,11 +519,29 @@ function Body({
               <td className="py-2 pl-4 text-right tabular-nums font-medium whitespace-nowrap">{formatUZS(d.daily_pay)}</td>
             </tr>
           ))}
+          {hasAdj && (
+            <tr className="border-b border-black/5">
+              <td className="py-2 pr-4 text-ink-soft" colSpan={2}>Ishlangan haq</td>
+              <td className="py-2 pl-4 text-right tabular-nums whitespace-nowrap">{formatUZS(base)}</td>
+            </tr>
+          )}
+          {bonus > 0 && (
+            <tr className="border-b border-black/5 text-green-700">
+              <td className="py-2 pr-4" colSpan={2}>Bonus</td>
+              <td className="py-2 pl-4 text-right tabular-nums font-medium whitespace-nowrap">+ {formatUZS(bonus)}</td>
+            </tr>
+          )}
+          {penalty > 0 && (
+            <tr className="border-b border-black/5 text-danger">
+              <td className="py-2 pr-4" colSpan={2}>Jarima</td>
+              <td className="py-2 pl-4 text-right tabular-nums font-medium whitespace-nowrap">− {formatUZS(penalty)}</td>
+            </tr>
+          )}
         </tbody>
         <tfoot>
           <tr className="border-t border-black/10 font-semibold">
-            <td className="py-2 pr-4" colSpan={2}>Jami</td>
-            <td className="py-2 pl-4 text-right tabular-nums whitespace-nowrap">{formatUZS(total)}</td>
+            <td className="py-2 pr-4" colSpan={2}>Hisoblangan oylik</td>
+            <td className="py-2 pl-4 text-right tabular-nums whitespace-nowrap">{formatUZS(gross)}</td>
           </tr>
         </tfoot>
       </table>
@@ -543,14 +571,15 @@ function Body({
   );
 }
 
-function Line({ label, value, bold, negative }: { label: string; value: string; bold?: boolean; negative?: boolean }) {
+function Line({ label, value, bold, negative, positive }: { label: string; value: string; bold?: boolean; negative?: boolean; positive?: boolean }) {
   return (
     <div className="flex items-center justify-between py-1">
       <span className={bold ? 'font-semibold' : 'text-ink-soft'}>{label}</span>
       <span className={
         'tabular-nums whitespace-nowrap ' +
         (bold ? 'font-bold text-base ' : '') +
-        (negative ? 'text-warning' : '')
+        (negative ? 'text-danger ' : '') +
+        (positive ? 'text-green-700' : '')
       }>{value}</span>
     </div>
   );

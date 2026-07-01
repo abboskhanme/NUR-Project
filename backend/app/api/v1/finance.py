@@ -363,7 +363,7 @@ async def create_employee_payment(payload: EmployeePaymentIn, user: CurrentUser,
     month_end = date(payload.year, payload.month, last_day)
 
     if payload.kind == "salary":
-        _, _, _, _, net = await _month_aggregate(db, emp, payload.year, payload.month)
+        _, _, _, _, net, _, _ = await _month_aggregate(db, emp, payload.year, payload.month)
         amount = net
         if amount is None or amount <= 0:
             raise HTTPException(status_code=400, detail="To'lanadigan qoldiq oylik yo'q")
