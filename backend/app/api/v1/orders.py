@@ -239,34 +239,55 @@ async def sales_summary(
     salesperson_id: Optional[uuid.UUID] = None,
     customer_id: Optional[uuid.UUID] = None,
     date_from: Optional[date] = None, date_to: Optional[date] = None,
+    # Qiyoslash davri (oldingi oy/yil) — berilса, oldingi davr ko'rsatkichlari ham qaytadi
+    cmp_date_from: Optional[date] = None, cmp_date_to: Optional[date] = None,
     search: Optional[str] = None,
 ):
-    # Tanlangan filtrga mos asosiy so'rov — barcha ko'rsatkichlar shunga qarab hisoblanadi
-    base = _apply_filters(select(Order), current, status, salesperson_id,
-                          customer_id, date_from, date_to, search)
-    order_ids = select(base.with_only_columns(Order.id).subquery().c.id)
-
-    status_rows = (await db.execute(
-        _apply_filters(select(Order.status, func.count(Order.id)), current, status,
-                       salesperson_id, customer_id, date_from, date_to, search)
-        .group_by(Order.status)
-    )).all()
-    status_counts = {s: c for s, c in status_rows}
-    total_orders = sum(status_counts.values())
-
     paid_expr = func.coalesce(func.sum(func.coalesce(func.nullif(Payment.amount_uzs_equiv, 0), Payment.amount)), 0)
 
-    revenue_total = (await db.execute(
-        select(func.coalesce(func.sum(OrderItem.total_uzs), 0)).where(OrderItem.order_id.in_(order_ids))
-    )).scalar() or Decimal(0)
+    async def _period(d_from: Optional[date], d_to: Optional[date]):
+        """Berilgan sana oralig'i uchun: status_counts, tushum, to'langan, sotuvchi→son."""
+        base = _apply_filters(select(Order), current, status, salesperson_id,
+                              customer_id, d_from, d_to, search)
+        order_ids = select(base.with_only_columns(Order.id).subquery().c.id)
+        status_rows = (await db.execute(
+            _apply_filters(select(Order.status, func.count(Order.id)), current, status,
+                           salesperson_id, customer_id, d_from, d_to, search)
+            .group_by(Order.status)
+        )).all()
+        st = {s: c for s, c in status_rows}
+        rev = (await db.execute(
+            select(func.coalesce(func.sum(OrderItem.total_uzs), 0)).where(OrderItem.order_id.in_(order_ids))
+        )).scalar() or Decimal(0)
+        paid = (await db.execute(select(paid_expr).where(Payment.order_id.in_(order_ids)))).scalar() or Decimal(0)
+        sp_rows = (await db.execute(_apply_filters(
+            select(User.id, User.full_name, func.count(Order.id))
+            .select_from(Order).join(User, User.id == Order.salesperson_id),
+            current, status, salesperson_id, customer_id, d_from, d_to, search,
+        ).group_by(User.id, User.full_name))).all()
+        sp = {i: (n, int(c)) for i, n, c in sp_rows}
+        return st, rev, paid, sp
 
-    paid_total = (await db.execute(
-        select(paid_expr).where(Payment.order_id.in_(order_ids))
-    )).scalar() or Decimal(0)
+    # Joriy davr (tanlangan filtr)
+    status_counts, revenue_total, paid_total, cur_sp = await _period(date_from, date_to)
+    total_orders = sum(status_counts.values())
 
+    # Oldingi davr (qiyoslash) — faqat cmp oralig'i berilганда
+    prev_st = prev_sp = None
+    orders_prev = delivered_prev = pending_prev = None
+    revenue_prev = paid_prev = outstanding_prev = None
+    if cmp_date_from and cmp_date_to:
+        prev_st, revenue_prev, paid_prev, prev_sp = await _period(cmp_date_from, cmp_date_to)
+        orders_prev = sum(prev_st.values())
+        delivered_prev = prev_st.get("delivered", 0)
+        pending_prev = prev_st.get("new", 0) + prev_st.get("ready", 0)
+        outstanding_prev = (revenue_prev or Decimal(0)) - (paid_prev or Decimal(0))
+
+    # "This month" bloki — har doim JORIY kalendar oy (filtrdan qat'i nazar, orqaga moslik)
     today = date.today()
     month_start = today.replace(day=1)
-    month_base = base.where(Order.order_date >= month_start)
+    month_base = _apply_filters(select(Order), current, status, salesperson_id,
+                                customer_id, None, None, search).where(Order.order_date >= month_start)
     month_ids = select(month_base.with_only_columns(Order.id).subquery().c.id)
     month_orders = (await db.execute(select(func.count()).select_from(month_base.subquery()))).scalar() or 0
     month_revenue = (await db.execute(
@@ -276,15 +297,12 @@ async def sales_summary(
         select(paid_expr).where(Payment.order_id.in_(month_ids)).where(Payment.date >= month_start)
     )).scalar() or Decimal(0)
 
-    # Sotuvchilar bo'yicha zakaz soni (joriy filtr) — ko'pdan kamga
-    sp_q = _apply_filters(
-        select(User.id, User.full_name, func.count(Order.id))
-        .select_from(Order).join(User, User.id == Order.salesperson_id),
-        current, status, salesperson_id, customer_id, date_from, date_to, search,
-    ).group_by(User.id, User.full_name)
-    sp_rows = (await db.execute(sp_q)).all()
+    # Sotuvchilar bo'yicha — joriy son + oldingi davr soni (ko'pdan kamga)
     salesperson_counts = sorted(
-        (SalespersonCount(salesperson_id=i, name=n, count=int(c)) for i, n, c in sp_rows),
+        (SalespersonCount(
+            salesperson_id=i, name=n, count=c,
+            prev_count=(prev_sp.get(i, (None, 0))[1] if prev_sp is not None else None),
+         ) for i, (n, c) in cur_sp.items()),
         key=lambda r: r.count, reverse=True,
     )
 
@@ -298,6 +316,12 @@ async def sales_summary(
         month_orders=month_orders,
         month_revenue=month_revenue,
         month_paid=month_paid,
+        orders_prev=orders_prev,
+        delivered_prev=delivered_prev,
+        pending_prev=pending_prev,
+        revenue_prev=revenue_prev,
+        paid_prev=paid_prev,
+        outstanding_prev=outstanding_prev,
     )
 
 
