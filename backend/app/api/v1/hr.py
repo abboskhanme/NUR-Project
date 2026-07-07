@@ -6,7 +6,7 @@ from decimal import Decimal
 from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import and_, case, select, func
+from sqlalchemy import and_, case, delete, select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import CurrentUser
@@ -29,7 +29,7 @@ from app.schemas.hr import (
     PositionCreate, PositionOut, PositionUpdate,
     SalaryAdjustmentIn, SalaryAdjustmentOut,
     SalaryAdvanceIn, SalaryAdvanceOut,
-    SalaryRateCreate, SalaryRateOut,
+    SalaryRateOut,
 )
 
 router = APIRouter(dependencies=[Depends(module_guard("hr"))])
@@ -66,8 +66,10 @@ def _max_month_gross(emp: Employee, year: int, month: int, gross_actual: Decimal
 
     `adj_delta` — shu oy bonus (musbat) va jarima (manfiy) yig'indisi.
     """
-    if emp.salary_type == "fixed" or rate_type == "fixed":
-        return (emp.salary_amount or Decimal(0)) + adj_delta
+    # Shu oyning tarixiy tipiga tayanamiz (`rate_type`) — joriy emp.salary_type emas,
+    # aks holda tip o'zgarган xodimda o'tgan oy noto'g'ri hisoblanardi.
+    if rate_type == "fixed":
+        return (rate_amount or emp.salary_amount or Decimal(0)) + adj_delta
 
     start = date(year, month, 1)
     end = date(year, month, calendar.monthrange(year, month)[1])
@@ -100,6 +102,34 @@ async def _rate_on(db: AsyncSession, emp: Employee, on_date: date):
     if rate:
         return rate.salary_type, (rate.amount or Decimal(0))
     return emp.salary_type, (emp.salary_amount or Decimal(0))
+
+
+async def _ensure_baseline_rate(db: AsyncSession, emp: Employee, before: date) -> None:
+    """Yangi stavka qo'shishdan OLDIN — agar xodimning stavka tarixi umuman bo'lmasa,
+    joriy (eski) stavkani tarixga "boshlang'ich" yozuv sifatida kiritadi.
+
+    Busiz: birinchi marta stavka ko'tarilganda oldingi oylar `_rate_on` fallback
+    orqali jonli `salary_amount`ga (ya'ni YANGI summaga) qaytib ketib, eski oylar
+    ham o'zgarib qolar edi. Boshlang'ich yozuv effektiv sanasi — ish boshlagan sana,
+    ammo har doim `before` (yangi stavka sanasi)'dan OLDIN bo'ladi, aks holda yangi
+    stavka joriy oyda boshlang'ich yozuv bilan ustma-ust tushib qolardi.
+    """
+    exists = await db.execute(
+        select(SalaryRate.id).where(SalaryRate.employee_id == emp.id).limit(1)
+    )
+    if exists.scalar_one_or_none():
+        return
+    eff = emp.hire_date or date(2000, 1, 1)
+    if eff >= before:
+        eff = before - timedelta(days=1)
+    db.add(SalaryRate(
+        employee_id=emp.id,
+        effective_from=eff,
+        salary_type=emp.salary_type,
+        amount=emp.salary_amount or Decimal(0),
+        currency=emp.currency,
+    ))
+    await db.flush()
 
 
 async def _month_adjustments(db: AsyncSession, emp: Employee, year: int, month: int):
@@ -147,8 +177,13 @@ async def _month_aggregate(db: AsyncSession, emp: Employee, year: int, month: in
     )
     present_days, hours, gross = att_res.one()
     gross = Decimal(gross or 0)
-    if emp.salary_type == "fixed":
-        gross = emp.salary_amount or Decimal(0)
+    # Shu oyda amal qilgan stavka (oy oxiriga ko'ra) — jonli salary_amount emas.
+    # Shu sabab stavkani ko'targanda faqat shu oy va keyingilar o'zgaradi.
+    # Tip HAM shu oyники (tarixiy) — xodim o'tmishda soatbay bo'lgan bo'lsa,
+    # o'sha oy summasi davomatdan (daily_pay) olinadi, fixed sifatida emas.
+    rate_type, rate_amount = await _rate_on(db, emp, end)
+    if rate_type == "fixed":
+        gross = rate_amount
 
     # Bonus/jarima tuzatishi — hisoblangan oylikka qo'shiladi/ayiriladi
     bonus, penalty = await _month_adjustments(db, emp, year, month)
@@ -245,6 +280,25 @@ async def salary_debts(_: CurrentUser, db: Annotated[AsyncSession, Depends(get_d
     )).all()
     adj_map = {(r[0], int(r[1])): Decimal(r[2] or 0) - Decimal(r[3] or 0) for r in adj_rows}
 
+    # Stavka tarixi (fixed xodimlar uchun) — har oy o'sha oyda amal qilgan stavka.
+    # emp_id -> effective_from bo'yicha KAMAYUVCHI tartibda (eng yangisi birinchi).
+    rate_rows = (await db.execute(
+        select(SalaryRate.employee_id, SalaryRate.effective_from,
+               SalaryRate.salary_type, SalaryRate.amount)
+        .where(SalaryRate.employee_id.in_(emp_ids))
+        .order_by(SalaryRate.effective_from.desc(), SalaryRate.created_at.desc())
+    )).all()
+    rates_map: dict = {}
+    for emp_id, eff, rtype, amt in rate_rows:
+        rates_map.setdefault(emp_id, []).append((eff, rtype, Decimal(amt or 0)))
+
+    def _rate_on_batch(e: Employee, on_date: date):
+        """`_rate_on` ning batch (DB'siz) varianti — (tip, summa) shu sanaга ko'ra."""
+        for eff, rtype, amt in rates_map.get(e.id, ()):  # yangidan eskiga
+            if eff <= on_date:
+                return rtype, amt
+        return e.salary_type, (e.salary_amount or Decimal(0))  # tarix bo'lmasa — jonli
+
     result: list[MonthDebts] = []
     for m in range(last_month, 0, -1):  # yangi oydan eskisiga
         month_end = date(year, m, calendar.monthrange(year, m)[1])
@@ -253,8 +307,9 @@ async def salary_debts(_: CurrentUser, db: Annotated[AsyncSession, Depends(get_d
         for e in emps:
             if e.hire_date and e.hire_date > month_end:
                 continue  # bu oyda hali ishlamagan
-            if e.salary_type == "fixed":
-                gross = e.salary_amount or Decimal(0)
+            rtype, ramount = _rate_on_batch(e, month_end)
+            if rtype == "fixed":
+                gross = ramount
             else:
                 gross = gross_map.get((e.id, m), Decimal(0))
             gross += adj_map.get((e.id, m), Decimal(0))
@@ -505,27 +560,6 @@ async def list_salary_rates(employee_id: uuid.UUID,
     return [SalaryRateOut.model_validate(r) for r in res.scalars().all()]
 
 
-@router.post("/employees/{employee_id}/salary-rates", response_model=SalaryRateOut, status_code=201)
-async def add_salary_rate(employee_id: uuid.UUID, payload: SalaryRateCreate, user: CurrentUser,
-                          db: Annotated[AsyncSession, Depends(get_db)]):
-    emp_res = await db.execute(select(Employee).where(Employee.id == employee_id))
-    emp = emp_res.scalar_one_or_none()
-    if not emp:
-        raise HTTPException(404, "Xodim topilmadi")
-    rate = SalaryRate(
-        employee_id=emp.id, created_by_id=user.id, **payload.model_dump(),
-    )
-    db.add(rate)
-    await db.flush()
-    # Employee'dagi "joriy" stavka — bugungi kunga ko'ra amaldagi stavka
-    cur_type, cur_amount = await _rate_on(db, emp, date.today())
-    emp.salary_type = cur_type
-    emp.salary_amount = cur_amount
-    await db.commit()
-    await db.refresh(rate)
-    return rate
-
-
 @router.patch("/employees/{employee_id}", response_model=EmployeeOut)
 async def update_employee(employee_id: uuid.UUID, payload: EmployeeUpdate,
                           user: CurrentUser,
@@ -537,20 +571,46 @@ async def update_employee(employee_id: uuid.UUID, payload: EmployeeUpdate,
     old_amount = e.salary_amount or Decimal(0)
     old_type = e.salary_type
     fields = payload.model_dump(exclude_unset=True)
+    # Stavka o'zgaradimi — mutatsiyadan OLDIN aniqlaymiz (payloadga qarab).
+    salary_changed = (
+        ("salary_amount" in fields and (fields["salary_amount"] or Decimal(0)) != old_amount)
+        or ("salary_type" in fields and fields["salary_type"] != old_type)
+    )
+    # Yangi stavka JORIY OYNING BOSHIDAN amal qiladi — butun joriy oy yangi
+    # summada, oldingi oylar esa avvalgi stavkada qoladi.
+    month_start = date.today().replace(day=1)
+    # Stavka o'zgarsa — avval ESKI stavkani boshlang'ich yozuv sifatida saqlab
+    # qolamiz (tarix bo'sh bo'lsa), so'ng jonli qiymatlarni yangilaymiz.
+    if salary_changed:
+        await _ensure_baseline_rate(db, e, month_start)
     for k, v in fields.items():
         setattr(e, k, v)
-    # Stavka o'zgargan bo'lsa — tarixga bugundan yoziladi (eski oylar o'zgarmaydi).
-    # Aniq sanali o'zgartirish uchun /salary-rates endpointidan foydalaning.
-    salary_changed = (
-        ("salary_amount" in fields and (e.salary_amount or Decimal(0)) != old_amount)
-        or ("salary_type" in fields and e.salary_type != old_type)
-    )
+    # Stavka o'zgargan bo'lsa — tarixga joriy oy boshidan yoziladi (eski oylar
+    # o'zgarmaydi). Bu yozuvlar "Oylik tarixi" kartasida ko'rinadi.
     if salary_changed:
+        # Joriy oy (va undan keyingi) mavjud stavka yozuvlarini o'chirib, bitta
+        # toza yozuv qoldiramiz. Aks holda: (a) shu oyda yaratilgan xodimning
+        # yaratilish-yozuvi (effective_from > oy boshi) tahrirni "yutib" yuborardi;
+        # (b) bir oyda bir necha tahrir dublikat yozuvlar yaratardi.
+        await db.execute(delete(SalaryRate).where(and_(
+            SalaryRate.employee_id == e.id,
+            SalaryRate.effective_from >= month_start,
+        )))
         db.add(SalaryRate(
-            employee_id=e.id, effective_from=date.today(),
+            employee_id=e.id, effective_from=month_start,
             salary_type=e.salary_type, amount=e.salary_amount or Decimal(0),
             currency=e.currency, created_by_id=user.id,
         ))
+        # Soatbay/kunbay: joriy oyda allaqachon kiritilgan davomat haqini yangi
+        # stavka bilan qayta hisoblaymiz (fixed uchun daily_pay ishlatilmaydi).
+        if e.salary_type == "hourly":
+            rate = e.salary_amount or Decimal(0)
+            att = (await db.execute(select(Attendance).where(and_(
+                Attendance.employee_id == e.id,
+                Attendance.work_date >= month_start,
+            )))).scalars().all()
+            for a in att:
+                a.daily_pay = rate * (a.hours_worked or Decimal(0))
     await db.commit()
     await db.refresh(e)
     pos_map = await _positions_map(db)

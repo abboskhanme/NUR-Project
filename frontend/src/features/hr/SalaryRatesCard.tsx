@@ -1,24 +1,17 @@
-import { useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import toast from 'react-hot-toast';
-import { Plus, TrendingUp } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { TrendingUp } from 'lucide-react';
 
 import { api } from '@/api/client';
 import Card from '@/components/ui/Card';
-import EmptyState from '@/components/ui/EmptyState';
 import { formatUZS } from '@/lib/format';
 
 const HR_MONTHS: Record<string, string> = {
   '1': 'Yanvar', '2': 'Fevral', '3': 'Mart', '4': 'Aprel', '5': 'May', '6': 'Iyun',
   '7': 'Iyul', '8': 'Avgust', '9': 'Sentyabr', '10': 'Oktyabr', '11': 'Noyabr', '12': 'Dekabr',
 };
-const SALARY_TYPES = [
-  { value: 'hourly', label: 'Soatbay' },
-  { value: 'daily', label: 'Kunbay' },
-  { value: 'fixed', label: 'Belgilangan (oylik)' },
-  { value: 'kpi', label: 'KPI' },
-];
-const TYPE_LABEL: Record<string, string> = Object.fromEntries(SALARY_TYPES.map((s) => [s.value, s.label]));
+const TYPE_LABEL: Record<string, string> = {
+  hourly: 'Soatbay', daily: 'Kunbay', fixed: 'Belgilangan (oylik)', kpi: 'KPI',
+};
 
 interface Rate {
   id: string;
@@ -29,14 +22,6 @@ interface Rate {
   note?: string | null;
 }
 
-function clean(raw: string) {
-  return raw.replace(/[^\d]/g, '');
-}
-function display(raw: string) {
-  if (!raw) return '';
-  return raw.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
-}
-
 function monthLabel(iso: string, monthNameFn: (m: number) => string): string {
   // "YYYY-MM-DD" -> "May 2026"
   const [y, m] = iso.split('-').map(Number);
@@ -44,16 +29,6 @@ function monthLabel(iso: string, monthNameFn: (m: number) => string): string {
 }
 
 export default function SalaryRatesCard({ employeeId }: { employeeId: string }) {
-  const qc = useQueryClient();
-  const now = new Date();
-  const [open, setOpen] = useState(false);
-  const [effYear, setEffYear] = useState(now.getFullYear());
-  const [effMonth, setEffMonth] = useState(now.getMonth() + 1); // 1-12
-  const [salaryType, setSalaryType] = useState('hourly');
-  const [amount, setAmount] = useState('');
-  const [note, setNote] = useState('');
-  const [saving, setSaving] = useState(false);
-
   const { data, isLoading } = useQuery<Rate[]>({
     queryKey: ['hr', 'salary-rates', employeeId],
     queryFn: () => api.get(`/hr/employees/${employeeId}/salary-rates`).then((r) => r.data),
@@ -62,81 +37,15 @@ export default function SalaryRatesCard({ employeeId }: { employeeId: string }) 
 
   const getMonthName = (m: number) => HR_MONTHS[String(m)];
 
-  async function handleSave() {
-    if (!amount || parseInt(amount, 10) <= 0) {
-      toast.error('Summani kiriting');
-      return;
-    }
-    setSaving(true);
-    try {
-      const effectiveFrom = `${effYear}-${String(effMonth).padStart(2, '0')}-01`;
-      await api.post(`/hr/employees/${employeeId}/salary-rates`, {
-        effective_from: effectiveFrom,
-        salary_type: salaryType,
-        amount,
-        note: note || null,
-      });
-      toast.success("Yangi stavka qo'shildi");
-      setAmount(''); setNote(''); setOpen(false);
-      qc.invalidateQueries({ queryKey: ['hr', 'salary-rates', employeeId] });
-      qc.invalidateQueries({ queryKey: ['hr', 'employee', employeeId] });
-      qc.invalidateQueries({ queryKey: ['hr', 'summary', employeeId] });
-    } catch (e: any) {
-      toast.error(e?.response?.data?.detail || 'Xatolik');
-    } finally {
-      setSaving(false);
-    }
-  }
+  // Tarix bo'sh bo'lsa (oylik hali hech qachon o'zgartirilmagan) — kartani ko'rsatmaymiz.
+  if (!isLoading && items.length === 0) return null;
 
   return (
-    <Card
-      title="Stavka tarixi"
-      action={
-        <button onClick={() => setOpen((o) => !o)} className="btn-ghost">
-          <Plus size={15} /> Yangi stavka
-        </button>
-      }
-    >
-      <p className="text-xs text-ink-soft mb-3">Stavka o'zgarsa, yangi sanadan boshlab amal qiladi. Eski oylar avvalgi stavka bilan saqlanadi.</p>
-
-      {open && (
-        <div className="flex items-end gap-x-6 gap-y-3 flex-wrap mb-4 p-4 bg-black/[0.02] rounded-button">
-          <div className="flex flex-col gap-1">
-            <label className="label !mb-0">Qaysi oydan</label>
-            <div className="flex gap-2">
-              <select className="input !w-32" value={effMonth} onChange={(e) => setEffMonth(Number(e.target.value))}>
-                {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-                  <option key={m} value={m}>{HR_MONTHS[String(m)]}</option>
-                ))}
-              </select>
-              <select className="input !w-24" value={effYear} onChange={(e) => setEffYear(Number(e.target.value))}>
-                {[now.getFullYear() + 1, now.getFullYear(), now.getFullYear() - 1, now.getFullYear() - 2].map((y) => (
-                  <option key={y} value={y}>{y}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="label !mb-0">Turi</label>
-            <select className="input !w-40" value={salaryType} onChange={(e) => setSalaryType(e.target.value)}>
-              {SALARY_TYPES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-            </select>
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="label !mb-0">Summa</label>
-            <input
-              className="input !w-40"
-              inputMode="numeric"
-              placeholder="0"
-              value={display(amount)}
-              onChange={(e) => setAmount(clean(e.target.value))}
-            />
-          </div>
-          <button onClick={handleSave} disabled={saving} className="btn-primary disabled:opacity-50">
-            {saving ? '...' : 'Saqlash'}
-          </button>
-        </div>
-      )}
+    <Card title="Oylik tarixi">
+      <p className="text-xs text-ink-soft mb-3">
+        Oylik Edit orqali o'zgartirilganda, yangi summa o'sha oydan boshlab amal qiladi.
+        Eski oylar avvalgi summada saqlanadi.
+      </p>
 
       {isLoading ? (
         <div className="space-y-2">
@@ -144,8 +53,6 @@ export default function SalaryRatesCard({ employeeId }: { employeeId: string }) 
             <div key={i} className="h-10 rounded-button bg-black/5 animate-pulse" />
           ))}
         </div>
-      ) : items.length === 0 ? (
-        <EmptyState title="Stavka yo'q" description="Boshlang'ich stavka qo'shilmagan." />
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
