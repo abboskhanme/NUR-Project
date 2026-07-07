@@ -244,7 +244,6 @@ class SalesSummary(BaseModel):
     pending_prev: Optional[int] = None
     revenue_prev: Optional[Decimal] = None
     paid_prev: Optional[Decimal] = None
-    outstanding_prev: Optional[Decimal] = None
 
 
 class QueueItemOut(OrderOut):

@@ -29,7 +29,6 @@ interface Summary {
   pending_prev?: number | null;
   revenue_prev?: string | null;
   paid_prev?: string | null;
-  outstanding_prev?: string | null;
 }
 
 // Status options with their labels
@@ -127,15 +126,10 @@ export default function OrdersPage() {
   const { dateFrom, dateTo, cmpFrom, cmpTo } = useMemo(() => {
     const iso = (y: number, m: number, d: number) => `${y}-${pad2(m)}-${pad2(d)}`;
     if (month === 0) {
-      // Butun yil — o'tgan yil bilan qiyos. Joriy yil bo'lsa, o'tgan yilning
-      // shu kunigacha (adolatli qiyos), aks holda to'liq yil.
-      const isCurYear = year === now.getFullYear();
-      const cmpEnd = isCurYear
-        ? iso(year - 1, now.getMonth() + 1, now.getDate())
-        : iso(year - 1, 12, 31);
+      // Butun yil — o'tgan yilning TO'LIQ natijasi bilan qiyos
       return {
         dateFrom: iso(year, 1, 1), dateTo: iso(year, 12, 31),
-        cmpFrom: iso(year - 1, 1, 1), cmpTo: cmpEnd,
+        cmpFrom: iso(year - 1, 1, 1), cmpTo: iso(year - 1, 12, 31),
       };
     }
     const lastDay = new Date(year, month, 0).getDate();
@@ -144,13 +138,10 @@ export default function OrdersPage() {
     const py = pd.getFullYear();
     const pm = pd.getMonth() + 1;
     const pLast = new Date(py, pm, 0).getDate();
-    // Joriy (davom etayotgan) oy bo'lsa — o'tgan oyning shu kunigacha qiyoslaymiz,
-    // aks holda to'liq oy.
-    const isCurMonth = year === now.getFullYear() && month === now.getMonth() + 1;
-    const cmpEndDay = isCurMonth ? Math.min(now.getDate(), pLast) : pLast;
+    // Har doim TO'LIQ oldingi oy bilan qiyoslaymiz (butun o'tgan oy).
     return {
       dateFrom: iso(year, month, 1), dateTo: iso(year, month, lastDay),
-      cmpFrom: iso(py, pm, 1), cmpTo: iso(py, pm, cmpEndDay),
+      cmpFrom: iso(py, pm, 1), cmpTo: iso(py, pm, pLast),
     };
   }, [month, year]);
 
@@ -294,8 +285,7 @@ export default function OrdersPage() {
         <Kpi icon={<CalendarClock size={18} />} label={`To'langan · ${periodLabel}`} value={s ? formatUZS(s.paid_total) : '—'} accent="text-success"
              trend={s ? moneyTrend(s.paid_total, s.paid_prev, cmpLabel) : undefined} />
         <Kpi icon={<AlertCircle size={18} />} label={`Qoldiq · ${periodLabel}`}
-             value={s ? formatUZS(s.outstanding_total) : '—'} accent="text-danger"
-             trend={s ? moneyTrend(s.outstanding_total, s.outstanding_prev, cmpLabel, true) : undefined} />
+             value={s ? formatUZS(s.outstanding_total) : '—'} accent="text-danger" />
       </div>
 
       <Card>

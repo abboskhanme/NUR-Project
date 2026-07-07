@@ -275,13 +275,12 @@ async def sales_summary(
     # Oldingi davr (qiyoslash) — faqat cmp oralig'i berilганда
     prev_st = prev_sp = None
     orders_prev = delivered_prev = pending_prev = None
-    revenue_prev = paid_prev = outstanding_prev = None
+    revenue_prev = paid_prev = None
     if cmp_date_from and cmp_date_to:
         prev_st, revenue_prev, paid_prev, prev_sp = await _period(cmp_date_from, cmp_date_to)
         orders_prev = sum(prev_st.values())
         delivered_prev = prev_st.get("delivered", 0)
         pending_prev = prev_st.get("new", 0) + prev_st.get("ready", 0)
-        outstanding_prev = (revenue_prev or Decimal(0)) - (paid_prev or Decimal(0))
 
     # "This month" bloki — har doim JORIY kalendar oy (filtrdan qat'i nazar, orqaga moslik)
     today = date.today()
@@ -321,7 +320,6 @@ async def sales_summary(
         pending_prev=pending_prev,
         revenue_prev=revenue_prev,
         paid_prev=paid_prev,
-        outstanding_prev=outstanding_prev,
     )
 
 

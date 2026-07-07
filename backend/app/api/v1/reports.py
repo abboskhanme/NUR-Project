@@ -88,10 +88,9 @@ async def dashboard(
     prev_month_end = month_start - timedelta(days=1)
     prev_month_start = prev_month_end.replace(day=1)
 
-    # Joriy oyda o'tgan kunlar soni — o'tgan oyni shu kungacha qiyoslash uchun
-    # (masalan oyning 10-kuni bo'lsa, o'tgan oyning ham 1–10 oralig'ini olamiz).
-    prev_cmp_end = min(prev_month_start + timedelta(days=(today - month_start).days),
-                       prev_month_end)
+    # Qiyoslash — joriy oy (shu kungacha) TO'LIQ o'tgan oy bilan solishtiriladi
+    # (butun o'tgan oy, oxirgi kunигача).
+    prev_cmp_end = prev_month_end
 
     def _growth(cur: float, prev: float) -> Optional[float]:
         return round((cur - prev) / prev * 100, 1) if prev else None
