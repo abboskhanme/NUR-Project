@@ -142,6 +142,8 @@ export default function ReceiptModal({ order, onClose }: { order: OrderFull; onC
       {SERVICE_PHONES.map((p) => <div key={p} style={phone}>{p}</div>)}
 
       <div style={hr} />
+      {/* Pechat uchun bo'sh joy */}
+      <div style={{ height: '2cm' }} />
       <div style={{ textAlign: 'center', fontSize: 11, marginTop: 2 }}>Xaridingiz uchun rahmat!</div>
       <div style={{ textAlign: 'center', fontSize: 10, marginTop: 4 }}>{nowStamp()}</div>
     </div>
