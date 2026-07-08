@@ -72,6 +72,13 @@ const num = (s: string | number | null | undefined) => {
 };
 interface Salesperson { id: string; full_name: string }
 
+// Ustun kengliklari — jadval, colgroup va yuqoridagi sinxron scrollbar
+// SHU massivdan hisoblanadi (bitta manba), aks holda ular orasidagi
+// nomuvofiqlik oxirgi ustunni (Chek/Ochish tugmalari) scroll orqali
+// hech qachon to'liq ko'rinmaydigan qilib qo'yadi.
+const COL_WIDTHS = [44, 210, 140, 140, 170, 140, 180, 280, 96, 70, 64, 120, 140, 160, 140, 140, 80];
+const TABLE_WIDTH = COL_WIDTHS.reduce((a, b) => a + b, 0);
+
 // Dollar summasi uchun — raqam va bitta o'nlik nuqta
 const decStr = (s: string | number | null | undefined) =>
   String(s ?? '').replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1');
@@ -124,29 +131,13 @@ export default function OrdersTable({
                       [&::-webkit-scrollbar-track]:bg-black/5 [&::-webkit-scrollbar-track]:rounded-full
                       [&::-webkit-scrollbar-thumb]:bg-black/30 [&::-webkit-scrollbar-thumb]:rounded-full
                       hover:[&::-webkit-scrollbar-thumb]:bg-black/45">
-        <div className="h-px w-[2240px]" />
+        <div className="h-px" style={{ width: TABLE_WIDTH }} />
       </div>
       <div ref={bodyRef} onScroll={syncFromBody}
            className="overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-      <table className="text-sm border-collapse table-fixed w-[2240px]">
+      <table className="text-sm border-collapse table-fixed" style={{ width: TABLE_WIDTH }}>
         <colgroup>
-          <col style={{ width: 44 }} />
-          <col style={{ width: 210 }} />
-          <col style={{ width: 140 }} />
-          <col style={{ width: 140 }} />
-          <col style={{ width: 170 }} />
-          <col style={{ width: 140 }} />
-          <col style={{ width: 180 }} />
-          <col style={{ width: 280 }} />
-          <col style={{ width: 96 }} />
-          <col style={{ width: 70 }} />
-          <col style={{ width: 64 }} />
-          <col style={{ width: 120 }} />
-          <col style={{ width: 140 }} />
-          <col style={{ width: 160 }} />
-          <col style={{ width: 140 }} />
-          <col style={{ width: 140 }} />
-          <col style={{ width: 80 }} />
+          {COL_WIDTHS.map((w, i) => <col key={i} style={{ width: w }} />)}
         </colgroup>
         <thead className="text-left text-ink-soft border-b border-black/10">
           <tr className="[&>th]:py-2 [&>th]:px-2 [&>th]:font-medium [&>th]:whitespace-nowrap">
