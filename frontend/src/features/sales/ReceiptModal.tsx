@@ -101,7 +101,7 @@ export default function ReceiptModal({ order, onClose }: { order: OrderFull; onC
           <div key={it.id} style={{ marginBottom: 4 }}>
             <div>({idx + 1}) {name}{dir ? ` (${dir})` : ''}</div>
             <div style={line}>
-              <span>/ {qty} × {som(unitUzs)}</span>
+              <span>{qty} × {som(unitUzs)}</span>
               <span>{som(unitUzs * qty)}</span>
             </div>
             {discUzs > 0 && (
