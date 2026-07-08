@@ -77,10 +77,6 @@ export default function ReceiptModal({ order, onClose }: { order: OrderFull; onC
       </div>
       <div style={hr} />
 
-      <div style={{ ...line, flexWrap: 'wrap' }}>
-        <span>Kotyol ID:</span>
-        <span style={{ fontWeight: 700, wordBreak: 'break-all', textAlign: 'right' }}>{order.unit_uid || '—'}</span>
-      </div>
       <div style={line}><span>Sana:</span><span>{formatDate(order.order_date)}</span></div>
       {order.customer?.full_name && (
         <div style={line}><span>Mijoz:</span><span>{order.customer.full_name}</span></div>
@@ -104,7 +100,7 @@ export default function ReceiptModal({ order, onClose }: { order: OrderFull; onC
           <div key={it.id} style={{ marginBottom: 4 }}>
             <div>{name}{dir ? ` (${dir})` : ''}</div>
             <div style={line}>
-              <span>{qty} × {som(unitUzs)}</span>
+              <span>/ {qty} × {som(unitUzs)}</span>
               <span>{som(unitUzs * qty)}</span>
             </div>
             {discUzs > 0 && (
