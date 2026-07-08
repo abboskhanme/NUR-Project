@@ -78,8 +78,8 @@ export default function ReceiptModal({ order, onClose }: { order: OrderFull; onC
       <div style={hr} />
 
       <div style={{ ...line, flexWrap: 'wrap' }}>
-        <span>Buyurtma:</span>
-        <span style={{ fontWeight: 700, wordBreak: 'break-all', textAlign: 'right' }}>{order.code}</span>
+        <span>Kotyol ID:</span>
+        <span style={{ fontWeight: 700, wordBreak: 'break-all', textAlign: 'right' }}>{order.unit_uid || '—'}</span>
       </div>
       <div style={line}><span>Sana:</span><span>{formatDate(order.order_date)}</span></div>
       {order.customer?.full_name && (
