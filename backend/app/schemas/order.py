@@ -160,6 +160,8 @@ class OrderUpdate(BaseModel):
     additional_info: Optional[str] = None
     salesperson_id: Optional[uuid.UUID] = None
     priority: Optional[int] = None
+    # Navbat bo'limida taxminiy chiqib-ketish sanasi (faqat navbat sahifasidan tahrirlanadi)
+    queue_departure_date: Optional[date] = None
     # If provided, replaces the full item list
     items: Optional[list[OrderItemIn]] = None
 
@@ -182,6 +184,7 @@ class OrderOut(ORMBase):
     priority: int = 0
     in_queue: bool = False
     pickup_date: Optional[date] = None
+    queue_departure_date: Optional[date] = None
     inventory_id: Optional[uuid.UUID] = None
     unit_uid: Optional[str] = None
     area_m2: Optional[int] = None

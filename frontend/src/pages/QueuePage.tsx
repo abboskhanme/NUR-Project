@@ -7,12 +7,14 @@ import { ChevronsUp, ChevronUp, ChevronDown, ListOrdered, Search, Coins, MapPin 
 import { api } from '@/api/client';
 import Card from '@/components/ui/Card';
 import EmptyState from '@/components/ui/EmptyState';
+import { CellDate } from '@/components/ui/TablePickers';
 import { formatDate, formatUZS } from '@/lib/format';
 
 interface ProductMini { product_type?: string; model?: string | null; name?: string | null; kvm?: number | null; display_name?: string; }
 interface Item { product?: ProductMini | null; bunker_direction?: string | null; quantity: number; }
 interface QueueOrder {
   id: string; code: string; status: string; order_date: string; pickup_date?: string | null; position: number;
+  queue_departure_date?: string | null;
   customer?: { full_name: string; phone?: string; region?: string | null } | null;
   items: Item[];
   items_total_uzs: string; paid_uzs: string; balance_uzs: string;
@@ -83,10 +85,37 @@ export default function QueuePage() {
     });
   }, [allPending, search, dirRight, dirLeft]);
 
+  // Bir xil chiqib-ketish sanasidagi yuklarni alohida cardlarga guruhlash.
+  // Sana belgilanmaganlar birinchi guruh sifatida chiqadi (e'tibor talab qiladi).
+  const dateGroups = useMemo(() => {
+    const map = new Map<string, QueueOrder[]>();
+    for (const o of pendingShown) {
+      const key = o.queue_departure_date || '';
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(o);
+    }
+    const keys = Array.from(map.keys()).sort((a, b) => {
+      if (!a) return -1;
+      if (!b) return 1;
+      return a.localeCompare(b);
+    });
+    return keys.map((date) => ({ date, rows: map.get(date)! }));
+  }, [pendingShown]);
+
   async function move(id: string, action: 'top' | 'up' | 'down', e: React.MouseEvent) {
     e.stopPropagation();
     try {
       await api.post(`/orders/${id}/queue-move`, { action });
+      qc.invalidateQueries({ queryKey: ['orders', 'queue'] });
+      qc.invalidateQueries({ queryKey: ['orders'] });
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail || "Xatolik yuz berdi");
+    }
+  }
+
+  async function setDepartureDate(id: string, iso: string) {
+    try {
+      await api.patch(`/orders/${id}`, { queue_departure_date: iso || null });
       qc.invalidateQueries({ queryKey: ['orders', 'queue'] });
       qc.invalidateQueries({ queryKey: ['orders'] });
     } catch (err: any) {
@@ -118,7 +147,13 @@ export default function QueuePage() {
                     {o.position || idx + 1}
                   </span>
                 </td>
-                <td className="py-2 pr-3 font-medium">{o.pickup_date ? formatDate(o.pickup_date) : '—'}</td>
+                <td className="py-2 pr-3 font-medium" onClick={(e) => e.stopPropagation()}>
+                  <CellDate
+                    value={o.queue_departure_date ?? ''}
+                    onChange={(iso) => iso !== (o.queue_departure_date ?? '') && setDepartureDate(o.id, iso)}
+                    triggerClassName="w-full bg-transparent border border-transparent hover:border-black/10 focus:border-primary rounded px-1 py-0.5 outline-none"
+                  />
+                </td>
                 <td className="py-2 pr-3">
                   <div className="truncate max-w-[160px]">{o.customer?.full_name ?? '—'}</div>
                   {o.customer?.region && <div className="text-xs text-ink-soft">{o.customer.region}</div>}
@@ -218,23 +253,26 @@ export default function QueuePage() {
         <Card>
           <EmptyState title="Navbat bo'sh" description="Faol (yetkazilmagan) buyurtmalar shu yerda navbat bo'yicha ko'rinadi" />
         </Card>
+      ) : searching ? (
+        <Card title={`Navbatda — qidiruv natijasi (${pendingShown.length} / ${allPending.length})`}>
+          {pendingShown.length === 0
+            ? <EmptyState title="Topilmadi" description="Qidiruv bo'yicha navbatda buyurtma topilmadi" />
+            : renderTable(pendingShown, false)}
+          {pendingShown.length > 0 && (
+            <p className="text-xs text-ink-soft mt-3">
+              Qidiruv rejimida tartibni o'zgartirish tugmalari yashiriladi — raqam buyurtmaning haqiqiy navbat o'rni.
+            </p>
+          )}
+        </Card>
       ) : (
-        <>
-          <Card title={searching
-            ? `Navbatda — qidiruv natijasi (${pendingShown.length} / ${allPending.length})`
-            : `Navbatda (${allPending.length})`}>
-            {allPending.length === 0
-              ? <EmptyState title="Navbatda buyurtma yo'q" description="Yangi buyurtmalar shu yerda ko'rinadi" />
-              : pendingShown.length === 0
-                ? <EmptyState title="Topilmadi" description="Qidiruv bo'yicha navbatda buyurtma topilmadi" />
-                : renderTable(pendingShown, !searching)}
-            {searching && pendingShown.length > 0 && (
-              <p className="text-xs text-ink-soft mt-3">
-                Qidiruv rejimida tartibni o'zgartirish tugmalari yashiriladi — raqam buyurtmaning haqiqiy navbat o'rni.
-              </p>
-            )}
-          </Card>
-        </>
+        <div className="space-y-4">
+          {dateGroups.map((g) => (
+            <Card key={g.date || '__none__'}
+                  title={`${g.date ? formatDate(g.date) : "Sana belgilanmagan"} (${g.rows.length})`}>
+              {renderTable(g.rows, true)}
+            </Card>
+          ))}
+        </div>
       )}
 
       <div className="flex items-center gap-2 text-xs text-ink-soft">

@@ -46,6 +46,9 @@ class Order(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
     # Rejalashtirilgan chiqib-ketish (olib ketish) sanasi — navbatdagilar uchun
     pickup_date: Mapped[Optional[date]] = mapped_column(Date, index=True)
+    # Navbat bo'limida qo'lda kiritiladigan taxminiy chiqib-ketish sanasi.
+    # pickup_date'dan farqli — faqat Navbat sahifasida ko'rinadi va tahrirlanadi.
+    queue_departure_date: Mapped[Optional[date]] = mapped_column(Date, index=True)
 
     # Inventory linkage (optional — pick a unique unit from SKLAD KATYOL)
     inventory_id: Mapped[Optional[uuid.UUID]] = mapped_column(
