@@ -2,11 +2,10 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { ChevronsUp, ChevronUp, ChevronDown, ListOrdered, Search, Wallet, Coins } from 'lucide-react';
+import { ChevronsUp, ChevronUp, ChevronDown, ListOrdered, Search, Coins, MapPin } from 'lucide-react';
 
 import { api } from '@/api/client';
 import Card from '@/components/ui/Card';
-import StatusBadge from '@/components/ui/StatusBadge';
 import EmptyState from '@/components/ui/EmptyState';
 import { formatDate, formatUZS } from '@/lib/format';
 
@@ -51,14 +50,22 @@ export default function QueuePage() {
   // Navbat = in_queue bo'lgan BARCHA buyurtmalar (status new/ready dan qat'i nazar)
   const allPending = queue;
 
-  // Navbatdagi jami to'langan va qoldiq (so'mda) — barcha navbat buyurtmalari bo'yicha
+  // Navbatdagi jami qoldiq (to'lanishi kerak, so'mda) — barcha navbat buyurtmalari bo'yicha
   const totals = useMemo(() => {
-    let paid = 0, due = 0;
+    let due = 0;
     for (const o of queue) {
-      paid += parseFloat(o.paid_uzs) || 0;
       due += parseFloat(o.balance_uzs) || 0;
     }
-    return { paid, due };
+    return { due };
+  }, [queue]);
+
+  // Yuklar chiqib ketayotgan viloyatlar ro'yxati
+  const regions = useMemo(() => {
+    const set = new Set<string>();
+    for (const o of queue) {
+      if (o.customer?.region) set.add(o.customer.region);
+    }
+    return Array.from(set).sort();
   }, [queue]);
 
   const searching = search.trim().length > 0;
@@ -94,13 +101,11 @@ export default function QueuePage() {
           <thead className="text-left text-ink-soft border-b border-black/5">
             <tr>
               <th className="py-2 pr-3 w-10">#</th>
-              <th className="py-2 pr-3">Kod</th>
+              <th className="py-2 pr-3">Chiqib ketish</th>
               <th className="py-2 pr-3">Mijoz</th>
               <th className="py-2 pr-3">Mahsulotlar</th>
               <th className="py-2 pr-3">Sana</th>
-              <th className="py-2 pr-3">Chiqib ketish</th>
-              <th className="py-2 pr-3 text-right">Summa</th>
-              <th className="py-2 pr-3">Status</th>
+              <th className="py-2 pr-3 text-right">Qoldiq</th>
               {reorderable && <th className="py-2 pr-3 text-right">Navbat</th>}
             </tr>
           </thead>
@@ -113,16 +118,14 @@ export default function QueuePage() {
                     {o.position || idx + 1}
                   </span>
                 </td>
-                <td className="py-2 pr-3 font-medium">{o.code}</td>
+                <td className="py-2 pr-3 font-medium">{o.pickup_date ? formatDate(o.pickup_date) : '—'}</td>
                 <td className="py-2 pr-3">
                   <div className="truncate max-w-[160px]">{o.customer?.full_name ?? '—'}</div>
                   {o.customer?.region && <div className="text-xs text-ink-soft">{o.customer.region}</div>}
                 </td>
                 <td className="py-2 pr-3 max-w-[220px] truncate" title={itemSummary(o, dirRight, dirLeft)}>{itemSummary(o, dirRight, dirLeft)}</td>
                 <td className="py-2 pr-3">{formatDate(o.order_date)}</td>
-                <td className="py-2 pr-3">{o.pickup_date ? formatDate(o.pickup_date) : '—'}</td>
-                <td className="py-2 pr-3 text-right">{formatUZS(o.items_total_uzs)}</td>
-                <td className="py-2 pr-3"><StatusBadge status={o.status} /></td>
+                <td className="py-2 pr-3 text-right font-semibold text-danger">{formatUZS(o.balance_uzs)}</td>
                 {reorderable && (
                   <td className="py-2 pr-3">
                     <div className="flex items-center gap-1 justify-end">
@@ -172,24 +175,34 @@ export default function QueuePage() {
 
       {queue.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {/* Berilgan zaklad — yashil */}
-          <div className="rounded-card border border-success/25 bg-success/10 p-4 flex items-start justify-between">
-            <div>
-              <div className="text-sm font-medium text-success/90">Berilgan zaklad summasi</div>
-              <div className="text-2xl font-bold mt-2 text-success">{formatUZS(totals.paid)}</div>
-            </div>
-            <div className="w-10 h-10 rounded-button bg-success/20 text-success flex items-center justify-center shrink-0">
-              <Wallet size={18} />
-            </div>
-          </div>
-          {/* Qarz — qizil */}
+          {/* Qoldiq — to'lanishi kerak summa, qizil */}
           <div className="rounded-card border border-danger/25 bg-danger/10 p-4 flex items-start justify-between">
             <div>
-              <div className="text-sm font-medium text-danger/90">Qarz (to‘lanishi kerak)</div>
+              <div className="text-sm font-medium text-danger/90">To‘lanishi kerak (qoldiq)</div>
               <div className="text-2xl font-bold mt-2 text-danger">{formatUZS(totals.due)}</div>
             </div>
             <div className="w-10 h-10 rounded-button bg-danger/20 text-danger flex items-center justify-center shrink-0">
               <Coins size={18} />
+            </div>
+          </div>
+          {/* Chiqib ketayotgan viloyatlar */}
+          <div className="rounded-card border border-primary/25 bg-primary/10 p-4 flex items-start justify-between">
+            <div className="min-w-0">
+              <div className="text-sm font-medium text-primary/90">Yuklar chiqadigan viloyatlar</div>
+              {regions.length > 0 ? (
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {regions.map((r) => (
+                    <span key={r} className="px-2 py-0.5 rounded-full bg-primary/15 text-primary text-xs font-medium">
+                      {r}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-sm text-ink-soft mt-2">—</div>
+              )}
+            </div>
+            <div className="w-10 h-10 rounded-button bg-primary/20 text-primary flex items-center justify-center shrink-0">
+              <MapPin size={18} />
             </div>
           </div>
         </div>
