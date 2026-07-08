@@ -47,14 +47,16 @@ export default function ReceiptModal({ order, onClose }: { order: OrderFull; onC
   const line: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', gap: 4 };
   const hr: React.CSSProperties = { borderTop: '1px dashed #000', margin: '5px 0' };
   const muted: React.CSSProperties = { textAlign: 'center', fontSize: 11 };
-  // Telefon raqamlari — 2.5x kattaroq, qalin qora (muted 11px → ~28px)
+  // Telefon raqamlari — muted (11px) dan kattaroq, lekin 58mm varoqqa sig'adigan o'lchamda
   const phone: React.CSSProperties = {
     textAlign: 'center',
-    fontSize: 28,
+    fontSize: 18,
     fontWeight: 700,
     color: '#000',
-    lineHeight: 1.2,
+    lineHeight: 1.25,
   };
+  // Jami / To'langan / Qoldiq summalar — bazaviy matndan kattaroq va qalin
+  const totalLine: React.CSSProperties = { ...line, fontWeight: 700, fontSize: 15 };
 
   // Bitta chek nusxasi
   const ReceiptCopy = () => (
@@ -75,7 +77,10 @@ export default function ReceiptModal({ order, onClose }: { order: OrderFull; onC
       </div>
       <div style={hr} />
 
-      <div style={line}><span>Buyurtma:</span><span style={{ fontWeight: 700 }}>{order.code}</span></div>
+      <div style={{ ...line, flexWrap: 'wrap' }}>
+        <span>Buyurtma:</span>
+        <span style={{ fontWeight: 700, wordBreak: 'break-all', textAlign: 'right' }}>{order.code}</span>
+      </div>
       <div style={line}><span>Sana:</span><span>{formatDate(order.order_date)}</span></div>
       {order.customer?.full_name && (
         <div style={line}><span>Mijoz:</span><span>{order.customer.full_name}</span></div>
@@ -115,11 +120,11 @@ export default function ReceiptModal({ order, onClose }: { order: OrderFull; onC
       <div style={hr} />
 
       {/* Yakuniy summalar */}
-      <div style={{ ...line, fontWeight: 700, fontSize: 14 }}>
+      <div style={totalLine}>
         <span>JAMI</span><span>{som(num(order.items_total_uzs))}</span>
       </div>
-      <div style={line}><span>To‘langan</span><span>{som(num(order.paid_uzs))}</span></div>
-      <div style={line}>
+      <div style={totalLine}><span>To‘langan</span><span>{som(num(order.paid_uzs))}</span></div>
+      <div style={totalLine}>
         <span>Qoldiq</span><span>{som(balance)}</span>
       </div>
 
@@ -127,12 +132,12 @@ export default function ReceiptModal({ order, onClose }: { order: OrderFull; onC
 
       {/* Sotuvchi */}
       {order.salesperson_name && (
-        <div style={{ textAlign: 'center', marginBottom: 4 }}>
+        <div style={{ textAlign: 'center', marginBottom: 4, fontSize: 14 }}>
           Sotuvchi: <b>{order.salesperson_name}</b>
         </div>
       )}
 
-      {/* Aloqa raqamlari — raqamlar shrifti 2.5x kattaroq, bold qora */}
+      {/* Aloqa raqamlari — bold qora, 58mm varoqqa sig'adigan o'lchamda */}
       <div style={{ ...muted, fontWeight: 700 }}>Aloqa raqamlari</div>
       {COMPANY_PHONES.map((p) => <div key={p} style={phone}>{p}</div>)}
       <div style={{ ...muted, fontWeight: 700, marginTop: 6 }}>Servis xizmati</div>
