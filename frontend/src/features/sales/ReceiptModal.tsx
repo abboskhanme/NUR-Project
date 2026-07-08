@@ -68,7 +68,7 @@ export default function ReceiptModal({ order, onClose }: { order: OrderFull; onC
           alt="NUR TECHNO GROUP"
           // Qora fon → oq, oltin rasm → qora (oq qog'ozli termal printer uchun)
           style={{
-            width: '34mm',
+            width: '51mm',
             maxWidth: '90%',
             display: 'inline-block',
             filter: 'grayscale(1) invert(1) contrast(4) brightness(1.05)',
@@ -88,7 +88,8 @@ export default function ReceiptModal({ order, onClose }: { order: OrderFull; onC
       <div style={hr} />
 
       {/* Mahsulotlar */}
-      {order.items.map((it) => {
+      <div style={{ fontWeight: 700, marginBottom: 2 }}>Buyurtmalar soni: {order.items.length} ta</div>
+      {order.items.map((it, idx) => {
         const qty = it.quantity || 1;
         const unitUzs = num(it.unit_price_uzs);
         const discUzs = num(it.discount_usd) * rate;
@@ -98,7 +99,7 @@ export default function ReceiptModal({ order, onClose }: { order: OrderFull; onC
           : '—';
         return (
           <div key={it.id} style={{ marginBottom: 4 }}>
-            <div>{name}{dir ? ` (${dir})` : ''}</div>
+            <div>({idx + 1}) {name}{dir ? ` (${dir})` : ''}</div>
             <div style={line}>
               <span>/ {qty} × {som(unitUzs)}</span>
               <span>{som(unitUzs * qty)}</span>
