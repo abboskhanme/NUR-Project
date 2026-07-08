@@ -166,7 +166,7 @@ export default function OrdersTable({
             <th className="text-right">To'langan</th>
             <th className="text-right">Qoldiq</th>
             <th>Status</th>
-            <th></th>
+            <th className="sticky right-0 z-[6] bg-card border-l border-black/10"></th>
           </tr>
         </thead>
         <tbody>
@@ -350,8 +350,10 @@ function Row({
   const inp = 'w-full bg-transparent border border-transparent hover:border-black/10 focus:border-primary rounded px-1 py-0.5 outline-none';
   const ro = 'block px-1 py-0.5 border border-transparent truncate';
 
+  const tint = rowTint(status, balance);
+
   return (
-    <tr className={'border-b border-black/5 transition-colors ' + rowTint(status, balance) + (saving ? ' opacity-60' : '')}>
+    <tr className={'border-b border-black/5 transition-colors ' + tint + (saving ? ' opacity-60' : '')}>
       {/* Navbatga olish — qator boshida, yorqin */}
       <td className={cell + ' text-center'}>
         <QueueButton o={o} onChanged={onChanged} />
@@ -563,7 +565,10 @@ function Row({
         )}
       </td>
 
-      <td className={cell}>
+      {/* Sticky — gorizontal scroll qanchalik uzun bo'lmasin, bu tugmalar doim
+          ko'rinib turadi (2240px kenglikdagi jadvalda oxirgi ustun ko'zdan
+          qochib, "tugma yo'q" deb tuyulishining oldini olish uchun). */}
+      <td className={cell + ' sticky right-0 z-[2] bg-card border-l border-black/10'}>
         <div className="flex items-center justify-center gap-0.5">
           <button onClick={() => setReceiptOpen(true)} className="p-1 rounded hover:bg-accent/10 text-accent" title="Chek chiqarish (termal printer)">
             <Printer size={14} />
