@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Printer } from 'lucide-react';
 
 import { formatDate, formatPhone } from '@/lib/format';
@@ -156,7 +157,11 @@ export default function ReceiptModal({ order, onClose }: { order: OrderFull; onC
     paddingTop: 2,
   };
 
-  return (
+  // Portal orqali document.body'ga chiqariladi — aks holda jadval ichidagi
+  // sticky ustunlar hosil qilgan stacking context modalni ortda qoldirib
+  // qo'yishi mumkin (fixed elementning z-index'i faqat shu context ichida
+  // hisoblanadi).
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-auto bg-black/40 p-4" onClick={onClose}>
       <div className="bg-card rounded-lg shadow-xl w-full max-w-md my-6 overflow-hidden flex flex-col"
            onClick={(e) => e.stopPropagation()}>
@@ -197,6 +202,7 @@ export default function ReceiptModal({ order, onClose }: { order: OrderFull; onC
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
