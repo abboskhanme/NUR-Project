@@ -4,7 +4,7 @@ import {
   X, Check, ShieldCheck, Sparkles, Lock, ShieldAlert,
   Users, ShoppingCart, Package, Warehouse, Wrench, Wallet,
   UserSquare2, BarChart3, Settings, Send, UserCog, Coins, PackageOpen, Factory,
-  Building2, Globe,
+  Building2, Globe, Target,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { api } from '@/api/client';
@@ -43,6 +43,7 @@ const MODULE_ICONS: Record<Module, LucideIcon> = {
   reports: BarChart3,
   telegram: Send,
   debts: Coins,
+  targets: Target,
   shipping: PackageOpen,
   settings: Settings,
 };
@@ -119,6 +120,7 @@ export default function RoleModal({
     reports: 'Hisobotlar',
     telegram: 'Telegram',
     debts: 'Bizning qarzlar',
+    targets: 'Maqsadlar',
     shipping: 'Yuk chiqarish',
     settings: 'Sozlamalar',
   };

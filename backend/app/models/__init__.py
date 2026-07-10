@@ -31,6 +31,7 @@ from app.models.supply import (
 )
 from app.models.system import Notification, AuditLog, FileRecord, TelegramOrder, MonthlyGoal
 from app.models.debt import DebtProduct, DebtTransaction
+from app.models.target import Target, TargetContribution
 from app.models.taminot import TaminotProduct, TaminotTransaction
 from app.models.shipping import Shipment
 from app.models.production import ProductionRecord
@@ -75,6 +76,8 @@ __all__ = [
     "MonthlyGoal",
     "DebtProduct",
     "DebtTransaction",
+    "Target",
+    "TargetContribution",
     "TaminotProduct",
     "TaminotTransaction",
     "Shipment",

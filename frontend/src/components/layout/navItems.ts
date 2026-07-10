@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, ShoppingCart, Users, Package, Wrench, Wallet,
   UserSquare2, Truck, BarChart3, Settings, ShieldCheck, ListOrdered, Warehouse,
-  Coins, PackageOpen, Factory, Building2, Globe,
+  Coins, PackageOpen, Factory, Building2, Globe, Target,
   type LucideIcon,
 } from 'lucide-react';
 import { usePermissions } from '@/lib/permissions';
@@ -25,6 +25,7 @@ export function useNavItems(): NavItem[] {
   const { canModule } = usePermissions();
   const items: NavItem[] = [
     { to: '/', label: 'Bosh sahifa', icon: LayoutDashboard, exact: true, module: 'reports' },
+    { to: '/targets', label: 'Maqsadlar', icon: Target, module: 'targets' },
     { to: '/orders', label: 'Sotuv', icon: ShoppingCart, module: 'orders' },
     { to: '/queue', label: 'Navbat', icon: ListOrdered, module: 'orders' },
     { to: '/shipping', label: 'Yuk chiqarish', icon: PackageOpen, module: 'shipping' },

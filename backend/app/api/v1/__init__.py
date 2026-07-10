@@ -19,6 +19,7 @@ from app.api.v1 import (
     permissions,
     search,
     debts,
+    targets,
     shipping,
     production,
     goals,
@@ -42,6 +43,7 @@ api_router.include_router(reports.router, prefix="/reports", tags=["Reports"])
 api_router.include_router(permissions.router, prefix="/permissions", tags=["Permissions"])
 api_router.include_router(search.router, prefix="/search", tags=["Search"])
 api_router.include_router(debts.router, prefix="/debts", tags=["Debts / Bizning qarzlar"])
+api_router.include_router(targets.router, prefix="/targets", tags=["Targets / Maqsadlar"])
 api_router.include_router(shipping.router, prefix="/shipping", tags=["Shipping / Yuk chiqarish"])
 api_router.include_router(production.router, prefix="/production", tags=["Production / Ishlab chiqarish"])
 api_router.include_router(goals.router, prefix="/goals", tags=["Goals / Oylik maqsadlar"])
