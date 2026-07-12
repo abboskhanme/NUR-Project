@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { X, Info } from 'lucide-react';
+import { X, Info, CalendarClock } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 
 import { api } from '@/api/client';
 import PhoneInput from '@/components/ui/PhoneInput';
+import SalaryOverrideModal from '@/features/hr/SalaryOverrideModal';
 
 const SALARY_TYPES = [
   { value: 'hourly', label: 'Soatbay' },
@@ -105,6 +106,7 @@ export default function EmployeeModal({
   const [salaryAmount, setSalaryAmount] = useState(normalizeAmount(employee?.salary_amount));
   const [status, setStatus] = useState(employee?.status ?? 'active');
   const [saving, setSaving] = useState(false);
+  const [showOverride, setShowOverride] = useState(false);
 
   const positionsQ = useQuery<Position[]>({
     queryKey: ['hr', 'positions'],
@@ -170,6 +172,7 @@ export default function EmployeeModal({
   }
 
   return (
+    <>
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
       onClick={onClose}
@@ -304,6 +307,25 @@ export default function EmployeeModal({
             </div>
           </div>
 
+          {!isCreate && employee && (
+            <div className="rounded-button bg-black/[0.02] border border-black/5 px-3 py-2.5 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-sm font-medium">Muayyan oy uchun boshqa oylik</div>
+                <div className="text-xs text-ink-soft">
+                  Yuqoridagi summa <strong>joriy oydan</strong> amal qiladi. Faqat bitta o'tgan
+                  oyni to'g'rilash uchun bu yerdan foydalaning.
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowOverride(true)}
+                className="btn-action shrink-0 whitespace-nowrap border border-primary/30 text-primary hover:bg-primary/5"
+              >
+                <CalendarClock size={15} /> Oy tanlash
+              </button>
+            </div>
+          )}
+
           {!isCreate && (
             <div>
               <label className="label">Status</label>
@@ -333,5 +355,15 @@ export default function EmployeeModal({
         </div>
       </div>
     </div>
+
+    {showOverride && employee && (
+      <SalaryOverrideModal
+        employeeId={employee.id}
+        employeeName={employee.full_name}
+        currency={employee.currency}
+        onClose={() => setShowOverride(false)}
+      />
+    )}
+    </>
   );
 }

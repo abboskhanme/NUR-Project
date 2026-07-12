@@ -291,6 +291,28 @@ class SalaryAdjustmentOut(ORMBase):
     created_at: datetime
 
 
+class SalaryOverrideIn(BaseModel):
+    """Muayyan bir oy uchun oylikni absolute qiymatga belgilash."""
+    employee_id: uuid.UUID
+    year: int
+    month: int
+    amount: Decimal
+    currency: str = "UZS"
+    note: Optional[str] = None
+
+
+class SalaryOverrideOut(ORMBase):
+    id: uuid.UUID
+    employee_id: uuid.UUID
+    year: int
+    month: int
+    amount: Decimal
+    currency: str
+    note: Optional[str] = None
+    status: str = "active"
+    created_at: datetime
+
+
 class PayrollRunIn(BaseModel):
     period_start: date
     period_end: date

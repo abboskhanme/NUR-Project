@@ -146,6 +146,33 @@ class SalaryAdjustment(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
 
 
+class SalaryOverride(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    """Muayyan bir oy uchun oylikni butunlay boshqa summaga belgilash (absolute).
+
+    Jarima/bonus (SalaryAdjustment) hisoblangan oylikka delta qo'shadi/ayiradi;
+    bu esa o'sha oyning ASOSIY oyligini to'g'ridan-to'g'ri almashtiradi — masalan
+    o'tgan oyni to'g'rilash uchun. FAQAT tanlangan oy o'zgaradi: boshqa oylar
+    standart stavkada qoladi (stavka tarixiga tegmaydi). Agar shu oyda bonus/jarima
+    ham bo'lsa — ular baribir shu almashtirilgan summa ustiga qo'shiladi/ayiriladi.
+    Har (xodim, yil, oy) uchun bitta faol yozuv bo'ladi.
+    """
+    __tablename__ = "salary_overrides"
+
+    employee_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("employees.id", ondelete="CASCADE"), index=True
+    )
+    year: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    month: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
+    currency: Mapped[str] = mapped_column(String(3), default="UZS")
+    note: Mapped[Optional[str]] = mapped_column(Text)
+    # "active" yoki "void" (o'chirilgan — o'sha oyning oyligiga ta'sir qilmaydi, tarixda qoladi)
+    status: Mapped[str] = mapped_column(String(10), default="active", server_default="active")
+    created_by_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+    )
+
+
 class EmployeeLoan(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     """Xodimning kompaniya/direktor oldidagi alohida qarzi (oylikdan tashqari).
 

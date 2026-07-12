@@ -14,7 +14,8 @@ from app.core.permissions import module_guard
 from app.db.session import get_db
 from app.models.hr import (
     Attendance, Department, Employee, EmployeeLoan, EmployeeLoanPayment,
-    PayrollItem, PayrollRun, Position, SalaryAdjustment, SalaryAdvance, SalaryRate,
+    PayrollItem, PayrollRun, Position, SalaryAdjustment, SalaryAdvance,
+    SalaryOverride, SalaryRate,
 )
 from app.schemas.common import Page
 from app.schemas.hr import (
@@ -29,6 +30,7 @@ from app.schemas.hr import (
     PositionCreate, PositionOut, PositionUpdate,
     SalaryAdjustmentIn, SalaryAdjustmentOut,
     SalaryAdvanceIn, SalaryAdvanceOut,
+    SalaryOverrideIn, SalaryOverrideOut,
     SalaryRateOut,
 )
 
@@ -54,9 +56,12 @@ def _working_days(start: date, end: date) -> int:
 
 def _max_month_gross(emp: Employee, year: int, month: int, gross_actual: Decimal,
                      rate_type: str, rate_amount: Decimal,
-                     adj_delta: Decimal = Decimal(0)) -> Decimal:
+                     adj_delta: Decimal = Decimal(0),
+                     override: Optional[Decimal] = None) -> Decimal:
     """Joriy oy uchun olinishi mumkin bo'lgan MAKSIMAL oylik (taxminiy).
 
+    - override belgilangan bo'lsa: o'sha oyning oyligi qat'iy (almashtirilgan)
+      summa + bonus/jarima tuzatishi (davomatga qarab proyeksiya qilinmaydi).
     - fixed: belgilangan oylik (o'zgarmas) + shu oy bonus/jarima tuzatishi.
     - soatbay (va boshqalar): o'tgan kunlardagi haqiqiy hisoblangan haq +
       qolgan ish kunlari to'liq kelganda hisoblanadigan haq.
@@ -66,6 +71,9 @@ def _max_month_gross(emp: Employee, year: int, month: int, gross_actual: Decimal
 
     `adj_delta` — shu oy bonus (musbat) va jarima (manfiy) yig'indisi.
     """
+    # Muayyan oy oyligi belgilangan bo'lsa — proyeksiyasiz, qat'iy summa.
+    if override is not None:
+        return override + adj_delta
     # Shu oyning tarixiy tipiga tayanamiz (`rate_type`) — joriy emp.salary_type emas,
     # aks holda tip o'zgarган xodimda o'tgan oy noto'g'ri hisoblanardi.
     if rate_type == "fixed":
@@ -151,6 +159,23 @@ async def _month_adjustments(db: AsyncSession, emp: Employee, year: int, month: 
     return Decimal(bonus or 0), Decimal(penalty or 0)
 
 
+async def _month_override(db: AsyncSession, emp: Employee, year: int, month: int) -> Optional[Decimal]:
+    """Shu oy uchun belgilangan qat'iy oylik (agar bor bo'lsa) — aks holda None.
+
+    Faqat status='active' yozuv hisobga olinadi. Har (xodim, oy) uchun bitta faol
+    yozuv bo'lishi kutiladi; ehtiyot uchun eng oxirgi yaratilgani olinadi."""
+    res = await db.execute(
+        select(SalaryOverride.amount).where(and_(
+            SalaryOverride.employee_id == emp.id,
+            SalaryOverride.year == year,
+            SalaryOverride.month == month,
+            SalaryOverride.status == "active",
+        )).order_by(SalaryOverride.created_at.desc()).limit(1)
+    )
+    val = res.scalar_one_or_none()
+    return Decimal(val) if val is not None else None
+
+
 async def _month_aggregate(db: AsyncSession, emp: Employee, year: int, month: int):
     """Bir oy uchun: kelgan kunlar, jami soat, gross, avans, net, bonus, jarima.
 
@@ -185,6 +210,13 @@ async def _month_aggregate(db: AsyncSession, emp: Employee, year: int, month: in
     if rate_type == "fixed":
         gross = rate_amount
 
+    # Muayyan oy oyligi belgilangan bo'lsa — asosiy oylikni butunlay almashtiradi
+    # (soatbayda ham davomat haqi o'rniga shu summa olinadi). Bonus/jarima esa
+    # baribir ustiga qo'shiladi/ayiriladi.
+    override = await _month_override(db, emp, year, month)
+    if override is not None:
+        gross = override
+
     # Bonus/jarima tuzatishi — hisoblangan oylikka qo'shiladi/ayiriladi
     bonus, penalty = await _month_adjustments(db, emp, year, month)
     gross = gross + bonus - penalty
@@ -209,7 +241,9 @@ async def advance_cap(db: AsyncSession, emp: Employee, year: int, month: int):
     _, _, gross, advance, _, bonus, penalty = await _month_aggregate(db, emp, year, month)
     eom = date(year, month, calendar.monthrange(year, month)[1])
     rate_type, rate_amount = await _rate_on(db, emp, eom)
-    max_gross = _max_month_gross(emp, year, month, gross, rate_type, rate_amount, bonus - penalty)
+    override = await _month_override(db, emp, year, month)
+    max_gross = _max_month_gross(emp, year, month, gross, rate_type, rate_amount,
+                                 bonus - penalty, override)
     return max_gross, advance
 
 
@@ -280,6 +314,17 @@ async def salary_debts(_: CurrentUser, db: Annotated[AsyncSession, Depends(get_d
     )).all()
     adj_map = {(r[0], int(r[1])): Decimal(r[2] or 0) - Decimal(r[3] or 0) for r in adj_rows}
 
+    # Muayyan oy oyligi (override) — o'sha oyning asosiy oyligini almashtiradi.
+    ov_rows = (await db.execute(
+        select(SalaryOverride.employee_id, SalaryOverride.month, SalaryOverride.amount)
+        .where(and_(
+            SalaryOverride.employee_id.in_(emp_ids),
+            SalaryOverride.year == year,
+            SalaryOverride.status == "active",
+        ))
+    )).all()
+    ov_map = {(r[0], int(r[1])): Decimal(r[2] or 0) for r in ov_rows}
+
     # Stavka tarixi (fixed xodimlar uchun) — har oy o'sha oyda amal qilgan stavka.
     # emp_id -> effective_from bo'yicha KAMAYUVCHI tartibda (eng yangisi birinchi).
     rate_rows = (await db.execute(
@@ -312,6 +357,9 @@ async def salary_debts(_: CurrentUser, db: Annotated[AsyncSession, Depends(get_d
                 gross = ramount
             else:
                 gross = gross_map.get((e.id, m), Decimal(0))
+            ov = ov_map.get((e.id, m))
+            if ov is not None:
+                gross = ov
             gross += adj_map.get((e.id, m), Decimal(0))
             paid = paid_map.get((e.id, m), Decimal(0))
             debt = gross - paid
@@ -460,7 +508,9 @@ async def list_employees(
             present, hours, gross, advance, net, bonus, penalty = await _month_aggregate(db, e, sy, sm)
             eom = date(sy, sm, calendar.monthrange(sy, sm)[1])
             rate_type, rate_amount = await _rate_on(db, e, eom)
-            max_gross = _max_month_gross(e, sy, sm, gross, rate_type, rate_amount, bonus - penalty)
+            override = await _month_override(db, e, sy, sm)
+            max_gross = _max_month_gross(e, sy, sm, gross, rate_type, rate_amount,
+                                         bonus - penalty, override)
             out.month_summary = EmployeeMonthSummary(
                 year=sy, month=sm, present_days=present, total_hours=hours,
                 gross=gross, advance=advance, net=net, salary_type=rate_type,
@@ -809,6 +859,93 @@ async def void_adjustment(adjustment_id: uuid.UUID, _user: CurrentUser,
     await db.commit()
     await db.refresh(adj)
     return SalaryAdjustmentOut.model_validate(adj)
+
+
+# ---- Salary overrides (muayyan oy uchun oylik) ----
+@router.get("/salary-overrides", response_model=list[SalaryOverrideOut])
+async def list_salary_overrides(
+    db: Annotated[AsyncSession, Depends(get_db)], _: CurrentUser,
+    employee_id: Optional[uuid.UUID] = None,
+    year: Optional[int] = None, month: Optional[int] = None,
+    status: Optional[str] = "active",
+):
+    q = select(SalaryOverride)
+    if employee_id:
+        q = q.where(SalaryOverride.employee_id == employee_id)
+    if year:
+        q = q.where(SalaryOverride.year == year)
+    if month:
+        q = q.where(SalaryOverride.month == month)
+    if status:
+        q = q.where(SalaryOverride.status == status)
+    res = await db.execute(
+        q.order_by(SalaryOverride.year.desc(), SalaryOverride.month.desc(),
+                   SalaryOverride.created_at.desc()).limit(500)
+    )
+    return [SalaryOverrideOut.model_validate(o) for o in res.scalars().all()]
+
+
+@router.post("/salary-overrides", response_model=SalaryOverrideOut, status_code=201)
+async def create_salary_override(payload: SalaryOverrideIn, user: CurrentUser,
+                                 db: Annotated[AsyncSession, Depends(get_db)]):
+    """Muayyan bir oy uchun oylikni belgilaydi (absolute). Faqat o'sha oy o'zgaradi.
+
+    Shu (xodim, yil, oy) uchun faol yozuv allaqachon bo'lsa — o'rniga yangilanadi
+    (bitta faol yozuv qoladi). Stavka tarixiga tegmaydi."""
+    if not (1 <= payload.month <= 12):
+        raise HTTPException(422, "Oy 1–12 oralig'ida bo'lishi kerak")
+    if not (2000 <= payload.year <= 2100):
+        raise HTTPException(422, "Yil noto'g'ri")
+    if payload.amount is None or payload.amount < 0:
+        raise HTTPException(422, "Summa manfiy bo'lishi mumkin emas")
+    emp = (await db.execute(
+        select(Employee).where(Employee.id == payload.employee_id)
+    )).scalar_one_or_none()
+    if not emp:
+        raise HTTPException(404, "Xodim topilmadi")
+
+    # Shu oy uchun mavjud faol override bo'lsa — o'rnini yangilaymiz (bitta faol yozuv)
+    existing = (await db.execute(
+        select(SalaryOverride).where(and_(
+            SalaryOverride.employee_id == payload.employee_id,
+            SalaryOverride.year == payload.year,
+            SalaryOverride.month == payload.month,
+            SalaryOverride.status == "active",
+        ))
+    )).scalars().all()
+    if existing:
+        ov = existing[0]
+        ov.amount = payload.amount
+        ov.currency = payload.currency
+        ov.note = payload.note
+        ov.created_by_id = user.id
+        for extra in existing[1:]:  # ehtiyot: dublikat faol yozuvlarni yopamiz
+            extra.status = "void"
+    else:
+        ov = SalaryOverride(created_by_id=user.id, **payload.model_dump())
+        db.add(ov)
+    await db.commit()
+    await db.refresh(ov)
+    return SalaryOverrideOut.model_validate(ov)
+
+
+@router.delete("/salary-overrides/{override_id}", response_model=SalaryOverrideOut)
+async def void_salary_override(override_id: uuid.UUID, _user: CurrentUser,
+                               db: Annotated[AsyncSession, Depends(get_db)]):
+    """Muayyan oy oyligini bekor qiladi (yumshoq o'chirish — tarixda 'void' bo'lib qoladi).
+
+    Bekor qilingach o'sha oy yana standart stavka/davomat bo'yicha hisoblanadi.
+    """
+    res = await db.execute(select(SalaryOverride).where(SalaryOverride.id == override_id))
+    ov = res.scalar_one_or_none()
+    if not ov:
+        raise HTTPException(404, "Yozuv topilmadi")
+    if ov.status == "void":
+        return SalaryOverrideOut.model_validate(ov)
+    ov.status = "void"
+    await db.commit()
+    await db.refresh(ov)
+    return SalaryOverrideOut.model_validate(ov)
 
 
 # ---- Employee loans (bizdan qarzdor xodimlar) ----
