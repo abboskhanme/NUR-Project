@@ -75,8 +75,8 @@ export default function ServiceMoneyStats() {
         </div>
       </div>
 
-      {/* Har bir arizadagi "Servis xarajati" — o'zining oy/yil filtri bilan alohida ro'yxat */}
-      <ServiceExpensesList />
+      {/* Har bir arizadagi "Servis xarajati" — davr yuqoridagi umumiy filtrdan */}
+      <ServiceExpensesList dateFrom={dateFrom} dateTo={dateTo} />
 
       <div className="text-xs text-ink-soft">{`${m?.trip_count ?? 0} ta yakunlangan safar`}</div>
 

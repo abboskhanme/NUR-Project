@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Coins } from 'lucide-react';
 
@@ -20,40 +20,23 @@ interface Expense {
   in_warranty: boolean;
 }
 
-const MONTH_NUMS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const;
-const pad2 = (n: number) => String(n).padStart(2, '0');
-const SVC_MONTHS: Record<string, string> = {
-  '1': 'Yanvar', '2': 'Fevral', '3': 'Mart', '4': 'Aprel', '5': 'May', '6': 'Iyun',
-  '7': 'Iyul', '8': 'Avgust', '9': 'Sentabr', '10': 'Oktabr', '11': 'Noyabr', '12': 'Dekabr',
-};
-
 /**
- * Har bir arizadagi "Servis xarajati" (client_cost) alohida ro'yxat — o'zining
- * oy/yil filtri bilan (mustaqil). Qatorni bosish — ariza detali (tahrirlash mumkin).
+ * Har bir arizadagi "Servis xarajati" (client_cost) alohida ro'yxat.
+ * Davr (oy/yil) filtri yuqoridagi umumiy filtrdan keladi — butun hisobot bo'limi
+ * uchun bitta filtr. Yig'indisi "Servis xarajati" kartasiga mos keladi.
+ * Qatorni bosish — ariza detali (tahrirlash mumkin).
  */
-export default function ServiceExpensesList() {
-  const now = new Date();
-  const [month, setMonth] = useState<number>(now.getMonth() + 1); // 0 = butun yil
-  const [year, setYear] = useState<number>(now.getFullYear());
+export default function ServiceExpensesList({ dateFrom, dateTo }: { dateFrom?: string; dateTo?: string }) {
   const [detailId, setDetailId] = useState<string | null>(null);
 
-  const { dateFrom, dateTo } = useMemo(() => {
-    if (month === 0) return { dateFrom: `${year}-01-01`, dateTo: `${year}-12-31` };
-    const lastDay = new Date(year, month, 0).getDate();
-    return { dateFrom: `${year}-${pad2(month)}-01`, dateTo: `${year}-${pad2(month)}-${pad2(lastDay)}` };
-  }, [month, year]);
-
-  const YEARS = Array.from({ length: 5 }, (_, i) => now.getFullYear() - i);
-
   const q = useQuery<Expense[]>({
-    queryKey: ['service-expenses', dateFrom, dateTo],
+    queryKey: ['service-expenses', dateFrom ?? '', dateTo ?? ''],
     queryFn: () => api.get('/service/expenses', {
-      params: { date_from: dateFrom, date_to: dateTo },
+      params: { date_from: dateFrom || undefined, date_to: dateTo || undefined },
     }).then((r) => r.data),
   });
   const items = q.data ?? [];
   const total = items.reduce((s, e) => s + Number(e.amount || 0), 0);
-  const periodLabel = month === 0 ? `${year}` : `${SVC_MONTHS[String(month)]} ${year}`;
 
   return (
     <Card>
@@ -61,24 +44,11 @@ export default function ServiceExpensesList() {
         <div className="flex items-center gap-2 font-semibold">
           <Coins size={16} className="text-danger" /> Servis xarajatlari (arizalar bo'yicha)
         </div>
-        <div className="flex items-center gap-2">
-          <select className="input h-9 py-0 w-32" value={month} onChange={(e) => setMonth(Number(e.target.value))}>
-            <option value={0}>Butun yil</option>
-            {MONTH_NUMS.map((mo) => <option key={mo} value={mo}>{SVC_MONTHS[String(mo)]}</option>)}
-          </select>
-          <select className="input h-9 py-0 w-24" value={year} onChange={(e) => setYear(Number(e.target.value))}>
-            {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
-          </select>
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between gap-2 mb-3 text-sm text-ink-soft">
-        <span>{periodLabel}</span>
         {items.length > 0 && (
-          <span>
+          <div className="text-sm text-ink-soft">
             {items.length} ta · Jami:{' '}
             <span className="font-bold text-danger tabular-nums">{formatUZS(total)}</span>
-          </span>
+          </div>
         )}
       </div>
 
@@ -91,7 +61,7 @@ export default function ServiceExpensesList() {
       ) : items.length === 0 ? (
         <EmptyState
           title="Servis xarajati yo'q"
-          description={`${periodLabel} uchun ariza xarajati kiritilmagan`}
+          description="Ariza ichida 'Servis xarajati' kiritilganda shu yerda ko'rinadi"
         />
       ) : (
         <div className="overflow-x-auto">
