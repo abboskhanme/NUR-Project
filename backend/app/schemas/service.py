@@ -124,10 +124,42 @@ class PartStat(BaseModel):
 
 
 class TripMoneyStat(BaseModel):
-    collected: Decimal = Decimal(0)   # olingan
-    spent: Decimal = Decimal(0)       # sarflangan
-    net: Decimal = Decimal(0)         # sof (olingan - sarflangan)
+    collected: Decimal = Decimal(0)         # olingan
+    spent: Decimal = Decimal(0)             # safar sarflangani (trip.spent yig'indisi)
+    net: Decimal = Decimal(0)               # sof (olingan - safar sarflangani) — eski hisob saqlanadi
     trip_count: int = 0
+    # Har bir arizadagi "Servis xarajati" (client_cost) yig'indisi — davр bo'yicha
+    service_expenses: Decimal = Decimal(0)
+    # Servislar uchun ketgan barcha xarajat = safar sarflangani + servis xarajatlari
+    total_expenses: Decimal = Decimal(0)
+
+
+class ServiceExpenseItem(BaseModel):
+    """Bitta arizadagi 'Servis xarajati' (client_cost) — hisobot ro'yxati uchun."""
+    id: uuid.UUID
+    code: str
+    customer_name: Optional[str] = None
+    customer_phone: Optional[str] = None
+    expense_date: Optional[date] = None    # ish bajarilgan sana (closed_at, bo'lmasa opened_at)
+    amount: Decimal
+    problem: Optional[str] = None
+    category: Optional[str] = None
+    in_warranty: bool = False
+
+
+class CustomerSearchHit(ORMBase):
+    """Servis arizasida qidiruv natijasi — mijoz (ixtiyoriy mos kelgan buyurtma bilan).
+
+    Buyurtma ID (kod) bo'yicha topilганда `order_id`/`order_code` to'ldiriladi va
+    modalда o'sha buyurtma avtomatik tanlanadi.
+    """
+    customer_id: uuid.UUID
+    full_name: str
+    phone: str
+    address: Optional[str] = None
+    order_id: Optional[uuid.UUID] = None
+    order_code: Optional[str] = None
+    product_summary: Optional[str] = None
 
 
 class ServiceSummary(BaseModel):

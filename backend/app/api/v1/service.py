@@ -1,4 +1,5 @@
 """Service tickets, visits, warranty."""
+import re
 import uuid
 from datetime import date, datetime, timezone
 from typing import Annotated, Optional
@@ -11,13 +12,15 @@ from sqlalchemy.orm import selectinload
 from app.core.dependencies import CurrentUser
 from app.core.permissions import module_guard
 from app.db.session import get_db
+from app.models.customer import Customer
 from app.models.order import Order, OrderItem
 from app.models.service import (
     ServiceCategory, ServicePart, ServiceTicket, ServiceTrip, ServiceVisit,
 )
 from app.schemas.common import Page
 from app.schemas.service import (
-    OrderMini, PartStat, ServiceCategoryIn, ServiceCategoryOut, ServicePartIn, ServicePartOut,
+    CustomerSearchHit, OrderMini, PartStat, ServiceCategoryIn, ServiceCategoryOut,
+    ServiceExpenseItem, ServicePartIn, ServicePartOut,
     ServiceSummary, ServiceTicketCreate, ServiceTicketOut, ServiceTicketUpdate,
     ServiceTripOut, ServiceTripUpdate, TripMoneyStat, ServiceVisitIn, ServiceVisitOut, WarrantyInfo,
 )
@@ -120,8 +123,61 @@ async def trips_stats(db: Annotated[AsyncSession, Depends(get_db)], _: CurrentUs
     if date_to:
         q = q.where(ref <= date_to)
     collected, spent, cnt = (await db.execute(q)).one()
-    return TripMoneyStat(collected=collected, spent=spent,
-                         net=(collected or 0) - (spent or 0), trip_count=int(cnt))
+
+    # Har bir arizadagi "Servis xarajati" (client_cost) yig'indisi — ish bajarilgan
+    # sana (closed_at, bo'lmasa opened_at) bo'yicha filtr (parts_stats bilan bir xil).
+    tref = func.date(func.coalesce(ServiceTicket.closed_at, ServiceTicket.opened_at))
+    sq = select(func.coalesce(func.sum(ServiceTicket.client_cost), 0))
+    if date_from:
+        sq = sq.where(tref >= date_from)
+    if date_to:
+        sq = sq.where(tref <= date_to)
+    service_expenses = (await db.execute(sq)).scalar() or 0
+
+    spent = spent or 0
+    total_expenses = spent + service_expenses
+    return TripMoneyStat(
+        collected=collected, spent=spent,
+        net=(collected or 0) - spent, trip_count=int(cnt),
+        service_expenses=service_expenses, total_expenses=total_expenses,
+    )
+
+
+@router.get("/expenses", response_model=list[ServiceExpenseItem])
+async def service_expenses_list(
+    db: Annotated[AsyncSession, Depends(get_db)], _: CurrentUser,
+    date_from: Optional[date] = None, date_to: Optional[date] = None,
+    limit: int = Query(500, ge=1, le=1000),
+):
+    """Har bir arizadagi 'Servis xarajati' (client_cost > 0) — hisobot ro'yxati.
+
+    Vaqt filtri: ish bajarilgan sana (closed_at, bo'lmasa opened_at) — trips/stats
+    dagi service_expenses bilan bir xil, shuning uchun ro'yxat yig'indisi umumiy
+    'Servis xarajati' kartasiga to'liq mos keladi.
+    """
+    ref = func.date(func.coalesce(ServiceTicket.closed_at, ServiceTicket.opened_at))
+    q = (
+        select(ServiceTicket)
+        .options(selectinload(ServiceTicket.customer))
+        .where(ServiceTicket.client_cost > 0)
+    )
+    if date_from:
+        q = q.where(ref >= date_from)
+    if date_to:
+        q = q.where(ref <= date_to)
+    rows = (await db.execute(q.order_by(ref.desc()).limit(limit))).scalars().unique().all()
+    out: list[ServiceExpenseItem] = []
+    for t in rows:
+        when = t.closed_at or t.opened_at
+        out.append(ServiceExpenseItem(
+            id=t.id, code=t.code,
+            customer_name=t.customer.full_name if t.customer else None,
+            customer_phone=t.customer.phone if t.customer else None,
+            expense_date=when.date() if when else None,
+            amount=t.client_cost, problem=t.problem, category=t.category,
+            in_warranty=t.in_warranty,
+        ))
+    return out
 
 
 @router.get("/trips", response_model=list[ServiceTripOut])
@@ -340,6 +396,73 @@ async def customer_orders(customer_id: uuid.UUID, _: CurrentUser,
         )
         for o in orders
     ]
+
+
+@router.get("/customer-search", response_model=list[CustomerSearchHit])
+async def customer_search(
+    _: CurrentUser, db: Annotated[AsyncSession, Depends(get_db)],
+    q: str = Query(..., min_length=1), limit: int = Query(8, ge=1, le=20),
+):
+    """Servis arizasi uchun kengaytirilgan qidiruv: mijoz ismi, telefon raqami
+    (ajratgichlardan qat'i nazar — faqat raqamlar solishtiriladi, masalan "2233"
+    ham "22 33" ham topadi) yoki buyurtma ID (kodi) bo'yicha.
+
+    Buyurtma kodi bo'yicha topilganda natijaga o'sha buyurtma biriktiriladi —
+    modalда mijoz + buyurtma avtomatik tanlanadi.
+    """
+    term = q.strip()
+    if not term:
+        return []
+    like = f"%{term}%"
+    digits = re.sub(r"\D", "", term)
+
+    hits: list[CustomerSearchHit] = []
+    seen: set[uuid.UUID] = set()
+
+    # 1) Buyurtma kodi bo'yicha — mos buyurtma va uning egasi (avtomatik tanlash uchun)
+    order_rows = (await db.execute(
+        select(Order)
+        .options(selectinload(Order.items).selectinload(OrderItem.product))
+        .where(Order.code.ilike(like))
+        .order_by(Order.order_date.desc())
+        .limit(limit)
+    )).scalars().unique().all()
+    cust_ids = {o.customer_id for o in order_rows}
+    cust_map: dict[uuid.UUID, Customer] = {}
+    if cust_ids:
+        crows = (await db.execute(
+            select(Customer).where(Customer.id.in_(cust_ids))
+        )).scalars().all()
+        cust_map = {c.id: c for c in crows}
+    for o in order_rows:
+        c = cust_map.get(o.customer_id)
+        if not c or c.id in seen:
+            continue
+        hits.append(CustomerSearchHit(
+            customer_id=c.id, full_name=c.full_name, phone=c.phone, address=c.address,
+            order_id=o.id, order_code=o.code, product_summary=_product_summary(o),
+        ))
+        seen.add(c.id)
+
+    # 2) Mijoz ismi yoki telefon raqami (raqamlar bo'yicha) — buyurtmasiz
+    conds = [Customer.full_name.ilike(like)]
+    if digits:
+        conds.append(
+            func.regexp_replace(Customer.phone, "[^0-9]", "", "g").ilike(f"%{digits}%")
+        )
+    crows = (await db.execute(
+        select(Customer).where(or_(*conds))
+        .order_by(Customer.created_at.desc()).limit(limit)
+    )).scalars().all()
+    for c in crows:
+        if c.id in seen:
+            continue
+        hits.append(CustomerSearchHit(
+            customer_id=c.id, full_name=c.full_name, phone=c.phone, address=c.address,
+        ))
+        seen.add(c.id)
+
+    return hits
 
 
 @router.get("/categories", response_model=list[ServiceCategoryOut])

@@ -84,13 +84,17 @@ export default function TicketDetailModal({
       : 'Mahsulot hali yetkazilmagan';
   }
 
-  async function patch(body: Record<string, unknown>, msg: string) {
+  async function patch(body: Record<string, unknown>, msg: string, closeAfter = false) {
     setBusy(true);
     try {
       await api.patch(`/service/tickets/${ticketId}`, body);
       await qc.invalidateQueries({ queryKey: ['service-ticket', ticketId] });
+      // Hisobot (Sarflangan mablag) — servis xarajati o'zgarsa yangilansin
+      qc.invalidateQueries({ queryKey: ['service-trips-stats'] });
+      qc.invalidateQueries({ queryKey: ['service-expenses'] });
       onChanged();
       toast.success(msg);
+      if (closeAfter) onClose();
     } catch (e: any) {
       toast.error(e?.response?.data?.detail || 'Xatolik yuz berdi');
     } finally {
@@ -98,9 +102,10 @@ export default function TicketDetailModal({
     }
   }
 
+  // "Servis xarajati"ni saqlagach modal yopiladi
   function saveDetails() {
     patch({ resolution: resolution.trim() || null, client_cost: toNum(cost), parts_used: partsUsed },
-          'Saqlandi');
+          'Saqlandi', true);
   }
 
   function togglePart(name: string) {

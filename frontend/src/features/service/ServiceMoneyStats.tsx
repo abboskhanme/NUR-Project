@@ -1,12 +1,16 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Wallet, Coins, TrendingUp } from 'lucide-react';
+import { Coins } from 'lucide-react';
 
 import { api } from '@/api/client';
 import { formatUZS } from '@/lib/format';
 import ServiceTripsList from '@/features/service/ServiceTripsList';
+import ServiceExpensesList from '@/features/service/ServiceExpensesList';
 
-interface Money { collected: string; spent: string; net: string; trip_count: number }
+interface Money {
+  collected: string; spent: string; net: string; trip_count: number;
+  service_expenses: string; total_expenses: string;
+}
 
 const MONTH_NUMS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const;
 const pad2 = (n: number) => String(n).padStart(2, '0');
@@ -37,7 +41,6 @@ export default function ServiceMoneyStats() {
     }).then((r) => r.data),
   });
   const m = q.data;
-  const net = Number(m?.net ?? 0);
 
   return (
     <div className="space-y-4">
@@ -52,14 +55,28 @@ export default function ServiceMoneyStats() {
         </select>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <MoneyCard label="Olingan" value={formatUZS(m?.collected ?? 0)}
-                   tone="success" icon={<Wallet size={18} />} />
-        <MoneyCard label="Sarflangan" value={formatUZS(m?.spent ?? 0)}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <MoneyCard label="Safar xarajati" value={formatUZS(m?.spent ?? 0)}
                    tone="danger" icon={<Coins size={18} />} />
-        <MoneyCard label="Sof" value={formatUZS(net)}
-                   tone={net >= 0 ? 'success' : 'danger'} icon={<TrendingUp size={18} />} />
+        <MoneyCard label="Servis xarajati (arizalar)" value={formatUZS(m?.service_expenses ?? 0)}
+                   tone="danger" icon={<Coins size={18} />} />
       </div>
+
+      {/* Servislar uchun ketgan barcha xarajat = safar + arizalar */}
+      <div className="rounded-card border border-danger/25 bg-danger/[0.06] p-4 flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <div className="text-sm font-medium text-danger/90">Jami servis xarajati</div>
+          <div className="text-xs text-ink-soft mt-0.5">
+            Safar xarajati + har bir arizadagi «Servis xarajati»
+          </div>
+        </div>
+        <div className="text-2xl font-bold text-danger tabular-nums">
+          {formatUZS(m?.total_expenses ?? 0)}
+        </div>
+      </div>
+
+      {/* Har bir arizadagi "Servis xarajati" — o'zining oy/yil filtri bilan alohida ro'yxat */}
+      <ServiceExpensesList />
 
       <div className="text-xs text-ink-soft">{`${m?.trip_count ?? 0} ta yakunlangan safar`}</div>
 

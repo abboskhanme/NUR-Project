@@ -8,6 +8,10 @@ import { formatDate, formatPhone } from '@/lib/format';
 import { computeWarranty, WARRANTY_META } from '@/features/service/warranty';
 
 interface Customer { id: string; full_name: string; phone: string; address?: string | null }
+interface SearchHit {
+  customer_id: string; full_name: string; phone: string; address?: string | null;
+  order_id?: string | null; order_code?: string | null; product_summary?: string | null;
+}
 interface Order {
   id: string; code: string; delivered_at?: string | null; status: string;
   delivery_address?: string | null; product_summary?: string | null;
@@ -21,6 +25,8 @@ export default function ServiceTicketModal({
   const [debounced, setDebounced] = useState('');
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [order, setOrder] = useState<Order | null>(null);
+  // Buyurtma ID bo'yicha topilganda — mijoz tanlangach shu buyurtmani avtomatik tanlash
+  const [pendingOrderId, setPendingOrderId] = useState<string | null>(null);
   const [problem, setProblem] = useState('');
   const [category, setCategory] = useState('');
   const [address, setAddress] = useState('');
@@ -37,11 +43,12 @@ export default function ServiceTicketModal({
     return () => window.removeEventListener('keydown', esc);
   }, [onClose]);
 
-  const customersQ = useQuery<{ items: Customer[] }>({
+  const customersQ = useQuery<SearchHit[]>({
     queryKey: ['svc-cust-search', debounced],
-    queryFn: () => api.get('/customers', { params: { search: debounced, page_size: 8 } }).then((r) => r.data),
+    queryFn: () => api.get('/service/customer-search', { params: { q: debounced } }).then((r) => r.data),
     enabled: !customer && debounced.length >= 1,
   });
+  const hits = customersQ.data ?? [];
 
   const ordersQ = useQuery<Order[]>({
     queryKey: ['svc-cust-orders', customer?.id],
@@ -52,6 +59,17 @@ export default function ServiceTicketModal({
   });
   const orders = ordersQ.data ?? [];
 
+  // Buyurtma ID bo'yicha topilgan bo'lsa — mijoz buyurtmalari yuklangach o'shani tanlaymiz
+  useEffect(() => {
+    if (!pendingOrderId) return;
+    const found = orders.find((o) => o.id === pendingOrderId);
+    if (found) {
+      setOrder(found);
+      setAddress('');
+      setPendingOrderId(null);
+    }
+  }, [orders, pendingOrderId]);
+
   const categoriesQ = useQuery<Category[]>({
     queryKey: ['service-categories'],
     queryFn: () => api.get('/service/categories').then((r) => r.data),
@@ -61,11 +79,13 @@ export default function ServiceTicketModal({
   const orderHasAddress = !!(order?.delivery_address && order.delivery_address.trim());
   const needAddress = !!order && !orderHasAddress;
 
-  function pickCustomer(c: Customer) {
-    setCustomer(c);
-    setSearch(c.full_name);
+  function pickHit(h: SearchHit) {
+    setCustomer({ id: h.customer_id, full_name: h.full_name, phone: h.phone, address: h.address ?? null });
+    setSearch(h.full_name);
     setOrder(null);
     setAddress('');
+    // Buyurtma ID bo'yicha topilgan bo'lsa — o'sha buyurtmani avtomatik tanlaymiz
+    setPendingOrderId(h.order_id ?? null);
   }
 
   // Warranty label helpers — literal o'zbekcha matnlar
@@ -126,18 +146,25 @@ export default function ServiceTicketModal({
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft" />
               <input
                 className="input pl-9"
-                placeholder="Ism yoki telefon bo'yicha qidiring…"
+                placeholder="Ism, telefon yoki buyurtma ID bo'yicha qidiring…"
                 value={search}
-                onChange={(e) => { setSearch(e.target.value); setCustomer(null); setOrder(null); }}
+                onChange={(e) => { setSearch(e.target.value); setCustomer(null); setOrder(null); setPendingOrderId(null); }}
               />
             </div>
-            {!customer && debounced.length >= 1 && (customersQ.data?.items?.length ?? 0) > 0 && (
+            {!customer && debounced.length >= 1 && hits.length > 0 && (
               <div className="mt-1 border border-black/10 rounded-button divide-y divide-black/5 overflow-hidden">
-                {customersQ.data!.items.map((c) => (
-                  <button key={c.id} type="button" onClick={() => pickCustomer(c)}
-                    className="w-full text-left px-3 py-2 hover:bg-black/5 text-sm">
-                    <div className="font-medium">{c.full_name}</div>
-                    <div className="text-xs text-ink-soft">{formatPhone(c.phone)}</div>
+                {hits.map((h, i) => (
+                  <button key={`${h.customer_id}-${h.order_id ?? i}`} type="button" onClick={() => pickHit(h)}
+                    className="w-full text-left px-3 py-2 hover:bg-black/5 text-sm flex items-center justify-between gap-2">
+                    <span className="min-w-0">
+                      <span className="block font-medium truncate">{h.full_name}</span>
+                      <span className="block text-xs text-ink-soft">{formatPhone(h.phone)}</span>
+                    </span>
+                    {h.order_code && (
+                      <span className="badge bg-primary/10 text-primary shrink-0 inline-flex items-center gap-1">
+                        <Package size={12} /> {h.order_code}
+                      </span>
+                    )}
                   </button>
                 ))}
               </div>
