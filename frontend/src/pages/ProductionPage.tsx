@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { Plus, Pencil, Trash2, Search, Flame, Boxes, Cylinder, Warehouse, CheckCircle2, Container } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Flame, Boxes, Cylinder, Warehouse, CheckCircle2, Container, CalendarDays } from 'lucide-react';
 
 import { api } from '@/api/client';
 import Card from '@/components/ui/Card';
@@ -40,6 +40,13 @@ const ADD_LABELS: Record<Category, string> = {
   tana: "Ishlab chiqarishdan olib kelish",
 };
 
+// Hisobot filtri uchun oy nomlari (1..12)
+const REPORT_MONTHS: Record<number, string> = {
+  1: 'Yanvar', 2: 'Fevral', 3: 'Mart', 4: 'Aprel', 5: 'May', 6: 'Iyun',
+  7: 'Iyul', 8: 'Avgust', 9: 'Sentabr', 10: 'Oktabr', 11: 'Noyabr', 12: 'Dekabr',
+};
+const rpad2 = (n: number) => String(n).padStart(2, '0');
+
 export default function ProductionPage() {
   const qc = useQueryClient();
   const { can } = usePermissions();
@@ -49,10 +56,44 @@ export default function ProductionPage() {
   const [deleteRec, setDeleteRec] = useState<ProductionRecord | null>(null);
   const [xferRec, setXferRec] = useState<ProductionRecord | null>(null);
 
+  // Hisobot davri filtri (oy / yil / kun). month 0 = butun yil, day 0 = butun oy.
+  const now = new Date();
+  const [repYear, setRepYear] = useState(now.getFullYear());
+  const [repMonth, setRepMonth] = useState(now.getMonth() + 1);
+  const [repDay, setRepDay] = useState(0);
+
+  const daysInMonth = repMonth === 0 ? 0 : new Date(repYear, repMonth, 0).getDate();
+  const effectiveDay = repMonth !== 0 && repDay >= 1 && repDay <= daysInMonth ? repDay : 0;
+  const { dateFrom, dateTo } = useMemo(() => {
+    if (repMonth === 0) return { dateFrom: `${repYear}-01-01`, dateTo: `${repYear}-12-31` };
+    const last = new Date(repYear, repMonth, 0).getDate();
+    if (effectiveDay === 0)
+      return {
+        dateFrom: `${repYear}-${rpad2(repMonth)}-01`,
+        dateTo: `${repYear}-${rpad2(repMonth)}-${rpad2(last)}`,
+      };
+    const iso = `${repYear}-${rpad2(repMonth)}-${rpad2(effectiveDay)}`;
+    return { dateFrom: iso, dateTo: iso };
+  }, [repYear, repMonth, effectiveDay]);
+  const YEARS = Array.from({ length: 5 }, (_, i) => now.getFullYear() - i);
+  const isDefaultPeriod =
+    repYear === now.getFullYear() && repMonth === now.getMonth() + 1 && effectiveDay === 0;
+
+  // KPI kartalar uchun — butun davr (filtrsiz) jami
   const summaryQ = useQuery<Summary>({
     queryKey: ['prod-summary'],
     queryFn: () => api.get('/production/summary').then((r) => r.data),
   });
+
+  // Hisobot jadvali uchun — tanlangan davr bo'yicha
+  const reportQ = useQuery<Summary>({
+    queryKey: ['prod-summary', dateFrom, dateTo],
+    queryFn: () => api.get('/production/summary', {
+      params: { date_from: dateFrom, date_to: dateTo },
+    }).then((r) => r.data),
+    enabled: tab === 'summary',
+  });
+  const rs = reportQ.data;
 
   const category = tab === 'summary' ? null : tab;
   const recordsQ = useQuery<ProductionRecord[]>({
@@ -130,10 +171,50 @@ export default function ProductionPage() {
 
       {tab === 'summary' ? (
         <Card title="Kunlik hisobot">
-          {summaryQ.isLoading ? (
+          {/* Davr filtri — oy / yil / kun */}
+          <div className="flex items-center gap-2 flex-wrap mb-4">
+            <span className="text-sm text-ink-soft inline-flex items-center gap-1.5">
+              <CalendarDays size={15} /> Davr:
+            </span>
+            <select className="input w-36" value={repMonth}
+                    onChange={(e) => { setRepMonth(Number(e.target.value)); setRepDay(0); }}>
+              <option value={0}>Butun yil</option>
+              {Object.entries(REPORT_MONTHS).map(([n, l]) => (
+                <option key={n} value={n}>{l}</option>
+              ))}
+            </select>
+            <select className="input w-24" value={repYear}
+                    onChange={(e) => { setRepYear(Number(e.target.value)); setRepDay(0); }}>
+              {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
+            </select>
+            <select className="input w-32" value={effectiveDay} disabled={repMonth === 0}
+                    onChange={(e) => setRepDay(Number(e.target.value))}>
+              <option value={0}>Butun oy</option>
+              {Array.from({ length: daysInMonth }, (_, i) => i + 1).map((d) => (
+                <option key={d} value={d}>{d}-kun</option>
+              ))}
+            </select>
+            {!isDefaultPeriod && (
+              <button
+                onClick={() => { setRepYear(now.getFullYear()); setRepMonth(now.getMonth() + 1); setRepDay(0); }}
+                className="text-xs text-ink-soft hover:text-primary px-2 py-1 rounded-button hover:bg-black/5">
+                Joriy oy
+              </button>
+            )}
+          </div>
+
+          {/* Tanlangan davr jamlanmasi */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
+            <PeriodStat label="Kotyol" value={rs?.total_kotyol ?? 0} tone="primary" />
+            <PeriodStat label="Bunker" value={rs?.total_bunker ?? 0} tone="success" />
+            <PeriodStat label="Garelka" value={rs?.total_garelka ?? 0} tone="warning" />
+            <PeriodStat label="Tana" value={rs?.total_tana ?? 0} tone="accent" />
+          </div>
+
+          {reportQ.isLoading ? (
             <Skeleton />
-          ) : (s?.days.length ?? 0) === 0 ? (
-            <EmptyState title="Hozircha yozuv yoʻq" description="Kotyol, tana, bunker yoki garelka qoʻshing" />
+          ) : (rs?.days.length ?? 0) === 0 ? (
+            <EmptyState title="Bu davrda yozuv yoʻq" description="Boshqa oy yoki kunni tanlang" />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -147,7 +228,7 @@ export default function ProductionPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {s!.days.map((d) => (
+                  {rs!.days.map((d) => (
                     <tr key={d.production_date} className="border-b border-black/5 hover:bg-black/5">
                       <td className="py-2 pr-3 whitespace-nowrap font-medium">{formatDate(d.production_date)}</td>
                       <td className="py-2 pr-3 text-right">{d.kotyol || '—'}</td>
@@ -157,6 +238,15 @@ export default function ProductionPage() {
                     </tr>
                   ))}
                 </tbody>
+                <tfoot>
+                  <tr className="border-t-2 border-black/10 font-semibold">
+                    <td className="py-2 pr-3">Jami</td>
+                    <td className="py-2 pr-3 text-right">{rs!.total_kotyol || '—'}</td>
+                    <td className="py-2 pr-3 text-right">{rs!.total_bunker || '—'}</td>
+                    <td className="py-2 pr-3 text-right">{rs!.total_garelka || '—'}</td>
+                    <td className="py-2 pr-3 text-right">{rs!.total_tana || '—'}</td>
+                  </tr>
+                </tfoot>
               </table>
             </div>
           )}
@@ -297,6 +387,24 @@ function Skeleton() {
   return (
     <div className="space-y-2">
       {Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-10 rounded-button bg-black/5 animate-pulse" />)}
+    </div>
+  );
+}
+
+const PERIOD_TONES: Record<string, string> = {
+  primary: 'border-primary/20 bg-primary/5 text-primary',
+  success: 'border-success/25 bg-success/10 text-success',
+  warning: 'border-warning/25 bg-warning/10 text-warning',
+  accent: 'border-accent/25 bg-accent/10 text-accent',
+};
+
+function PeriodStat({ label, value, tone }: {
+  label: string; value: number; tone: 'primary' | 'success' | 'warning' | 'accent';
+}) {
+  return (
+    <div className={`rounded-button border p-2.5 ${PERIOD_TONES[tone]}`}>
+      <div className="text-xs font-medium opacity-80">{label}</div>
+      <div className="text-xl font-bold tabular-nums">{value}</div>
     </div>
   );
 }
