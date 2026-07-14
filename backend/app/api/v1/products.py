@@ -80,6 +80,8 @@ async def list_products(db: Annotated[AsyncSession, Depends(get_db)], _: Current
 async def create_product(payload: ProductCreate, _: CurrentUser,
                          db: Annotated[AsyncSession, Depends(get_db)]):
     _validate_product(payload.product_type, payload.model, payload.name)
+    if payload.product_type == "warehouse" and payload.year is None:
+        raise HTTPException(422, "Ombor turi uchun yil majburiy")
     p = Product(**payload.model_dump())
     db.add(p)
     await db.commit()

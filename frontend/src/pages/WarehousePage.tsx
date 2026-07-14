@@ -33,8 +33,11 @@ interface MainProduct extends ProductFull {
 interface SizeRow {
   kvm: number | null; right: number; left: number; total: number;
 }
+interface SizeYearGroup {
+  year: number | null; rows: SizeRow[]; total_right: number; total_left: number; total: number;
+}
 interface SizeSummary {
-  rows: SizeRow[]; total_right: number; total_left: number; total: number;
+  years: SizeYearGroup[]; total: number;
 }
 
 const STATUS_STYLE: Record<string, string> = {
@@ -102,6 +105,7 @@ export default function WarehousePage() {
     return types.filter((p) =>
       (p.model ?? '').toLowerCase().includes(term) ||
       String(p.kvm ?? '').includes(term) ||
+      String(p.year ?? '').includes(term) ||
       (p.display_name ?? '').toLowerCase().includes(term),
     );
   }, [types, typeSearch]);
@@ -246,7 +250,7 @@ export default function WarehousePage() {
                     const c = countByProduct.get(p.id);
                     return (
                       <tr key={p.id} className="border-b border-black/5 hover:bg-black/5">
-                        <td className="py-2 pr-3 font-medium">{p.model ?? '—'}</td>
+                        <td className="py-2 pr-3 font-medium">{p.model ?? '—'}{p.year ? ` ${p.year}` : ''}</td>
                         <td className="py-2 pr-3">{p.kvm ? `${p.kvm} kvm` : '—'}</td>
                         <td className="py-2 pr-3 text-right">{formatUSD(p.base_price_usd)}</td>
                         <td className="py-2 pr-3 text-right font-semibold text-success">{c?.available ?? 0}</td>
@@ -358,50 +362,57 @@ export default function WarehousePage() {
           )}
         </Card>
       ) : (
-        /* Oʻlcham boʻyicha qoldiq — model farqlanmaydi, faqat oʻlcham + yoʻnalish */
-        <Card title="Oʻlcham boʻyicha qoldiq">
-          <p className="text-sm text-ink-soft mb-4">
-            Ombordagi boʻsh birliklar — oʻlchami va yoʻnalishi boʻyicha (modeldan qatʼi nazar)
-          </p>
-          {sizeSummaryQ.isLoading ? (
+        /* Oʻlcham boʻyicha qoldiq — YIL bo'yicha alohida bo'limlar (bir xil o'lcham
+           har yil uchun alohida hisoblanadi) */
+        sizeSummaryQ.isLoading ? (
+          <Card title="Oʻlcham boʻyicha qoldiq">
             <div className="space-y-2">
               {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-10 rounded-button bg-black/5 animate-pulse" />)}
             </div>
-          ) : (sz?.rows.length ?? 0) === 0 ? (
+          </Card>
+        ) : (sz?.years.length ?? 0) === 0 ? (
+          <Card title="Oʻlcham boʻyicha qoldiq">
             <EmptyState title="Ombor boʻsh" description="Hozircha boʻsh birlik yoʻq" />
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="text-left text-ink-soft border-b border-black/5">
-                  <tr>
-                    <th className="py-2 pr-3">Oʻlcham</th>
-                    <th className="py-2 pr-3 text-right">Oʻngga</th>
-                    <th className="py-2 pr-3 text-right">Chapga</th>
-                    <th className="py-2 pr-3 text-right">Jami</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sz!.rows.map((r) => (
-                    <tr key={r.kvm ?? 'none'} className="border-b border-black/5 hover:bg-black/5">
-                      <td className="py-2 pr-3 font-medium">{r.kvm ? `${r.kvm} kvm` : '—'}</td>
-                      <td className="py-2 pr-3 text-right">{r.right || '—'}</td>
-                      <td className="py-2 pr-3 text-right">{r.left || '—'}</td>
-                      <td className="py-2 pr-3 text-right font-semibold text-success">{r.total}</td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr className="border-t-2 border-black/10 font-semibold">
-                    <td className="py-2 pr-3">Jami</td>
-                    <td className="py-2 pr-3 text-right">{sz!.total_right || '—'}</td>
-                    <td className="py-2 pr-3 text-right">{sz!.total_left || '—'}</td>
-                    <td className="py-2 pr-3 text-right text-success">{sz!.total}</td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          )}
-        </Card>
+          </Card>
+        ) : (
+          <div className="space-y-4">
+            {sz!.years.map((g) => (
+              <Card key={g.year ?? 'none'}
+                    title={`Oʻlcham boʻyicha qoldiq — ${g.year ?? 'Yil belgilanmagan'}`}>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="text-left text-ink-soft border-b border-black/5">
+                      <tr>
+                        <th className="py-2 pr-3">Oʻlcham</th>
+                        <th className="py-2 pr-3 text-right">Oʻngga</th>
+                        <th className="py-2 pr-3 text-right">Chapga</th>
+                        <th className="py-2 pr-3 text-right">Jami</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {g.rows.map((r) => (
+                        <tr key={r.kvm ?? 'none'} className="border-b border-black/5 hover:bg-black/5">
+                          <td className="py-2 pr-3 font-medium">{r.kvm ? `${r.kvm} kvm` : '—'}</td>
+                          <td className="py-2 pr-3 text-right">{r.right || '—'}</td>
+                          <td className="py-2 pr-3 text-right">{r.left || '—'}</td>
+                          <td className="py-2 pr-3 text-right font-semibold text-success">{r.total}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t-2 border-black/10 font-semibold">
+                        <td className="py-2 pr-3">Jami</td>
+                        <td className="py-2 pr-3 text-right">{g.total_right || '—'}</td>
+                        <td className="py-2 pr-3 text-right">{g.total_left || '—'}</td>
+                        <td className="py-2 pr-3 text-right text-success">{g.total}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )
       )}
 
       {adding && <AddUnitsModal onClose={() => setAdding(false)} onSaved={refresh} />}

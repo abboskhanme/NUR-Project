@@ -56,10 +56,17 @@ class SizeSummaryRow(BaseModel):
     total: int = 0
 
 
-class SizeSummaryOut(BaseModel):
+class SizeYearGroup(BaseModel):
+    """Bitta yil uchun o'lcham bo'yicha qoldiq (yillar alohida hisoblanadi)."""
+    year: Optional[int] = None
     rows: list[SizeSummaryRow]
     total_right: int = 0
     total_left: int = 0
+    total: int = 0
+
+
+class SizeSummaryOut(BaseModel):
+    years: list[SizeYearGroup]
     total: int = 0
 
 
@@ -176,23 +183,26 @@ async def warehouse_summary(db: Annotated[AsyncSession, Depends(get_db)], _: Cur
 # --------------------------------------------------------------------------- #
 @router.get("/size-summary", response_model=SizeSummaryOut)
 async def warehouse_size_summary(db: Annotated[AsyncSession, Depends(get_db)], _: CurrentUser):
-    """Ombordagi BO'SH (available) qoldiqlar soni — faqat o'lcham (kvm) va
-    yo'nalish (o'ng/chap) bo'yicha guruhlaydi, modeldan qat'i nazar."""
+    """Ombordagi BO'SH (available) qoldiqlar soni — YIL bo'yicha bo'lingan holda,
+    har yil ichida o'lcham (kvm) x yo'nalish (o'ng/chap) bo'yicha (modeldan qat'i
+    nazar). Bir xil o'lcham har yil uchun ALOHIDA hisoblanadi."""
     rows = (await db.execute(
-        select(Product.kvm, Inventory.bunker_direction, func.count(Inventory.id))
+        select(Product.year, Product.kvm, Inventory.bunker_direction, func.count(Inventory.id))
         .join(Product, Product.id == Inventory.product_id)
         .where(Product.product_type == "warehouse",
                Inventory.status == "available",
                Inventory.bunker_direction.in_(("right", "left")))
-        .group_by(Product.kvm, Inventory.bunker_direction)
+        .group_by(Product.year, Product.kvm, Inventory.bunker_direction)
     )).all()
 
-    by_kvm: dict[Optional[int], SizeSummaryRow] = {}
-    for kvm, direction, cnt in rows:
-        r = by_kvm.get(kvm)
+    # year -> kvm -> row
+    by_year: dict[Optional[int], dict[Optional[int], SizeSummaryRow]] = {}
+    for year, kvm, direction, cnt in rows:
+        ymap = by_year.setdefault(year, {})
+        r = ymap.get(kvm)
         if not r:
             r = SizeSummaryRow(kvm=kvm)
-            by_kvm[kvm] = r
+            ymap[kvm] = r
         c = int(cnt or 0)
         if direction == "right":
             r.right += c
@@ -200,13 +210,18 @@ async def warehouse_size_summary(db: Annotated[AsyncSession, Depends(get_db)], _
             r.left += c
         r.total += c
 
-    out = sorted(by_kvm.values(), key=lambda r: (r.kvm or 0))
-    return SizeSummaryOut(
-        rows=out,
-        total_right=sum(r.right for r in out),
-        total_left=sum(r.left for r in out),
-        total=sum(r.total for r in out),
-    )
+    # Yillar yangidan eskiga; yili belgilanmagan (None) oxirida
+    groups: list[SizeYearGroup] = []
+    for year in sorted(by_year.keys(), key=lambda y: (y is None, -(y or 0))):
+        yrows = sorted(by_year[year].values(), key=lambda r: (r.kvm or 0))
+        groups.append(SizeYearGroup(
+            year=year,
+            rows=yrows,
+            total_right=sum(r.right for r in yrows),
+            total_left=sum(r.left for r in yrows),
+            total=sum(r.total for r in yrows),
+        ))
+    return SizeSummaryOut(years=groups, total=sum(g.total for g in groups))
 
 
 # --------------------------------------------------------------------------- #

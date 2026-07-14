@@ -24,6 +24,9 @@ class Product(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     model: Mapped[Optional[str]] = mapped_column(String(50), index=True)
     # Kvadratura: 150 / 200 / 300 / 400 / 500
     kvm: Mapped[Optional[int]] = mapped_column()
+    # Ishlab chiqarilgan yil (ombor turlari uchun) — bir xil o'lcham har yil uchun
+    # ALOHIDA hisoblanadi. Ombor hisobotida yil bo'yicha bo'limlarga bo'linadi.
+    year: Mapped[Optional[int]] = mapped_column()
 
     # --- Qo'shimcha mahsulot maydonlari ---
     # Erkin nom (turba, defizor, nasos, ...)
@@ -53,6 +56,8 @@ class Product(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         if self.product_type == "additional":
             return self.name or "-"
         parts = [self.model or "-"]
+        if self.year:
+            parts.append(str(self.year))
         if self.kvm:
             parts.append(f"{self.kvm} kvm")
         return " ".join(parts)

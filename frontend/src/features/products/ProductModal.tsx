@@ -11,6 +11,7 @@ export interface ProductFull {
   product_type: ProductType;
   model?: string | null;
   kvm?: number | null;
+  year?: number | null;
   name?: string | null;
   unit?: string | null;
   sku?: string | null;
@@ -23,6 +24,10 @@ export interface ProductFull {
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 const UNITS = ['dona', 'metr', 'komplekt', 'kg', 'litr'];
+
+const CUR_YEAR = new Date().getFullYear();
+// Joriy yildan +1 dan 6 yil orqagacha (ombor turi yili uchun)
+const YEAR_OPTIONS = Array.from({ length: 8 }, (_, i) => CUR_YEAR + 1 - i);
 
 const num = (s: string) => {
   const n = parseFloat(s); return Number.isNaN(n) ? 0 : n;
@@ -44,14 +49,16 @@ export default function ProductModal({
 
   const [model, setModel] = useState(product?.model ?? '');
   const [kvm, setKvm] = useState(product?.kvm != null ? String(product.kvm) : '');
+  const [year, setYear] = useState<number>(product?.year ?? CUR_YEAR);
   const [name, setName] = useState(product?.name ?? '');
   const [unit, setUnit] = useState(product?.unit ?? 'dona');
   const [price, setPrice] = useState(product ? String(num(product.base_price_usd)) : '');
   const [description, setDescription] = useState(product?.description ?? '');
   const [saving, setSaving] = useState(false);
 
-  // 'warehouse' (ombor turi) ham kotyol modeli kabi — model + kvm bilan kiritiladi.
+  // 'warehouse' (ombor turi) ham kotyol modeli kabi — model + kvm + yil bilan kiritiladi.
   const isAdditional = type === 'additional';
+  const isWarehouse = type === 'warehouse';
 
   // --- Rasm (faqat qo'shimcha mahsulot uchun) ---
   const fileRef = useRef<HTMLInputElement>(null);
@@ -111,6 +118,7 @@ export default function ProductModal({
     if (!isAdditional) {
       body.model = model.trim();
       body.kvm = kvm.trim() ? parseInt(kvm, 10) : null;
+      body.year = isWarehouse ? year : null;
       body.name = null;
       body.unit = null;
     } else {
@@ -181,6 +189,14 @@ export default function ProductModal({
                 <input type="number" min={0} className="input" placeholder="200" value={kvm}
                        onChange={(e) => setKvm(e.target.value)} />
               </div>
+              {isWarehouse && (
+                <div>
+                  <label className="label">Yil *</label>
+                  <select className="input" value={year} onChange={(e) => setYear(Number(e.target.value))}>
+                    {YEAR_OPTIONS.map((y) => <option key={y} value={y}>{y}</option>)}
+                  </select>
+                </div>
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-3">

@@ -14,6 +14,7 @@ class ProductBase(BaseModel):
     # asosiy (kotyol)
     model: Optional[str] = None
     kvm: Optional[int] = None
+    year: Optional[int] = None  # ombor turi uchun ishlab chiqarilgan yil
     # qo'shimcha
     name: Optional[str] = None
     unit: Optional[str] = None
@@ -32,6 +33,7 @@ class ProductUpdate(BaseModel):
     product_type: Optional[str] = None
     model: Optional[str] = None
     kvm: Optional[int] = None
+    year: Optional[int] = None
     name: Optional[str] = None
     unit: Optional[str] = None
     sku: Optional[str] = None
@@ -45,6 +47,7 @@ class ProductOut(ORMBase):
     product_type: str
     model: Optional[str] = None
     kvm: Optional[int] = None
+    year: Optional[int] = None
     name: Optional[str] = None
     unit: Optional[str] = None
     sku: Optional[str] = None
@@ -61,6 +64,8 @@ class ProductOut(ORMBase):
         if self.product_type == "additional":
             return self.name or "—"
         parts = [self.model or "—"]
+        if self.year:
+            parts.append(str(self.year))
         if self.kvm:
             parts.append(f"{self.kvm} kvm")
         return " ".join(parts)
