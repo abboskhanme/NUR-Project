@@ -35,6 +35,7 @@ from app.models.target import Target, TargetContribution
 from app.models.taminot import TaminotProduct, TaminotTransaction
 from app.models.shipping import Shipment
 from app.models.production import ProductionRecord
+from app.models.lead import Lead, LeadEvent
 
 __all__ = [
     "Base",
@@ -82,4 +83,6 @@ __all__ = [
     "TaminotTransaction",
     "Shipment",
     "ProductionRecord",
+    "Lead",
+    "LeadEvent",
 ]

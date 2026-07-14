@@ -13,6 +13,8 @@ import OrderDetailPage from '@/pages/OrderDetailPage';
 import QueuePage from '@/pages/QueuePage';
 import CustomersPage from '@/pages/CustomersPage';
 import CustomerDetailPage from '@/pages/CustomerDetailPage';
+import LeadsPage from '@/pages/LeadsPage';
+import LeadDetailPage from '@/pages/LeadDetailPage';
 import ProductsPage from '@/pages/ProductsPage';
 import WarehousePage from '@/pages/WarehousePage';
 import ProductionPage from '@/pages/ProductionPage';
@@ -109,6 +111,8 @@ export default function App() {
         <Route path="queue" element={<RequireModule module="orders"><QueuePage /></RequireModule>} />
         <Route path="customers" element={<RequireModule module="customers"><CustomersPage /></RequireModule>} />
         <Route path="customers/:customerId" element={<RequireModule module="customers"><CustomerDetailPage /></RequireModule>} />
+        <Route path="leads" element={<RequireModule module="leads"><LeadsPage /></RequireModule>} />
+        <Route path="leads/:leadId" element={<RequireModule module="leads"><LeadDetailPage /></RequireModule>} />
         <Route path="products" element={<RequireModule module="products"><ProductsPage /></RequireModule>} />
         <Route path="warehouse" element={<RequireModule module="inventory"><WarehousePage /></RequireModule>} />
         <Route path="production" element={<RequireModule module="production"><ProductionPage /></RequireModule>} />

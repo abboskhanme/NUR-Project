@@ -55,6 +55,11 @@ class Settings(BaseSettings):
     # CBU
     CBU_API_URL: str = "https://cbu.uz/uz/arkhiv-kursov-valyut/json/"
 
+    # NUR Agent (Instagram) — tashqi agent lead'larni shu kalit bilan yozadi.
+    # `POST /api/v1/leads/ingest` header'i: X-Agent-Key. Bo'sh bo'lsa ingest o'chiq
+    # (503) — agent hali sozlanmagani bilinadi. Prod'da .env orqali beriladi.
+    AGENT_INGEST_KEY: str = ""
+
     # Seed admin
     INIT_ADMIN_PHONE: str = "+998901234567"
     INIT_ADMIN_PASSWORD: str = "Admin@12345"

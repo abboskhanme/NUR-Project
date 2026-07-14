@@ -46,6 +46,7 @@ MODULES: list[str] = [
     "telegram",    # Telegram bot
     "debts",       # Bizning qarzlar (mustaqil modul)
     "targets",     # Maqsadlar (mustaqil modul)
+    "leads",       # Leadlar / Marketing (Instagram AI agenti manbai)
     "shipping",    # Yuk chiqarish (yetkazib berilgan yuklar jurnali)
     "settings",    # Tizim sozlamalari
 ]

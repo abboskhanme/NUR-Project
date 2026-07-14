@@ -23,6 +23,7 @@ from app.api.v1 import (
     shipping,
     production,
     goals,
+    leads,
 )
 
 api_router = APIRouter()
@@ -47,3 +48,5 @@ api_router.include_router(targets.router, prefix="/targets", tags=["Targets / Ma
 api_router.include_router(shipping.router, prefix="/shipping", tags=["Shipping / Yuk chiqarish"])
 api_router.include_router(production.router, prefix="/production", tags=["Production / Ishlab chiqarish"])
 api_router.include_router(goals.router, prefix="/goals", tags=["Goals / Oylik maqsadlar"])
+api_router.include_router(leads.router, prefix="/leads", tags=["Leads / Marketing"])
+api_router.include_router(leads.ingest_router, prefix="/leads", tags=["Leads / Marketing"])

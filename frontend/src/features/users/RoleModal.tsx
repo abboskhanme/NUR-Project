@@ -44,6 +44,7 @@ const MODULE_ICONS: Record<Module, LucideIcon> = {
   telegram: Send,
   debts: Coins,
   targets: Target,
+  leads: Sparkles,
   shipping: PackageOpen,
   settings: Settings,
 };
@@ -121,6 +122,7 @@ export default function RoleModal({
     telegram: 'Telegram',
     debts: 'Bizning qarzlar',
     targets: 'Maqsadlar',
+    leads: 'Leadlar',
     shipping: 'Yuk chiqarish',
     settings: 'Sozlamalar',
   };
