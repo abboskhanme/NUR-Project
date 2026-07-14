@@ -11,7 +11,7 @@ from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select
+from sqlalchemy import String, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import CurrentUser
@@ -46,6 +46,21 @@ class WarehouseSummary(BaseModel):
     total_sold: int
     # Omborda mavjud (bo'sh + band) birliklarning narx bo'yicha umumiy qiymati, USD
     total_value_usd: Decimal = Decimal(0)
+
+
+class SizeSummaryRow(BaseModel):
+    """O'lcham (kvm) bo'yicha bo'sh qoldiq — o'ng/chap yo'nalish sanoqlari."""
+    kvm: Optional[int] = None
+    right: int = 0
+    left: int = 0
+    total: int = 0
+
+
+class SizeSummaryOut(BaseModel):
+    rows: list[SizeSummaryRow]
+    total_right: int = 0
+    total_left: int = 0
+    total: int = 0
 
 
 class ModelOption(BaseModel):
@@ -157,6 +172,44 @@ async def warehouse_summary(db: Annotated[AsyncSession, Depends(get_db)], _: Cur
 
 
 # --------------------------------------------------------------------------- #
+# O'lcham bo'yicha qoldiq — model farqlanmaydi, faqat o'lcham + yo'nalish
+# --------------------------------------------------------------------------- #
+@router.get("/size-summary", response_model=SizeSummaryOut)
+async def warehouse_size_summary(db: Annotated[AsyncSession, Depends(get_db)], _: CurrentUser):
+    """Ombordagi BO'SH (available) qoldiqlar soni — faqat o'lcham (kvm) va
+    yo'nalish (o'ng/chap) bo'yicha guruhlaydi, modeldan qat'i nazar."""
+    rows = (await db.execute(
+        select(Product.kvm, Inventory.bunker_direction, func.count(Inventory.id))
+        .join(Product, Product.id == Inventory.product_id)
+        .where(Product.product_type == "warehouse",
+               Inventory.status == "available",
+               Inventory.bunker_direction.in_(("right", "left")))
+        .group_by(Product.kvm, Inventory.bunker_direction)
+    )).all()
+
+    by_kvm: dict[Optional[int], SizeSummaryRow] = {}
+    for kvm, direction, cnt in rows:
+        r = by_kvm.get(kvm)
+        if not r:
+            r = SizeSummaryRow(kvm=kvm)
+            by_kvm[kvm] = r
+        c = int(cnt or 0)
+        if direction == "right":
+            r.right += c
+        else:  # left — faqat shu ikkala yo'nalish filtrlangan
+            r.left += c
+        r.total += c
+
+    out = sorted(by_kvm.values(), key=lambda r: (r.kvm or 0))
+    return SizeSummaryOut(
+        rows=out,
+        total_right=sum(r.right for r in out),
+        total_left=sum(r.left for r in out),
+        total=sum(r.total for r in out),
+    )
+
+
+# --------------------------------------------------------------------------- #
 # Models — ombor (kotyol) modellari katalogi
 # --------------------------------------------------------------------------- #
 @router.get("/models", response_model=list[ModelOption])
@@ -204,7 +257,12 @@ async def list_units(
     if model:
         q = q.where(Product.model == model)
     if search:
-        q = q.where(Inventory.unique_id.ilike(f"%{search.strip()}%"))
+        term = f"%{search.strip()}%"
+        q = q.where(or_(
+            Inventory.unique_id.ilike(term),   # ID raqami
+            Product.model.ilike(term),         # model nomi
+            cast(Product.kvm, String).ilike(term),  # o'lcham (kvm)
+        ))
     q = q.order_by(Inventory.status.asc(), Inventory.added_date.desc()).limit(limit)
 
     rows = (await db.execute(q)).all()
@@ -245,8 +303,10 @@ async def add_units(payload: UnitsCreate, _: CurrentUser,
     if clashes:
         raise HTTPException(400, f"Bu ID raqamlar allaqachon mavjud: {', '.join(clashes[:10])}")
 
+    direction = (payload.bunker_direction or "").strip()
+    if direction not in ("right", "left"):
+        raise HTTPException(422, "Yo'nalish (o'ng yoki chap) majburiy")
     added = payload.added_date or date.today()
-    direction = payload.bunker_direction or None
     for uid in ids:
         db.add(Inventory(product_id=prod.id, unique_id=uid, status="available",
                          added_date=added, notes=payload.notes,

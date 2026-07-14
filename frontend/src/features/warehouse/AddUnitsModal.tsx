@@ -39,11 +39,12 @@ export default function AddUnitsModal({ onClose, onSaved }: { onClose: () => voi
   async function submit() {
     if (!productId) { toast.error("Modelni tanlang"); return; }
     if (ids.length === 0) { toast.error("Kamida bitta ID raqami kerak"); return; }
+    if (!direction) { toast.error("Yoʻnalishni tanlang"); return; }
     setSaving(true);
     try {
       const r = await api.post('/inventory/units', {
         product_id: productId, unique_ids: ids, notes: notes.trim() || null,
-        bunker_direction: direction || null,
+        bunker_direction: direction,
       });
       toast.success(`${r.data.created} ta birlik qoʻshildi`);
       onSaved();
@@ -87,9 +88,9 @@ export default function AddUnitsModal({ onClose, onSaved }: { onClose: () => voi
             <div className="text-xs text-ink-soft mt-1">{`${ids.length} ta ID`}</div>
           </div>
           <div>
-            <label className="text-xs text-ink-soft">Yoʻnalish</label>
+            <label className="text-xs text-ink-soft">Yoʻnalish <span className="text-danger">*</span></label>
             <select className="input w-full mt-1" value={direction} onChange={(e) => setDirection(e.target.value)}>
-              <option value="">— tanlanmagan —</option>
+              <option value="">— tanlang —</option>
               <option value="right">Oʻngga</option>
               <option value="left">Chapga</option>
             </select>
