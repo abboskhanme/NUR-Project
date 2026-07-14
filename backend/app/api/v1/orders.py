@@ -241,6 +241,8 @@ async def sales_summary(
     date_from: Optional[date] = None, date_to: Optional[date] = None,
     # Qiyoslash davri (oldingi oy/yil) — berilса, oldingi davr ko'rsatkichlari ham qaytadi
     cmp_date_from: Optional[date] = None, cmp_date_to: Optional[date] = None,
+    # Ikkinchi qiyos davri — o'tgan oyning shu sanasigacha (joriy oy uchun)
+    cmp2_date_from: Optional[date] = None, cmp2_date_to: Optional[date] = None,
     search: Optional[str] = None,
 ):
     paid_expr = func.coalesce(func.sum(func.coalesce(func.nullif(Payment.amount_uzs_equiv, 0), Payment.amount)), 0)
@@ -282,6 +284,16 @@ async def sales_summary(
         delivered_prev = prev_st.get("delivered", 0)
         pending_prev = prev_st.get("new", 0) + prev_st.get("ready", 0)
 
+    # Ikkinchi qiyoslash davri (o'tgan oyning shu sanasigacha) — faqat cmp2 berilганда
+    prev2_sp = None
+    orders_prev2 = delivered_prev2 = pending_prev2 = None
+    revenue_prev2 = paid_prev2 = None
+    if cmp2_date_from and cmp2_date_to:
+        prev2_st, revenue_prev2, paid_prev2, prev2_sp = await _period(cmp2_date_from, cmp2_date_to)
+        orders_prev2 = sum(prev2_st.values())
+        delivered_prev2 = prev2_st.get("delivered", 0)
+        pending_prev2 = prev2_st.get("new", 0) + prev2_st.get("ready", 0)
+
     # "This month" bloki — har doim JORIY kalendar oy (filtrdan qat'i nazar, orqaga moslik)
     today = date.today()
     month_start = today.replace(day=1)
@@ -301,6 +313,7 @@ async def sales_summary(
         (SalespersonCount(
             salesperson_id=i, name=n, count=c,
             prev_count=(prev_sp.get(i, (None, 0))[1] if prev_sp is not None else None),
+            prev_count2=(prev2_sp.get(i, (None, 0))[1] if prev2_sp is not None else None),
          ) for i, (n, c) in cur_sp.items()),
         key=lambda r: r.count, reverse=True,
     )
@@ -320,6 +333,11 @@ async def sales_summary(
         pending_prev=pending_prev,
         revenue_prev=revenue_prev,
         paid_prev=paid_prev,
+        orders_prev2=orders_prev2,
+        delivered_prev2=delivered_prev2,
+        pending_prev2=pending_prev2,
+        revenue_prev2=revenue_prev2,
+        paid_prev2=paid_prev2,
     )
 
 

@@ -225,6 +225,8 @@ class SalespersonCount(BaseModel):
     count: int = 0
     # Oldingi davr (o'tgan oy/yil) zakaz soni — qiyoslash uchun. None = qiyos yo'q.
     prev_count: Optional[int] = None
+    # O'tgan oyning shu sanasigacha zakaz soni (joriy oy uchun). None = yo'q.
+    prev_count2: Optional[int] = None
 
 
 class SalesSummary(BaseModel):
@@ -247,6 +249,12 @@ class SalesSummary(BaseModel):
     pending_prev: Optional[int] = None
     revenue_prev: Optional[Decimal] = None
     paid_prev: Optional[Decimal] = None
+    # Ikkinchi qiyos — o'tgan oyning shu sanasigacha (faqat joriy oy uchun).
+    orders_prev2: Optional[int] = None
+    delivered_prev2: Optional[int] = None
+    pending_prev2: Optional[int] = None
+    revenue_prev2: Optional[Decimal] = None
+    paid_prev2: Optional[Decimal] = None
 
 
 class QueueItemOut(OrderOut):

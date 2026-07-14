@@ -12,7 +12,7 @@ import OrderModal from '@/features/sales/OrderModal';
 import PaymentModal from '@/features/sales/PaymentModal';
 import OrdersTable, { OrderFull, ProductOpt } from '@/features/sales/OrdersTable';
 
-interface SalespersonCount { salesperson_id: string | null; name: string; count: number; prev_count?: number | null; }
+interface SalespersonCount { salesperson_id: string | null; name: string; count: number; prev_count?: number | null; prev_count2?: number | null; }
 interface Summary {
   total_orders: number;
   status_counts: Record<string, number>;
@@ -29,6 +29,12 @@ interface Summary {
   pending_prev?: number | null;
   revenue_prev?: string | null;
   paid_prev?: string | null;
+  // Ikkinchi qiyos — o'tgan oyning shu sanasigacha (joriy oy uchun)
+  orders_prev2?: number | null;
+  delivered_prev2?: number | null;
+  pending_prev2?: number | null;
+  revenue_prev2?: string | null;
+  paid_prev2?: string | null;
 }
 
 // Status options with their labels
@@ -123,13 +129,18 @@ export default function OrdersPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [payingId, setPayingId] = useState<string | null>(null);
 
-  const { dateFrom, dateTo, cmpFrom, cmpTo } = useMemo(() => {
+  const todayDay = now.getDate();
+  const nowMonth = now.getMonth() + 1;
+  const nowYear = now.getFullYear();
+
+  const { dateFrom, dateTo, cmpFrom, cmpTo, cmp2From, cmp2To, cmp2Day } = useMemo(() => {
     const iso = (y: number, m: number, d: number) => `${y}-${pad2(m)}-${pad2(d)}`;
     if (month === 0) {
       // Butun yil — o'tgan yilning TO'LIQ natijasi bilan qiyos
       return {
         dateFrom: iso(year, 1, 1), dateTo: iso(year, 12, 31),
         cmpFrom: iso(year - 1, 1, 1), cmpTo: iso(year - 1, 12, 31),
+        cmp2From: null as string | null, cmp2To: null as string | null, cmp2Day: 0,
       };
     }
     const lastDay = new Date(year, month, 0).getDate();
@@ -138,14 +149,22 @@ export default function OrdersPage() {
     const py = pd.getFullYear();
     const pm = pd.getMonth() + 1;
     const pLast = new Date(py, pm, 0).getDate();
-    // Har doim TO'LIQ oldingi oy bilan qiyoslaymiz (butun o'tgan oy).
+    // Ikkinchi qiyos FAQAT joriy oy ko'rilganda: o'tgan oyning shu sanasigacha
+    // (masalan bugun 16 bo'lsa — o'tgan oyning 1–16 kunlari). Kun oydan oshsa
+    // (masalan 31), o'tgan oyning oxirgi kunigacha cheklaymiz.
+    const isCur = month === nowMonth && year === nowYear;
+    const day2 = Math.min(todayDay, pLast);
     return {
       dateFrom: iso(year, month, 1), dateTo: iso(year, month, lastDay),
       cmpFrom: iso(py, pm, 1), cmpTo: iso(py, pm, pLast),
+      cmp2From: isCur ? iso(py, pm, 1) : null,
+      cmp2To: isCur ? iso(py, pm, day2) : null,
+      cmp2Day: isCur ? day2 : 0,
     };
-  }, [month, year]);
+  }, [month, year, todayDay, nowMonth, nowYear]);
 
   const cmpLabel = month === 0 ? "o'tgan yilga nisbatan" : "o'tgan oyga nisbatan";
+  const cmp2Label = `o'tgan oyning ${cmp2Day}-sanasigacha`;
 
   const YEARS = Array.from({ length: 5 }, (_, i) => now.getFullYear() - i);
 
@@ -189,6 +208,8 @@ export default function OrdersPage() {
         // Qidiruvda qiyoslash mantiqsiz — faqat davr tanlanганда yuboramiz
         cmp_date_from: searching ? undefined : (cmpFrom || undefined),
         cmp_date_to: searching ? undefined : (cmpTo || undefined),
+        cmp2_date_from: searching ? undefined : (cmp2From || undefined),
+        cmp2_date_to: searching ? undefined : (cmp2To || undefined),
       },
     }).then((r) => r.data),
   });
@@ -236,7 +257,10 @@ export default function OrdersPage() {
                   return (
                     <span key={sp.salesperson_id ?? sp.name}
                           className={'inline-flex items-center gap-2 text-xl font-semibold rounded-full pl-4 pr-2 py-1.5 ' + spColor(sp.name)}
-                          title={sp.prev_count != null ? `${cmpLabel}: ${sp.prev_count} ta` : undefined}>
+                          title={[
+                            sp.prev_count != null ? `${cmpLabel}: ${sp.prev_count} ta` : null,
+                            sp.prev_count2 != null ? `${cmp2Label}: ${sp.prev_count2} ta` : null,
+                          ].filter(Boolean).join(' · ') || undefined}>
                       {sp.name}
                       <span className="inline-flex items-center justify-center min-w-[30px] h-7 px-2 rounded-full bg-white/75 font-bold text-base">{sp.count}</span>
                       {d != null && d !== 0 && (
@@ -266,24 +290,30 @@ export default function OrdersPage() {
       {/* KPI — songa oid kartalar (alohida qator) */}
       <div className="grid grid-cols-3 gap-3">
         <Kpi icon={<ShoppingCart size={18} />} label={`Buyurtma · ${periodLabel}`} value={s ? String(s.total_orders) : '—'}
-             trend={s ? countTrend(s.total_orders, s.orders_prev, cmpLabel) : undefined} />
+             trend={s ? countTrend(s.total_orders, s.orders_prev, cmpLabel) : undefined}
+             trend2={s ? countTrend(s.total_orders, s.orders_prev2, cmp2Label) : undefined} />
         <Kpi icon={<PackageCheck size={18} />} label={`Yetkazildi · ${periodLabel}`}
              value={s ? String(s.status_counts?.delivered ?? 0) : '—'} accent="text-success"
-             trend={s ? countTrend(s.status_counts?.delivered ?? 0, s.delivered_prev, cmpLabel) : undefined} />
+             trend={s ? countTrend(s.status_counts?.delivered ?? 0, s.delivered_prev, cmpLabel) : undefined}
+             trend2={s ? countTrend(s.status_counts?.delivered ?? 0, s.delivered_prev2, cmp2Label) : undefined} />
         <Kpi icon={<Clock size={18} />} label={`Qoldi · ${periodLabel}`}
              value={s ? String((s.status_counts?.new ?? 0) + (s.status_counts?.ready ?? 0)) : '—'} accent="text-warning"
-             trend={s ? countTrend((s.status_counts?.new ?? 0) + (s.status_counts?.ready ?? 0), s.pending_prev, cmpLabel) : undefined} />
+             trend={s ? countTrend((s.status_counts?.new ?? 0) + (s.status_counts?.ready ?? 0), s.pending_prev, cmpLabel) : undefined}
+             trend2={s ? countTrend((s.status_counts?.new ?? 0) + (s.status_counts?.ready ?? 0), s.pending_prev2, cmp2Label) : undefined} />
       </div>
 
       {/* KPI — pulga oid kartalar (alohida qator) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <Kpi icon={<Wallet size={18} />} label={`Savdo · ${periodLabel}`} value={s ? formatUZS(s.revenue_total) : '—'} accent="text-ink"
-             trend={s ? moneyTrend(s.revenue_total, s.revenue_prev, cmpLabel) : undefined} />
+             trend={s ? moneyTrend(s.revenue_total, s.revenue_prev, cmpLabel) : undefined}
+             trend2={s ? moneyTrend(s.revenue_total, s.revenue_prev2, cmp2Label) : undefined} />
         <Kpi icon={<DollarSign size={18} />} label={`Savdo ($) · ${periodLabel}`}
              value={s && rate > 0 ? formatUSD(Number(s.revenue_total) / rate) : '—'} accent="text-ink"
-             trend={s ? moneyTrend(s.revenue_total, s.revenue_prev, cmpLabel) : undefined} />
+             trend={s ? moneyTrend(s.revenue_total, s.revenue_prev, cmpLabel) : undefined}
+             trend2={s ? moneyTrend(s.revenue_total, s.revenue_prev2, cmp2Label) : undefined} />
         <Kpi icon={<CalendarClock size={18} />} label={`To'langan · ${periodLabel}`} value={s ? formatUZS(s.paid_total) : '—'} accent="text-success"
-             trend={s ? moneyTrend(s.paid_total, s.paid_prev, cmpLabel) : undefined} />
+             trend={s ? moneyTrend(s.paid_total, s.paid_prev, cmpLabel) : undefined}
+             trend2={s ? moneyTrend(s.paid_total, s.paid_prev2, cmp2Label) : undefined} />
         <Kpi icon={<AlertCircle size={18} />} label={`Qoldiq · ${periodLabel}`}
              value={s ? formatUZS(s.outstanding_total) : '—'} accent="text-danger" />
       </div>
@@ -335,8 +365,9 @@ export default function OrdersPage() {
   );
 }
 
-function Kpi({ icon, label, value, sub, accent, trend }: {
-  icon: React.ReactNode; label: string; value: string; sub?: string; accent?: string; trend?: Trend;
+function Kpi({ icon, label, value, sub, accent, trend, trend2 }: {
+  icon: React.ReactNode; label: string; value: string; sub?: string; accent?: string;
+  trend?: Trend; trend2?: Trend;
 }) {
   return (
     <div className="card !p-4">
@@ -345,6 +376,7 @@ function Kpi({ icon, label, value, sub, accent, trend }: {
       </div>
       <div className={'text-2xl font-bold mt-1 ' + (accent ?? 'text-ink')}>{value}</div>
       {trend ? <TrendBadge t={trend} /> : (sub && <div className="text-xs text-ink-soft mt-0.5">{sub}</div>)}
+      {trend2 && <TrendBadge t={trend2} />}
     </div>
   );
 }

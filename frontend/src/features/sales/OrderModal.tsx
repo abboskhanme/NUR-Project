@@ -5,12 +5,15 @@ import { X, Plus, Trash2, RefreshCw } from 'lucide-react';
 
 import { api } from '@/api/client';
 import { formatUZS } from '@/lib/format';
+import Select, { type SelectOption } from '@/components/ui/Select';
+import ProductThumb from '@/features/products/ProductThumb';
 import CustomerPicker, { CustomerLite } from './CustomerPicker';
 
 interface Product {
   id: string; product_type?: string; model?: string | null; kvm?: number | null;
   name?: string | null; unit?: string | null; display_name?: string;
   bunker_direction?: string | null; base_price_usd: string;
+  has_image?: boolean;
 }
 interface ItemRow {
   product_id: string;
@@ -69,8 +72,20 @@ export default function OrderModal({
     queryFn: () => api.get('/products', { params: { page_size: 200 } }).then((r) => r.data),
   });
   // Ombor turlari (product_type='warehouse') sotuvda ko'rsatilmaydi — aralashmasligi uchun
-  const products: Product[] = (productsQ.data?.items ?? [])
-    .filter((p: Product) => p.product_type !== 'warehouse');
+  const products: Product[] = useMemo(
+    () => (productsQ.data?.items ?? []).filter((p: Product) => p.product_type !== 'warehouse'),
+    [productsQ.data],
+  );
+  // Dropdown variantlari — rasmi bor mahsulotlar (ayniqsa qo'shimchalar) rasm bilan
+  // ko'rsatiladi (dropdownda va tanlangandan keyin trigger'da ham).
+  const productOptions: SelectOption[] = useMemo(
+    () => products.map((p) => ({
+      value: p.id,
+      label: p.display_name ?? p.model ?? p.name ?? '—',
+      icon: p.has_image ? <ProductThumb id={p.id} hasImage size={26} /> : undefined,
+    })),
+    [products],
+  );
 
   useEffect(() => {
     const esc = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -269,17 +284,14 @@ export default function OrderModal({
                 </div>
                 {items.map((it, idx) => (
                   <div key={idx} className="grid grid-cols-12 gap-2 items-center">
-                    <select
-                      className={`input col-span-3 ${!it.product_id ? 'border-danger ring-1 ring-danger/40' : ''}`}
-                      value={it.product_id} required
-                      onChange={(e) => onProductChange(idx, e.target.value)}>
-                      <option value="">— mahsulot tanlang —</option>
-                      {products.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.display_name ?? p.model ?? p.name ?? '—'}
-                        </option>
-                      ))}
-                    </select>
+                    <Select
+                      className="col-span-3"
+                      value={it.product_id}
+                      invalid={!it.product_id}
+                      onChange={(v) => onProductChange(idx, v)}
+                      options={productOptions}
+                      placeholder="— mahsulot tanlang —"
+                    />
                     {products.find((p) => p.id === it.product_id)?.product_type !== 'additional' ? (
                       <select
                         className={`input col-span-2 ${!it.bunker_direction ? 'border-danger ring-1 ring-danger/40' : ''}`}
