@@ -25,7 +25,8 @@ interface Summary {
 interface Unit {
   id: string; unique_id: string; status: string; added_date: string; notes?: string | null;
   product_id: string; bunker_direction?: string | null;
-  model: string | null; kvm: number | null; order_code?: string | null; customer_name?: string | null;
+  model: string | null; kvm: number | null; year?: number | null;
+  order_code?: string | null; customer_name?: string | null;
 }
 interface MainProduct extends ProductFull {
   display_name: string;
@@ -324,7 +325,7 @@ export default function WarehousePage() {
                   {units.map((u) => (
                     <tr key={u.id} className="border-b border-black/5 hover:bg-black/5">
                       <td className="py-2 pr-3 font-mono font-medium">{u.unique_id}</td>
-                      <td className="py-2 pr-3">{u.model ?? '—'}</td>
+                      <td className="py-2 pr-3">{u.model ?? '—'}{u.year ? ` ${u.year}` : ''}</td>
                       <td className="py-2 pr-3">{u.kvm ? `${u.kvm} kvm` : '—'}</td>
                       <td className="py-2 pr-3">
                         {u.bunker_direction === 'right' ? 'Oʻngga'

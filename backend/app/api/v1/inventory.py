@@ -88,6 +88,7 @@ class UnitOut(ORMBase):
     product_id: uuid.UUID
     model: Optional[str] = None
     kvm: Optional[int] = None
+    year: Optional[int] = None
     order_code: Optional[str] = None
     customer_name: Optional[str] = None
 
@@ -117,7 +118,7 @@ _ACTIVE_ORDER_JOIN = (
 
 def _unit_out_query():
     return (
-        select(Inventory, Product.model, Product.kvm, Order.code, Customer.full_name)
+        select(Inventory, Product.model, Product.kvm, Product.year, Order.code, Customer.full_name)
         .join(Product, Product.id == Inventory.product_id)
         .outerjoin(Order, _ACTIVE_ORDER_JOIN)
         .outerjoin(Customer, Customer.id == Order.customer_id)
@@ -125,9 +126,9 @@ def _unit_out_query():
 
 
 def _to_unit_out(row) -> "UnitOut":
-    inv, model_, kvm, code, cust = row
+    inv, model_, kvm, year, code, cust = row
     u = UnitOut.model_validate(inv)
-    u.model, u.kvm, u.order_code, u.customer_name = model_, kvm, code, cust
+    u.model, u.kvm, u.year, u.order_code, u.customer_name = model_, kvm, year, code, cust
     return u
 
 
@@ -259,7 +260,7 @@ async def list_units(
     limit: int = Query(500, ge=1, le=2000),
 ):
     q = (
-        select(Inventory, Product.model, Product.kvm, Order.code, Customer.full_name)
+        select(Inventory, Product.model, Product.kvm, Product.year, Order.code, Customer.full_name)
         .join(Product, Product.id == Inventory.product_id)
         .outerjoin(Order, _ACTIVE_ORDER_JOIN)
         .outerjoin(Customer, Customer.id == Order.customer_id)
@@ -277,15 +278,17 @@ async def list_units(
             Inventory.unique_id.ilike(term),   # ID raqami
             Product.model.ilike(term),         # model nomi
             cast(Product.kvm, String).ilike(term),  # o'lcham (kvm)
+            cast(Product.year, String).ilike(term),  # ishlab chiqarilgan yil
         ))
     q = q.order_by(Inventory.status.asc(), Inventory.added_date.desc()).limit(limit)
 
     rows = (await db.execute(q)).all()
     out: list[UnitOut] = []
-    for inv, model_, kvm, code, cust in rows:
+    for inv, model_, kvm, year, code, cust in rows:
         u = UnitOut.model_validate(inv)
         u.model = model_
         u.kvm = kvm
+        u.year = year
         u.order_code = code
         u.customer_name = cust
         out.append(u)
