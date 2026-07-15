@@ -251,7 +251,13 @@ export default function WarehousePage() {
                     const c = countByProduct.get(p.id);
                     return (
                       <tr key={p.id} className="border-b border-black/5 hover:bg-black/5">
-                        <td className="py-2 pr-3 font-medium">{p.model ?? '—'}{p.year ? ` ${p.year}` : ''}</td>
+                        <td className="py-2 pr-3 font-medium">
+                          {p.model ?? '—'}{p.year ? ` ${p.year}` : ''}
+                          {!p.year && (
+                            <span title="Yil belgilanmagan — tahrirlab yilini qoʻying"
+                                  className="inline-block w-2 h-2 rounded-full bg-danger ml-1.5 align-middle" />
+                          )}
+                        </td>
                         <td className="py-2 pr-3">{p.kvm ? `${p.kvm} kvm` : '—'}</td>
                         <td className="py-2 pr-3 text-right">{formatUSD(p.base_price_usd)}</td>
                         <td className="py-2 pr-3 text-right font-semibold text-success">{c?.available ?? 0}</td>
@@ -325,7 +331,13 @@ export default function WarehousePage() {
                   {units.map((u) => (
                     <tr key={u.id} className="border-b border-black/5 hover:bg-black/5">
                       <td className="py-2 pr-3 font-mono font-medium">{u.unique_id}</td>
-                      <td className="py-2 pr-3">{u.model ?? '—'}{u.year ? ` ${u.year}` : ''}</td>
+                      <td className="py-2 pr-3">
+                        {u.model ?? '—'}{u.year ? ` ${u.year}` : ''}
+                        {!u.year && (
+                          <span title="Yil belgilanmagan — turini tahrirlab yilini qoʻying"
+                                className="inline-block w-2 h-2 rounded-full bg-danger ml-1.5 align-middle" />
+                        )}
+                      </td>
                       <td className="py-2 pr-3">{u.kvm ? `${u.kvm} kvm` : '—'}</td>
                       <td className="py-2 pr-3">
                         {u.bunker_direction === 'right' ? 'Oʻngga'
