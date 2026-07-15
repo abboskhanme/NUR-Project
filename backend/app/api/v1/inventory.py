@@ -4,6 +4,7 @@ Ishlab chiqarilgan kotyollar ID raqamlari (unique_id) bilan saqlanadi.
 Model + o'lcham (kvm) bo'yicha nechta bo'sh / band / sotilgan ekanini ko'rsatadi.
 Sotuvda mos birlik avtomatik band qilinadi (orders.py da).
 """
+import re
 import uuid
 from datetime import date
 from decimal import Decimal
@@ -132,6 +133,23 @@ def _to_unit_out(row) -> "UnitOut":
     return u
 
 
+# Ba'zi eski ombor turlarida yil alohida `year` ustunida emas, model nomi ichida
+# saqlangan (masalan model="OPTIMA 2026"). Ro'yxat displayi buni ko'rsatadi;
+# hisobot ham yilni shu matndan olishi uchun (ma'lumotni o'zgartirmasdan).
+_MODEL_YEAR_RE = re.compile(r"(20\d{2})\s*$")
+
+
+def _effective_year(year: Optional[int], model: Optional[str]) -> Optional[int]:
+    """`year` ustuni bo'sh bo'lsa, yilni model matni oxiridan ajratadi."""
+    if year is not None:
+        return year
+    if model:
+        m = _MODEL_YEAR_RE.search(model)
+        if m:
+            return int(m.group(1))
+    return None
+
+
 # --------------------------------------------------------------------------- #
 # Summary — model + kvm bo'yicha sanoq
 # --------------------------------------------------------------------------- #
@@ -188,18 +206,21 @@ async def warehouse_size_summary(db: Annotated[AsyncSession, Depends(get_db)], _
     har yil ichida o'lcham (kvm) x yo'nalish (o'ng/chap) bo'yicha (modeldan qat'i
     nazar). Bir xil o'lcham har yil uchun ALOHIDA hisoblanadi."""
     rows = (await db.execute(
-        select(Product.year, Product.kvm, Inventory.bunker_direction, func.count(Inventory.id))
+        select(Product.year, Product.model, Product.kvm, Inventory.bunker_direction,
+               func.count(Inventory.id))
         .join(Product, Product.id == Inventory.product_id)
         .where(Product.product_type == "warehouse",
                Inventory.status == "available",
                Inventory.bunker_direction.in_(("right", "left")))
-        .group_by(Product.year, Product.kvm, Inventory.bunker_direction)
+        .group_by(Product.year, Product.model, Product.kvm, Inventory.bunker_direction)
     )).all()
 
-    # year -> kvm -> row
+    # year -> kvm -> row. Yil `year` ustunida bo'lmasa, model matnidan olinadi
+    # (Ro'yxat displayi bilan bir xil — masalan "OPTIMA 2026" -> 2026).
     by_year: dict[Optional[int], dict[Optional[int], SizeSummaryRow]] = {}
-    for year, kvm, direction, cnt in rows:
-        ymap = by_year.setdefault(year, {})
+    for year, model, kvm, direction, cnt in rows:
+        eff_year = _effective_year(year, model)
+        ymap = by_year.setdefault(eff_year, {})
         r = ymap.get(kvm)
         if not r:
             r = SizeSummaryRow(kvm=kvm)
