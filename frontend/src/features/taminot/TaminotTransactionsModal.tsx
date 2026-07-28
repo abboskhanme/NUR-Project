@@ -1,16 +1,20 @@
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { X, Trash2, PackagePlus, Wallet } from 'lucide-react';
+import { X, Trash2, PackagePlus, Wallet, PackageMinus, ClipboardCheck } from 'lucide-react';
 
 import { api } from '@/api/client';
-import { formatMoney, formatDateTime } from '@/lib/format';
+import { formatMoney, formatQty, formatDateTime } from '@/lib/format';
 import ConfirmModal from '@/components/ui/ConfirmModal';
+import { cn } from '@/lib/cn';
+import { STOCK_META } from '@/features/taminot/TaminotStockTab';
 import type { TaminotProduct } from '@/features/taminot/TaminotProductModal';
+
+type TxKind = 'purchase' | 'payment' | 'consume' | 'adjust';
 
 interface Tx {
   id: string;
-  kind: 'purchase' | 'payment';
+  kind: TxKind;
   qty: number;
   unit_price: number;
   amount: number;
@@ -18,6 +22,16 @@ interface Tx {
   note?: string | null;
   created_at: string;
 }
+
+const UNIT_LABEL: Record<string, string> = { dona: 'dona', kg: 'kg', metr: 'metr', list: 'list' };
+
+/** Har bir harakat turining ko'rinishi (ikonka, rang, sarlavha). */
+const TX_META: Record<TxKind, { label: string; icon: typeof PackagePlus; tone: string }> = {
+  purchase: { label: 'Olib kelish', icon: PackagePlus, tone: 'bg-primary/10 text-primary' },
+  payment: { label: "To'lov", icon: Wallet, tone: 'bg-success/10 text-success' },
+  consume: { label: 'Sarflandi', icon: PackageMinus, tone: 'bg-warning/15 text-warning' },
+  adjust: { label: "Qoldiq to'g'rilandi", icon: ClipboardCheck, tone: 'bg-black/5 text-ink-soft' },
+};
 
 /** Bitta mahsulot bo'yicha to'liq harakatlar tarixi (o'chirish mumkin). */
 export default function TaminotTransactionsModal({
@@ -37,6 +51,10 @@ export default function TaminotTransactionsModal({
     queryFn: () => api.get(`/taminot/products/${product.id}/transactions`).then((r) => r.data),
   });
   const txs = txQ.data ?? [];
+
+  const sm = STOCK_META[product.stock_status];
+  const attention = product.stock_status === 'low' || product.stock_status === 'out';
+  const unitLabel = UNIT_LABEL[product.unit] ?? product.unit;
 
   async function confirmDelete() {
     if (!delId) return;
@@ -66,15 +84,40 @@ export default function TaminotTransactionsModal({
           <button onClick={onClose} className="p-1 rounded hover:bg-black/5"><X size={18} /></button>
         </div>
 
-        {/* Qarz qoldig'i */}
+        {/* Ombor qoldig'i va qarz qoldig'i */}
         <div className="px-5 pt-4">
-          <div className="rounded-button bg-danger/10 border border-danger/20 px-4 py-3 flex items-center justify-between">
-            <span className="text-sm font-medium text-danger/90">Qarz qoldig'i</span>
-            <span className="text-xl font-bold text-danger">{formatMoney(product.balance, product.currency)}</span>
+          <div className="grid grid-cols-2 gap-3">
+            <div className={cn('rounded-button border px-4 py-3',
+              attention ? 'border-danger/25 bg-danger/10' : 'border-black/10 bg-black/[0.03]')}>
+              <div className="text-xs font-medium text-ink-soft">Ombor qoldig'i</div>
+              <div className={cn('text-xl font-bold mt-0.5', sm.value)}>
+                {formatQty(product.stock, unitLabel)}
+              </div>
+              <span className={cn('badge mt-1 !px-1.5 !py-0 text-[10px]', sm.badge)}>{sm.label}</span>
+            </div>
+            <div className="rounded-button bg-danger/10 border border-danger/20 px-4 py-3">
+              <div className="text-xs font-medium text-danger/80">Qarz qoldig'i</div>
+              <div className="text-xl font-bold text-danger mt-0.5">
+                {formatMoney(product.balance, product.currency)}
+              </div>
+              {product.min_qty > 0 && (
+                <div className="text-[10px] text-ink-soft mt-1.5">
+                  chegara: {formatQty(product.min_qty, unitLabel)}
+                </div>
+              )}
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-3 mt-2 text-sm">
             <div className="rounded-button bg-black/[0.03] px-3 py-2 flex justify-between">
               <span className="text-ink-soft">Olib kelingan</span>
+              <span className="font-medium">{formatQty(product.in_qty, unitLabel)}</span>
+            </div>
+            <div className="rounded-button bg-black/[0.03] px-3 py-2 flex justify-between">
+              <span className="text-ink-soft">Sarflangan</span>
+              <span className="font-medium text-warning">{formatQty(product.out_qty, unitLabel)}</span>
+            </div>
+            <div className="rounded-button bg-black/[0.03] px-3 py-2 flex justify-between">
+              <span className="text-ink-soft">Umumiy qiymat</span>
               <span className="font-medium">{formatMoney(product.total_purchased, product.currency)}</span>
             </div>
             <div className="rounded-button bg-black/[0.03] px-3 py-2 flex justify-between">
@@ -96,19 +139,27 @@ export default function TaminotTransactionsModal({
           ) : (
             <div className="divide-y divide-black/5 border border-black/10 rounded-button overflow-hidden">
               {txs.map((tx) => {
-                const purchase = tx.kind === 'purchase';
+                const m = TX_META[tx.kind];
+                const Icon = m.icon;
                 return (
                   <div key={tx.id} className="flex items-center gap-3 px-3 py-2.5 group">
-                    <div className={`w-8 h-8 rounded-button flex items-center justify-center shrink-0 ${
-                      purchase ? 'bg-primary/10 text-primary' : 'bg-success/10 text-success'}`}>
-                      {purchase ? <PackagePlus size={15} /> : <Wallet size={15} />}
+                    <div className={`w-8 h-8 rounded-button flex items-center justify-center shrink-0 ${m.tone}`}>
+                      <Icon size={15} />
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-medium">
-                        {purchase ? 'Olib kelish' : "To'lov"}
-                        {purchase && (
+                        {m.label}
+                        {tx.kind === 'purchase' && (
                           <span className="text-ink-soft font-normal">
-                            {' '}· {tx.qty} × {formatMoney(tx.unit_price, tx.currency)}
+                            {' '}· {formatQty(tx.qty)} × {formatMoney(tx.unit_price, tx.currency)}
+                          </span>
+                        )}
+                        {tx.kind === 'consume' && (
+                          <span className="text-ink-soft font-normal"> · {formatQty(tx.qty, unitLabel)}</span>
+                        )}
+                        {tx.kind === 'adjust' && (
+                          <span className="text-ink-soft font-normal">
+                            {' '}· {tx.qty > 0 ? '+' : ''}{formatQty(tx.qty, unitLabel)}
                           </span>
                         )}
                       </div>
@@ -116,8 +167,12 @@ export default function TaminotTransactionsModal({
                         {formatDateTime(tx.created_at)}{tx.note ? ` · ${tx.note}` : ''}
                       </div>
                     </div>
-                    <div className={`text-sm font-bold shrink-0 ${purchase ? 'text-danger' : 'text-success'}`}>
-                      {purchase ? '+' : '−'}{formatMoney(tx.amount, tx.currency)}
+                    <div className={cn('text-sm font-bold shrink-0',
+                      tx.kind === 'purchase' ? 'text-danger'
+                        : tx.kind === 'payment' ? 'text-success' : 'text-ink-soft')}>
+                      {tx.kind === 'purchase' ? `+${formatMoney(tx.amount, tx.currency)}`
+                        : tx.kind === 'payment' ? `−${formatMoney(tx.amount, tx.currency)}`
+                        : '—'}
                     </div>
                     <button onClick={() => setDelId(tx.id)}
                             className="p-1.5 rounded hover:bg-danger/10 text-ink-soft hover:text-danger opacity-0 group-hover:opacity-100 transition">

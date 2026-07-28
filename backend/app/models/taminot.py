@@ -6,10 +6,15 @@ Modul "Bizning qarzlar" (debt) mantig'iga asoslanadi, lekin ikki ta'minot turi
   - "tashqi" — tashqi ta'minot
 
   - TaminotProduct      — olib kelinadigan mahsulot (nom, birlik, narx, taminotchi)
-  - TaminotTransaction  — har bir harakat: olib kelish (purchase) yoki to'lov (payment)
+  - TaminotTransaction  — har bir harakat: olib kelish (purchase), to'lov (payment),
+                          sarflash (consume) yoki qoldiqni to'g'rilash (adjust)
 
 Mahsulot qarzi = sum(purchase.amount) - sum(payment.amount). Valyutalar
 hech qachon aralashtirilmaydi (har valyuta alohida hisoblanadi).
+
+Ombor qoldig'i (miqdor bo'yicha, puldan mustaqil):
+    qoldiq = sum(purchase.qty) - sum(consume.qty) + sum(adjust.qty)
+Qoldiq `min_qty` chegarasidan pastga tushsa mahsulot "kam qoldi" hisoblanadi.
 """
 import uuid
 from decimal import Decimal
@@ -32,6 +37,10 @@ class TaminotProduct(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     unit: Mapped[str] = mapped_column(String(20), default="dona")  # dona/kg/metr/list
     unit_price: Mapped[Decimal] = mapped_column(Numeric(16, 2), default=0)
     currency: Mapped[str] = mapped_column(String(3), default="UZS")  # UZS / USD
+    # Kam qoldi chegarasi: qoldiq shundan past bo'lsa ogohlantiriladi (0 — chegara yo'q)
+    min_qty: Mapped[Decimal] = mapped_column(
+        Numeric(14, 3), default=0, server_default="0", nullable=False
+    )
     supplier: Mapped[Optional[str]] = mapped_column(String(255))
     note: Mapped[Optional[str]] = mapped_column(Text)
 
@@ -47,16 +56,22 @@ class TaminotProduct(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
 
 class TaminotTransaction(UUIDPrimaryKeyMixin, TimestampMixin, Base):
-    """Bitta harakat: 'purchase' (olib kelish, qarzni oshiradi) yoki
-    'payment' (to'lov, qarzni kamaytiradi)."""
+    """Bitta harakat. `kind` qiymatlari:
+      - 'purchase' — olib kelish: qarzni ham, ombor qoldig'ini ham oshiradi
+      - 'payment'  — to'lov: faqat qarzni kamaytiradi (qty = 0)
+      - 'consume'  — sarflash: faqat qoldiqni kamaytiradi (amount = 0)
+      - 'adjust'   — qoldiqni to'g'rilash (inventarizatsiya): qty musbat yoki
+                     manfiy bo'lishi mumkin, pulga ta'sir qilmaydi (amount = 0)
+    """
     __tablename__ = "taminot_transactions"
 
     product_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("taminot_products.id", ondelete="CASCADE"), index=True
     )
-    kind: Mapped[str] = mapped_column(String(20), nullable=False)  # purchase / payment
+    # purchase / payment / consume / adjust
+    kind: Mapped[str] = mapped_column(String(20), nullable=False)
 
-    # Olib kelishda to'ldiriladi (to'lovda 0 bo'lishi mumkin)
+    # Miqdor: purchase/consume/adjust uchun to'ldiriladi (to'lovda 0)
     qty: Mapped[Decimal] = mapped_column(Numeric(14, 3), default=0)
     unit_price: Mapped[Decimal] = mapped_column(Numeric(16, 2), default=0)
     # Harakat summasi (purchase = qty*unit_price, payment = to'langan summa)

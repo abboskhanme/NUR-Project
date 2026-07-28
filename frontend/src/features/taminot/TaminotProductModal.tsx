@@ -12,6 +12,9 @@ const CURRENCY_LABEL: Record<string, string> = {
   UZS: "so'm", USD: 'dollar',
 };
 
+/** Ombor qoldig'i holati: harakat yo'q / tugagan / kam qoldi / yetarli */
+export type StockStatus = 'none' | 'out' | 'low' | 'ok';
+
 export interface TaminotProduct {
   id: string;
   scope: string;
@@ -19,6 +22,7 @@ export interface TaminotProduct {
   unit: string;
   unit_price: number;
   currency: string;
+  min_qty: number;
   supplier?: string | null;
   note?: string | null;
   total_purchased: number;
@@ -26,6 +30,14 @@ export interface TaminotProduct {
   balance: number;
   last_purchase_at?: string | null;
   tx_count: number;
+  // Ombor qoldig'i (miqdor bo'yicha)
+  in_qty: number;
+  out_qty: number;
+  adjust_qty: number;
+  stock: number;
+  stock_value: number;
+  stock_status: StockStatus;
+  last_consume_at?: string | null;
 }
 
 const UNITS = ['dona', 'kg', 'metr', 'list'];
@@ -49,6 +61,7 @@ export default function TaminotProductModal({
   const [unit, setUnit] = useState(product?.unit ?? 'dona');
   const [unitPrice, setUnitPrice] = useState<number>(product?.unit_price ?? 0);
   const [currency, setCurrency] = useState(product?.currency ?? 'UZS');
+  const [minQty, setMinQty] = useState(product?.min_qty ? String(product.min_qty) : '');
   const [supplier, setSupplier] = useState(product?.supplier ?? '');
   const [note, setNote] = useState(product?.note ?? '');
   const [saving, setSaving] = useState(false);
@@ -69,6 +82,7 @@ export default function TaminotProductModal({
         unit,
         unit_price: unitPrice || 0,
         currency,
+        min_qty: Math.max(0, parseFloat(minQty) || 0),
         supplier: supplier.trim() || null,
         note: note.trim() || null,
       };
@@ -114,9 +128,24 @@ export default function TaminotProductModal({
             </div>
           </div>
 
-          <div>
-            <label className="label">Birlik narxi</label>
-            <MoneyInput value={unitPrice} onChange={setUnitPrice} suffix={CURRENCY_LABEL[currency]} />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label">Birlik narxi</label>
+              <MoneyInput value={unitPrice} onChange={setUnitPrice} suffix={CURRENCY_LABEL[currency]} />
+            </div>
+            <div>
+              <label className="label">Kam qoldi chegarasi</label>
+              <div className="relative">
+                <input className="input pr-14" type="number" min="0" step="any" inputMode="decimal"
+                       placeholder="0" value={minQty} onChange={(e) => setMinQty(e.target.value)} />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-ink-soft pointer-events-none">
+                  {UNIT_LABEL[unit] ?? unit}
+                </span>
+              </div>
+              <p className="text-[11px] text-ink-soft mt-1">
+                Qoldiq shu miqdordan pastga tushsa — qizil bilan ogohlantiriladi
+              </p>
+            </div>
           </div>
 
           <div>

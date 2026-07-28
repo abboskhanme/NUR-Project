@@ -2,17 +2,18 @@ import { useMemo } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, Legend,
 } from 'recharts';
-import { PackagePlus, Wallet, ArrowLeftRight } from 'lucide-react';
+import { PackagePlus, Wallet, ArrowLeftRight, PackageMinus } from 'lucide-react';
 
 import Card from '@/components/ui/Card';
-import { formatMoney } from '@/lib/format';
+import { formatMoney, formatQty } from '@/lib/format';
 
 interface TxLog {
   id: string;
   product_id: string;
   product_name: string;
+  unit: string;
   supplier?: string | null;
-  kind: 'purchase' | 'payment';
+  kind: 'purchase' | 'payment' | 'consume' | 'adjust';
   qty: number;
   unit_price: number;
   amount: number;
@@ -50,12 +51,12 @@ export default function TaminotReportCharts({ log }: { log: TxLog[] }) {
     const otherCurrencies = [...curCount.keys()].filter((c) => c !== currency);
     const rows = log.filter((t) => t.currency === currency);
 
-    // Davr yig'indilari
+    // Davr yig'indilari (consume/adjust — pul harakati emas)
     let purchased = 0;
     let paid = 0;
     for (const t of rows) {
       if (t.kind === 'purchase') purchased += t.amount;
-      else paid += t.amount;
+      else if (t.kind === 'payment') paid += t.amount;
     }
 
     // Kunlik dinamika
@@ -64,7 +65,7 @@ export default function TaminotReportCharts({ log }: { log: TxLog[] }) {
       const day = t.created_at.slice(0, 10);
       const slot = byDay.get(day) ?? { date: day, purchase: 0, payment: 0 };
       if (t.kind === 'purchase') slot.purchase += t.amount;
-      else slot.payment += t.amount;
+      else if (t.kind === 'payment') slot.payment += t.amount;
       byDay.set(day, slot);
     }
     const daily = [...byDay.values()].sort((a, b) => a.date.localeCompare(b.date));
@@ -80,21 +81,41 @@ export default function TaminotReportCharts({ log }: { log: TxLog[] }) {
       .sort((a, b) => b.value - a.value)
       .slice(0, 7);
 
-    return { currency, otherCurrencies, rows, purchased, paid, daily, topProducts };
+    // Eng ko'p sarflangan mahsulotlar (miqdor bo'yicha, barcha valyutalardan)
+    const byConsume = new Map<string, { name: string; unit: string; value: number }>();
+    for (const t of log) {
+      if (t.kind !== 'consume') continue;
+      const slot = byConsume.get(t.product_name)
+        ?? { name: t.product_name, unit: t.unit, value: 0 };
+      slot.value += t.qty;
+      byConsume.set(t.product_name, slot);
+    }
+    const topConsumed = [...byConsume.values()].sort((a, b) => b.value - a.value).slice(0, 7);
+    const consumedCount = log.filter((t) => t.kind === 'consume').length;
+
+    return {
+      currency, otherCurrencies, rows, purchased, paid, daily, topProducts,
+      topConsumed, consumedCount,
+    };
   }, [log]);
 
   if (!view) return null;
-  const { currency, otherCurrencies, rows, purchased, paid, daily, topProducts } = view;
+  const {
+    currency, otherCurrencies, rows, purchased, paid, daily, topProducts,
+    topConsumed, consumedCount,
+  } = view;
   const curLabel = CURRENCY_LABEL[currency] ?? currency;
 
   return (
     <div className="space-y-4">
       {/* Davr bo'yicha mini-statistika */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <MiniTile tone="primary" label="Davr kirim" value={formatMoney(purchased, currency)}
           icon={<PackagePlus size={16} />} />
         <MiniTile tone="success" label="Davr to'lov" value={formatMoney(paid, currency)}
           icon={<Wallet size={16} />} />
+        <MiniTile tone="warning" label="Sarflash" value={`${consumedCount} ta`}
+          icon={<PackageMinus size={16} />} />
         <MiniTile tone="muted" label="Harakatlar" value={`${rows.length} ta`}
           icon={<ArrowLeftRight size={16} />} />
       </div>
@@ -145,6 +166,27 @@ export default function TaminotReportCharts({ log }: { log: TxLog[] }) {
           )}
         </Card>
       </div>
+
+      {/* Eng ko'p sarflangan mahsulotlar — miqdor bo'yicha (ombordan chiqim) */}
+      {topConsumed.length > 0 && (
+        <Card title="Eng ko'p sarflangan mahsulotlar (miqdor)">
+          <ResponsiveContainer width="100%" height={Math.max(180, topConsumed.length * 34)}>
+            <BarChart data={topConsumed} layout="vertical" margin={{ left: 8, right: 16 }}>
+              <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
+              <XAxis type="number" fontSize={11} tickFormatter={compact} />
+              <YAxis type="category" dataKey="name" fontSize={11} width={120} interval={0} />
+              <Tooltip
+                formatter={(v: number, _n, p: any) => [formatQty(v, p?.payload?.unit), 'Sarflangan']}
+              />
+              <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                {topConsumed.map((_, i) => (
+                  <Cell key={i} fill={i === 0 ? '#F39C12' : '#F5B461'} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </Card>
+      )}
     </div>
   );
 }
@@ -152,6 +194,7 @@ export default function TaminotReportCharts({ log }: { log: TxLog[] }) {
 const TILE_TONES = {
   primary: 'border-primary/20 bg-primary/5 text-primary',
   success: 'border-success/25 bg-success/10 text-success',
+  warning: 'border-warning/30 bg-warning/10 text-warning',
   muted: 'border-black/10 bg-black/[0.03] text-ink',
 } as const;
 

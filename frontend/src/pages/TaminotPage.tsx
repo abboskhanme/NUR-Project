@@ -3,22 +3,23 @@ import { Navigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import {
-  Plus, Search, Wallet, PackagePlus, Pencil, Trash2, ChevronRight, ChevronLeft, Coins,
-  Building2, Globe, CalendarDays,
+  Plus, Search, Wallet, PackagePlus, PackageMinus, ClipboardCheck, Pencil, Trash2,
+  ChevronRight, ChevronLeft, Coins, Building2, Globe, CalendarDays, AlertTriangle, Boxes,
 } from 'lucide-react';
 
 import { api } from '@/api/client';
 import Card from '@/components/ui/Card';
 import EmptyState from '@/components/ui/EmptyState';
 import ConfirmModal from '@/components/ui/ConfirmModal';
-import { formatMoney, formatDateTime, formatDate } from '@/lib/format';
+import { formatMoney, formatQty, formatDateTime, formatDate } from '@/lib/format';
 import { usePermissions } from '@/lib/permissions';
 import { cn } from '@/lib/cn';
 
 import TaminotProductModal, { type TaminotProduct } from '@/features/taminot/TaminotProductModal';
-import TaminotActionModal from '@/features/taminot/TaminotActionModal';
+import TaminotActionModal, { type ActionKind } from '@/features/taminot/TaminotActionModal';
 import TaminotTransactionsModal from '@/features/taminot/TaminotTransactionsModal';
 import TaminotReportCharts from '@/features/taminot/TaminotReportCharts';
+import TaminotStockTab, { STOCK_META } from '@/features/taminot/TaminotStockTab';
 
 interface CurrencyTotal {
   currency: string;
@@ -26,17 +27,23 @@ interface CurrencyTotal {
   total_paid: number;
   total_balance: number;
   with_debt_count: number;
+  stock_value: number;
 }
 interface Summary {
   by_currency: CurrencyTotal[];
   product_count: number;
+  low_stock_count: number;
+  out_of_stock_count: number;
+  ok_stock_count: number;
+  tracked_count: number;
 }
 interface TxLog {
   id: string;
   product_id: string;
   product_name: string;
+  unit: string;
   supplier?: string | null;
-  kind: 'purchase' | 'payment';
+  kind: 'purchase' | 'payment' | 'consume' | 'adjust';
   qty: number;
   unit_price: number;
   amount: number;
@@ -51,6 +58,13 @@ const SCOPE_META: Record<string, { title: string; icon: typeof Building2 }> = {
   ichki: { title: 'Ichki taʼminot', icon: Building2 },
   tashqi: { title: 'Tashqi taʼminot', icon: Globe },
 };
+/** Harakat turlarining hisobotdagi ko'rinishi. */
+const KIND_META: Record<TxLog['kind'], { label: string; badge: string; money: string }> = {
+  purchase: { label: 'Olib kelish', badge: 'bg-primary/10 text-primary', money: 'text-danger' },
+  payment: { label: "To'lov", badge: 'bg-success/10 text-success', money: 'text-success' },
+  consume: { label: 'Sarflandi', badge: 'bg-warning/15 text-warning', money: 'text-ink-soft' },
+  adjust: { label: "Qoldiq to'g'rilandi", badge: 'bg-black/5 text-ink-soft', money: 'text-ink-soft' },
+};
 
 export default function TaminotPage() {
   const { scope = '' } = useParams();
@@ -62,13 +76,14 @@ export default function TaminotPage() {
   const canWrite = can(`supply_${scope}:write`);
   const canDelete = can(`supply_${scope}:delete`);
 
-  const [tab, setTab] = useState<'products' | 'reports'>('products');
+  const [tab, setTab] = useState<'products' | 'stock' | 'reports'>('products');
   const [search, setSearch] = useState('');
   const [onlyDebt, setOnlyDebt] = useState(false);
+  const [lowOnly, setLowOnly] = useState(false);
 
   // Modal holatlari
   const [editProduct, setEditProduct] = useState<TaminotProduct | null | undefined>(undefined);
-  const [action, setAction] = useState<{ product: TaminotProduct; kind: 'purchase' | 'payment' } | null>(null);
+  const [action, setAction] = useState<{ product: TaminotProduct; kind: ActionKind } | null>(null);
   const [detail, setDetail] = useState<TaminotProduct | null>(null);
   const [delProduct, setDelProduct] = useState<TaminotProduct | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -84,10 +99,19 @@ export default function TaminotPage() {
     queryFn: () => api.get('/taminot/summary', { params: { scope } }).then((r) => r.data),
     enabled: valid,
   });
+  // Filtrlar tabga bog'liq: "faqat qarzi borlar" — mahsulotlar tabida,
+  // "faqat kam qolganlar" — ombor tabida ishlaydi.
+  const withDebtParam = tab === 'products' && onlyDebt;
+  const lowStockParam = tab === 'stock' && lowOnly;
   const productsQ = useQuery<TaminotProduct[]>({
-    queryKey: ['taminot-products', scope, search, onlyDebt],
+    queryKey: ['taminot-products', scope, search, withDebtParam, lowStockParam],
     queryFn: () => api.get('/taminot/products', {
-      params: { scope, search: search.trim() || undefined, with_debt: onlyDebt || undefined },
+      params: {
+        scope,
+        search: search.trim() || undefined,
+        with_debt: withDebtParam || undefined,
+        low_stock: lowStockParam || undefined,
+      },
     }).then((r) => r.data),
     enabled: valid,
   });
@@ -101,6 +125,8 @@ export default function TaminotPage() {
 
   const products = productsQ.data ?? [];
   const s = summaryQ.data;
+  // Kam qolgan + tugagan mahsulotlar soni (tab belgisi uchun)
+  const attentionCount = (s?.low_stock_count ?? 0) + (s?.out_of_stock_count ?? 0);
 
   // Ochiq tarix modalini yangilangan ma'lumot bilan sinxronlash
   useEffect(() => {
@@ -173,12 +199,28 @@ export default function TaminotPage() {
     let purchased = 0, paid = 0;
     for (const t of dayRows) {
       if (t.currency !== currency) continue;
-      if (t.kind === 'purchase') purchased += t.amount; else paid += t.amount;
+      // consume/adjust — faqat miqdor harakati, pulga ta'sir qilmaydi
+      if (t.kind === 'purchase') purchased += t.amount;
+      else if (t.kind === 'payment') paid += t.amount;
     }
     return { currency, purchased, paid, mixed: count.size > 1 };
   }, [dayRows]);
   // Filtr/scope o'zgarsa — eng yangi kunga qaytamiz
   useEffect(() => { setRepPage(1); }, [dateFrom, dateTo, scope]);
+
+  // Ichki ↔ tashqi almashganda oldingi bo'limdan hech narsa qolib ketmasin:
+  // qidiruv, filtrlar va ochiq modallar tozalanadi (ma'lumot esa scope bo'yicha
+  // alohida so'raladi — query key ichida scope bor).
+  useEffect(() => {
+    setSearch('');
+    setOnlyDebt(false);
+    setLowOnly(false);
+    setEditProduct(undefined);
+    setAction(null);
+    setDetail(null);
+    setDelProduct(null);
+    setDelTx(null);
+  }, [scope]);
 
   if (!valid) return <Navigate to="/supply/ichki" replace />;
   const meta = SCOPE_META[scope];
@@ -194,7 +236,9 @@ export default function TaminotPage() {
           </div>
           <div>
             <h1 className="text-2xl font-bold">{meta.title}</h1>
-            <p className="text-sm text-ink-soft">Qarzga olib kelinadigan mahsulotlar va to'lovlar</p>
+            <p className="text-sm text-ink-soft">
+              Olib kelinadigan mahsulotlar, to'lovlar va ombordagi aniq qoldiq
+            </p>
           </div>
         </div>
         {canWrite && (
@@ -204,35 +248,67 @@ export default function TaminotPage() {
         )}
       </div>
 
-      {/* KPI kartalari — har valyuta uchun: olib kelingan, to'langan, qarz qoldi */}
+      {/* KPI kartalari — har valyuta uchun: olib kelingan, to'langan, qarz qoldi, ombor qoldig'i */}
       <div className="space-y-3">
-        {(s?.by_currency?.length ? s.by_currency : [{ currency: 'UZS', total_purchased: 0, total_paid: 0, total_balance: 0, with_debt_count: 0 }]).map((c) => (
+        {(s?.by_currency?.length ? s.by_currency : [{ currency: 'UZS', total_purchased: 0, total_paid: 0, total_balance: 0, with_debt_count: 0, stock_value: 0 }]).map((c) => (
           <div key={c.currency}>
             {(s?.by_currency?.length ?? 0) > 1 && (
               <div className="text-xs font-medium text-ink-soft mb-1.5">
                 {CURRENCY_LABEL[c.currency] ?? c.currency}
               </div>
             )}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <KpiCard tone="primary" label="Olib kelingan"
                 value={formatMoney(c.total_purchased, c.currency)} icon={<PackagePlus size={18} />} />
               <KpiCard tone="success" label="To'langan"
                 value={formatMoney(c.total_paid, c.currency)} icon={<Wallet size={18} />} />
               <KpiCard tone="danger" label="Qarz qoldiq"
                 value={formatMoney(c.total_balance, c.currency)} icon={<Coins size={18} />} />
+              <KpiCard tone="neutral" label="Ombordagi qoldiq"
+                value={formatMoney(c.stock_value, c.currency)} icon={<Boxes size={18} />} />
             </div>
           </div>
         ))}
       </div>
 
+      {/* Ombor ogohlantirishi — kam qolgan/tugagan mahsulotlar doim ko'rinib turadi */}
+      {(s?.low_stock_count || s?.out_of_stock_count) ? (
+        <button
+          onClick={() => { setTab('stock'); setLowOnly(true); }}
+          className="w-full text-left rounded-card border border-danger/30 bg-danger/[0.07] px-4 py-3 flex items-center gap-3 hover:bg-danger/10 transition">
+          <div className="w-9 h-9 rounded-button bg-danger/15 text-danger flex items-center justify-center shrink-0">
+            <AlertTriangle size={18} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="font-semibold text-danger">Ombor diqqat talab qiladi</div>
+            <div className="text-sm text-danger/80">
+              {[
+                s.out_of_stock_count ? `${s.out_of_stock_count} ta mahsulot tugagan` : null,
+                s.low_stock_count ? `${s.low_stock_count} ta mahsulot kam qoldi` : null,
+              ].filter(Boolean).join(' · ')}
+            </div>
+          </div>
+          <span className="text-sm font-medium text-danger flex items-center gap-1 shrink-0">
+            Ko'rish <ChevronRight size={15} />
+          </span>
+        </button>
+      ) : null}
+
       {/* Tabs */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex gap-1.5">
-          {([['products', 'Mahsulotlar'], ['reports', 'Hisobotlar']] as const).map(([key, label]) => (
+          {([['products', 'Mahsulotlar'], ['stock', 'Ombor qoldiq'], ['reports', 'Hisobotlar']] as const).map(([key, label]) => (
             <button key={key} onClick={() => setTab(key)}
-              className={cn('px-3 py-1.5 rounded-button text-sm font-medium transition',
+              className={cn('px-3 py-1.5 rounded-button text-sm font-medium transition flex items-center gap-1.5',
                 tab === key ? 'bg-primary text-white' : 'bg-black/5 text-ink-soft hover:bg-black/10')}>
               {label}
+              {/* Ombor tabida diqqat talab qiladiganlar soni */}
+              {key === 'stock' && attentionCount > 0 && (
+                <span className={cn('px-1.5 py-0.5 rounded-full text-[10px] font-bold',
+                  tab === key ? 'bg-white/20 text-white' : 'bg-danger/15 text-danger')}>
+                  {attentionCount}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -272,21 +348,45 @@ export default function TaminotPage() {
               description={canWrite ? '«Yangi mahsulot» tugmasi orqali birinchisini qo\'shing' : 'Hozircha bo\'sh'} />
           ) : (
             <div className="divide-y divide-black/5">
-              {products.map((p) => (
+              {products.map((p) => {
+                const sm = STOCK_META[p.stock_status];
+                const attention = p.stock_status === 'low' || p.stock_status === 'out';
+                const unit = UNIT_LABEL[p.unit] ?? p.unit;
+                return (
                 <div key={p.id}
-                     className="flex items-center gap-3 py-3 hover:bg-black/[0.02] -mx-2 px-2 rounded-button transition cursor-pointer"
+                     className={cn('flex items-center gap-3 py-3 -mx-2 px-2 rounded-button transition cursor-pointer',
+                       attention ? 'bg-danger/[0.04] hover:bg-danger/[0.07]' : 'hover:bg-black/[0.02]')}
                      onClick={() => setDetail(p)}>
                   <div className="min-w-0 flex-1">
-                    <div className="font-medium truncate">
-                      {p.name}
-                      <span className="text-ink-soft font-normal"> · {UNIT_LABEL[p.unit] ?? p.unit}</span>
+                    <div className="font-medium truncate flex items-center gap-1.5">
+                      {attention && <AlertTriangle size={13} className="text-danger shrink-0" />}
+                      <span className="truncate">{p.name}</span>
+                      <span className="text-ink-soft font-normal shrink-0">· {unit}</span>
                     </div>
                     <div className="text-xs text-ink-soft truncate">
                       {p.supplier ? `${p.supplier} · ` : ''}
                       {p.last_purchase_at ? `oxirgi: ${formatDateTime(p.last_purchase_at)}` : 'harakat yo\'q'}
                     </div>
                   </div>
-                  <div className="text-right shrink-0">
+                  {/* Ombordagi qoldiq — puldan alohida blok (chapda), kam qolganda qizil */}
+                  <div className={cn(
+                    'shrink-0 w-[132px] mr-6 sm:mr-10 rounded-button border px-3 py-1.5 text-center',
+                    attention ? 'border-danger/25 bg-danger/10' : 'border-black/[0.07] bg-black/[0.03]',
+                  )}>
+                    <div className={cn('font-bold leading-tight', sm.value)}>
+                      {formatQty(p.stock, unit)}
+                    </div>
+                    {attention ? (
+                      <div className={cn('text-[10px] font-semibold uppercase tracking-wide', sm.value)}>
+                        {sm.label}
+                      </div>
+                    ) : (
+                      <div className="text-[10px] text-ink-soft">
+                        ombor qoldiq{p.min_qty > 0 ? ` · min ${formatQty(p.min_qty)}` : ''}
+                      </div>
+                    )}
+                  </div>
+                  <div className="text-right shrink-0 w-[132px]">
                     <div className={cn('font-bold', p.balance > 0 ? 'text-danger' : 'text-success')}>
                       {formatMoney(p.balance, p.currency)}
                     </div>
@@ -300,10 +400,24 @@ export default function TaminotPage() {
                       </button>
                     )}
                     {canWrite && (
+                      <button onClick={() => setAction({ product: p, kind: 'consume' })}
+                              disabled={p.stock <= 0} title="Sarflash (ombordan chiqim)"
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-button text-xs font-medium bg-warning/10 text-warning hover:bg-warning/20 transition disabled:opacity-40">
+                        <PackageMinus size={14} /> Sarflash
+                      </button>
+                    )}
+                    {canWrite && (
                       <button onClick={() => setAction({ product: p, kind: 'payment' })}
                               disabled={p.balance <= 0}
                               className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-button text-xs font-medium bg-success/10 text-success hover:bg-success/20 transition disabled:opacity-40">
                         <Wallet size={14} /> To'lash
+                      </button>
+                    )}
+                    {canWrite && (
+                      <button onClick={() => setAction({ product: p, kind: 'stock' })}
+                              title="Qoldiqni to'g'rilash"
+                              className="p-1.5 rounded hover:bg-black/5 text-ink-soft hover:text-primary">
+                        <ClipboardCheck size={15} />
                       </button>
                     )}
                     {canWrite && (
@@ -321,10 +435,32 @@ export default function TaminotPage() {
                     <ChevronRight size={16} className="text-ink-soft" />
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </Card>
+      ) : tab === 'stock' ? (
+        /* ===================== OMBOR QOLDIQ ===================== */
+        <TaminotStockTab
+          products={products}
+          stats={{
+            low: s?.low_stock_count ?? 0,
+            out: s?.out_of_stock_count ?? 0,
+            ok: s?.ok_stock_count ?? 0,
+            stockValue: (s?.by_currency ?? []).map((c) => ({
+              currency: c.currency, value: c.stock_value,
+            })),
+          }}
+          loading={productsQ.isLoading}
+          canWrite={canWrite}
+          search={search}
+          onSearch={setSearch}
+          lowOnly={lowOnly}
+          onLowOnly={setLowOnly}
+          onAction={(product, kind) => setAction({ product, kind })}
+          onOpenDetail={(product) => setDetail(product)}
+        />
       ) : (
         /* ===================== HISOBOTLAR ===================== */
         <div className="space-y-4">
@@ -366,7 +502,8 @@ export default function TaminotPage() {
                 </thead>
                 <tbody>
                   {dayRows.map((tx) => {
-                    const purchase = tx.kind === 'purchase';
+                    const km = KIND_META[tx.kind];
+                    const unit = UNIT_LABEL[tx.unit] ?? tx.unit;
                     return (
                       <tr key={tx.id} className="border-b border-black/5 hover:bg-black/[0.02]">
                         <td className="py-2.5 pr-3 whitespace-nowrap">{formatDateTime(tx.created_at)}</td>
@@ -376,15 +513,21 @@ export default function TaminotPage() {
                           {tx.note ? <div className="text-xs text-ink-soft font-normal">{tx.note}</div> : null}
                         </td>
                         <td className="py-2.5 pr-3">
-                          <span className={cn('badge', purchase ? 'bg-primary/10 text-primary' : 'bg-success/10 text-success')}>
-                            {purchase ? 'Olib kelish' : "To'lov"}
-                          </span>
+                          <span className={cn('badge whitespace-nowrap', km.badge)}>{km.label}</span>
                         </td>
-                        <td className="py-2.5 pr-3 text-right text-ink-soft">
-                          {purchase ? `${tx.qty} × ${formatMoney(tx.unit_price, tx.currency)}` : '—'}
+                        <td className="py-2.5 pr-3 text-right text-ink-soft whitespace-nowrap">
+                          {tx.kind === 'purchase'
+                            ? `${formatQty(tx.qty)} × ${formatMoney(tx.unit_price, tx.currency)}`
+                            : tx.kind === 'consume'
+                              ? `−${formatQty(tx.qty, unit)}`
+                              : tx.kind === 'adjust'
+                                ? `${tx.qty > 0 ? '+' : ''}${formatQty(tx.qty, unit)}`
+                                : '—'}
                         </td>
-                        <td className={cn('py-2.5 pr-3 text-right font-semibold', purchase ? 'text-danger' : 'text-success')}>
-                          {purchase ? '+' : '−'}{formatMoney(tx.amount, tx.currency)}
+                        <td className={cn('py-2.5 pr-3 text-right font-semibold', km.money)}>
+                          {tx.kind === 'purchase' ? `+${formatMoney(tx.amount, tx.currency)}`
+                            : tx.kind === 'payment' ? `−${formatMoney(tx.amount, tx.currency)}`
+                            : '—'}
                         </td>
                         {canDelete && (
                           <td className="py-2.5 pl-3">
@@ -463,6 +606,7 @@ const KPI_TONES = {
   primary: { card: 'border-primary/20 bg-primary/5', text: 'text-primary', icon: 'bg-primary/15 text-primary' },
   success: { card: 'border-success/25 bg-success/10', text: 'text-success', icon: 'bg-success/20 text-success' },
   danger: { card: 'border-danger/25 bg-danger/10', text: 'text-danger', icon: 'bg-danger/20 text-danger' },
+  neutral: { card: 'border-black/10 bg-black/[0.03]', text: 'text-ink', icon: 'bg-black/5 text-ink-soft' },
 } as const;
 
 function KpiCard({ tone, label, value, icon }: {

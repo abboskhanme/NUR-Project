@@ -23,6 +23,23 @@ export function formatMoney(
 }
 
 /**
+ * Miqdorni formatlash: 3 xonadan ajratiladi, keraksiz nollar tashlanadi.
+ * Masalan 1250 -> "1 250", 12.500 -> "12.5". `unit` berilsa oxiriga qo'shiladi.
+ */
+export function formatQty(
+  value: number | string | null | undefined,
+  unit?: string | null,
+): string {
+  const n = typeof value === 'string' ? parseFloat(value) : value ?? 0;
+  const num = Number.isFinite(n as number) ? (n as number) : 0;
+  const rounded = Math.round(num * 1000) / 1000;
+  const [intPart, decPart] = String(Math.abs(rounded)).split('.');
+  const grouped = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  const body = (rounded < 0 ? '−' : '') + (decPart ? `${grouped}.${decPart}` : grouped);
+  return unit ? `${body} ${unit}` : body;
+}
+
+/**
  * Input ichida raqamni 3 xonadan bo'sh joy bilan ajratib ko'rsatish.
  * Masalan "1234567.5" -> "1 234 567.5". Faqat raqam va bitta nuqta qoladi.
  */

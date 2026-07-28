@@ -20,6 +20,7 @@ class TaminotProductCreate(BaseModel):
     unit: str = "dona"
     unit_price: float = 0
     currency: str = "UZS"
+    min_qty: float = Field(0, ge=0, description="Kam qoldi chegarasi (0 — chegara yo'q)")
     supplier: Optional[str] = None
     note: Optional[str] = None
 
@@ -29,6 +30,7 @@ class TaminotProductUpdate(BaseModel):
     unit: Optional[str] = None
     unit_price: Optional[float] = None
     currency: Optional[str] = None
+    min_qty: Optional[float] = Field(None, ge=0)
     supplier: Optional[str] = None
     note: Optional[str] = None
 
@@ -40,15 +42,25 @@ class TaminotProductOut(ORMBase):
     unit: str
     unit_price: float
     currency: str = "UZS"
+    min_qty: float = 0
     supplier: Optional[str] = None
     note: Optional[str] = None
     created_at: datetime
-    # Hisoblangan qiymatlar
+    # Hisoblangan pul qiymatlari
     total_purchased: float = 0
     total_paid: float = 0
     balance: float = 0
     last_purchase_at: Optional[datetime] = None
     tx_count: int = 0
+    # Hisoblangan ombor qoldig'i (miqdor bo'yicha)
+    in_qty: float = 0          # jami olib kelingan miqdor
+    out_qty: float = 0         # jami sarflangan miqdor
+    adjust_qty: float = 0      # to'g'rilashlar yig'indisi (musbat/manfiy)
+    stock: float = 0           # ombordagi qoldiq = in − out + adjust
+    stock_value: float = 0     # qoldiqning puldagi qiymati (qoldiq × birlik narxi)
+    # none — hali harakat yo'q, out — tugagan, low — kam qoldi, ok — yetarli
+    stock_status: str = "none"
+    last_consume_at: Optional[datetime] = None
 
 
 # ---------------------------------------------------------------------------
@@ -64,6 +76,22 @@ class PurchaseCreate(BaseModel):
 class PaymentCreate(BaseModel):
     """Qarz to'lash — qarzni kamaytiradi."""
     amount: float = Field(gt=0)
+    note: Optional[str] = None
+
+
+class ConsumeCreate(BaseModel):
+    """Sarflash — ombor qoldig'ini kamaytiradi, qarzga ta'sir qilmaydi."""
+    qty: float = Field(gt=0)
+    note: Optional[str] = None
+
+
+class StockSetCreate(BaseModel):
+    """Qoldiqni to'g'rilash (inventarizatsiya) — haqiqiy qoldiqni belgilash.
+
+    Farq (yangi qoldiq − joriy qoldiq) `adjust` harakati sifatida yoziladi,
+    shuning uchun tarix va hisob-kitob buzilmaydi.
+    """
+    qty: float = Field(ge=0, description="Ombordagi haqiqiy qoldiq")
     note: Optional[str] = None
 
 
@@ -84,6 +112,7 @@ class TaminotTxLogOut(BaseModel):
     id: uuid.UUID
     product_id: uuid.UUID
     product_name: str
+    unit: str = "dona"
     supplier: Optional[str] = None
     kind: str
     qty: float
@@ -103,8 +132,15 @@ class CurrencyTotal(BaseModel):
     total_paid: float = 0
     total_balance: float = 0
     with_debt_count: int = 0
+    # Shu valyutadagi mahsulotlar ombor qoldig'ining qiymati
+    stock_value: float = 0
 
 
 class TaminotSummary(BaseModel):
     by_currency: list[CurrencyTotal] = []
     product_count: int = 0
+    # Ombor holati
+    low_stock_count: int = 0     # kam qolganlar (chegaradan past, lekin bor)
+    out_of_stock_count: int = 0  # tugaganlar
+    ok_stock_count: int = 0      # yetarli
+    tracked_count: int = 0       # harakati bo'lgan (qoldig'i hisoblanadigan) mahsulotlar

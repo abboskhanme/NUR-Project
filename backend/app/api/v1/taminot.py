@@ -6,6 +6,12 @@
   - tashqi -> `supply_tashqi:read|write|delete`
 Shu sabab ichki va tashqi ta'minot turli odamlarga alohida lavozim sifatida
 biriktirilishi mumkin.
+
+Pul hisobidan tashqari har bir mahsulotning OMBOR QOLDIG'I ham yuritiladi:
+    qoldiq = olib kelingan (purchase.qty) − sarflangan (consume.qty)
+             + to'g'rilashlar (adjust.qty)
+Qoldiq mahsulotning `min_qty` chegarasidan past bo'lsa — "kam qoldi" (low),
+0 va past bo'lsa — "tugadi" (out) holati qaytariladi.
 """
 import uuid
 from datetime import date
@@ -22,9 +28,11 @@ from app.db.session import get_db
 from app.models.taminot import TaminotProduct, TaminotTransaction
 from app.schemas.taminot import (
     SCOPES,
+    ConsumeCreate,
     CurrencyTotal,
     PaymentCreate,
     PurchaseCreate,
+    StockSetCreate,
     TaminotProductCreate,
     TaminotProductOut,
     TaminotProductUpdate,
@@ -61,7 +69,11 @@ def _require_scope(user, scope: str, verb: str) -> str:
 
 
 async def _aggregates(db: AsyncSession, product_ids: Optional[list[uuid.UUID]] = None):
-    """product_id -> {purchased, paid, last_purchase_at, tx_count} xaritasi."""
+    """product_id -> pul va miqdor yig'indilari xaritasi.
+
+    Pul: purchased/paid. Miqdor (ombor qoldig'i uchun): in_qty (olib kelingan),
+    out_qty (sarflangan), adjust_qty (to'g'rilashlar).
+    """
     q = select(
         TaminotTransaction.product_id,
         func.coalesce(
@@ -70,9 +82,21 @@ async def _aggregates(db: AsyncSession, product_ids: Optional[list[uuid.UUID]] =
         func.coalesce(
             func.sum(case((TaminotTransaction.kind == "payment", TaminotTransaction.amount), else_=0)), 0
         ).label("paid"),
+        func.coalesce(
+            func.sum(case((TaminotTransaction.kind == "purchase", TaminotTransaction.qty), else_=0)), 0
+        ).label("in_qty"),
+        func.coalesce(
+            func.sum(case((TaminotTransaction.kind == "consume", TaminotTransaction.qty), else_=0)), 0
+        ).label("out_qty"),
+        func.coalesce(
+            func.sum(case((TaminotTransaction.kind == "adjust", TaminotTransaction.qty), else_=0)), 0
+        ).label("adjust_qty"),
         func.max(
             case((TaminotTransaction.kind == "purchase", TaminotTransaction.created_at), else_=None)
         ).label("last_purchase_at"),
+        func.max(
+            case((TaminotTransaction.kind == "consume", TaminotTransaction.created_at), else_=None)
+        ).label("last_consume_at"),
         func.count(TaminotTransaction.id).label("tx_count"),
     ).group_by(TaminotTransaction.product_id)
     if product_ids is not None:
@@ -85,15 +109,36 @@ async def _aggregates(db: AsyncSession, product_ids: Optional[list[uuid.UUID]] =
         out[row.product_id] = {
             "purchased": _q(row.purchased),
             "paid": _q(row.paid),
+            "in_qty": _q(row.in_qty),
+            "out_qty": _q(row.out_qty),
+            "adjust_qty": _q(row.adjust_qty),
             "last_purchase_at": row.last_purchase_at,
+            "last_consume_at": row.last_consume_at,
             "tx_count": row.tx_count or 0,
         }
     return out
 
 
+def _stock_status(stock: float, min_qty: float, has_movement: bool) -> str:
+    """none — hali harakat yo'q; out — tugagan; low — chegaradan past; ok — yetarli."""
+    if not has_movement:
+        return "none"
+    if stock <= 0:
+        return "out"
+    if min_qty > 0 and stock <= min_qty:
+        return "low"
+    return "ok"
+
+
 def _build_out(p: TaminotProduct, agg: dict) -> TaminotProductOut:
     purchased = agg.get("purchased", 0.0)
     paid = agg.get("paid", 0.0)
+    in_qty = agg.get("in_qty", 0.0)
+    out_qty = agg.get("out_qty", 0.0)
+    adjust_qty = agg.get("adjust_qty", 0.0)
+    tx_count = agg.get("tx_count", 0)
+    stock = round(in_qty - out_qty + adjust_qty, 3)
+    min_qty = _q(p.min_qty)
     return TaminotProductOut(
         id=p.id,
         scope=p.scope,
@@ -101,6 +146,7 @@ def _build_out(p: TaminotProduct, agg: dict) -> TaminotProductOut:
         unit=p.unit,
         unit_price=_q(p.unit_price),
         currency=p.currency,
+        min_qty=min_qty,
         supplier=p.supplier,
         note=p.note,
         created_at=p.created_at,
@@ -108,7 +154,22 @@ def _build_out(p: TaminotProduct, agg: dict) -> TaminotProductOut:
         total_paid=paid,
         balance=round(purchased - paid, 2),
         last_purchase_at=agg.get("last_purchase_at"),
-        tx_count=agg.get("tx_count", 0),
+        tx_count=tx_count,
+        in_qty=in_qty,
+        out_qty=out_qty,
+        adjust_qty=adjust_qty,
+        stock=stock,
+        stock_value=round(max(stock, 0.0) * _q(p.unit_price), 2),
+        stock_status=_stock_status(stock, min_qty, tx_count > 0),
+        last_consume_at=agg.get("last_consume_at"),
+    )
+
+
+async def _current_stock(db: AsyncSession, product_id: uuid.UUID) -> float:
+    """Bitta mahsulotning joriy ombor qoldig'i."""
+    agg = (await _aggregates(db, [product_id])).get(product_id, {})
+    return round(
+        agg.get("in_qty", 0.0) - agg.get("out_qty", 0.0) + agg.get("adjust_qty", 0.0), 3
     )
 
 
@@ -131,34 +192,26 @@ async def taminot_summary(
     scope: str = Query(..., description="ichki / tashqi"),
 ):
     _require_scope(user, scope, "read")
-    res = await db.execute(
-        select(
-            TaminotTransaction.product_id,
-            TaminotTransaction.currency,
-            func.coalesce(
-                func.sum(case((TaminotTransaction.kind == "purchase", TaminotTransaction.amount), else_=0)), 0
-            ).label("purchased"),
-            func.coalesce(
-                func.sum(case((TaminotTransaction.kind == "payment", TaminotTransaction.amount), else_=0)), 0
-            ).label("paid"),
-        )
-        .join(TaminotProduct, TaminotProduct.id == TaminotTransaction.product_id)
-        .where(TaminotProduct.scope == scope)
-        .group_by(TaminotTransaction.product_id, TaminotTransaction.currency)
-    )
-    by_cur: dict[str, dict] = {}
-    for row in res.all():
-        cur = row.currency or "UZS"
-        slot = by_cur.setdefault(cur, {"purchased": 0.0, "paid": 0.0, "with_debt": 0})
-        purchased, paid = _q(row.purchased), _q(row.paid)
-        slot["purchased"] += purchased
-        slot["paid"] += paid
-        if round(purchased - paid, 2) > 0:
-            slot["with_debt"] += 1
+    products = (await db.execute(
+        select(TaminotProduct).where(TaminotProduct.scope == scope)
+    )).scalars().all()
+    agg = await _aggregates(db, [p.id for p in products])
 
-    product_count = (await db.execute(
-        select(func.count(TaminotProduct.id)).where(TaminotProduct.scope == scope)
-    )).scalar() or 0
+    by_cur: dict[str, dict] = {}
+    counts = {"none": 0, "out": 0, "low": 0, "ok": 0}
+    for p in products:
+        o = _build_out(p, agg.get(p.id, {}))
+        cur = o.currency or "UZS"
+        slot = by_cur.setdefault(
+            cur, {"purchased": 0.0, "paid": 0.0, "with_debt": 0, "stock_value": 0.0}
+        )
+        slot["purchased"] += o.total_purchased
+        slot["paid"] += o.total_paid
+        slot["stock_value"] += o.stock_value
+        if o.balance > 0:
+            slot["with_debt"] += 1
+        counts[o.stock_status] += 1
+
     totals = [
         CurrencyTotal(
             currency=cur,
@@ -166,10 +219,18 @@ async def taminot_summary(
             total_paid=round(s["paid"], 2),
             total_balance=round(s["purchased"] - s["paid"], 2),
             with_debt_count=s["with_debt"],
+            stock_value=round(s["stock_value"], 2),
         )
         for cur, s in sorted(by_cur.items())
     ]
-    return TaminotSummary(by_currency=totals, product_count=product_count)
+    return TaminotSummary(
+        by_currency=totals,
+        product_count=len(products),
+        low_stock_count=counts["low"],
+        out_of_stock_count=counts["out"],
+        ok_stock_count=counts["ok"],
+        tracked_count=counts["low"] + counts["out"] + counts["ok"],
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -182,6 +243,8 @@ async def list_products(
     scope: str = Query(..., description="ichki / tashqi"),
     search: Optional[str] = None,
     with_debt: bool = Query(False, description="Faqat qarzi borlar"),
+    low_stock: bool = Query(False, description="Faqat kam qolgan yoki tugagan mahsulotlar"),
+    sort: str = Query("name", description="name / stock (kam qolganlar birinchi)"),
 ):
     _require_scope(user, scope, "read")
     q = select(TaminotProduct).where(TaminotProduct.scope == scope)
@@ -194,6 +257,12 @@ async def list_products(
     out = [_build_out(p, agg.get(p.id, {})) for p in products]
     if with_debt:
         out = [o for o in out if o.balance > 0]
+    if low_stock:
+        out = [o for o in out if o.stock_status in ("low", "out")]
+    if sort == "stock":
+        # Diqqat talab qiladiganlar tepada: tugagan → kam qoldi → yetarli → harakatsiz
+        rank = {"out": 0, "low": 1, "ok": 2, "none": 3}
+        out.sort(key=lambda o: (rank.get(o.stock_status, 9), o.name.lower()))
     return out
 
 
@@ -310,6 +379,79 @@ async def add_payment(
     return tx
 
 
+@router.post("/products/{product_id}/consume", response_model=TaminotTransactionOut, status_code=201)
+async def add_consume(
+    product_id: uuid.UUID,
+    payload: ConsumeCreate,
+    user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Sarflash — ombordan chiqim. Pulga (qarzga) ta'sir qilmaydi.
+
+    Qoldiq manfiy bo'lib ketmasligi uchun sarf miqdori joriy qoldiqdan oshsa
+    xatolik qaytariladi — bu ma'lumot aniqligini saqlaydi. Haqiqiy qoldiq
+    boshqacha bo'lsa, avval "Qoldiqni to'g'rilash" orqali kiritiladi.
+    """
+    p = await _get_product(db, product_id)
+    _require_scope(user, p.scope, "write")
+    stock = await _current_stock(db, product_id)
+    qty = Decimal(str(payload.qty))
+    if float(qty) > stock:
+        raise HTTPException(
+            422,
+            f"Ombordagi qoldiq yetarli emas. Joriy qoldiq: {stock:g} {p.unit}. "
+            "Agar haqiqiy qoldiq boshqacha bo'lsa — «Qoldiqni to'g'rilash»dan foydalaning.",
+        )
+    tx = TaminotTransaction(
+        product_id=product_id,
+        kind="consume",
+        qty=qty,
+        unit_price=p.unit_price,
+        amount=Decimal("0"),
+        currency=p.currency,
+        note=payload.note,
+        created_by_id=user.id,
+    )
+    db.add(tx)
+    await db.commit()
+    await db.refresh(tx)
+    return tx
+
+
+@router.post("/products/{product_id}/stock", response_model=TaminotTransactionOut, status_code=201)
+async def set_stock(
+    product_id: uuid.UUID,
+    payload: StockSetCreate,
+    user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Qoldiqni to'g'rilash (inventarizatsiya) — ombordagi haqiqiy qoldiqni belgilash.
+
+    Farq `adjust` harakati sifatida yoziladi (musbat yoki manfiy), shu sababli
+    tarix saqlanadi va qarz hisobiga ta'sir qilmaydi.
+    """
+    p = await _get_product(db, product_id)
+    _require_scope(user, p.scope, "write")
+    stock = await _current_stock(db, product_id)
+    delta = Decimal(str(payload.qty)) - Decimal(str(stock))
+    if delta == 0:
+        raise HTTPException(422, f"Qoldiq allaqachon {stock:g} {p.unit} — o'zgarish yo'q")
+    tx = TaminotTransaction(
+        product_id=product_id,
+        kind="adjust",
+        qty=delta,
+        unit_price=p.unit_price,
+        amount=Decimal("0"),
+        currency=p.currency,
+        note=payload.note,
+        created_by_id=user.id,
+    )
+    db.add(tx)
+    await db.commit()
+    await db.refresh(tx)
+    return tx
+
+
 @router.delete("/transactions/{tx_id}", status_code=204)
 async def delete_transaction(
     tx_id: uuid.UUID,
@@ -337,12 +479,17 @@ async def transaction_log(
     scope: str = Query(..., description="ichki / tashqi"),
     date_from: Optional[date] = None,
     date_to: Optional[date] = None,
-    kind: Optional[str] = Query(None, description="purchase / payment"),
+    kind: Optional[str] = Query(None, description="purchase / payment / consume / adjust"),
     limit: int = Query(500, le=2000),
 ):
     _require_scope(user, scope, "read")
     q = (
-        select(TaminotTransaction, TaminotProduct.name, TaminotProduct.supplier)
+        select(
+            TaminotTransaction,
+            TaminotProduct.name,
+            TaminotProduct.unit,
+            TaminotProduct.supplier,
+        )
         .join(TaminotProduct, TaminotProduct.id == TaminotTransaction.product_id)
         .where(TaminotProduct.scope == scope)
     )
@@ -350,16 +497,17 @@ async def transaction_log(
         q = q.where(func.date(TaminotTransaction.created_at) >= date_from)
     if date_to is not None:
         q = q.where(func.date(TaminotTransaction.created_at) <= date_to)
-    if kind in ("purchase", "payment"):
+    if kind in ("purchase", "payment", "consume", "adjust"):
         q = q.where(TaminotTransaction.kind == kind)
     q = q.order_by(TaminotTransaction.created_at.desc()).limit(limit)
     res = await db.execute(q)
     out: list[TaminotTxLogOut] = []
-    for tx, name, supplier in res.all():
+    for tx, name, unit, supplier in res.all():
         out.append(TaminotTxLogOut(
             id=tx.id,
             product_id=tx.product_id,
             product_name=name,
+            unit=unit,
             supplier=supplier,
             kind=tx.kind,
             qty=_q(tx.qty),
