@@ -1,7 +1,7 @@
 """Ta'minot (ichki/tashqi) — Pydantic sxemalar."""
 import uuid
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -67,9 +67,17 @@ class TaminotProductOut(ORMBase):
 # Tranzaksiyalar
 # ---------------------------------------------------------------------------
 class PurchaseCreate(BaseModel):
-    """Olib kelish — qarzni oshiradi. qty (+ ixtiyoriy unit_price) → summa = qty × narx."""
+    """Olib kelish. qty (+ ixtiyoriy unit_price) → summa = qty × narx.
+
+    `payment_mode`:
+      - "debt" (sukut) — qarzga olib kelindi, qarz qoldig'i oshadi
+      - "cash"         — naqdga olib kelindi: shu zahoti to'liq summaga
+                         to'lov yoziladi, qarz qoldig'i o'zgarmaydi
+    Ombor qoldig'i ikkala holatda ham bir xil oshadi.
+    """
     qty: float = Field(gt=0)
     unit_price: Optional[float] = None  # bo'lmasa mahsulot narxi olinadi
+    payment_mode: Literal["debt", "cash"] = "debt"
     note: Optional[str] = None
 
 

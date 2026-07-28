@@ -338,6 +338,8 @@ async def add_purchase(
     unit_price = Decimal(str(payload.unit_price)) if payload.unit_price is not None else p.unit_price
     qty = Decimal(str(payload.qty))
     amount = (qty * unit_price).quantize(Decimal("0.01"))
+    cash = payload.payment_mode == "cash"
+    note = payload.note
     tx = TaminotTransaction(
         product_id=product_id,
         kind="purchase",
@@ -345,10 +347,23 @@ async def add_purchase(
         unit_price=unit_price,
         amount=amount,
         currency=p.currency,
-        note=payload.note,
+        note=f"{note} · naqd" if (cash and note) else ("Naqd olib kelish" if cash else note),
         created_by_id=user.id,
     )
     db.add(tx)
+    # Naqdga olib kelindi — shu zahoti to'liq summaga to'lov yoziladi, shuning
+    # uchun qarz qoldig'i o'zgarmaydi (ombor qoldig'i esa baribir oshadi).
+    if cash and amount > 0:
+        db.add(TaminotTransaction(
+            product_id=product_id,
+            kind="payment",
+            qty=Decimal("0"),
+            unit_price=Decimal("0"),
+            amount=amount,
+            currency=p.currency,
+            note="Naqd to'lov (olib kelish bilan birga)",
+            created_by_id=user.id,
+        ))
     await db.commit()
     await db.refresh(tx)
     return tx

@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { X, PackagePlus, Wallet, PackageMinus, ClipboardCheck, ArrowRight } from 'lucide-react';
+import {
+  X, PackagePlus, Wallet, PackageMinus, ClipboardCheck, ArrowRight, Coins, Banknote,
+} from 'lucide-react';
 
 import { api } from '@/api/client';
 import { formatMoney, formatQty } from '@/lib/format';
+import { cn } from '@/lib/cn';
 import MoneyInput from '@/components/ui/MoneyInput';
 import type { TaminotProduct } from '@/features/taminot/TaminotProductModal';
 
@@ -57,6 +60,8 @@ export default function TaminotActionModal({
   const [amount, setAmount] = useState<number>(0);
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
+  // Olib kelish turi: qarzga (qarz qoldig'i oshadi) yoki naqd (darhol to'langan)
+  const [payMode, setPayMode] = useState<'debt' | 'cash'>('debt');
 
   useEffect(() => {
     const esc = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -83,9 +88,9 @@ export default function TaminotActionModal({
       if (kind === 'purchase') {
         if (!q || q <= 0) { toast.error('Miqdorni kiriting'); setSaving(false); return; }
         await api.post(`/taminot/products/${product.id}/purchase`, {
-          qty: q, unit_price: unitPrice || 0, note: note.trim() || null,
+          qty: q, unit_price: unitPrice || 0, payment_mode: payMode, note: note.trim() || null,
         });
-        toast.success("Olib kelish qo'shildi");
+        toast.success(payMode === 'cash' ? "Naqd olib kelish qo'shildi" : "Olib kelish qo'shildi");
       } else if (kind === 'payment') {
         if (!amount || amount <= 0) { toast.error("To'lov summasini kiriting"); setSaving(false); return; }
         await api.post(`/taminot/products/${product.id}/payment`, {
@@ -151,9 +156,48 @@ export default function TaminotActionModal({
                   <MoneyInput value={unitPrice} onChange={setUnitPrice} suffix={curLabel} />
                 </div>
               </div>
-              <div className="rounded-button bg-primary/10 border border-primary/20 px-4 py-3 flex items-center justify-between">
-                <span className="text-sm font-medium text-primary/90">Umumiy qiymat</span>
-                <span className="text-lg font-bold text-primary">{formatMoney(total, product.currency)}</span>
+
+              {/* To'lov turi: qarzga yoki naqd */}
+              <div>
+                <label className="label">To'lov turi</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {([
+                    ['debt', 'Qarzga', Coins, 'danger'],
+                    ['cash', 'Naqd', Banknote, 'success'],
+                  ] as const).map(([mode, label, ModeIcon, tone]) => {
+                    const active = payMode === mode;
+                    return (
+                      <button key={mode} type="button" onClick={() => setPayMode(mode)}
+                        className={cn(
+                          'flex items-center justify-center gap-1.5 px-3 py-2 rounded-button text-sm font-medium border transition',
+                          !active && 'border-black/10 text-ink-soft hover:bg-black/5',
+                          active && tone === 'danger' && 'border-danger/40 bg-danger/10 text-danger',
+                          active && tone === 'success' && 'border-success/40 bg-success/10 text-success',
+                        )}>
+                        <ModeIcon size={15} /> {label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-[11px] text-ink-soft mt-1">
+                  {payMode === 'cash'
+                    ? "Naqd — summa darhol to'langan deb yoziladi, qarz qoldig'i oshmaydi"
+                    : "Qarzga — summa qarz qoldig'iga qo'shiladi"}
+                </p>
+              </div>
+
+              <div className={cn('rounded-button border px-4 py-3 flex items-center justify-between',
+                payMode === 'cash'
+                  ? 'bg-success/10 border-success/20'
+                  : 'bg-primary/10 border-primary/20')}>
+                <span className={cn('text-sm font-medium',
+                  payMode === 'cash' ? 'text-success/90' : 'text-primary/90')}>
+                  {payMode === 'cash' ? "Naqd to'lanadi" : "Qarzga qo'shiladi"}
+                </span>
+                <span className={cn('text-lg font-bold',
+                  payMode === 'cash' ? 'text-success' : 'text-primary')}>
+                  {formatMoney(total, product.currency)}
+                </span>
               </div>
             </>
           )}
