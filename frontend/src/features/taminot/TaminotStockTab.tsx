@@ -101,6 +101,8 @@ export default function TaminotStockTab({
         />
         <StockTile
           tone="primary"
+          // Valyutalar yonma-yon yozilgani uchun telefonda to'liq kenglik
+          className="col-span-2 lg:col-span-1"
           icon={<PackagePlus size={16} />}
           label="Qoldiq qiymati"
           value={
@@ -112,14 +114,14 @@ export default function TaminotStockTab({
       </div>
 
       {/* Filtrlar */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <label className="flex items-center gap-1.5 text-sm text-ink-soft cursor-pointer select-none">
+      <div className="flex items-center justify-between gap-3">
+        <label className="flex items-center gap-1.5 text-xs sm:text-sm text-ink-soft cursor-pointer select-none shrink-0">
           <input type="checkbox" checked={lowOnly} onChange={(e) => onLowOnly(e.target.checked)} />
           Faqat kam qolganlar
         </label>
-        <div className="relative">
+        <div className="relative flex-1 sm:flex-none">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft" />
-          <input className="input pl-9 w-56" placeholder="Qidirish..."
+          <input className="input pl-9 w-full sm:w-56" placeholder="Qidirish..."
                  value={search} onChange={(e) => onSearch(e.target.value)} />
         </div>
       </div>
@@ -137,7 +139,9 @@ export default function TaminotStockTab({
             description={lowOnly ? 'Barcha mahsulotlar yetarli miqdorda' : 'Avval mahsulot qo‘shing'}
           />
         ) : (
-          <div className="overflow-x-auto">
+          <>
+          {/* Katta ekran — to'liq jadval */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="text-left text-ink-soft border-b border-black/5">
                 <tr>
@@ -195,21 +199,7 @@ export default function TaminotStockTab({
                       </td>
                       {canWrite && (
                         <td className="py-2.5 pl-3" onClick={(e) => e.stopPropagation()}>
-                          <div className="flex items-center gap-1.5 justify-end">
-                            <button onClick={() => onAction(p, 'purchase')} title="Olib kelish"
-                                    className="p-1.5 rounded-button bg-primary/10 text-primary hover:bg-primary/20 transition">
-                              <PackagePlus size={15} />
-                            </button>
-                            <button onClick={() => onAction(p, 'consume')} title="Sarflash"
-                                    disabled={p.stock <= 0}
-                                    className="p-1.5 rounded-button bg-warning/10 text-warning hover:bg-warning/20 transition disabled:opacity-40">
-                              <PackageMinus size={15} />
-                            </button>
-                            <button onClick={() => onAction(p, 'stock')} title="Qoldiqni to'g'rilash"
-                                    className="p-1.5 rounded-button bg-black/5 text-ink-soft hover:bg-black/10 hover:text-ink transition">
-                              <ClipboardCheck size={15} />
-                            </button>
-                          </div>
+                          <StockActions product={p} onAction={onAction} />
                         </td>
                       )}
                     </tr>
@@ -218,6 +208,53 @@ export default function TaminotStockTab({
               </tbody>
             </table>
           </div>
+
+          {/* Telefon — jadval o'rniga kartalar */}
+          <div className="md:hidden divide-y divide-black/5">
+            {rows.map((p) => {
+              const m = STOCK_META[p.stock_status];
+              const unit = UNIT_LABEL[p.unit] ?? p.unit;
+              const attention = p.stock_status === 'low' || p.stock_status === 'out';
+              return (
+                <div key={p.id}
+                     className={cn('py-3 -mx-2 px-2 rounded-button transition cursor-pointer', m.row)}
+                     onClick={() => onOpenDetail(p)}>
+                  <div className="flex items-start gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="font-medium flex items-center gap-1.5">
+                        {attention && <AlertTriangle size={13} className="text-danger shrink-0" />}
+                        <span className="truncate">{p.name}</span>
+                      </div>
+                      <div className="text-xs text-ink-soft truncate">
+                        {p.supplier ? `${p.supplier} · ` : ''}
+                        {formatMoney(p.stock_value, p.currency)}
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className={cn('font-bold leading-tight', m.value)}>
+                        {formatQty(p.stock, unit)}
+                      </div>
+                      <span className={cn('badge mt-0.5 !px-1.5 !py-0 text-[10px] whitespace-nowrap', m.badge)}>
+                        {m.label}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between gap-2 mt-2">
+                    <div className="text-[11px] text-ink-soft truncate">
+                      kirim {formatQty(p.in_qty)} · sarf {formatQty(p.out_qty)}
+                      {p.min_qty > 0 ? ` · min ${formatQty(p.min_qty)}` : ''}
+                    </div>
+                    {canWrite && (
+                      <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+                        <StockActions product={p} onAction={onAction} />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          </>
         )}
         {!loading && rows.length > 0 && (
           <p className="text-[11px] text-ink-soft mt-3">
@@ -230,6 +267,30 @@ export default function TaminotStockTab({
   );
 }
 
+/** Bitta mahsulot uchun amal tugmalari (jadval ham, mobil karta ham shuni ishlatadi). */
+function StockActions({ product, onAction }: {
+  product: TaminotProduct;
+  onAction: (product: TaminotProduct, kind: ActionKind) => void;
+}) {
+  return (
+    <div className="flex items-center gap-1.5 justify-end">
+      <button onClick={() => onAction(product, 'purchase')} title="Olib kelish"
+              className="p-2 md:p-1.5 rounded-button bg-primary/10 text-primary hover:bg-primary/20 transition">
+        <PackagePlus size={15} />
+      </button>
+      <button onClick={() => onAction(product, 'consume')} title="Sarflash"
+              disabled={product.stock <= 0}
+              className="p-2 md:p-1.5 rounded-button bg-warning/10 text-warning hover:bg-warning/20 transition disabled:opacity-40">
+        <PackageMinus size={15} />
+      </button>
+      <button onClick={() => onAction(product, 'stock')} title="Qoldiqni to'g'rilash"
+              className="p-2 md:p-1.5 rounded-button bg-black/5 text-ink-soft hover:bg-black/10 hover:text-ink transition">
+        <ClipboardCheck size={15} />
+      </button>
+    </div>
+  );
+}
+
 const TILE_TONES = {
   primary: 'border-primary/20 bg-primary/5 text-primary',
   success: 'border-success/25 bg-success/10 text-success',
@@ -237,18 +298,19 @@ const TILE_TONES = {
   muted: 'border-black/10 bg-black/[0.03] text-ink-soft',
 } as const;
 
-function StockTile({ tone, icon, label, value }: {
+function StockTile({ tone, icon, label, value, className }: {
   tone: keyof typeof TILE_TONES;
   icon: React.ReactNode;
   label: string;
   value: string;
+  className?: string;
 }) {
   return (
-    <div className={`rounded-card border p-3 ${TILE_TONES[tone]}`}>
-      <div className="flex items-center gap-1.5 text-xs font-medium opacity-90">
-        {icon} {label}
+    <div className={cn('rounded-card border p-2.5 sm:p-3', TILE_TONES[tone], className)}>
+      <div className="flex items-center gap-1.5 text-[11px] sm:text-xs font-medium opacity-90">
+        {icon} <span className="truncate">{label}</span>
       </div>
-      <div className="text-lg font-bold mt-1.5 truncate">{value}</div>
+      <div className="text-base sm:text-lg font-bold mt-1 sm:mt-1.5 truncate">{value}</div>
     </div>
   );
 }

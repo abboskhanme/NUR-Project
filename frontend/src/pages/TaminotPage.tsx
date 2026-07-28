@@ -234,15 +234,15 @@ export default function TaminotPage() {
           <div className="w-10 h-10 rounded-button bg-primary/10 text-primary flex items-center justify-center">
             <Icon size={20} />
           </div>
-          <div>
-            <h1 className="text-2xl font-bold">{meta.title}</h1>
-            <p className="text-sm text-ink-soft">
+          <div className="min-w-0">
+            <h1 className="text-xl sm:text-2xl font-bold">{meta.title}</h1>
+            <p className="text-xs sm:text-sm text-ink-soft">
               Olib kelinadigan mahsulotlar, to'lovlar va ombordagi aniq qoldiq
             </p>
           </div>
         </div>
         {canWrite && (
-          <button className="btn-primary" onClick={() => setEditProduct(null)}>
+          <button className="btn-primary w-full sm:w-auto" onClick={() => setEditProduct(null)}>
             <Plus size={16} /> Yangi mahsulot
           </button>
         )}
@@ -257,7 +257,7 @@ export default function TaminotPage() {
                 {CURRENCY_LABEL[c.currency] ?? c.currency}
               </div>
             )}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
               <KpiCard tone="primary" label="Olib kelingan"
                 value={formatMoney(c.total_purchased, c.currency)} icon={<PackagePlus size={18} />} />
               <KpiCard tone="success" label="To'langan"
@@ -289,17 +289,17 @@ export default function TaminotPage() {
             </div>
           </div>
           <span className="text-sm font-medium text-danger flex items-center gap-1 shrink-0">
-            Ko'rish <ChevronRight size={15} />
+            <span className="hidden sm:inline">Ko'rish</span> <ChevronRight size={15} />
           </span>
         </button>
       ) : null}
 
       {/* Tabs */}
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex gap-1.5">
+        <div className="flex gap-1.5 flex-wrap">
           {([['products', 'Mahsulotlar'], ['stock', 'Ombor qoldiq'], ['reports', 'Hisobotlar']] as const).map(([key, label]) => (
             <button key={key} onClick={() => setTab(key)}
-              className={cn('px-3 py-1.5 rounded-button text-sm font-medium transition flex items-center gap-1.5',
+              className={cn('px-2.5 sm:px-3 py-1.5 rounded-button text-xs sm:text-sm font-medium transition flex items-center gap-1.5',
                 tab === key ? 'bg-primary text-white' : 'bg-black/5 text-ink-soft hover:bg-black/10')}>
               {label}
               {/* Ombor tabida diqqat talab qiladiganlar soni */}
@@ -313,23 +313,25 @@ export default function TaminotPage() {
           ))}
         </div>
         {tab === 'products' && (
-          <div className="flex items-center gap-2">
-            <label className="flex items-center gap-1.5 text-sm text-ink-soft cursor-pointer select-none">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <label className="flex items-center gap-1.5 text-xs sm:text-sm text-ink-soft cursor-pointer select-none shrink-0">
               <input type="checkbox" checked={onlyDebt} onChange={(e) => setOnlyDebt(e.target.checked)} />
               Faqat qarzi borlar
             </label>
-            <div className="relative">
+            <div className="relative flex-1 sm:flex-none">
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft" />
-              <input className="input pl-9 w-56" placeholder="Qidirish..."
+              <input className="input pl-9 w-full sm:w-56" placeholder="Qidirish..."
                      value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
           </div>
         )}
         {tab === 'reports' && (
-          <div className="flex items-center gap-2 text-sm">
-            <input type="date" className="input" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
-            <span className="text-ink-soft">—</span>
-            <input type="date" className="input" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+          <div className="flex items-center gap-2 text-sm w-full sm:w-auto">
+            <input type="date" className="input flex-1 sm:flex-none sm:w-auto"
+                   value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+            <span className="text-ink-soft shrink-0">—</span>
+            <input type="date" className="input flex-1 sm:flex-none sm:w-auto"
+                   value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
           </div>
         )}
       </div>
@@ -354,10 +356,12 @@ export default function TaminotPage() {
                 const unit = UNIT_LABEL[p.unit] ?? p.unit;
                 return (
                 <div key={p.id}
-                     className={cn('flex items-center gap-3 py-3 -mx-2 px-2 rounded-button transition cursor-pointer',
+                     className={cn(
+                       // Mobilda ustma-ust qatorlar, sm dan boshlab bitta qator
+                       'flex flex-wrap items-center gap-x-3 gap-y-2 py-3 -mx-2 px-2 rounded-button transition cursor-pointer',
                        attention ? 'bg-danger/[0.04] hover:bg-danger/[0.07]' : 'hover:bg-black/[0.02]')}
                      onClick={() => setDetail(p)}>
-                  <div className="min-w-0 flex-1">
+                  <div className="min-w-0 basis-full sm:basis-0 sm:flex-1">
                     <div className="font-medium truncate flex items-center gap-1.5">
                       {attention && <AlertTriangle size={13} className="text-danger shrink-0" />}
                       <span className="truncate">{p.name}</span>
@@ -370,7 +374,7 @@ export default function TaminotPage() {
                   </div>
                   {/* Ombordagi qoldiq — puldan alohida blok (chapda), kam qolganda qizil */}
                   <div className={cn(
-                    'shrink-0 w-[132px] mr-6 sm:mr-10 rounded-button border px-3 py-1.5 text-center',
+                    'shrink-0 w-[112px] sm:w-[132px] sm:mr-10 rounded-button border px-2.5 sm:px-3 py-1.5 text-center',
                     attention ? 'border-danger/25 bg-danger/10' : 'border-black/[0.07] bg-black/[0.03]',
                   )}>
                     <div className={cn('font-bold leading-tight', sm.value)}>
@@ -386,31 +390,33 @@ export default function TaminotPage() {
                       </div>
                     )}
                   </div>
-                  <div className="text-right shrink-0 w-[132px]">
+                  <div className="text-right shrink-0 ml-auto sm:ml-0 sm:w-[132px]">
                     <div className={cn('font-bold', p.balance > 0 ? 'text-danger' : 'text-success')}>
                       {formatMoney(p.balance, p.currency)}
                     </div>
                     <div className="text-[11px] text-ink-soft">qarz qoldiq</div>
                   </div>
-                  <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex items-center gap-1.5 shrink-0 basis-full sm:basis-auto justify-end"
+                       onClick={(e) => e.stopPropagation()}>
                     {canWrite && (
                       <button onClick={() => setAction({ product: p, kind: 'purchase' })}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-button text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 transition">
-                        <PackagePlus size={14} /> Olib kelish
+                              title="Olib kelish"
+                              className="inline-flex items-center gap-1 px-2.5 py-2 lg:py-1.5 rounded-button text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 transition">
+                        <PackagePlus size={14} /> <span className="hidden lg:inline">Olib kelish</span>
                       </button>
                     )}
                     {canWrite && (
                       <button onClick={() => setAction({ product: p, kind: 'consume' })}
                               disabled={p.stock <= 0} title="Sarflash (ombordan chiqim)"
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-button text-xs font-medium bg-warning/10 text-warning hover:bg-warning/20 transition disabled:opacity-40">
-                        <PackageMinus size={14} /> Sarflash
+                              className="inline-flex items-center gap-1 px-2.5 py-2 lg:py-1.5 rounded-button text-xs font-medium bg-warning/10 text-warning hover:bg-warning/20 transition disabled:opacity-40">
+                        <PackageMinus size={14} /> <span className="hidden lg:inline">Sarflash</span>
                       </button>
                     )}
                     {canWrite && (
                       <button onClick={() => setAction({ product: p, kind: 'payment' })}
-                              disabled={p.balance <= 0}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-button text-xs font-medium bg-success/10 text-success hover:bg-success/20 transition disabled:opacity-40">
-                        <Wallet size={14} /> To'lash
+                              disabled={p.balance <= 0} title="Qarz to'lash"
+                              className="inline-flex items-center gap-1 px-2.5 py-2 lg:py-1.5 rounded-button text-xs font-medium bg-success/10 text-success hover:bg-success/20 transition disabled:opacity-40">
+                        <Wallet size={14} /> <span className="hidden lg:inline">To'lash</span>
                       </button>
                     )}
                     {canWrite && (
@@ -488,8 +494,9 @@ export default function TaminotPage() {
                   <span className="text-ink-soft">To'lov: <span className="font-semibold text-success">{formatMoney(dayTotals.paid, dayTotals.currency)}</span></span>
                 </div>
               </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+            {/* Mobilda jadval gorizontal siljiydi — ustunlar siqilib ketmaydi */}
+            <div className="overflow-x-auto -mx-1 px-1">
+              <table className="w-full text-sm min-w-[620px]">
                 <thead className="text-left text-ink-soft border-b border-black/5">
                   <tr>
                     <th className="py-2 pr-3">Vaqt</th>
@@ -546,9 +553,9 @@ export default function TaminotPage() {
 
             {/* Kunlik pagination — har sahifa bir kun */}
             {totalDays > 1 && (
-              <div className="flex items-center justify-between mt-4 text-sm">
+              <div className="flex items-center justify-between flex-wrap gap-2 mt-4 text-sm">
                 <span className="text-ink-soft">{dayRows.length} ta harakat</span>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 ml-auto">
                   <button onClick={() => setRepPage((p) => Math.max(1, p - 1))} disabled={repPage <= 1}
                     className="flex items-center gap-1 px-2.5 py-1.5 rounded-button border border-black/10 hover:bg-black/5 disabled:opacity-40 disabled:cursor-not-allowed">
                     <ChevronLeft size={15} /> Yangiroq
@@ -617,12 +624,13 @@ function KpiCard({ tone, label, value, icon }: {
 }) {
   const tn = KPI_TONES[tone];
   return (
-    <div className={`rounded-card border p-4 flex items-start justify-between ${tn.card}`}>
+    <div className={`rounded-card border p-3 sm:p-4 flex items-start justify-between gap-2 ${tn.card}`}>
       <div className="min-w-0">
-        <div className={`text-sm font-medium ${tn.text}`}>{label}</div>
-        <div className={`text-2xl font-bold mt-2 ${tn.text}`}>{value}</div>
+        <div className={`text-xs sm:text-sm font-medium ${tn.text}`}>{label}</div>
+        <div className={`text-[15px] sm:text-2xl font-bold mt-1 sm:mt-2 truncate ${tn.text}`}>{value}</div>
       </div>
-      <div className={`w-10 h-10 rounded-button flex items-center justify-center shrink-0 ${tn.icon}`}>
+      {/* Ikonka telefonda yashiriladi — summaga joy bo'shatadi */}
+      <div className={`w-10 h-10 rounded-button hidden sm:flex items-center justify-center shrink-0 ${tn.icon}`}>
         {icon}
       </div>
     </div>

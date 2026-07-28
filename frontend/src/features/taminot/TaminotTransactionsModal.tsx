@@ -86,18 +86,18 @@ export default function TaminotTransactionsModal({
 
         {/* Ombor qoldig'i va qarz qoldig'i */}
         <div className="px-5 pt-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className={cn('rounded-button border px-4 py-3',
               attention ? 'border-danger/25 bg-danger/10' : 'border-black/10 bg-black/[0.03]')}>
               <div className="text-xs font-medium text-ink-soft">Ombor qoldig'i</div>
-              <div className={cn('text-xl font-bold mt-0.5', sm.value)}>
+              <div className={cn('text-lg sm:text-xl font-bold mt-0.5', sm.value)}>
                 {formatQty(product.stock, unitLabel)}
               </div>
               <span className={cn('badge mt-1 !px-1.5 !py-0 text-[10px]', sm.badge)}>{sm.label}</span>
             </div>
             <div className="rounded-button bg-danger/10 border border-danger/20 px-4 py-3">
               <div className="text-xs font-medium text-danger/80">Qarz qoldig'i</div>
-              <div className="text-xl font-bold text-danger mt-0.5">
+              <div className="text-lg sm:text-xl font-bold text-danger mt-0.5">
                 {formatMoney(product.balance, product.currency)}
               </div>
               {product.min_qty > 0 && (
@@ -107,7 +107,7 @@ export default function TaminotTransactionsModal({
               )}
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3 mt-2 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 mt-2 text-sm">
             <div className="rounded-button bg-black/[0.03] px-3 py-2 flex justify-between">
               <span className="text-ink-soft">Olib kelingan</span>
               <span className="font-medium">{formatQty(product.in_qty, unitLabel)}</span>
@@ -174,8 +174,9 @@ export default function TaminotTransactionsModal({
                         : tx.kind === 'payment' ? `−${formatMoney(tx.amount, tx.currency)}`
                         : '—'}
                     </div>
+                    {/* Telefonda hover yo'q — tugma doim ko'rinadi */}
                     <button onClick={() => setDelId(tx.id)}
-                            className="p-1.5 rounded hover:bg-danger/10 text-ink-soft hover:text-danger opacity-0 group-hover:opacity-100 transition">
+                            className="p-1.5 rounded hover:bg-danger/10 text-ink-soft hover:text-danger opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition shrink-0">
                       <Trash2 size={15} />
                     </button>
                   </div>
