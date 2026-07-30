@@ -35,7 +35,7 @@ from app.models.system import (
 from app.models.debt import DebtProduct, DebtTransaction
 from app.models.target import Target, TargetContribution
 from app.models.taminot import TaminotProduct, TaminotTransaction
-from app.models.costing import ProductRecipe, ProductRecipeItem
+from app.models.costing import CostingMaterial, ProductRecipe, ProductRecipeItem
 from app.models.shipping import Shipment
 from app.models.production import ProductionRecord
 from app.models.lead import Lead, LeadEvent
@@ -84,6 +84,7 @@ __all__ = [
     "TargetContribution",
     "TaminotProduct",
     "TaminotTransaction",
+    "CostingMaterial",
     "ProductRecipe",
     "ProductRecipeItem",
     "Shipment",

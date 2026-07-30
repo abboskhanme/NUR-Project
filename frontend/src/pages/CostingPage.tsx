@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   Calculator, Search, TrendingUp, TrendingDown, Percent, AlertTriangle,
-  ChevronRight, PackageSearch,
+  ChevronRight, PackageSearch, Table2, Rows3, Boxes,
 } from 'lucide-react';
 
 import { api } from '@/api/client';
@@ -11,6 +11,9 @@ import Card from '@/components/ui/Card';
 import EmptyState from '@/components/ui/EmptyState';
 import { formatMoney } from '@/lib/format';
 import { cn } from '@/lib/cn';
+import { usePermissions } from '@/lib/permissions';
+import CostingMatrix from '@/features/costing/CostingMatrix';
+import MaterialsTab from '@/features/costing/MaterialsTab';
 import type { CostRow, CostingSummary } from '@/features/costing/types';
 import { marginTone } from '@/features/costing/types';
 
@@ -22,23 +25,27 @@ import { marginTone } from '@/features/costing/types';
  * shuning uchun ta'minotda narx o'zgarsa bu jadval o'zi yangilanadi.
  */
 export default function CostingPage() {
-  const [type, setType] = useState<'main' | 'additional'>('main');
+  // Ro'yxat — mahsulot bo'yicha ko'rsatkichlar; Jadval — matritsa (bir ekranda belgilash)
+  const [tab, setTab] = useState<'list' | 'matrix' | 'materials'>('list');
   const [search, setSearch] = useState('');
   const [onlyMissing, setOnlyMissing] = useState(false);
+  const { can } = usePermissions();
+  const canWrite = can('costing:write');
+  const canDelete = can('costing:delete');
 
   const summaryQ = useQuery<CostingSummary>({
-    queryKey: ['costing-summary', type],
-    queryFn: () => api.get('/costing/summary', { params: { product_type: type } }).then((r) => r.data),
+    queryKey: ['costing-summary'],
+    queryFn: () => api.get('/costing/summary').then((r) => r.data),
   });
   const rowsQ = useQuery<CostRow[]>({
-    queryKey: ['costing-products', type, search, onlyMissing],
+    queryKey: ['costing-products', search, onlyMissing],
     queryFn: () => api.get('/costing/products', {
       params: {
-        product_type: type,
         search: search.trim() || undefined,
         only_missing: onlyMissing || undefined,
       },
     }).then((r) => r.data),
+    enabled: tab === 'list',
   });
 
   const rows = rowsQ.data ?? [];
@@ -106,30 +113,35 @@ export default function CostingPage() {
         </div>
       )}
 
-      {/* Filtrlar */}
+      {/* Tablar + filtrlar */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex gap-1.5">
-          {([['main', 'Asosiy mahsulotlar'], ['additional', "Qo'shimcha"]] as const).map(([key, label]) => (
-            <button key={key} onClick={() => setType(key)}
-              className={cn('px-2.5 sm:px-3 py-1.5 rounded-button text-xs sm:text-sm font-medium transition',
-                type === key ? 'bg-primary text-white' : 'bg-black/5 text-ink-soft hover:bg-black/10')}>
-              {label}
+          {([['list', "Ro'yxat"], ['matrix', 'Jadval'], ['materials', 'Materiallar']] as const).map(([key, label]) => (
+            <button key={key} onClick={() => setTab(key)}
+              className={cn('px-2.5 sm:px-3 py-1.5 rounded-button text-xs sm:text-sm font-medium transition flex items-center gap-1.5',
+                tab === key ? 'bg-primary text-white' : 'bg-black/5 text-ink-soft hover:bg-black/10')}>
+              {key === 'matrix' ? <Table2 size={14} />
+                : key === 'materials' ? <Boxes size={14} /> : <Rows3 size={14} />} {label}
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <label className="flex items-center gap-1.5 text-xs sm:text-sm text-ink-soft cursor-pointer select-none shrink-0">
-            <input type="checkbox" checked={onlyMissing} onChange={(e) => setOnlyMissing(e.target.checked)} />
-            Faqat kiritilmaganlar
-          </label>
-          <div className="relative flex-1 sm:flex-none">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft" />
-            <input className="input pl-9 w-full sm:w-56" placeholder="Qidirish..."
-                   value={search} onChange={(e) => setSearch(e.target.value)} />
+        {tab === 'list' && (
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <label className="flex items-center gap-1.5 text-xs sm:text-sm text-ink-soft cursor-pointer select-none shrink-0">
+              <input type="checkbox" checked={onlyMissing} onChange={(e) => setOnlyMissing(e.target.checked)} />
+              Faqat kiritilmaganlar
+            </label>
+            <div className="relative flex-1 sm:flex-none">
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft" />
+              <input className="input pl-9 w-full sm:w-56" placeholder="Qidirish..."
+                     value={search} onChange={(e) => setSearch(e.target.value)} />
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
+      {tab === 'materials' ? <MaterialsTab canWrite={canWrite} canDelete={canDelete} />
+       : tab === 'matrix' ? <CostingMatrix canWrite={canWrite} /> : (
       <Card>
         {rowsQ.isLoading ? (
           <div className="space-y-2">
@@ -156,7 +168,6 @@ export default function CostingPage() {
                     <th className="py-2 pr-3 text-right">Sotish narxi</th>
                     <th className="py-2 pr-3 text-right">Foyda</th>
                     <th className="py-2 pr-3 text-right">Marja</th>
-                    <th className="py-2 pr-3 text-right">Sotilgan</th>
                     <th className="py-2 pl-3 w-[1%]"></th>
                   </tr>
                 </thead>
@@ -186,14 +197,6 @@ export default function CostingPage() {
                       <td className={cn('py-2.5 pr-3 text-right whitespace-nowrap font-semibold',
                         marginTone(r.margin_percent))}>
                         {r.margin_percent != null ? `${r.margin_percent}%` : '—'}
-                      </td>
-                      <td className="py-2.5 pr-3 text-right whitespace-nowrap text-ink-soft">
-                        {r.sold_count > 0 ? `${r.sold_count} dona` : '—'}
-                        {r.avg_sold_uzs != null && (
-                          <div className="text-[11px]">
-                            o'rt. {formatMoney(r.avg_sold_uzs, 'UZS')}
-                          </div>
-                        )}
                       </td>
                       <td className="py-2.5 pl-3 text-right">
                         <Link to={`/costing/${r.product_id}`}
@@ -253,11 +256,12 @@ export default function CostingPage() {
         )}
         {!rowsQ.isLoading && rows.length > 0 && (
           <p className="text-[11px] text-ink-soft mt-3">
-            Tannarx = materiallar + qo'shimcha xarajatlar + ustama. Material narxlari ichki
-            ta'minotdan jonli olinadi. «Sotilgan» — oxirgi 180 kundagi haqiqiy sotuvlar.
+            Tannarx = materiallar + qo'shimcha xarajatlar + ustama. Material narxlari
+            «Materiallar» katalogidan jonli olinadi — narx o'zgarsa bu jadval o'zi yangilanadi.
           </p>
         )}
       </Card>
+      )}
     </div>
   );
 }

@@ -1,12 +1,12 @@
 """Tannarx (costing) — tarkib asosida tannarx va foyda hisobi.
 
 Tekshiriladi:
-  - materiallar narxi ichki ta'minotdan JONLI olinadi (ta'minotda narx o'zgarsa
+  - materiallar narxi tannarx katalogidan JONLI olinadi (katalogda narx o'zgarsa
     tannarx o'zi yangilanadi), qo'lda kiritilgan narx esa qat'iy qoladi
   - USD satrlar oxirgi kurs bo'yicha so'mga o'giriladi
   - ustama foizi, foyda va marja to'g'ri hisoblanadi
   - ruxsat: `costing` moduli bo'lmagan xodim ko'ra olmaydi
-  - faqat ichki ta'minot materiallari qo'shiladi (tashqi rad etiladi)
+  - summa bilan kiritish (entry_mode="sum") va katalog CRUD
 
 Integration test — Postgres kerak (TEST_DATABASE_URL).
 """
@@ -52,27 +52,28 @@ def _auth(client, user):
 
 
 async def _seed(db_engine, *, rate: Decimal = Decimal(12000)):
-    """Mahsulot + ichki/tashqi material + valyuta kursi yaratadi."""
+    """Mahsulot + tannarx katalogidagi materiallar + valyuta kursi yaratadi."""
+    from app.models.costing import CostingMaterial
     from app.models.finance import ExchangeRate
     from app.models.product import Product
-    from app.models.taminot import TaminotProduct
 
     Session = async_sessionmaker(db_engine, class_=AsyncSession, expire_on_commit=False)
     async with Session() as db:
         db.add(ExchangeRate(date=date.today(), usd_to_uzs=rate, source="manual"))
         product = Product(product_type="main", model="OPTIMA", kvm=200, year=2026,
                           base_price_usd=Decimal(1000), status="active")
-        metal = TaminotProduct(scope="ichki", name="Metall list 2mm", unit="list",
-                               unit_price=Decimal(200_000), currency="UZS")
-        datchik = TaminotProduct(scope="ichki", name="Datchik", unit="dona",
-                                 unit_price=Decimal(10), currency="USD")
-        tashqi = TaminotProduct(scope="tashqi", name="Tashqi profil", unit="metr",
-                                unit_price=Decimal(50_000), currency="UZS")
-        db.add_all([product, metal, datchik, tashqi])
+        metal = CostingMaterial(name="Metall list 2mm", unit="list",
+                                unit_price=Decimal(200_000), currency="UZS")
+        datchik = CostingMaterial(name="Datchik", unit="dona",
+                                  unit_price=Decimal(10), currency="USD")
+        # Birligi/narxi yo'q — summa bilan kiritish uchun ("50 ming so'mlik kraska")
+        kraska = CostingMaterial(name="Kraska", unit=None, unit_price=Decimal(0),
+                                 currency="UZS")
+        db.add_all([product, metal, datchik, kraska])
         await db.commit()
-        for o in (product, metal, datchik, tashqi):
+        for o in (product, metal, datchik, kraska):
             await db.refresh(o)
-        return product, metal, datchik, tashqi
+        return product, metal, datchik, kraska
 
 
 async def test_cost_from_live_material_prices(client, db_engine):
@@ -111,8 +112,8 @@ async def test_cost_from_live_material_prices(client, db_engine):
 
 
 async def test_material_price_change_updates_cost(client, db_engine):
-    """Ta'minotda narx o'zgarsa tannarx o'zi yangilanadi; qo'lda narx qotib qoladi."""
-    from app.models.taminot import TaminotProduct
+    """Katalogda narx o'zgarsa tannarx o'zi yangilanadi; qo'lda narx qotib qoladi."""
+    from app.models.costing import CostingMaterial
     from sqlalchemy import select
 
     product, metal, _, _ = await _seed(db_engine)
@@ -129,10 +130,10 @@ async def test_material_price_change_updates_cost(client, db_engine):
     before = (await c.get(f"{API}/products/{product.id}")).json()["breakdown"]["cost_uzs"]
     assert before == 400_000
 
-    # Ta'minotda narx ikki barobar oshdi
+    # Katalogda narx ikki barobar oshdi
     Session = async_sessionmaker(db_engine, class_=AsyncSession, expire_on_commit=False)
     async with Session() as db:
-        m = (await db.execute(select(TaminotProduct).where(TaminotProduct.id == metal.id))).scalar_one()
+        m = (await db.execute(select(CostingMaterial).where(CostingMaterial.id == metal.id))).scalar_one()
         m.unit_price = Decimal(400_000)
         await db.commit()
 
@@ -141,21 +142,78 @@ async def test_material_price_change_updates_cost(client, db_engine):
     assert after == 600_000
 
 
-async def test_only_ichki_materials_allowed(client, db_engine):
-    """Tashqi ta'minot materialini tarkibga qo'shib bo'lmaydi."""
-    product, _, _, tashqi = await _seed(db_engine)
+async def test_sum_mode_line(client, db_engine):
+    """Summa bilan kiritish: «50 ming so'mlik kraska sepildi»."""
+    product, metal, _, kraska = await _seed(db_engine)
     c = _auth(client, await _user(db_engine, ["costing:*"]))
 
     r = await c.put(f"{API}/products/{product.id}", json={
         "overhead_percent": 0,
-        "items": [{"kind": "material", "material_id": str(tashqi.id), "qty": 1}],
+        "items": [
+            {"kind": "material", "material_id": str(metal.id), "entry_mode": "qty", "qty": 2},
+            {"kind": "material", "material_id": str(kraska.id), "entry_mode": "sum",
+             "amount": 50_000},
+        ],
     })
-    assert r.status_code == 422
-    assert "ichki" in r.json()["detail"].lower()
+    assert r.status_code == 200, r.text
+    b = r.json()["breakdown"]
+    # 2 × 200 000 + 50 000 (summa) = 450 000
+    assert b["materials_uzs"] == 450_000
+    assert b["cost_uzs"] == 450_000
 
-    # Materiallar ro'yxatida ham faqat ichki bo'ladi
-    mats = (await c.get(f"{API}/materials")).json()
-    assert all(m["name"] != "Tashqi profil" for m in mats)
+    sum_line = next(i for i in r.json()["items"] if i["label"] == "Kraska")
+    assert sum_line["entry_mode"] == "sum"
+    assert sum_line["amount"] == 50_000
+    assert sum_line["line_total"] == 50_000
+
+    # Summa rejimida summa bo'sh bo'lsa — rad etiladi
+    bad = await c.put(f"{API}/products/{product.id}", json={
+        "overhead_percent": 0,
+        "items": [{"kind": "material", "material_id": str(kraska.id), "entry_mode": "sum"}],
+    })
+    assert bad.status_code == 422
+    assert "summa" in bad.json()["detail"].lower()
+
+
+async def test_material_catalog_crud(client, db_engine):
+    """Katalog tannarx bo'limining o'zida boshqariladi (ta'minotdan mustaqil)."""
+    product, metal, _, _ = await _seed(db_engine)
+    c = _auth(client, await _user(db_engine, ["costing:*"]))
+
+    # Qo'shish
+    r = await c.post(f"{API}/materials", json={
+        "name": "Payvand simi", "unit": "kg", "unit_price": 35_000, "currency": "UZS",
+    })
+    assert r.status_code == 201, r.text
+    new_id = r.json()["id"]
+
+    # Bir xil nom — rad etiladi
+    dup = await c.post(f"{API}/materials", json={"name": "payvand simi", "unit": "kg"})
+    assert dup.status_code == 422 and "allaqachon" in dup.json()["detail"]
+
+    # Tahrirlash: narx o'zgarsa kalkulyatsiya o'zi yangilanadi
+    await c.put(f"{API}/products/{product.id}", json={
+        "overhead_percent": 0,
+        "items": [{"kind": "material", "material_id": new_id, "qty": 2}],
+    })
+    assert (await c.get(f"{API}/products/{product.id}")).json()["breakdown"]["cost_uzs"] == 70_000
+    upd = await c.patch(f"{API}/materials/{new_id}", json={
+        "name": "Payvand simi", "unit": "kg", "unit_price": 50_000, "currency": "UZS",
+    })
+    assert upd.status_code == 200 and upd.json()["used_in"] == 1
+    assert (await c.get(f"{API}/products/{product.id}")).json()["breakdown"]["cost_uzs"] == 100_000
+
+    # Ishlatilgan materialni o'chirib bo'lmaydi (tarix buzilmasin)
+    dele = await c.delete(f"{API}/materials/{new_id}")
+    assert dele.status_code == 422 and "arxivlang" in dele.json()["detail"]
+
+    # Birlik IXTIYORIY — ko'rsatilmasa bo'sh qoladi
+    no_unit = await c.post(f"{API}/materials", json={"name": "Birligi yo'q", "unit_price": 1000})
+    assert no_unit.status_code == 201 and no_unit.json()["unit"] is None
+
+    # Ishlatilmagani o'chadi
+    free = (await c.post(f"{API}/materials", json={"name": "Ishlatilmagan", "unit": "dona"})).json()
+    assert (await c.delete(f"{API}/materials/{free['id']}")).status_code == 204
 
 
 async def test_permissions_read_write_delete(client, db_engine):
@@ -185,7 +243,7 @@ async def test_summary_and_list(client, db_engine):
     product, metal, _, _ = await _seed(db_engine)
     c = _auth(client, await _user(db_engine, ["costing:*"]))
 
-    rows = (await c.get(f"{API}/products", params={"product_type": "main"})).json()
+    rows = (await c.get(f"{API}/products")).json()
     assert len(rows) == 1 and rows[0]["has_recipe"] is False
     assert rows[0]["display_name"] == "OPTIMA 2026 200 kvm"
 
@@ -193,7 +251,7 @@ async def test_summary_and_list(client, db_engine):
         "overhead_percent": 0, "target_price_usd": 1000,
         "items": [{"kind": "material", "material_id": str(metal.id), "qty": 1}],
     })
-    s = (await c.get(f"{API}/summary", params={"product_type": "main"})).json()
+    s = (await c.get(f"{API}/summary")).json()
     assert s["usd_rate"] == 12000
     assert s["with_recipe"] == 1 and s["without_recipe"] == 0
     assert s["loss_count"] == 0
@@ -201,3 +259,115 @@ async def test_summary_and_list(client, db_engine):
 
     # Faqat kiritilmaganlar filtri
     assert (await c.get(f"{API}/products", params={"only_missing": True})).json() == []
+
+
+async def test_matrix_view_and_bulk_save(client, db_engine):
+    """Jadval (matritsa): ustunlar — materiallar, kataklar — miqdor.
+
+    Eng muhimi: jadvalni saqlash FAQAT material satrlarini almashtiradi —
+    qo'shimcha xarajatlar, ustama foizi va sotish narxi tegilmasligi kerak.
+    """
+    product, metal, datchik, _ = await _seed(db_engine)
+    c = _auth(client, await _user(db_engine, ["costing:*"]))
+
+    # Avval mahsulot sahifasi orqali xarajat + ustama + narx kiritamiz
+    await c.put(f"{API}/products/{product.id}", json={
+        "overhead_percent": 10,
+        "target_price_usd": 1000,
+        "note": "qo'lda kiritilgan izoh",
+        "items": [
+            {"kind": "material", "material_id": str(metal.id), "qty": 1},
+            {"kind": "expense", "label": "Payvandlash", "qty": 1,
+             "unit_price": 100_000, "currency": "UZS"},
+        ],
+    })
+
+    # Jadval ko'rinishi: kataklar to'ldirilgan bo'lishi kerak
+    m = (await c.get(f"{API}/matrix")).json()
+    assert m["usd_rate"] == 12000
+    assert {x["name"] for x in m["materials"]} == {"Metall list 2mm", "Datchik", "Kraska"}
+    row = next(r for r in m["rows"] if r["product_id"] == str(product.id))
+    assert row["display_name"] == "OPTIMA 2026 200 kvm"
+    assert row["cells"] == {str(metal.id): 1.0}
+    assert row["expense_count"] == 1
+    assert row["overhead_percent"] == 10
+
+    # Jadval orqali miqdorlarni o'zgartiramiz: metall 3 ta, datchik 2 ta
+    r = await c.put(f"{API}/matrix", json={"rows": [{
+        "product_id": str(product.id),
+        "cells": [
+            {"material_id": str(metal.id), "value": 3},
+            {"material_id": str(datchik.id), "value": 2},
+        ],
+    }]})
+    assert r.status_code == 200, r.text
+    row = next(x for x in r.json()["rows"] if x["product_id"] == str(product.id))
+    assert row["cells"] == {str(metal.id): 3.0, str(datchik.id): 2.0}
+    # 3×200 000 + 2×$10×12 000 = 840 000
+    assert row["materials_uzs"] == 840_000
+
+    # Xarajat, ustama, narx va izoh SAQLANGAN bo'lishi kerak
+    d = (await c.get(f"{API}/products/{product.id}")).json()
+    assert d["overhead_percent"] == 10
+    assert d["target_price_usd"] == 1000
+    assert d["note"] == "qo'lda kiritilgan izoh"
+    assert [i["label"] for i in d["items"] if i["kind"] == "expense"] == ["Payvandlash"]
+    # Tannarx: 840k materiallar + 100k xarajat + 10% ustama = 1 034 000
+    assert d["breakdown"]["cost_uzs"] == 1_034_000
+
+    # Katakni bo'shatish (ro'yxatdan olib tashlash) — material satri o'chadi
+    await c.put(f"{API}/matrix", json={"rows": [{
+        "product_id": str(product.id),
+        "cells": [{"material_id": str(metal.id), "value": 3}],
+    }]})
+    d = (await c.get(f"{API}/products/{product.id}")).json()
+    assert [i["label"] for i in d["items"] if i["kind"] == "material"] == ["Metall list 2mm"]
+    assert [i["label"] for i in d["items"] if i["kind"] == "expense"] == ["Payvandlash"]
+
+
+async def test_matrix_preserves_sum_lines(client, db_engine):
+    """Jadval faqat MIQDOR satrlarini almashtiradi — summa satrlari saqlanadi."""
+    product, metal, _, kraska = await _seed(db_engine)
+
+    c = _auth(client, await _user(db_engine, ["costing:*"]))
+    # Mahsulot sahifasida summa satri kiritamiz
+    await c.put(f"{API}/products/{product.id}", json={
+        "overhead_percent": 0,
+        "items": [{"kind": "material", "material_id": str(kraska.id),
+                   "entry_mode": "sum", "amount": 50_000}],
+    })
+
+    # Jadvalda summa satri KATAK sifatida ko'rinmaydi, faqat sanaladi
+    m = (await c.get(f"{API}/matrix")).json()
+    row = next(x for x in m["rows"] if x["product_id"] == str(product.id))
+    assert row["cells"] == {} and row["sum_line_count"] == 1
+
+    # Jadval orqali miqdor saqlaymiz — summa satri joyida qolishi kerak
+    r = await c.put(f"{API}/matrix", json={"rows": [{
+        "product_id": str(product.id),
+        "cells": [{"material_id": str(metal.id), "value": 2}],
+    }]})
+    assert r.status_code == 200, r.text
+    row = next(x for x in r.json()["rows"] if x["product_id"] == str(product.id))
+    assert row["cells"] == {str(metal.id): 2.0}
+    assert row["sum_line_count"] == 1
+    assert row["materials_uzs"] == 450_000     # 2×200k (jadval) + 50k (summa satri)
+
+    d = (await c.get(f"{API}/products/{product.id}")).json()
+    labels = sorted(i["label"] for i in d["items"])
+    assert labels == ["Kraska", "Metall list 2mm"]
+
+    # Katalogda yo'q material — rad etiladi
+    bad = await c.put(f"{API}/matrix", json={"rows": [{
+        "product_id": str(product.id),
+        "cells": [{"material_id": str(uuid.uuid4()), "value": 1}],
+    }]})
+    assert bad.status_code == 422
+
+    c = _auth(client, await _user(db_engine, ["costing:read"]))
+    assert (await c.get(f"{API}/matrix")).status_code == 200
+    r = await c.put(f"{API}/matrix", json={"rows": [{
+        "product_id": str(product.id),
+        "cells": [{"material_id": str(metal.id), "value": 1}],
+    }]})
+    assert r.status_code == 403

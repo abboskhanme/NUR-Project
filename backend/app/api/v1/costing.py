@@ -19,20 +19,23 @@ from decimal import Decimal
 from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import case, delete, func, or_, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import CurrentUser
 from app.core.permissions import module_guard
 from app.db.session import get_db
-from app.models.costing import ProductRecipe, ProductRecipeItem
+from app.models.costing import CostingMaterial, ProductRecipe, ProductRecipeItem
 from app.models.order import Order, OrderItem
 from app.models.product import Product
-from app.models.taminot import TaminotProduct, TaminotTransaction
 from app.schemas.costing import (
     CostBreakdown,
     CostingSummary,
+    MaterialIn,
     MaterialOption,
+    MatrixOut,
+    MatrixRowOut,
+    MatrixSave,
     ProductCostDetail,
     ProductCostRow,
     RecipeIn,
@@ -63,10 +66,14 @@ def _r2(v: Decimal) -> float:
 # ---------------------------------------------------------------------------
 def _build_lines(
     items: list[ProductRecipeItem],
-    materials: dict[uuid.UUID, TaminotProduct],
+    materials: dict[uuid.UUID, CostingMaterial],
     rate: Decimal,
 ) -> list[RecipeItemOut]:
-    """Satrlarni amaldagi narx bilan hisoblab chiqadi."""
+    """Satrlarni amaldagi narx bilan hisoblab chiqadi.
+
+    entry_mode="sum" — satr summasi `amount` dan olinadi (miqdor × narx emas).
+    entry_mode="qty" — miqdor × narx; narx bo'sh bo'lsa katalogdan jonli olinadi.
+    """
     out: list[RecipeItemOut] = []
     for it in items:
         mat = materials.get(it.material_id) if it.material_id else None
@@ -80,7 +87,10 @@ def _build_lines(
 
         qty = _q(it.qty)
         price_d = _q(price)
-        line_total = (qty * price_d).quantize(Decimal("0.01"))
+        if (it.entry_mode or "qty") == "sum":
+            line_total = _q(it.amount).quantize(Decimal("0.01"))
+        else:
+            line_total = (qty * price_d).quantize(Decimal("0.01"))
         line_total_uzs = line_total * rate if currency == "USD" else line_total
 
         out.append(RecipeItemOut(
@@ -88,7 +98,9 @@ def _build_lines(
             kind=it.kind,
             material_id=it.material_id,
             label=it.label or (mat.name if mat else "—"),
+            entry_mode=it.entry_mode or "qty",
             qty=_f(it.qty),
+            amount=_f(it.amount) if it.amount is not None else None,
             unit=it.unit or (mat.unit if mat else None),
             unit_price=_f(price_d),
             currency=currency,
@@ -163,10 +175,10 @@ def _breakdown(
     )
 
 
-async def _materials_map(db: AsyncSession, ids: set[uuid.UUID]) -> dict[uuid.UUID, TaminotProduct]:
+async def _materials_map(db: AsyncSession, ids: set[uuid.UUID]) -> dict[uuid.UUID, CostingMaterial]:
     if not ids:
         return {}
-    res = await db.execute(select(TaminotProduct).where(TaminotProduct.id.in_(ids)))
+    res = await db.execute(select(CostingMaterial).where(CostingMaterial.id.in_(ids)))
     return {m.id: m for m in res.scalars().all()}
 
 
@@ -222,13 +234,11 @@ async def _items_map(
 async def list_product_costs(
     db: Annotated[AsyncSession, Depends(get_db)],
     user: CurrentUser,
-    product_type: str = Query("main", description="main / additional / all"),
     search: Optional[str] = None,
     only_missing: bool = Query(False, description="Faqat kalkulyatsiyasi yo'qlar"),
 ):
-    q = select(Product).where(Product.status == "active")
-    if product_type in ("main", "additional"):
-        q = q.where(Product.product_type == product_type)
+    # Tannarx faqat ASOSIY mahsulotlar (kotyollar) uchun yuritiladi
+    q = select(Product).where(Product.status == "active", Product.product_type == "main")
     if search:
         like = f"%{search.strip()}%"
         q = q.where(or_(Product.model.ilike(like), Product.name.ilike(like)))
@@ -280,10 +290,8 @@ async def list_product_costs(
 async def costing_summary(
     db: Annotated[AsyncSession, Depends(get_db)],
     user: CurrentUser,
-    product_type: str = Query("main"),
 ):
-    rows = await list_product_costs(db=db, user=user, product_type=product_type,
-                                   search=None, only_missing=False)
+    rows = await list_product_costs(db=db, user=user, search=None, only_missing=False)
     with_recipe = [r for r in rows if r.has_recipe and r.margin_percent is not None]
     margins = [r.margin_percent for r in with_recipe if r.margin_percent is not None]
     best = max(with_recipe, key=lambda r: r.margin_percent or 0, default=None)
@@ -306,44 +314,123 @@ async def costing_summary(
 # ---------------------------------------------------------------------------
 # Materiallar (ichki ta'minot) — tanlash ro'yxati
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Materiallar katalogi — tannarx modulining O'Z ro'yxati (ta'minotdan mustaqil)
+# ---------------------------------------------------------------------------
+def _material_out(m: CostingMaterial, used_in: int = 0) -> MaterialOption:
+    return MaterialOption(
+        id=m.id, name=m.name, unit=m.unit, unit_price=_f(m.unit_price),
+        currency=m.currency, note=m.note, is_active=m.is_active, used_in=used_in,
+    )
+
+
+async def _usage_map(db: AsyncSession) -> dict[uuid.UUID, int]:
+    """material_id -> nechta mahsulot kalkulyatsiyasida ishlatilgan."""
+    res = await db.execute(
+        select(ProductRecipeItem.material_id,
+               func.count(func.distinct(ProductRecipeItem.recipe_id)))
+        .where(ProductRecipeItem.material_id.isnot(None))
+        .group_by(ProductRecipeItem.material_id)
+    )
+    return {row[0]: int(row[1] or 0) for row in res.all()}
+
+
 @router.get("/materials", response_model=list[MaterialOption])
 async def list_materials(
     db: Annotated[AsyncSession, Depends(get_db)],
     user: CurrentUser,
     search: Optional[str] = None,
+    include_inactive: bool = Query(False, description="Arxivlanganlar ham"),
 ):
-    """Ichki ta'minot materiallari — narxi va ombordagi qoldig'i bilan."""
-    q = select(TaminotProduct).where(TaminotProduct.scope == "ichki")
+    q = select(CostingMaterial)
+    if not include_inactive:
+        q = q.where(CostingMaterial.is_active.is_(True))
     if search:
-        like = f"%{search.strip()}%"
-        q = q.where(or_(TaminotProduct.name.ilike(like), TaminotProduct.supplier.ilike(like)))
-    mats = (await db.execute(q.order_by(TaminotProduct.name.asc()))).scalars().all()
+        q = q.where(CostingMaterial.name.ilike(f"%{search.strip()}%"))
+    mats = (await db.execute(q.order_by(CostingMaterial.name.asc()))).scalars().all()
+    usage = await _usage_map(db)
+    return [_material_out(m, usage.get(m.id, 0)) for m in mats]
 
-    # Qoldiq: kirim − sarf ± to'g'rilash (ta'minot moduli bilan bir xil mantiq)
-    stock: dict[uuid.UUID, float] = {}
-    if mats:
-        res = await db.execute(
-            select(
-                TaminotTransaction.product_id,
-                func.coalesce(func.sum(case(
-                    (TaminotTransaction.kind == "purchase", TaminotTransaction.qty),
-                    (TaminotTransaction.kind == "consume", -TaminotTransaction.qty),
-                    (TaminotTransaction.kind == "adjust", TaminotTransaction.qty),
-                    else_=0,
-                )), 0),
-            )
-            .where(TaminotTransaction.product_id.in_([m.id for m in mats]))
-            .group_by(TaminotTransaction.product_id)
-        )
-        stock = {row[0]: _f(row[1]) for row in res.all()}
 
-    return [
-        MaterialOption(
-            id=m.id, name=m.name, unit=m.unit, unit_price=_f(m.unit_price),
-            currency=m.currency, supplier=m.supplier, stock=stock.get(m.id, 0.0),
+async def _check_duplicate(db: AsyncSession, name: str, exclude_id: Optional[uuid.UUID] = None):
+    q = select(CostingMaterial).where(func.lower(CostingMaterial.name) == name.lower())
+    if exclude_id is not None:
+        q = q.where(CostingMaterial.id != exclude_id)
+    dup = (await db.execute(q)).scalar_one_or_none()
+    if dup is not None:
+        raise HTTPException(422, f"«{dup.name}» nomli material allaqachon bor")
+
+
+@router.post("/materials", response_model=MaterialOption, status_code=201)
+async def create_material(
+    payload: MaterialIn,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: CurrentUser,
+):
+    """Katalogga yangi material qo'shadi (tannarx bo'limining o'z ro'yxati)."""
+    name = payload.name.strip()
+    await _check_duplicate(db, name)
+    m = CostingMaterial(
+        name=name, unit=payload.unit or None, unit_price=_q(payload.unit_price),
+        currency=payload.currency, note=payload.note,
+        is_active=payload.is_active, created_by_id=user.id,
+    )
+    db.add(m)
+    await db.commit()
+    await db.refresh(m)
+    return _material_out(m)
+
+
+@router.patch("/materials/{material_id}", response_model=MaterialOption)
+async def update_material(
+    material_id: uuid.UUID,
+    payload: MaterialIn,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: CurrentUser,
+):
+    """Materialni tahrirlaydi. Narx o'zgarsa — uni ishlatgan barcha
+    kalkulyatsiyalar tannarxi o'zi yangilanadi (satrda narx qotirilmagan bo'lsa)."""
+    m = (await db.execute(
+        select(CostingMaterial).where(CostingMaterial.id == material_id)
+    )).scalar_one_or_none()
+    if m is None:
+        raise HTTPException(404, "Material topilmadi")
+    name = payload.name.strip()
+    await _check_duplicate(db, name, exclude_id=material_id)
+    m.name = name
+    m.unit = payload.unit or None
+    m.unit_price = _q(payload.unit_price)
+    m.currency = payload.currency
+    m.note = payload.note
+    m.is_active = payload.is_active
+    await db.commit()
+    await db.refresh(m)
+    usage = await _usage_map(db)
+    return _material_out(m, usage.get(m.id, 0))
+
+
+@router.delete("/materials/{material_id}", status_code=204)
+async def delete_material(
+    material_id: uuid.UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: CurrentUser,
+):
+    """Materialni o'chiradi. Kalkulyatsiyada ishlatilgan bo'lsa — o'chirmaydi,
+    o'rniga arxivlashni taklif qiladi (tarix buzilmasligi uchun)."""
+    m = (await db.execute(
+        select(CostingMaterial).where(CostingMaterial.id == material_id)
+    )).scalar_one_or_none()
+    if m is None:
+        raise HTTPException(404, "Material topilmadi")
+    used = (await _usage_map(db)).get(material_id, 0)
+    if used > 0:
+        raise HTTPException(
+            422,
+            f"Bu material {used} ta mahsulot kalkulyatsiyasida ishlatilgan — "
+            "o'chirish o'rniga arxivlang (faol emas qilib qo'ying)",
         )
-        for m in mats
-    ]
+    await db.delete(m)
+    await db.commit()
 
 
 # ---------------------------------------------------------------------------
@@ -426,12 +513,10 @@ async def save_product_cost(
             if row.material_id is None:
                 raise HTTPException(422, "Material satrida material tanlanishi kerak")
             mat = (await db.execute(
-                select(TaminotProduct).where(TaminotProduct.id == row.material_id)
+                select(CostingMaterial).where(CostingMaterial.id == row.material_id)
             )).scalar_one_or_none()
             if mat is None:
-                raise HTTPException(422, "Tanlangan material topilmadi")
-            if mat.scope != "ichki":
-                raise HTTPException(422, "Faqat ichki ta'minot materiallari qo'shiladi")
+                raise HTTPException(422, "Tanlangan material katalogda topilmadi")
             label = row.label or mat.name
             unit = row.unit or mat.unit
             currency = mat.currency if row.unit_price is None else row.currency
@@ -442,12 +527,17 @@ async def save_product_cost(
             unit = row.unit
             currency = row.currency
 
+        if row.entry_mode == "sum" and (row.amount is None or row.amount <= 0):
+            raise HTTPException(422, f"«{label}» uchun summa kiritilishi kerak")
+
         new_items.append(ProductRecipeItem(
             recipe_id=recipe.id,
             kind=row.kind,
             material_id=row.material_id if row.kind == "material" else None,
             label=label,
+            entry_mode=row.entry_mode,
             qty=_q(row.qty),
+            amount=_q(row.amount) if row.entry_mode == "sum" else None,
             unit=unit,
             unit_price=_q(row.unit_price) if row.unit_price is not None else None,
             currency=currency or "UZS",
@@ -472,3 +562,142 @@ async def delete_product_cost(
         raise HTTPException(404, "Kalkulyatsiya topilmadi")
     await db.delete(recipe)
     await db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Matritsa: mahsulot × material jadvali (bir ekranda hammasini belgilash)
+# ---------------------------------------------------------------------------
+@router.get("/matrix", response_model=MatrixOut)
+async def costing_matrix(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: CurrentUser,
+):
+    """Jadval ko'rinishi: qatorlar — asosiy mahsulotlar, ustunlar — ichki materiallar.
+
+    Katakdagi qiymat — shu mahsulotga o'sha materialdan qancha ketishi. Narx
+    ta'minotdan jonli olinadi, shuning uchun katakda faqat MIQDOR bo'ladi.
+    """
+    products = (await db.execute(
+        select(Product)
+        .where(Product.status == "active", Product.product_type == "main")
+        .order_by(Product.model.asc().nullslast(),
+                  Product.year.desc().nullslast(),
+                  Product.kvm.asc().nullslast())
+    )).scalars().all()
+
+    materials = await list_materials(db=db, user=user, search=None, include_inactive=False)
+    mat_by_id = {m.id: m for m in materials}
+    rate = _q(await latest_exchange_rate(db)) or Decimal(0)
+
+    recipes = await _recipes_map(db, [p.id for p in products])
+    items_by_recipe = await _items_map(db, [r.id for r in recipes.values()])
+
+    rows: list[MatrixRowOut] = []
+    for p in products:
+        recipe = recipes.get(p.id)
+        items = items_by_recipe.get(recipe.id, []) if recipe else []
+        cells: dict[str, float] = {}
+        sum_lines = 0
+        for it in items:
+            if it.kind != "material":
+                continue
+            if (it.entry_mode or "qty") == "sum":
+                # Summa bilan kiritilgan satr — jadvalda tahrirlanmaydi, faqat sanaladi
+                sum_lines += 1
+                continue
+            if it.material_id and it.material_id in mat_by_id:
+                key = str(it.material_id)
+                cells[key] = cells.get(key, 0.0) + _f(it.qty)
+
+        lines = _build_lines(
+            items,
+            await _materials_map(db, {i.material_id for i in items if i.material_id}),
+            rate,
+        )
+        b = _breakdown(lines, recipe, p, rate, None)
+        rows.append(MatrixRowOut(
+            product_id=p.id,
+            display_name=p.display_name,
+            has_recipe=recipe is not None,
+            cells=cells,
+            materials_uzs=b.materials_uzs,
+            cost_uzs=b.cost_uzs,
+            expense_count=sum(1 for l in lines if l.kind == "expense"),
+            sum_line_count=sum_lines,
+            overhead_percent=b.overhead_percent,
+        ))
+
+    return MatrixOut(usd_rate=_f(rate), materials=materials, rows=rows)
+
+
+@router.put("/matrix", response_model=MatrixOut)
+async def save_costing_matrix(
+    payload: MatrixSave,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: CurrentUser,
+):
+    """Jadvalni saqlaydi — FAQAT material satrlari almashtiriladi.
+
+    Har bir qator uchun eski material satrlari o'chiriladi va yangilari yoziladi.
+    Qo'shimcha xarajatlar, ustama foizi, sotish narxi va izoh TEGILMAYDI —
+    ular mahsulotning o'z sahifasida tahrirlanadi.
+    """
+    if not payload.rows:
+        return await costing_matrix(db=db, user=user)
+
+    # Faqat asosiy mahsulotlar va faqat ichki materiallar
+    product_ids = [r.product_id for r in payload.rows]
+    products = {p.id: p for p in (await db.execute(
+        select(Product).where(Product.id.in_(product_ids))
+    )).scalars().all()}
+    for pid in product_ids:
+        if pid not in products:
+            raise HTTPException(422, "Mahsulot topilmadi")
+
+    mat_ids = {c.material_id for r in payload.rows for c in r.cells}
+    mats = await _materials_map(db, mat_ids)
+    for mid in mat_ids:
+        if mats.get(mid) is None:
+            raise HTTPException(422, "Tanlangan material katalogda topilmadi")
+
+    recipes = await _recipes_map(db, product_ids)
+    for row in payload.rows:
+        recipe = recipes.get(row.product_id)
+        if recipe is None:
+            recipe = ProductRecipe(product_id=row.product_id, created_by_id=user.id)
+            db.add(recipe)
+            await db.flush()
+            recipes[row.product_id] = recipe
+
+        # Faqat MIQDOR bilan kiritilgan material satrlari almashtiriladi.
+        # Xarajatlar va summa bilan kiritilgan satrlar SAQLANADI (ular mahsulot
+        # sahifasida boshqariladi).
+        await db.execute(
+            delete(ProductRecipeItem).where(
+                ProductRecipeItem.recipe_id == recipe.id,
+                ProductRecipeItem.kind == "material",
+                ProductRecipeItem.entry_mode != "sum",
+            )
+        )
+        await db.flush()
+
+        # Xarajat satrlari sort_order'da tepada qolmasligi uchun materiallarni
+        # oldindan joylashtiramiz (0..n-1)
+        for idx, cell in enumerate(row.cells):
+            mat = mats[cell.material_id]
+            db.add(ProductRecipeItem(
+                recipe_id=recipe.id,
+                kind="material",
+                material_id=mat.id,
+                label=mat.name,
+                entry_mode="qty",
+                qty=_q(cell.value),
+                amount=None,
+                unit=mat.unit,
+                unit_price=None,          # narx katalogdan jonli olinadi
+                currency=mat.currency or "UZS",
+                sort_order=idx,
+            ))
+
+    await db.commit()
+    return await costing_matrix(db=db, user=user)

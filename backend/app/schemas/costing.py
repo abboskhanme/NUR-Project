@@ -20,7 +20,10 @@ class RecipeItemIn(BaseModel):
     kind: Literal["material", "expense"] = "material"
     material_id: Optional[uuid.UUID] = None
     label: Optional[str] = None
+    # qty — miqdor × narx; sum — `amount` to'g'ridan-to'g'ri summa
+    entry_mode: Literal["qty", "sum"] = "qty"
     qty: float = Field(1, gt=0)
+    amount: Optional[float] = Field(None, ge=0)
     unit: Optional[str] = None
     unit_price: Optional[float] = Field(None, ge=0)
     currency: Literal["UZS", "USD"] = "UZS"
@@ -42,7 +45,9 @@ class RecipeItemOut(BaseModel):
     kind: str
     material_id: Optional[uuid.UUID] = None
     label: str
+    entry_mode: str = "qty"
     qty: float
+    amount: Optional[float] = None
     unit: Optional[str] = None
     # Amalda ishlatilgan narx (override yoki materialning joriy narxi)
     unit_price: float
@@ -114,14 +119,28 @@ class ProductCostDetail(BaseModel):
 
 
 class MaterialOption(BaseModel):
-    """Ichki ta'minot materiali — tanlash ro'yxati uchun."""
+    """Tannarx katalogidagi material."""
     id: uuid.UUID
     name: str
-    unit: str
+    # Birlik ixtiyoriy (summa rejimida ko'pincha kerak emas)
+    unit: Optional[str] = None
     unit_price: float
     currency: str = "UZS"
-    supplier: Optional[str] = None
-    stock: float = 0
+    note: Optional[str] = None
+    is_active: bool = True
+    # Nechta mahsulot kalkulyatsiyasida ishlatilgani
+    used_in: int = 0
+
+
+class MaterialIn(BaseModel):
+    """Katalogga material qo'shish / tahrirlash."""
+    name: str = Field(min_length=2, max_length=255)
+    # Ixtiyoriy: bo'sh bo'lsa birlik ko'rsatilmaydi
+    unit: Optional[Literal["dona", "kg", "metr", "list", "litr"]] = None
+    unit_price: float = Field(0, ge=0)
+    currency: Literal["UZS", "USD"] = "UZS"
+    note: Optional[str] = None
+    is_active: bool = True
 
 
 class CostingSummary(BaseModel):
@@ -135,3 +154,50 @@ class CostingSummary(BaseModel):
     worst_name: Optional[str] = None
     worst_margin_percent: Optional[float] = None
     loss_count: int = 0  # zarariga ishlayotganlar (foyda <= 0)
+
+
+# ---------------------------------------------------------------------------
+# Matritsa ko'rinishi — mahsulot × material jadvali (kalendar uslubida)
+# ---------------------------------------------------------------------------
+class MatrixCell(BaseModel):
+    """Bitta katak: mahsulotga shu materialdan ketadigan MIQDOR."""
+    material_id: uuid.UUID
+    value: float = Field(gt=0)
+
+
+class MatrixRow(BaseModel):
+    """Saqlash uchun bitta qator — mahsulot va uning material miqdorlari."""
+    product_id: uuid.UUID
+    cells: list[MatrixCell] = []
+
+
+class MatrixRowOut(BaseModel):
+    product_id: uuid.UUID
+    display_name: str
+    has_recipe: bool = False
+    # material_id (matn) -> miqdor
+    cells: dict[str, float] = {}
+    # Faqat materiallardan kelgan summa va to'liq tannarx (xarajat + ustama bilan)
+    materials_uzs: float = 0
+    cost_uzs: float = 0
+    expense_count: int = 0
+    # Mahsulot sahifasida summa bilan kiritilgan satrlar (jadvalda tahrirlanmaydi)
+    sum_line_count: int = 0
+    overhead_percent: float = 0
+
+
+class MatrixOut(BaseModel):
+    """Jadval uchun to'liq ma'lumot: ustunlar (materiallar) + qatorlar."""
+    usd_rate: float = 0
+    materials: list[MaterialOption] = []
+    rows: list[MatrixRowOut] = []
+
+
+class MatrixSave(BaseModel):
+    """Jadvalni saqlash — FAQAT material satrlari almashtiriladi.
+
+    Qo'shimcha xarajatlar, ustama foizi, sotish narxi va izoh o'z holida qoladi
+    (ular mahsulot sahifasida tahrirlanadi).
+    """
+    rows: list[MatrixRow] = []
+

@@ -23,7 +23,10 @@ export interface RecipeItem {
   kind: 'material' | 'expense';
   material_id?: string | null;
   label: string;
+  /** qty — miqdor × narx; sum — summa to'g'ridan-to'g'ri kiritilgan */
+  entry_mode: EntryMode;
   qty: number;
+  amount?: number | null;
   unit?: string | null;
   unit_price: number;
   currency: string;
@@ -67,15 +70,32 @@ export interface CostDetail {
   updated_at?: string | null;
 }
 
+/** Kalkulyatsiya satrining kiritilish usuli (material darajasida emas). */
+export type EntryMode = 'qty' | 'sum';
+
+/** Tannarx modulining O'Z katalogidagi material (ta'minotdan mustaqil). */
 export interface MaterialOption {
   id: string;
   name: string;
-  unit: string;
+  /** Ixtiyoriy — summa rejimida odatda bo'sh */
+  unit?: string | null;
   unit_price: number;
   currency: string;
-  supplier?: string | null;
-  stock: number;
+  note?: string | null;
+  is_active: boolean;
+  /** Nechta mahsulot kalkulyatsiyasida ishlatilgani */
+  used_in: number;
 }
+
+export const UNITS = ['dona', 'kg', 'metr', 'list', 'litr'] as const;
+export const UNIT_LABEL: Record<string, string> = {
+  dona: 'dona', kg: 'kg', metr: 'metr', list: 'list', litr: 'litr',
+};
+export const CURRENCY_LABEL: Record<string, string> = { UZS: "so'm", USD: 'dollar' };
+export const ENTRY_MODE_LABEL: Record<EntryMode, string> = {
+  qty: 'Miqdor',
+  sum: 'Summa',
+};
 
 export interface CostingSummary {
   usd_rate: number;

@@ -14,8 +14,9 @@ import MoneyInput from '@/components/ui/MoneyInput';
 import { formatMoney, formatQty } from '@/lib/format';
 import { usePermissions } from '@/lib/permissions';
 import { cn } from '@/lib/cn';
-import type { CostDetail, MaterialOption } from '@/features/costing/types';
-import { marginTone } from '@/features/costing/types';
+import type { CostDetail, EntryMode, MaterialOption } from '@/features/costing/types';
+import { marginTone, CURRENCY_LABEL, UNIT_LABEL } from '@/features/costing/types';
+import MaterialModal from '@/features/costing/MaterialModal';
 
 /** Tahrirlash uchun satr holati (backendga yuborishdan oldingi ko'rinish). */
 interface EditRow {
@@ -23,9 +24,12 @@ interface EditRow {
   kind: 'material' | 'expense';
   material_id: string | null;
   label: string;
+  /** qty — miqdor × narx; sum — summa to'g'ridan-to'g'ri */
+  mode: EntryMode;
   qty: string;
+  amount: number;
   unit: string;
-  // manual=false — narx ichki ta'minotdan JONLI olinadi (tavsiya etiladi)
+  // manual=false — narx katalogdan JONLI olinadi (tavsiya etiladi)
   manual: boolean;
   unit_price: number;
   currency: 'UZS' | 'USD';
@@ -64,6 +68,7 @@ export default function CostingDetailPage() {
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
   const [confirmDel, setConfirmDel] = useState(false);
+  const [newMaterial, setNewMaterial] = useState(false);
 
   const detail = detailQ.data;
   const materials = materialsQ.data ?? [];
@@ -80,7 +85,9 @@ export default function CostingDetailPage() {
       kind: it.kind as 'material' | 'expense',
       material_id: it.material_id ?? null,
       label: it.label,
+      mode: it.entry_mode === 'sum' ? 'sum' : 'qty',
       qty: String(it.qty),
+      amount: it.amount ?? 0,
       unit: it.unit ?? '',
       manual: it.kind === 'expense' ? true : !it.price_from_material,
       unit_price: it.unit_price,
@@ -101,7 +108,7 @@ export default function CostingDetailPage() {
   };
   const lineUzs = (r: EditRow) => {
     const { price, currency } = effective(r);
-    const total = num(r.qty) * price;
+    const total = r.mode === 'sum' ? r.amount : num(r.qty) * price;
     return currency === 'USD' ? total * rate : total;
   };
 
@@ -124,12 +131,12 @@ export default function CostingDetailPage() {
     setRows((prev) => prev.map((r) => (r.key === key ? { ...r, ...next } : r)));
 
   const addMaterial = () => setRows((p) => [...p, {
-    key: newKey(), kind: 'material', material_id: null, label: '', qty: '1',
-    unit: '', manual: false, unit_price: 0, currency: 'UZS',
+    key: newKey(), kind: 'material', material_id: null, label: '', mode: 'qty',
+    qty: '1', amount: 0, unit: '', manual: false, unit_price: 0, currency: 'UZS',
   }]);
   const addExpense = () => setRows((p) => [...p, {
-    key: newKey(), kind: 'expense', material_id: null, label: '', qty: '1',
-    unit: '', manual: true, unit_price: 0, currency: 'UZS',
+    key: newKey(), kind: 'expense', material_id: null, label: '', mode: 'sum',
+    qty: '1', amount: 0, unit: '', manual: true, unit_price: 0, currency: 'UZS',
   }]);
 
   async function handleSave() {
@@ -143,7 +150,12 @@ export default function CostingDetailPage() {
         toast.error('Xarajat satrida nom kiriting');
         return;
       }
-      if (num(r.qty) <= 0) {
+      if (r.mode === 'sum') {
+        if (r.amount <= 0) {
+          toast.error(`«${r.label || 'satr'}» uchun summani kiriting`);
+          return;
+        }
+      } else if (num(r.qty) <= 0) {
         toast.error(`«${r.label || 'satr'}» uchun miqdor 0 dan katta bo'lishi kerak`);
         return;
       }
@@ -158,7 +170,9 @@ export default function CostingDetailPage() {
           kind: r.kind,
           material_id: r.kind === 'material' ? r.material_id : null,
           label: r.kind === 'expense' ? r.label.trim() : null,
-          qty: num(r.qty),
+          entry_mode: r.mode,
+          qty: r.mode === 'sum' ? 1 : num(r.qty),
+          amount: r.mode === 'sum' ? r.amount : null,
           unit: r.unit.trim() || null,
           unit_price: r.kind === 'expense' || r.manual ? r.unit_price : null,
           currency: r.currency,
@@ -237,7 +251,7 @@ export default function CostingDetailPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* ============ Tarkib ============ */}
         <div className="lg:col-span-2 space-y-4">
-          <Card title="Tarkib — ichki materiallar">
+          <Card title="Tarkib — materiallar">
             <div className="space-y-2">
               {rows.filter((r) => r.kind === 'material').length === 0 && (
                 <div className="text-sm text-ink-soft py-3 text-center">
@@ -249,6 +263,7 @@ export default function CostingDetailPage() {
                              rate={rate} canWrite={canWrite}
                              lineUzs={lineUzs(r)}
                              onPatch={(next) => patch(r.key, next)}
+                             onAddMaterial={() => setNewMaterial(true)}
                              onRemove={() => setRows((p) => p.filter((x) => x.key !== r.key))} />
               ))}
             </div>
@@ -381,6 +396,10 @@ export default function CostingDetailPage() {
         </div>
       </div>
 
+      {newMaterial && (
+        <MaterialModal onClose={() => setNewMaterial(false)}
+                       onSaved={() => materialsQ.refetch()} />
+      )}
       <ConfirmModal
         open={confirmDel}
         title="Kalkulyatsiyani o'chirish"
@@ -402,8 +421,12 @@ function Line({ label, value }: { label: string; value: string }) {
   );
 }
 
-/** Material satri: material tanlash + miqdor + narx (jonli yoki qo'lda). */
-function MaterialRow({ row, materials, matById, rate, canWrite, lineUzs, onPatch, onRemove }: {
+/**
+ * Material satri. Materialning kiritish usuliga qarab ko'rinish o'zgaradi:
+ *   qty — Miqdor + Narx (narx katalogdan jonli, qulf bilan qotirish mumkin)
+ *   sum — bitta «Summa» maydoni ("50 ming so'mlik kraska sepildi")
+ */
+function MaterialRow({ row, materials, matById, rate, canWrite, lineUzs, onPatch, onRemove, onAddMaterial }: {
   row: EditRow;
   materials: MaterialOption[];
   matById: Record<string, MaterialOption>;
@@ -412,73 +435,108 @@ function MaterialRow({ row, materials, matById, rate, canWrite, lineUzs, onPatch
   lineUzs: number;
   onPatch: (next: Partial<EditRow>) => void;
   onRemove: () => void;
+  onAddMaterial: () => void;
 }) {
   const mat = row.material_id ? matById[row.material_id] : undefined;
   const livePrice = mat?.unit_price ?? 0;
   const liveCurrency = mat?.currency === 'USD' ? 'USD' : 'UZS';
   const missing = !!row.material_id && !mat;
+  const isSum = row.mode === 'sum';
 
   return (
     <div className={cn('rounded-button border p-2.5',
       missing ? 'border-danger/30 bg-danger/[0.04]' : 'border-black/[0.07] bg-black/[0.02]')}>
       <div className="flex flex-wrap items-end gap-2">
-        {/* Material */}
+        {/* Material tanlash + yangi qo'shish */}
         <div className="basis-full sm:basis-0 sm:flex-1 min-w-0">
           <label className="label !mb-0.5 text-xs">Material</label>
-          <select className="input !py-1.5 text-sm" value={row.material_id ?? ''} disabled={!canWrite}
-                  onChange={(e) => {
-                    const m = matById[e.target.value];
-                    onPatch({
-                      material_id: e.target.value || null,
-                      label: m?.name ?? '',
-                      unit: m?.unit ?? '',
-                      unit_price: m?.unit_price ?? 0,
-                      currency: (m?.currency === 'USD' ? 'USD' : 'UZS'),
-                    });
-                  }}>
-            <option value="">— tanlang —</option>
-            {materials.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name} ({m.unit}) — {m.currency === 'USD' ? `$${m.unit_price}` : `${m.unit_price} so'm`}
-              </option>
-            ))}
-          </select>
-        </div>
-        {/* Miqdor */}
-        <div className="w-[92px]">
-          <label className="label !mb-0.5 text-xs">Miqdor</label>
-          <input className="input !py-1.5 text-sm" type="number" min="0" step="any" disabled={!canWrite}
-                 value={row.qty} onChange={(e) => onPatch({ qty: e.target.value })} />
-        </div>
-        {/* Narx */}
-        <div className="w-[132px]">
-          <label className="label !mb-0.5 text-xs flex items-center gap-1">
-            Narx
+          <div className="flex items-center gap-1.5">
+            <select className="input !py-1.5 text-sm min-w-0" value={row.material_id ?? ''} disabled={!canWrite}
+                    onChange={(e) => {
+                      const m = matById[e.target.value];
+                      onPatch({
+                        material_id: e.target.value || null,
+                        label: m?.name ?? '',
+                        unit: m?.unit ?? '',
+                        unit_price: m?.unit_price ?? 0,
+                        currency: (m?.currency === 'USD' ? 'USD' : 'UZS'),
+                      });
+                    }}>
+              <option value="">— tanlang —</option>
+              {materials.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                  {`${m.unit ? ` (${UNIT_LABEL[m.unit] ?? m.unit})` : ''} — ${m.currency === 'USD' ? `$${m.unit_price}` : `${m.unit_price} so'm`}`}
+                </option>
+              ))}
+            </select>
             {canWrite && (
-              <button type="button" title={row.manual ? "Ta'minot narxiga qaytarish" : "Narxni qo'lda kiritish"}
-                      onClick={() => onPatch({
-                        manual: !row.manual,
-                        unit_price: row.manual ? livePrice : (row.unit_price || livePrice),
-                        currency: row.manual ? liveCurrency : row.currency,
-                      })}
-                      className="text-ink-soft hover:text-primary">
-                {row.manual ? <Unlock size={12} /> : <Lock size={12} />}
+              <button type="button" onClick={onAddMaterial} title="Ro'yxatda yo'q materialni qo'shish"
+                      className="p-2 rounded-button bg-primary/10 text-primary hover:bg-primary/20 transition shrink-0">
+                <Plus size={15} />
               </button>
             )}
-          </label>
-          {row.manual ? (
-            <input className="input !py-1.5 text-sm" type="number" min="0" step="any" disabled={!canWrite}
-                   value={row.unit_price}
-                   onChange={(e) => onPatch({ unit_price: parseFloat(e.target.value) || 0 })} />
-          ) : (
-            <div className="input !py-1.5 text-sm bg-black/[0.03] text-ink-soft truncate">
-              {liveCurrency === 'USD' ? `$${livePrice}` : `${formatQty(livePrice)} so'm`}
-            </div>
-          )}
+          </div>
         </div>
+
+        {/* Usul: miqdor × narx yoki to'g'ridan-to'g'ri summa */}
+        <div className="w-[104px]">
+          <label className="label !mb-0.5 text-xs">Usul</label>
+          <select className="input !py-1.5 text-sm" value={row.mode} disabled={!canWrite}
+                  onChange={(e) => onPatch({ mode: e.target.value as EntryMode })}>
+            <option value="qty">Miqdor</option>
+            <option value="sum">Summa</option>
+          </select>
+        </div>
+
+        {isSum ? (
+          /* Summa rejimi — bitta maydon */
+          <div className="w-[140px]">
+            <label className="label !mb-0.5 text-xs">Summa *</label>
+            <input className="input !py-1.5 text-sm" type="number" min="0" step="any" disabled={!canWrite}
+                   value={row.amount || ''} placeholder="50000"
+                   onChange={(e) => onPatch({ amount: parseFloat(e.target.value) || 0 })} />
+          </div>
+        ) : (
+          <>
+            {/* Miqdor */}
+            <div className="w-[92px]">
+              <label className="label !mb-0.5 text-xs">Miqdor</label>
+              <input className="input !py-1.5 text-sm" type="number" min="0" step="any" disabled={!canWrite}
+                     value={row.qty} onChange={(e) => onPatch({ qty: e.target.value })} />
+            </div>
+            {/* Narx */}
+            <div className="w-[132px]">
+              <label className="label !mb-0.5 text-xs flex items-center gap-1">
+                Narx
+                {canWrite && (
+                  <button type="button" title={row.manual ? 'Katalog narxiga qaytarish' : "Narxni qo'lda kiritish"}
+                          onClick={() => onPatch({
+                            manual: !row.manual,
+                            unit_price: row.manual ? livePrice : (row.unit_price || livePrice),
+                            currency: row.manual ? liveCurrency : row.currency,
+                          })}
+                          className="text-ink-soft hover:text-primary">
+                    {row.manual ? <Unlock size={12} /> : <Lock size={12} />}
+                  </button>
+                )}
+              </label>
+              {row.manual ? (
+                <input className="input !py-1.5 text-sm" type="number" min="0" step="any" disabled={!canWrite}
+                       value={row.unit_price}
+                       onChange={(e) => onPatch({ unit_price: parseFloat(e.target.value) || 0 })} />
+              ) : (
+                <div className="input !py-1.5 text-sm bg-black/[0.03] text-ink-soft truncate">
+                  {liveCurrency === 'USD' ? `$${livePrice}` : `${formatQty(livePrice)} so'm`}
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
         {/* Satr summasi */}
         <div className="ml-auto text-right shrink-0">
-          <div className="text-[11px] text-ink-soft">Summa</div>
+          <div className="text-[11px] text-ink-soft">Jami</div>
           <div className="font-bold whitespace-nowrap">{formatMoney(lineUzs, 'UZS')}</div>
         </div>
         {canWrite && (
@@ -492,13 +550,16 @@ function MaterialRow({ row, materials, matById, rate, canWrite, lineUzs, onPatch
         {missing ? (
           <span className="text-danger">Material o'chirilgan — boshqasini tanlang</span>
         ) : mat ? (
-          <>
-            {row.manual
-              ? "narx qo'lda kiritilgan (ta'minotdagi o'zgarish ta'sir qilmaydi)"
-              : "narx ichki ta'minotdan jonli olinadi"}
-            {` · omborda ${formatQty(mat.stock, mat.unit)}`}
-            {liveCurrency === 'USD' && rate > 0 ? ` · kurs ${formatQty(rate)}` : ''}
-          </>
+          isSum
+            ? "summa to'g'ridan-to'g'ri kiritildi — miqdor va narx hisobga olinmaydi"
+            : (
+              <>
+                {row.manual
+                  ? "narx qo'lda kiritilgan (katalogdagi o'zgarish ta'sir qilmaydi)"
+                  : 'narx katalogdan jonli olinadi'}
+                {liveCurrency === 'USD' && rate > 0 ? ` · kurs ${formatQty(rate)}` : ''}
+              </>
+            )
         ) : "material tanlanmagan"}
       </div>
     </div>
