@@ -6,6 +6,7 @@ from app.api.v1 import (
     users,
     customers,
     products,
+    costing,
     inventory,
     orders,
     service,
@@ -24,6 +25,7 @@ from app.api.v1 import (
     production,
     goals,
     leads,
+    system_settings,
 )
 
 api_router = APIRouter()
@@ -31,6 +33,7 @@ api_router.include_router(auth.router, prefix="/auth", tags=["Auth"])
 api_router.include_router(users.router, prefix="/users", tags=["Users"])
 api_router.include_router(customers.router, prefix="/customers", tags=["Customers"])
 api_router.include_router(products.router, prefix="/products", tags=["Products"])
+api_router.include_router(costing.router, prefix="/costing", tags=["Costing / Tannarx"])
 api_router.include_router(inventory.router, prefix="/inventory", tags=["Warehouse / Ombor"])
 api_router.include_router(orders.router, prefix="/orders", tags=["Sales / Orders"])
 api_router.include_router(service.router, prefix="/service", tags=["Service"])
@@ -50,3 +53,5 @@ api_router.include_router(production.router, prefix="/production", tags=["Produc
 api_router.include_router(goals.router, prefix="/goals", tags=["Goals / Oylik maqsadlar"])
 api_router.include_router(leads.router, prefix="/leads", tags=["Leads / Marketing"])
 api_router.include_router(leads.ingest_router, prefix="/leads", tags=["Leads / Marketing"])
+api_router.include_router(system_settings.router, prefix="/system-settings", tags=["System Settings"])
+api_router.include_router(system_settings.agent_router, prefix="/system-settings", tags=["System Settings"])

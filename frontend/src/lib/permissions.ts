@@ -16,7 +16,7 @@ import { useMemo } from 'react';
 import { useAuthStore } from '@/stores/auth';
 
 export const MODULES = [
-  'users', 'customers', 'orders', 'products', 'inventory', 'production', 'service',
+  'users', 'customers', 'orders', 'products', 'costing', 'inventory', 'production', 'service',
   'finance', 'hr', 'supply_ichki', 'supply_tashqi', 'reports', 'telegram', 'debts', 'targets',
   'leads', 'shipping', 'settings',
 ] as const;

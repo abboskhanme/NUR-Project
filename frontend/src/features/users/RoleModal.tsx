@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import {
+  Calculator,
   X, Check, ShieldCheck, Sparkles, Lock, ShieldAlert,
   Users, ShoppingCart, Package, Warehouse, Wrench, Wallet,
   UserSquare2, BarChart3, Settings, Send, UserCog, Coins, PackageOpen, Factory,
@@ -33,6 +34,7 @@ const MODULE_ICONS: Record<Module, LucideIcon> = {
   customers: Users,
   orders: ShoppingCart,
   products: Package,
+  costing: Calculator,
   inventory: Warehouse,
   production: Factory,
   service: Wrench,
@@ -111,6 +113,7 @@ export default function RoleModal({
     customers: 'Mijozlar',
     orders: 'Sotuv',
     products: 'Mahsulotlar',
+    costing: 'Tannarx',
     inventory: 'Ombor',
     production: 'Ishlab chiqarish',
     service: 'Servis',

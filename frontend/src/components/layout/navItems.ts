@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, ShoppingCart, Users, Package, Wrench, Wallet,
   UserSquare2, Truck, BarChart3, Settings, ShieldCheck, ListOrdered, Warehouse,
-  Coins, PackageOpen, Factory, Building2, Globe, Target, Sparkles,
+  Coins, PackageOpen, Factory, Building2, Globe, Target, Sparkles, Calculator,
   type LucideIcon,
 } from 'lucide-react';
 import { usePermissions } from '@/lib/permissions';
@@ -32,6 +32,7 @@ export function useNavItems(): NavItem[] {
     { to: '/customers', label: 'Mijozlar', icon: Users, module: 'customers' },
     { to: '/leads', label: 'Leadlar', icon: Sparkles, module: 'leads' },
     { to: '/products', label: 'Mahsulotlar', icon: Package, module: 'products' },
+    { to: '/costing', label: 'Tannarx', icon: Calculator, module: 'costing' },
     { to: '/warehouse', label: 'Ombor', icon: Warehouse, module: 'inventory' },
     { to: '/production', label: 'Ishlab chiqarish', icon: Factory, module: 'production' },
     { to: '/service', label: 'Servis', icon: Wrench, module: 'service' },

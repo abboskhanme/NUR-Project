@@ -1,0 +1,137 @@
+"""Tannarx (kalkulyatsiya) — Pydantic sxemalar."""
+import uuid
+from datetime import datetime
+from typing import Literal, Optional
+
+from pydantic import BaseModel, Field
+
+ITEM_KINDS = ("material", "expense")
+
+
+# ---------------------------------------------------------------------------
+# Kirish (saqlash)
+# ---------------------------------------------------------------------------
+class RecipeItemIn(BaseModel):
+    """Kalkulyatsiya satri.
+
+    material uchun `material_id` majburiy; `unit_price` bo'sh bo'lsa materialning
+    joriy narxi ishlatiladi. expense uchun `label` va `unit_price` majburiy.
+    """
+    kind: Literal["material", "expense"] = "material"
+    material_id: Optional[uuid.UUID] = None
+    label: Optional[str] = None
+    qty: float = Field(1, gt=0)
+    unit: Optional[str] = None
+    unit_price: Optional[float] = Field(None, ge=0)
+    currency: Literal["UZS", "USD"] = "UZS"
+
+
+class RecipeIn(BaseModel):
+    """Mahsulot kalkulyatsiyasini saqlash — satrlar to'liq almashtiriladi."""
+    overhead_percent: float = Field(0, ge=0, le=100)
+    target_price_usd: Optional[float] = Field(None, ge=0)
+    note: Optional[str] = None
+    items: list[RecipeItemIn] = []
+
+
+# ---------------------------------------------------------------------------
+# Chiqish
+# ---------------------------------------------------------------------------
+class RecipeItemOut(BaseModel):
+    id: Optional[uuid.UUID] = None
+    kind: str
+    material_id: Optional[uuid.UUID] = None
+    label: str
+    qty: float
+    unit: Optional[str] = None
+    # Amalda ishlatilgan narx (override yoki materialning joriy narxi)
+    unit_price: float
+    currency: str = "UZS"
+    # Satr summasi: o'z valyutasida va UZS ekvivalentida
+    line_total: float
+    line_total_uzs: float
+    # Narx materialdan jonli olinganmi yoki qo'lda kiritilganmi
+    price_from_material: bool = False
+    # Material o'chirilgan/topilmagan bo'lsa — ogohlantirish uchun
+    material_missing: bool = False
+
+
+class CostBreakdown(BaseModel):
+    """Tannarx tafsiloti (barchasi UZS'da, kurs bilan birga)."""
+    usd_rate: float = 0
+    materials_uzs: float = 0
+    expenses_uzs: float = 0
+    overhead_percent: float = 0
+    overhead_uzs: float = 0
+    cost_uzs: float = 0          # TANNARX
+    cost_usd: float = 0
+    # Sotish narxi — target_price_usd yoki mahsulotning base_price_usd
+    price_usd: float = 0
+    price_uzs: float = 0
+    price_source: str = "none"   # recipe / product / none
+    profit_uzs: float = 0        # foyda = sotish − tannarx
+    margin_percent: float = 0    # foyda / sotish × 100
+    markup_percent: float = 0    # foyda / tannarx × 100
+    # Haqiqiy sotuvlar bo'yicha o'rtacha (order_items asosida)
+    avg_sold_uzs: Optional[float] = None
+    sold_count: int = 0
+    real_profit_uzs: Optional[float] = None
+    real_margin_percent: Optional[float] = None
+
+
+class ProductCostRow(BaseModel):
+    """Ro'yxatdagi bitta mahsulot — qisqa ko'rsatkichlar bilan."""
+    product_id: uuid.UUID
+    display_name: str
+    product_type: str
+    model: Optional[str] = None
+    kvm: Optional[int] = None
+    year: Optional[int] = None
+    has_recipe: bool = False
+    item_count: int = 0
+    cost_uzs: Optional[float] = None
+    price_uzs: Optional[float] = None
+    profit_uzs: Optional[float] = None
+    margin_percent: Optional[float] = None
+    avg_sold_uzs: Optional[float] = None
+    sold_count: int = 0
+    updated_at: Optional[datetime] = None
+
+
+class ProductCostDetail(BaseModel):
+    """To'liq kalkulyatsiya (tahrirlash oynasi uchun)."""
+    product_id: uuid.UUID
+    display_name: str
+    product_type: str
+    base_price_usd: float = 0
+    has_recipe: bool = False
+    overhead_percent: float = 0
+    target_price_usd: Optional[float] = None
+    note: Optional[str] = None
+    items: list[RecipeItemOut] = []
+    breakdown: CostBreakdown
+    updated_at: Optional[datetime] = None
+
+
+class MaterialOption(BaseModel):
+    """Ichki ta'minot materiali — tanlash ro'yxati uchun."""
+    id: uuid.UUID
+    name: str
+    unit: str
+    unit_price: float
+    currency: str = "UZS"
+    supplier: Optional[str] = None
+    stock: float = 0
+
+
+class CostingSummary(BaseModel):
+    usd_rate: float = 0
+    product_count: int = 0
+    with_recipe: int = 0
+    without_recipe: int = 0
+    avg_margin_percent: Optional[float] = None
+    best_name: Optional[str] = None
+    best_margin_percent: Optional[float] = None
+    worst_name: Optional[str] = None
+    worst_margin_percent: Optional[float] = None
+    loss_count: int = 0  # zarariga ishlayotganlar (foyda <= 0)

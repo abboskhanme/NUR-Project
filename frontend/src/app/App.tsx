@@ -16,6 +16,8 @@ import CustomerDetailPage from '@/pages/CustomerDetailPage';
 import LeadsPage from '@/pages/LeadsPage';
 import LeadDetailPage from '@/pages/LeadDetailPage';
 import ProductsPage from '@/pages/ProductsPage';
+import CostingPage from '@/pages/CostingPage';
+import CostingDetailPage from '@/pages/CostingDetailPage';
 import WarehousePage from '@/pages/WarehousePage';
 import ProductionPage from '@/pages/ProductionPage';
 import ServicePage from '@/pages/ServicePage';
@@ -114,6 +116,8 @@ export default function App() {
         <Route path="leads" element={<RequireModule module="leads"><LeadsPage /></RequireModule>} />
         <Route path="leads/:leadId" element={<RequireModule module="leads"><LeadDetailPage /></RequireModule>} />
         <Route path="products" element={<RequireModule module="products"><ProductsPage /></RequireModule>} />
+        <Route path="costing" element={<RequireModule module="costing"><CostingPage /></RequireModule>} />
+        <Route path="costing/:productId" element={<RequireModule module="costing"><CostingDetailPage /></RequireModule>} />
         <Route path="warehouse" element={<RequireModule module="inventory"><WarehousePage /></RequireModule>} />
         <Route path="production" element={<RequireModule module="production"><ProductionPage /></RequireModule>} />
         <Route path="service" element={<RequireModule module="service"><ServicePage /></RequireModule>} />
