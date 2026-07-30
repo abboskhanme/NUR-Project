@@ -79,3 +79,17 @@ class TelegramOrder(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         UUID(as_uuid=True), ForeignKey("orders.id", ondelete="SET NULL")
     )
     processed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+
+
+class SystemSetting(TimestampMixin, Base):
+    """Tizim sozlamasi (key-value) — Instagram AI agenti .env qiymatlari.
+
+    Faqat `core/system_settings.py::ALLOWED_KEYS` dagi kalitlar yoziladi.
+    Tashqi agent bu qiymatlarni ERP'dan avtomatik oladi (X-Agent-Key bilan).
+    Xavfli infratuzilma (DB, SECRET_KEY, AGENT_INGEST_KEY) bu yerда saqlanmaydi.
+    """
+
+    __tablename__ = "system_settings"
+
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[Optional[str]] = mapped_column(Text)
