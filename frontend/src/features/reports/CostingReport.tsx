@@ -1,11 +1,10 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer,
   CartesianGrid, BarChart, Cell, PieChart, Pie,
 } from 'recharts';
-import { AlertTriangle, Info, Calculator, ChevronRight } from 'lucide-react';
+import { AlertTriangle, Info } from 'lucide-react';
 
 import { api } from '@/api/client';
 import Card from '@/components/ui/Card';
@@ -20,8 +19,9 @@ import type { DateRange, ProfitReport, ProfitProductRow } from './types';
  *
  * Davr ichida sotilgan mahsulotlarga Tannarx bo'limidagi kalkulyatsiya
  * qo'llanadi: tushum − tannarx = yalpi foyda, undan moliyadagi xarajatlar
- * ayrilsa — sof foyda. Kalkulyatsiyasi kiritilmagan mahsulotlar hisobga
- * kirmaydi (tannarxi noma'lum) — ular alohida ogohlantirishda ko'rsatiladi.
+ * ayrilsa — sof foyda. Kalkulyatsiyasi kiritilmagan mahsulot ham hisobga
+ * qo'shiladi — tannarxi 0 deb olinadi (100% foyda), shunda umumiy manzara
+ * to'liq bo'ladi; foyda oshib ketgani ogohlantirishda aytiladi.
  */
 
 // Ranglar CVD (rang ko'rmaslik) tekshiruvidan o'tkazilgan tartibda —
@@ -69,18 +69,15 @@ export default function CostingReport({ range }: { range: DateRange }) {
   const d = q.data;
   const products = d?.products ?? [];
   const withRecipe = products.filter((p) => p.has_recipe);
+  // Grafik/jami — BARCHA sotilgan mahsulot (tannarxsizlari 100% foyda sifatida)
 
-  /**
-   * Sof foyda faqat qamrov yuqori bo'lganda ma'noli: operatsion xarajat BUTUN
-   * davr uchun olinadi, yalpi foyda esa faqat kalkulyatsiyali mahsulotlardan.
-   * Qamrov past bo'lsa ularni ayirish katta manfiy "zarar" ko'rsatadi — bu
-   * noto'g'ri, shuning uchun raqam ko'rsatilmaydi.
-   */
-  const COVERAGE_MIN = 90;
-  const netUsable = !!d && d.coverage_percent >= COVERAGE_MIN;
+  // Kalkulyatsiyasi yo'q mahsulot tannarxi 0 deb olinadi (100% foyda), shuning
+  // uchun foyda BARCHA sotuvdan hisoblanadi va xarajat bilan bir xil bazada
+  // bo'ladi. Lekin bunday mahsulotlar foydani sun'iy oshiradi — ogohlantiramiz.
+  const inflated = !!d && d.uncovered_count > 0;
 
   // Foyda bo'yicha eng yaxshi 12 ta (grafik o'qilishi uchun cheklangan)
-  const topProducts = [...withRecipe]
+  const topProducts = [...products]
     .sort((a, b) => (b.profit_uzs ?? 0) - (a.profit_uzs ?? 0))
     .slice(0, 12);
 
@@ -92,7 +89,17 @@ export default function CostingReport({ range }: { range: DateRange }) {
   ].filter((s) => s.value > 0) : [];
 
   const cols: Column<ProfitProductRow>[] = [
-    { key: 'display_name', label: 'Mahsulot' },
+    { key: 'display_name', label: 'Mahsulot',
+      render: (r) => (
+        <span className="inline-flex items-center gap-1.5">
+          {r.display_name}
+          {!r.has_recipe && (
+            <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-warning/15 text-warning whitespace-nowrap">
+              tannarx yo'q
+            </span>
+          )}
+        </span>
+      ) },
     { key: 'units', label: 'Sotildi', align: 'right', render: (r) => `${r.units} ta` },
     { key: 'avg_price_uzs', label: "O'rtacha narx", align: 'right', render: (r) => formatUZS(r.avg_price_uzs) },
     { key: 'unit_cost_uzs', label: 'Birlik tannarxi', align: 'right',
@@ -104,17 +111,18 @@ export default function CostingReport({ range }: { range: DateRange }) {
       render: (r) => (r.cogs_uzs != null ? formatUZS(r.cogs_uzs) : '—') },
     { key: 'profit_uzs', label: 'Foyda', align: 'right',
       value: (r) => r.profit_uzs ?? 0,
-      render: (r) => (r.profit_uzs != null
-        ? <span className={cn('font-semibold', r.profit_uzs >= 0 ? 'text-success' : 'text-danger')}>
-            {formatUZS(r.profit_uzs)}
-          </span>
-        : <span className="text-ink-soft">kalkulyatsiya yo'q</span>) },
+      render: (r) => (
+        <span className={cn('font-semibold',
+          (r.profit_uzs ?? 0) >= 0 ? 'text-success' : 'text-danger')}>
+          {formatUZS(r.profit_uzs ?? 0)}
+        </span>
+      ) },
     { key: 'margin_percent', label: 'Marja', align: 'right',
       value: (r) => r.margin_percent ?? 0,
       render: (r) => (r.margin_percent != null ? `${r.margin_percent}%` : '—') },
   ];
 
-  const totals = withRecipe.reduce(
+  const totals = products.reduce(
     (acc, r) => ({
       units: acc.units + r.units,
       revenue: acc.revenue + r.revenue_uzs,
@@ -147,37 +155,13 @@ export default function CostingReport({ range }: { range: DateRange }) {
     );
   }
 
-  // Sotuv bor, lekin birortasiga ham kalkulyatsiya kiritilmagan — foydani
-  // hisoblab bo'lmaydi (raqamlarni noto'g'ri ko'rsatgandan ko'ra aytgan yaxshi).
-  if (d && d.covered_revenue_uzs === 0) {
-    return (
-      <Card>
-        <div className="py-10 text-center max-w-lg mx-auto">
-          <Calculator size={28} className="mx-auto text-ink-soft opacity-40 mb-3" />
-          <div className="font-semibold">Foydani hisoblab bo'lmadi</div>
-          <p className="text-sm text-ink-soft mt-1.5">
-            Bu davrda {d.units_sold} dona sotilgan ({formatUZS(d.revenue_uzs)}), lekin
-            sotilgan {d.uncovered_count} ta mahsulotning birortasiga ham tannarx
-            kalkulyatsiyasi kiritilmagan — tannarxsiz foyda hisoblanmaydi.
-          </p>
-          <Link to="/costing"
-                className="inline-flex items-center gap-1.5 mt-4 px-3 py-2 rounded-button text-sm font-medium bg-primary text-white hover:bg-primary-700">
-            Tannarx bo'limiga o'tish <ChevronRight size={15} />
-          </Link>
-        </div>
-      </Card>
-    );
-  }
-
   return (
     <div className="space-y-4">
       {/* KPI */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-        <StatTile label="Sotuv tushumi" value={d ? formatUZS(d.covered_revenue_uzs) : '—'}
+        <StatTile label="Sotuv tushumi" value={d ? formatUZS(d.revenue_uzs) : '—'}
           tone="primary"
-          sub={d && d.uncovered_count > 0
-            ? `jami ${formatUZS(d.revenue_uzs)} dan`
-            : d ? `${d.units_sold} dona sotilgan` : undefined} />
+          sub={d ? `${d.units_sold} dona sotilgan` : undefined} />
         <StatTile label="Tannarx" value={d ? formatUZS(d.cogs_uzs) : '—'} tone="danger"
           sub="sotilgan mahsulotlar" />
         <StatTile label="Yalpi foyda" value={d ? formatUZS(d.gross_profit_uzs) : '—'}
@@ -185,11 +169,10 @@ export default function CostingReport({ range }: { range: DateRange }) {
           sub={d?.gross_margin_percent != null ? `marja ${d.gross_margin_percent}%` : undefined} />
         <StatTile label="Operatsion xarajat" value={d ? formatUZS(d.opex_uzs) : '—'} tone="warning"
           sub="moliya bo'limidan" />
-        <StatTile label="Sof foyda"
-          value={d && netUsable ? formatUZS(d.net_profit_uzs) : '—'}
-          tone={d && netUsable && d.net_profit_uzs >= 0 ? 'primary' : netUsable ? 'danger' : 'default'}
+        <StatTile label="Sof foyda" value={d ? formatUZS(d.net_profit_uzs) : '—'}
+          tone={d && d.net_profit_uzs >= 0 ? 'primary' : 'danger'}
           sub={!d ? undefined
-            : !netUsable ? `qamrov ${d.coverage_percent}% — hisoblab bo'lmaydi`
+            : inflated ? `qamrov ${d.coverage_percent}% — haqiqiydan yuqori`
             : d.net_margin_percent != null ? `marja ${d.net_margin_percent}%` : undefined} />
       </div>
 
@@ -210,21 +193,18 @@ export default function CostingReport({ range }: { range: DateRange }) {
           <AlertTriangle size={18} className="text-warning shrink-0 mt-0.5" />
           <div className="text-sm text-warning">
             {d.uncovered_count} ta asosiy mahsulot ({d.uncovered_units} dona,
-            {' '}{formatUZS(d.uncovered_revenue_uzs)}) kalkulyatsiyasiz sotilgan — tannarxi
-            noma'lum bo'lgani uchun foyda hisobiga kirmadi. Tushumning{' '}
-            {d.coverage_percent}% qismi qamrab olingan.
-            {!netUsable && (
-              <> <b>Shu sababli sof foyda hisoblanmadi:</b> operatsion xarajat butun davr
-              uchun, foyda esa tushumning atigi {d.coverage_percent}% qismidan — ularni
-              ayirish noto'g'ri natija beradi. Qolgan mahsulotlarga tannarx kiriting.</>
-            )}
+            {' '}{formatUZS(d.uncovered_revenue_uzs)}) kalkulyatsiyasiz sotilgan —
+            ularning tannarxi <b>0 deb olindi</b>, ya'ni to'liq foyda sifatida
+            hisoblandi. Shuning uchun yuqoridagi foyda haqiqiydan{' '}
+            <b>yuqori</b> ko'rinadi. Tushumning faqat {d.coverage_percent}% qismida
+            haqiqiy tannarx bor — qolganiga Tannarx bo'limidan kalkulyatsiya kiriting.
           </div>
         </div>
       )}
 
       {/* Foyda qanday shakllandi — waterfall */}
-      <Card title={netUsable ? 'Sof foyda qanday shakllandi' : 'Yalpi foyda qanday shakllandi'}>
-        {d && <Waterfall data={d} showNet={netUsable} />}
+      <Card title="Sof foyda qanday shakllandi">
+        {d && <Waterfall data={d} />}
 
         {/* Xarajat nimalardan iborat — moliyaga kiritilmagani ko'rinmasligi uchun */}
         {d && d.opex_by_category.length > 0 && (
@@ -373,7 +353,7 @@ export default function CostingReport({ range }: { range: DateRange }) {
           emptyText="Bu davrda sotuv yo'q"
           footer={
             <>
-              <td className="py-2 px-2">Jami (kalkulyatsiyali)</td>
+              <td className="py-2 px-2">Jami</td>
               <td className="py-2 px-2 text-right">{totals.units} ta</td>
               <td className="py-2 px-2" />
               <td className="py-2 px-2" />
@@ -407,8 +387,8 @@ function Waterfall({ data, showNet = true }: { data: ProfitReport; showNet?: boo
   const gross = data.gross_profit_uzs;
   const net = data.net_profit_uzs;
   const steps = [
-    { label: 'Tushum', from: 0, to: data.covered_revenue_uzs, value: data.covered_revenue_uzs, color: C_REVENUE },
-    { label: 'Tannarx', from: gross, to: data.covered_revenue_uzs, value: -data.cogs_uzs, color: C_COST },
+    { label: 'Tushum', from: 0, to: data.revenue_uzs, value: data.revenue_uzs, color: C_REVENUE },
+    { label: 'Tannarx', from: gross, to: data.revenue_uzs, value: -data.cogs_uzs, color: C_COST },
     { label: 'Yalpi foyda', from: Math.min(0, gross), to: Math.max(0, gross), value: gross, color: C_PROFIT },
     // Qamrov past bo'lsa xarajat/sof foyda qadamlari ko'rsatilmaydi — davr
     // xarajatini tushumning bir qismidan ayirish yolg'on "zarar" beradi

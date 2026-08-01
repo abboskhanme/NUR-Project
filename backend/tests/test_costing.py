@@ -456,18 +456,21 @@ async def test_profit_report(client, db_engine):
     assert d["excluded_rejected_uzs"] == 60_000_000
     assert d["covered_revenue_uzs"] == 24_000_000    # faqat kalkulyatsiyalisi
     assert d["cogs_uzs"] == 2_200_000                # 2 × 1 100 000
-    assert d["gross_profit_uzs"] == 21_800_000
+    # Kalkulyatsiyasiz mahsulot tannarxi 0 deb olinadi (100% foyda), shuning
+    # uchun yalpi foyda BARCHA tushumdan: 30 mln − 2.2 mln
+    assert d["gross_profit_uzs"] == 27_800_000
     assert d["opex_uzs"] == 3_000_000                # void va USD chiqimlarsiz
     # Xarajat tarkibi ko'rinib turadi (moliyaga nima kiritilgani tekshirilsin)
     assert d["opex_count"] == 1
     assert d["opex_by_category"] == [
         {"category": "Boshqa", "amount_uzs": 3_000_000, "count": 1},
     ]
-    assert d["net_profit_uzs"] == 18_800_000
+    assert d["net_profit_uzs"] == 24_800_000         # 27.8 − 3.0
     assert d["uncovered_count"] == 1 and d["uncovered_revenue_uzs"] == 6_000_000
     assert d["coverage_percent"] == 80.0
 
     # Tushum tarkibi: materiallar + xarajat + ustama = tannarx
+    # Dinamika kalkulyatsiyasizlarni ham qo'shadi (jami hisob bilan bir xil)
     s = d["structure"]
     assert s["materials_uzs"] == 1_680_000 and s["expenses_uzs"] == 320_000
     assert s["overhead_uzs"] == 200_000
@@ -478,15 +481,18 @@ async def test_profit_report(client, db_engine):
     assert row["units"] == 2 and row["unit_cost_uzs"] == 1_100_000
     assert row["profit_uzs"] == 21_800_000
     missing = next(x for x in d["products"] if x["product_id"] == str(other.id))
-    assert missing["has_recipe"] is False and missing["profit_uzs"] is None
+    # Tannarxi yo'q — 0 deb olinadi, ya'ni butun tushumi foyda
+    assert missing["has_recipe"] is False
+    assert missing["unit_cost_uzs"] == 0 and missing["cogs_uzs"] == 0
+    assert missing["profit_uzs"] == 6_000_000 and missing["margin_percent"] == 100
     # Qo'shimcha mahsulot hech qayerda ko'rinmaydi (tushumga ham qo'shilmagan)
     assert all(x["product_id"] != str(extra.id) for x in d["products"])
 
     # Dinamika: bugungi nuqtada tushum va tannarx (kalkulyatsiyasizlarsiz)
     today_point = next(p for p in d["trend"] if p["date"] == str(date.today()))
-    assert today_point["revenue_uzs"] == 24_000_000
+    assert today_point["revenue_uzs"] == 30_000_000
     assert today_point["cogs_uzs"] == 2_200_000
-    assert today_point["profit_uzs"] == 21_800_000
+    assert today_point["profit_uzs"] == 27_800_000
 
     # Ruxsat: costing moduli yo'q xodim ko'ra olmaydi
     c2 = _auth(client, await _user(db_engine, ["reports:read"]))

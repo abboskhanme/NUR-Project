@@ -790,13 +790,12 @@ async def _profit_trend(
     agg: dict[date, list[Decimal]] = {}
     for period, pid, qty, total in rows:
         b = costs.get(pid)
-        # Kalkulyatsiyasizlar dinamikaga ham kirmaydi (tannarxi noma'lum)
-        if b is None:
-            continue
         key = period.date() if hasattr(period, "date") else period
         cell = agg.setdefault(key, [Decimal(0), Decimal(0)])
         cell[0] += _q(total)
-        cell[1] += _q(b.cost_uzs) * int(qty or 0)
+        # Kalkulyatsiyasiz mahsulotning tannarxi 0 — jami hisob bilan bir xil qoida
+        if b is not None:
+            cell[1] += _q(b.cost_uzs) * int(qty or 0)
 
     out: list[ProfitTrendPoint] = []
     for point in _period_points(date_from, date_to, granularity):
@@ -828,9 +827,13 @@ async def profit_report(
     MUHIM: faqat ASOSIY mahsulotlar (product_type="main") hisoblanadi —
     qo'shimcha mahsulotlar (ehtiyot qismlar) tannarx yuritilmagani uchun bu
     hisobotga umuman kirmaydi. Tannarx JORIY narxlar bo'yicha hisoblanadi
-    (o'sha kundagi narx tarixi saqlanmaydi), rad etilgan buyurtmalar hisobga
-    olinmaydi va kalkulyatsiyasi kiritilmagan asosiy mahsulotlar foyda
-    hisobiga KIRMAYDI — ular alohida `uncovered_*` maydonlarida ko'rsatiladi.
+    (o'sha kundagi narx tarixi saqlanmaydi) va rad etilgan buyurtmalar hisobga
+    olinmaydi.
+
+    Kalkulyatsiyasi KIRITILMAGAN asosiy mahsulot ham hisobga qo'shiladi —
+    tannarxi 0 deb olinadi, ya'ni 100% foyda sifatida sanaladi. Shunda umumiy
+    manzara to'liq bo'ladi; qancha qism shunday hisoblangani `uncovered_*` va
+    `coverage_percent` da ko'rinadi (foyda shu qadar oshib ketgan bo'ladi).
     """
     date_from, date_to = _resolve_report_range(date_from, date_to)
     rate = _q(await latest_exchange_rate(db)) or Decimal(0)
@@ -878,12 +881,19 @@ async def profit_report(
         avg_price = (rev / units).quantize(Decimal("0.01")) if units else Decimal(0)
 
         if b is None:
+            # Kalkulyatsiya kiritilmagan — tannarx 0 deb olinadi, ya'ni mahsulot
+            # 100% foyda sifatida sanaladi. Bu foydalanuvchi qarori: umumiy
+            # manzara ko'rinsin, aks holda hisobning katta qismi tushib qolardi.
+            # `uncovered_*` maydonlari qancha qism shunday hisoblanganini
+            # ko'rsatadi — foyda shu qadar OSHIB ketgan bo'ladi.
             uncovered_revenue += rev
             uncovered_units += units
             uncovered_count += 1
             rows.append(ProfitProductRow(
                 product_id=pid, display_name=p.display_name, has_recipe=False,
                 units=units, revenue_uzs=_r2(rev), avg_price_uzs=_f(avg_price),
+                unit_cost_uzs=0.0, cogs_uzs=0.0, profit_uzs=_r2(rev),
+                margin_percent=100.0 if rev > 0 else 0.0,
             ))
             continue
 
@@ -946,7 +956,9 @@ async def profit_report(
         Order.status != "rejected", Product.product_type != "main"
     )
 
-    gross = covered_revenue - cogs
+    # Yalpi foyda BARCHA sotuvdan hisoblanadi (kalkulyatsiyasizlarning tannarxi
+    # 0 deb olingan) — shunda operatsion xarajat bilan bir xil bazada bo'ladi
+    gross = revenue - cogs
     net = gross - opex
 
     return ProfitReport(
@@ -966,7 +978,7 @@ async def profit_report(
         coverage_percent=_r2(covered_revenue / revenue * 100) if revenue > 0 else 0.0,
         cogs_uzs=_r2(cogs),
         gross_profit_uzs=_r2(gross),
-        gross_margin_percent=_r2(gross / covered_revenue * 100) if covered_revenue > 0 else None,
+        gross_margin_percent=_r2(gross / revenue * 100) if revenue > 0 else None,
         opex_uzs=_r2(opex),
         opex_count=opex_count,
         opex_by_category=[
@@ -974,7 +986,7 @@ async def profit_report(
             for n, a, c in opex_rows
         ],
         net_profit_uzs=_r2(net),
-        net_margin_percent=_r2(net / covered_revenue * 100) if covered_revenue > 0 else None,
+        net_margin_percent=_r2(net / revenue * 100) if revenue > 0 else None,
         structure=ProfitStructure(
             materials_uzs=_r2(mat_total),
             expenses_uzs=_r2(exp_total),

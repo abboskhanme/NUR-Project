@@ -251,9 +251,9 @@ class ProfitReport(BaseModel):
     ishlatilmaydi (u faqat kassa/naqd oqimini ko'rsatadi, sotuvning hammasi
     unga tushmaydi).
 
-    Yalpi foyda FAQAT kalkulyatsiyasi kiritilgan mahsulotlar bo'yicha
-    hisoblanadi — kalkulyatsiyasizlari alohida ko'rsatiladi (`uncovered_*`),
-    chunki ularning tannarxi noma'lum.
+    Kalkulyatsiyasi kiritilmagan mahsulot ham hisobga qo'shiladi — tannarxi 0
+    deb olinadi (100% foyda). Qancha qism shunday hisoblangani `uncovered_*` va
+    `coverage_percent` da ko'rinadi — foyda shu qadar oshib ketgan bo'ladi.
     """
     date_from: date
     date_to: date
