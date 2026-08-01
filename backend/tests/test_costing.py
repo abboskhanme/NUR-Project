@@ -394,7 +394,7 @@ async def _sell(db_engine, product_id, *, qty: int, total_uzs: int,
 
 
 async def test_profit_report(client, db_engine):
-    """Foyda hisoboti: tushum − (sotilgan dona × tannarx) − xarajat = sof foyda."""
+    """Foyda hisoboti: tushum − (sotilgan dona × tannarx) = yalpi foyda."""
     from app.models.finance import FinanceTransaction
     from app.models.product import Product
 
@@ -421,13 +421,9 @@ async def test_profit_report(client, db_engine):
         extra = Product(product_type="additional", name="Ventil (kran)",
                         base_price_usd=Decimal(10), status="active")
         db.add_all([other, extra])
+        # Moliyada chiqim bo'lsa ham foyda hisobiga TEGMASLIGI kerak
         db.add(FinanceTransaction(date=date.today(), type="expense", amount=Decimal(3_000_000),
                                   currency="UZS", status="active"))
-        # Bekor qilingan chiqim va USD chiqim — hisobga kirmasligi kerak
-        db.add(FinanceTransaction(date=date.today(), type="expense", amount=Decimal(9_000_000),
-                                  currency="UZS", status="void"))
-        db.add(FinanceTransaction(date=date.today(), type="expense", amount=Decimal(500),
-                                  currency="USD", status="active"))
         await db.commit()
         await db.refresh(other)
         await db.refresh(extra)
@@ -459,13 +455,8 @@ async def test_profit_report(client, db_engine):
     # Kalkulyatsiyasiz mahsulot tannarxi 0 deb olinadi (100% foyda), shuning
     # uchun yalpi foyda BARCHA tushumdan: 30 mln − 2.2 mln
     assert d["gross_profit_uzs"] == 27_800_000
-    assert d["opex_uzs"] == 3_000_000                # void va USD chiqimlarsiz
-    # Xarajat tarkibi ko'rinib turadi (moliyaga nima kiritilgani tekshirilsin)
-    assert d["opex_count"] == 1
-    assert d["opex_by_category"] == [
-        {"category": "Boshqa", "amount_uzs": 3_000_000, "count": 1},
-    ]
-    assert d["net_profit_uzs"] == 24_800_000         # 27.8 − 3.0
+    # Moliya bo'limi bu hisobga UMUMAN aralashmaydi (chiqim tannarxda ham bor)
+    assert "opex_uzs" not in d and "net_profit_uzs" not in d
     assert d["uncovered_count"] == 1 and d["uncovered_revenue_uzs"] == 6_000_000
     assert d["coverage_percent"] == 80.0
 
