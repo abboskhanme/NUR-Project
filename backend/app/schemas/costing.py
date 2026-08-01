@@ -1,6 +1,6 @@
 """Tannarx (kalkulyatsiya) — Pydantic sxemalar."""
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
@@ -200,4 +200,70 @@ class MatrixSave(BaseModel):
     (ular mahsulot sahifasida tahrirlanadi).
     """
     rows: list[MatrixRow] = []
+
+
+# ---------------------------------------------------------------------------
+# Foyda hisoboti — tannarx × haqiqiy sotuvlar (Hisobotlar bo'limi uchun)
+# ---------------------------------------------------------------------------
+class ProfitProductRow(BaseModel):
+    """Davr ichida sotilgan bitta mahsulot bo'yicha foyda."""
+    product_id: uuid.UUID
+    display_name: str
+    has_recipe: bool = False
+    units: int = 0
+    revenue_uzs: float = 0
+    avg_price_uzs: float = 0
+    # Kalkulyatsiya yo'q bo'lsa tannarx noma'lum — None
+    unit_cost_uzs: Optional[float] = None
+    cogs_uzs: Optional[float] = None
+    profit_uzs: Optional[float] = None
+    margin_percent: Optional[float] = None
+
+
+class ProfitTrendPoint(BaseModel):
+    """Dinamika nuqtasi: tushum, tannarx va yalpi foyda."""
+    date: date
+    revenue_uzs: float = 0
+    cogs_uzs: float = 0
+    profit_uzs: float = 0
+
+
+class ProfitStructure(BaseModel):
+    """Sotilgan mahsulotlar tushumining tarkibi (nimaga qancha ketdi)."""
+    materials_uzs: float = 0
+    expenses_uzs: float = 0
+    overhead_uzs: float = 0
+    profit_uzs: float = 0
+
+
+class ProfitReport(BaseModel):
+    """Tannarx asosidagi foyda hisoboti (davr bo'yicha).
+
+    Yalpi foyda FAQAT kalkulyatsiyasi kiritilgan mahsulotlar bo'yicha
+    hisoblanadi — kalkulyatsiyasizlari alohida ko'rsatiladi (`uncovered_*`),
+    chunki ularning tannarxi noma'lum.
+    """
+    date_from: date
+    date_to: date
+    granularity: str = "month"
+    usd_rate: float = 0
+
+    units_sold: int = 0
+    revenue_uzs: float = 0            # davr ichidagi BARCHA sotuv tushumi
+    covered_revenue_uzs: float = 0    # kalkulyatsiyasi bor mahsulotlar tushumi
+    uncovered_revenue_uzs: float = 0  # kalkulyatsiyasizlar tushumi
+    uncovered_units: int = 0
+    uncovered_count: int = 0          # nechta mahsulot turi
+    coverage_percent: float = 0       # tushumning necha foizi qamrab olingan
+
+    cogs_uzs: float = 0               # tannarx (sotilgan miqdor × birlik tannarxi)
+    gross_profit_uzs: float = 0       # yalpi foyda = qamrab olingan tushum − tannarx
+    gross_margin_percent: Optional[float] = None
+    opex_uzs: float = 0               # moliyadagi operatsion xarajatlar (UZS)
+    net_profit_uzs: float = 0         # sof foyda = yalpi foyda − xarajatlar
+    net_margin_percent: Optional[float] = None
+
+    structure: ProfitStructure = ProfitStructure()
+    products: list[ProfitProductRow] = []
+    trend: list[ProfitTrendPoint] = []
 

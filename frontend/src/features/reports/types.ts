@@ -76,3 +76,55 @@ export interface SupplySummary {
   low_stock: Array<{ name: string; unit: string; stock_qty: number; min_qty: number }>;
   top_debts: Array<{ vendor: string; debt_uzs: number }>;
 }
+
+/** Tannarx (kalkulyatsiya) asosidagi foyda hisoboti — GET /costing/profit-report */
+export interface ProfitProductRow {
+  product_id: string;
+  display_name: string;
+  has_recipe: boolean;
+  units: number;
+  revenue_uzs: number;
+  avg_price_uzs: number;
+  unit_cost_uzs: number | null;
+  cogs_uzs: number | null;
+  profit_uzs: number | null;
+  margin_percent: number | null;
+}
+
+export interface ProfitTrendPoint {
+  date: string;
+  revenue_uzs: number;
+  cogs_uzs: number;
+  profit_uzs: number;
+}
+
+export interface ProfitReport {
+  date_from: string;
+  date_to: string;
+  granularity: 'day' | 'month';
+  usd_rate: number;
+
+  units_sold: number;
+  revenue_uzs: number;
+  covered_revenue_uzs: number;
+  uncovered_revenue_uzs: number;
+  uncovered_units: number;
+  uncovered_count: number;
+  coverage_percent: number;
+
+  cogs_uzs: number;
+  gross_profit_uzs: number;
+  gross_margin_percent: number | null;
+  opex_uzs: number;
+  net_profit_uzs: number;
+  net_margin_percent: number | null;
+
+  structure: {
+    materials_uzs: number;
+    expenses_uzs: number;
+    overhead_uzs: number;
+    profit_uzs: number;
+  };
+  products: ProfitProductRow[];
+  trend: ProfitTrendPoint[];
+}

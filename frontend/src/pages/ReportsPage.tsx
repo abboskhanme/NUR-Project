@@ -1,20 +1,23 @@
 import { useState } from 'react';
-import { ShoppingCart, Wallet, Wrench, Truck } from 'lucide-react';
+import { ShoppingCart, Wallet, Wrench, Truck, Calculator } from 'lucide-react';
 
 import DateRangeFilter, { presetRange } from '@/features/reports/DateRangeFilter';
 import SalesReport from '@/features/reports/SalesReport';
 import FinanceReport from '@/features/reports/FinanceReport';
 import ServiceReport from '@/features/reports/ServiceReport';
 import SupplyReport from '@/features/reports/SupplyReport';
+import CostingReport from '@/features/reports/CostingReport';
 import { formatDate } from '@/lib/format';
+import { usePermissions } from '@/lib/permissions';
 import type { DateRange } from '@/features/reports/types';
 
-type Tab = 'sales' | 'finance' | 'service' | 'supply';
+type Tab = 'sales' | 'finance' | 'costing' | 'service' | 'supply';
 type Preset = 'this_month' | 'last_month' | 'last_30' | 'last_90' | 'this_year';
 
 const TAB_KEYS: Array<{ key: Tab; icon: typeof ShoppingCart }> = [
   { key: 'sales', icon: ShoppingCart },
   { key: 'finance', icon: Wallet },
+  { key: 'costing', icon: Calculator },
   { key: 'service', icon: Wrench },
   { key: 'supply', icon: Truck },
 ];
@@ -22,6 +25,7 @@ const TAB_KEYS: Array<{ key: Tab; icon: typeof ShoppingCart }> = [
 const REPORTS_TABS: Record<string, string> = {
   sales: 'Sotuv',
   finance: 'Moliya',
+  costing: 'Tannarx / Foyda',
   service: 'Servis',
   supply: "Ta'minot",
 };
@@ -30,6 +34,9 @@ export default function ReportsPage() {
   const [tab, setTab] = useState<Tab>('sales');
   const [preset, setPreset] = useState<Preset | null>('this_month');
   const [range, setRange] = useState<DateRange>(() => presetRange('this_month'));
+  const { can } = usePermissions();
+  // Tannarx maxfiy ma'lumot — faqat Tannarx bo'limiga ruxsati borlar ko'radi
+  const tabs = TAB_KEYS.filter((t) => t.key !== 'costing' || can('costing:read'));
 
   function applyPreset(p: Preset) {
     setPreset(p);
@@ -63,7 +70,7 @@ export default function ReportsPage() {
 
       {/* Bo'lim tablari */}
       <div className="flex gap-1 border-b border-black/10 overflow-x-auto">
-        {TAB_KEYS.map((tab_def) => {
+        {tabs.map((tab_def) => {
           const Icon = tab_def.icon;
           return (
             <button
@@ -83,6 +90,7 @@ export default function ReportsPage() {
 
       {tab === 'sales' && <SalesReport range={range} />}
       {tab === 'finance' && <FinanceReport range={range} />}
+      {tab === 'costing' && <CostingReport range={range} />}
       {tab === 'service' && <ServiceReport range={range} />}
       {tab === 'supply' && <SupplyReport range={range} />}
     </div>

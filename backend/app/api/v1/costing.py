@@ -26,6 +26,7 @@ from app.core.dependencies import CurrentUser
 from app.core.permissions import module_guard
 from app.db.session import get_db
 from app.models.costing import CostingMaterial, ProductRecipe, ProductRecipeItem
+from app.models.finance import FinanceTransaction
 from app.models.order import Order, OrderItem
 from app.models.product import Product
 from app.schemas.costing import (
@@ -38,6 +39,10 @@ from app.schemas.costing import (
     MatrixSave,
     ProductCostDetail,
     ProductCostRow,
+    ProfitProductRow,
+    ProfitReport,
+    ProfitStructure,
+    ProfitTrendPoint,
     RecipeIn,
     RecipeItemOut,
 )
@@ -192,7 +197,7 @@ async def _sales_map(db: AsyncSession) -> dict[uuid.UUID, tuple[Decimal, int]]:
             func.coalesce(func.sum(OrderItem.quantity), 0),
         )
         .join(Order, Order.id == OrderItem.order_id)
-        .where(Order.status != "cancelled", Order.order_date >= cutoff)
+        .where(Order.status != "rejected", Order.order_date >= cutoff)
         .group_by(OrderItem.product_id)
     )
     return {row[0]: (row[1], row[2]) for row in res.all()}
@@ -701,3 +706,234 @@ async def save_costing_matrix(
 
     await db.commit()
     return await costing_matrix(db=db, user=user)
+
+
+# ---------------------------------------------------------------------------
+# Foyda hisoboti — tannarx × haqiqiy sotuvlar (Hisobotlar bo'limi «Tannarx» tabi)
+# ---------------------------------------------------------------------------
+def _resolve_report_range(
+    date_from: Optional[date], date_to: Optional[date]
+) -> tuple[date, date]:
+    """Bo'sh qoldirilsa — joriy oyning 1-kunidan bugungacha."""
+    today = date.today()
+    date_to = date_to or today
+    date_from = date_from or date_to.replace(day=1)
+    return date_from, date_to
+
+
+async def _cost_map(
+    db: AsyncSession, product_ids: list[uuid.UUID], rate: Decimal
+) -> dict[uuid.UUID, CostBreakdown]:
+    """product_id -> tannarx tafsiloti. FAQAT kalkulyatsiyasi borlar kiradi."""
+    if not product_ids:
+        return {}
+    products = {p.id: p for p in (await db.execute(
+        select(Product).where(Product.id.in_(product_ids))
+    )).scalars().all()}
+    recipes = await _recipes_map(db, product_ids)
+    items_by_recipe = await _items_map(db, [r.id for r in recipes.values()])
+    materials = await _materials_map(db, {
+        i.material_id for rows_ in items_by_recipe.values() for i in rows_ if i.material_id
+    })
+
+    out: dict[uuid.UUID, CostBreakdown] = {}
+    for pid, recipe in recipes.items():
+        product = products.get(pid)
+        if product is None:
+            continue
+        lines = _build_lines(items_by_recipe.get(recipe.id, []), materials, rate)
+        out[pid] = _breakdown(lines, recipe, product, rate, None)
+    return out
+
+
+def _period_points(date_from: date, date_to: date, granularity: str) -> list[date]:
+    """Grafik uchun bo'sh davrlar ham chiqishi kerak — to'liq ro'yxat."""
+    out: list[date] = []
+    if granularity == "day":
+        cur = date_from
+        while cur <= date_to:
+            out.append(cur)
+            cur += timedelta(days=1)
+        return out
+    cur = date_from.replace(day=1)
+    last = date_to.replace(day=1)
+    while cur <= last:
+        out.append(cur)
+        cur = (cur + timedelta(days=32)).replace(day=1)
+    return out
+
+
+async def _profit_trend(
+    db: AsyncSession,
+    date_from: date,
+    date_to: date,
+    granularity: str,
+    costs: dict[uuid.UUID, CostBreakdown],
+    sold_cond: tuple,
+) -> list[ProfitTrendPoint]:
+    """Davrlar kesimida tushum / tannarx / yalpi foyda dinamikasi."""
+    period_col = (
+        Order.order_date if granularity == "day"
+        else func.date_trunc("month", Order.order_date)
+    )
+    rows = (await db.execute(
+        select(period_col.label("p"), OrderItem.product_id,
+               func.coalesce(func.sum(OrderItem.quantity), 0),
+               func.coalesce(func.sum(OrderItem.total_uzs), 0))
+        .join(Order, Order.id == OrderItem.order_id)
+        .where(*sold_cond)
+        .group_by("p", OrderItem.product_id)
+    )).all()
+
+    agg: dict[date, list[Decimal]] = {}
+    for period, pid, qty, total in rows:
+        b = costs.get(pid)
+        # Kalkulyatsiyasizlar dinamikaga ham kirmaydi (tannarxi noma'lum)
+        if b is None:
+            continue
+        key = period.date() if hasattr(period, "date") else period
+        cell = agg.setdefault(key, [Decimal(0), Decimal(0)])
+        cell[0] += _q(total)
+        cell[1] += _q(b.cost_uzs) * int(qty or 0)
+
+    out: list[ProfitTrendPoint] = []
+    for point in _period_points(date_from, date_to, granularity):
+        rev, cost = agg.get(point, [Decimal(0), Decimal(0)])
+        out.append(ProfitTrendPoint(
+            date=point, revenue_uzs=_r2(rev), cogs_uzs=_r2(cost),
+            profit_uzs=_r2(rev - cost),
+        ))
+    return out
+
+
+@router.get("/profit-report", response_model=ProfitReport)
+async def profit_report(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user: CurrentUser,
+    date_from: Optional[date] = None,
+    date_to: Optional[date] = None,
+    granularity: str = Query("month", pattern="^(day|month)$"),
+):
+    """Tannarx asosidagi FOYDA hisoboti — Hisobotlar bo'limi uchun.
+
+    Davr ichida haqiqatda sotilgan mahsulotlar (buyurtma satrlari) olinadi va
+    har biriga JORIY tannarx qo'llanadi:
+
+        tannarx (COGS) = sotilgan dona × birlik tannarxi
+        yalpi foyda    = tushum − tannarx
+        sof foyda      = yalpi foyda − moliyadagi operatsion xarajatlar
+
+    MUHIM: tannarx JORIY narxlar bo'yicha hisoblanadi (o'sha kundagi narx
+    tarixi saqlanmaydi), rad etilgan buyurtmalar hisobga olinmaydi va
+    kalkulyatsiyasi kiritilmagan mahsulotlar foyda hisobiga KIRMAYDI —
+    ular alohida `uncovered_*` maydonlarida ko'rsatiladi.
+    """
+    date_from, date_to = _resolve_report_range(date_from, date_to)
+    rate = _q(await latest_exchange_rate(db)) or Decimal(0)
+    sold_cond = (
+        Order.status != "rejected",
+        Order.order_date >= date_from,
+        Order.order_date <= date_to,
+    )
+
+    # --- Davr ichida sotilganlar (mahsulot kesimida) ---
+    sold_rows = (await db.execute(
+        select(OrderItem.product_id,
+               func.coalesce(func.sum(OrderItem.quantity), 0),
+               func.coalesce(func.sum(OrderItem.total_uzs), 0))
+        .join(Order, Order.id == OrderItem.order_id)
+        .where(*sold_cond)
+        .group_by(OrderItem.product_id)
+    )).all()
+
+    product_ids = [r[0] for r in sold_rows]
+    products = {p.id: p for p in (await db.execute(
+        select(Product).where(Product.id.in_(product_ids))
+    )).scalars().all()} if product_ids else {}
+    costs = await _cost_map(db, product_ids, rate)
+
+    rows: list[ProfitProductRow] = []
+    units_sold = revenue = covered_revenue = cogs = Decimal(0)
+    uncovered_revenue = Decimal(0)
+    uncovered_units = uncovered_count = 0
+    mat_total = exp_total = ovh_total = Decimal(0)
+
+    for pid, qty, total in sold_rows:
+        p = products.get(pid)
+        if p is None:
+            continue
+        units = int(qty or 0)
+        rev = _q(total)
+        units_sold += units
+        revenue += rev
+        b = costs.get(pid)
+        avg_price = (rev / units).quantize(Decimal("0.01")) if units else Decimal(0)
+
+        if b is None:
+            uncovered_revenue += rev
+            uncovered_units += units
+            uncovered_count += 1
+            rows.append(ProfitProductRow(
+                product_id=pid, display_name=p.display_name, has_recipe=False,
+                units=units, revenue_uzs=_r2(rev), avg_price_uzs=_f(avg_price),
+            ))
+            continue
+
+        unit_cost = _q(b.cost_uzs)
+        line_cogs = (unit_cost * units).quantize(Decimal("0.01"))
+        profit = rev - line_cogs
+        covered_revenue += rev
+        cogs += line_cogs
+        mat_total += _q(b.materials_uzs) * units
+        exp_total += _q(b.expenses_uzs) * units
+        ovh_total += _q(b.overhead_uzs) * units
+        rows.append(ProfitProductRow(
+            product_id=pid, display_name=p.display_name, has_recipe=True,
+            units=units, revenue_uzs=_r2(rev), avg_price_uzs=_f(avg_price),
+            unit_cost_uzs=_f(unit_cost), cogs_uzs=_r2(line_cogs),
+            profit_uzs=_r2(profit),
+            margin_percent=_r2(profit / rev * 100) if rev > 0 else 0.0,
+        ))
+
+    rows.sort(key=lambda r: r.profit_uzs if r.profit_uzs is not None else -1, reverse=True)
+
+    # --- Operatsion xarajatlar (moliya, faqat UZS va faol tranzaksiyalar) ---
+    opex = _q((await db.execute(
+        select(func.coalesce(func.sum(FinanceTransaction.amount), 0))
+        .where(FinanceTransaction.date >= date_from,
+               FinanceTransaction.date <= date_to,
+               FinanceTransaction.status == "active",
+               FinanceTransaction.currency == "UZS",
+               FinanceTransaction.type == "expense")
+    )).scalar())
+
+    gross = covered_revenue - cogs
+    net = gross - opex
+
+    return ProfitReport(
+        date_from=date_from,
+        date_to=date_to,
+        granularity=granularity,
+        usd_rate=_f(rate),
+        units_sold=int(units_sold),
+        revenue_uzs=_r2(revenue),
+        covered_revenue_uzs=_r2(covered_revenue),
+        uncovered_revenue_uzs=_r2(uncovered_revenue),
+        uncovered_units=uncovered_units,
+        uncovered_count=uncovered_count,
+        coverage_percent=_r2(covered_revenue / revenue * 100) if revenue > 0 else 0.0,
+        cogs_uzs=_r2(cogs),
+        gross_profit_uzs=_r2(gross),
+        gross_margin_percent=_r2(gross / covered_revenue * 100) if covered_revenue > 0 else None,
+        opex_uzs=_r2(opex),
+        net_profit_uzs=_r2(net),
+        net_margin_percent=_r2(net / covered_revenue * 100) if covered_revenue > 0 else None,
+        structure=ProfitStructure(
+            materials_uzs=_r2(mat_total),
+            expenses_uzs=_r2(exp_total),
+            overhead_uzs=_r2(ovh_total),
+            profit_uzs=_r2(gross),
+        ),
+        products=rows,
+        trend=await _profit_trend(db, date_from, date_to, granularity, costs, sold_cond),
+    )

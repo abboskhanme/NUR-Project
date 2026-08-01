@@ -371,3 +371,104 @@ async def test_matrix_preserves_sum_lines(client, db_engine):
         "cells": [{"material_id": str(metal.id), "value": 1}],
     }]})
     assert r.status_code == 403
+
+
+async def _sell(db_engine, product_id, *, qty: int, total_uzs: int,
+                order_date=None, status: str = "delivered"):
+    """Buyurtma yaratadi (mijoz bilan) — foyda hisoboti uchun sotuv manbai."""
+    from app.models.customer import Customer
+    from app.models.order import Order, OrderItem
+
+    Session = async_sessionmaker(db_engine, class_=AsyncSession, expire_on_commit=False)
+    async with Session() as db:
+        customer = Customer(full_name="Mijoz", phone=f"+9989{uuid.uuid4().int % 10**8:08d}")
+        db.add(customer)
+        await db.flush()
+        order = Order(code=f"ORD-{uuid.uuid4().hex[:6]}", customer_id=customer.id,
+                      order_date=order_date or date.today(), status=status)
+        db.add(order)
+        await db.flush()
+        db.add(OrderItem(order_id=order.id, product_id=product_id, quantity=qty,
+                         total_uzs=Decimal(total_uzs)))
+        await db.commit()
+
+
+async def test_profit_report(client, db_engine):
+    """Foyda hisoboti: tushum − (sotilgan dona × tannarx) − xarajat = sof foyda."""
+    from app.models.finance import FinanceTransaction
+    from app.models.product import Product
+
+    product, metal, datchik, _ = await _seed(db_engine)
+    c = _auth(client, await _user(db_engine, ["costing:*"]))
+
+    # Tannarx = 1 100 000 (birinchi testdagi tarkib bilan bir xil)
+    await c.put(f"{API}/products/{product.id}", json={
+        "overhead_percent": 10,
+        "target_price_usd": 1000,
+        "items": [
+            {"kind": "material", "material_id": str(metal.id), "qty": 3},
+            {"kind": "material", "material_id": str(datchik.id), "qty": 2},
+            {"kind": "expense", "label": "Payvandlash ishi", "qty": 1,
+             "unit_price": 160_000, "currency": "UZS"},
+        ],
+    })
+
+    # Kalkulyatsiyasi YO'Q ikkinchi mahsulot
+    Session = async_sessionmaker(db_engine, class_=AsyncSession, expire_on_commit=False)
+    async with Session() as db:
+        other = Product(product_type="main", model="BAZA", kvm=100, year=2026,
+                        base_price_usd=Decimal(500), status="active")
+        db.add(other)
+        db.add(FinanceTransaction(date=date.today(), type="expense", amount=Decimal(3_000_000),
+                                  currency="UZS", status="active"))
+        # Bekor qilingan chiqim va USD chiqim — hisobga kirmasligi kerak
+        db.add(FinanceTransaction(date=date.today(), type="expense", amount=Decimal(9_000_000),
+                                  currency="UZS", status="void"))
+        db.add(FinanceTransaction(date=date.today(), type="expense", amount=Decimal(500),
+                                  currency="USD", status="active"))
+        await db.commit()
+        await db.refresh(other)
+
+    await _sell(db_engine, product.id, qty=2, total_uzs=24_000_000)
+    await _sell(db_engine, other.id, qty=1, total_uzs=6_000_000)
+    # Rad etilgan buyurtma — hisobga kirmaydi
+    await _sell(db_engine, product.id, qty=5, total_uzs=60_000_000, status="rejected")
+
+    r = await c.get(f"{API}/profit-report", params={
+        "date_from": str(date.today()), "date_to": str(date.today()), "granularity": "day",
+    })
+    assert r.status_code == 200, r.text
+    d = r.json()
+
+    assert d["units_sold"] == 3                      # 2 + 1 (rad etilgani emas)
+    assert d["revenue_uzs"] == 30_000_000
+    assert d["covered_revenue_uzs"] == 24_000_000    # faqat kalkulyatsiyalisi
+    assert d["cogs_uzs"] == 2_200_000                # 2 × 1 100 000
+    assert d["gross_profit_uzs"] == 21_800_000
+    assert d["opex_uzs"] == 3_000_000                # void va USD chiqimlarsiz
+    assert d["net_profit_uzs"] == 18_800_000
+    assert d["uncovered_count"] == 1 and d["uncovered_revenue_uzs"] == 6_000_000
+    assert d["coverage_percent"] == 80.0
+
+    # Tushum tarkibi: materiallar + xarajat + ustama = tannarx
+    s = d["structure"]
+    assert s["materials_uzs"] == 1_680_000 and s["expenses_uzs"] == 320_000
+    assert s["overhead_uzs"] == 200_000
+    assert s["profit_uzs"] == d["gross_profit_uzs"]
+
+    # Mahsulotlar kesimi
+    row = next(x for x in d["products"] if x["product_id"] == str(product.id))
+    assert row["units"] == 2 and row["unit_cost_uzs"] == 1_100_000
+    assert row["profit_uzs"] == 21_800_000
+    missing = next(x for x in d["products"] if x["product_id"] == str(other.id))
+    assert missing["has_recipe"] is False and missing["profit_uzs"] is None
+
+    # Dinamika: bugungi nuqtada tushum va tannarx (kalkulyatsiyasizlarsiz)
+    today_point = next(p for p in d["trend"] if p["date"] == str(date.today()))
+    assert today_point["revenue_uzs"] == 24_000_000
+    assert today_point["cogs_uzs"] == 2_200_000
+    assert today_point["profit_uzs"] == 21_800_000
+
+    # Ruxsat: costing moduli yo'q xodim ko'ra olmaydi
+    c2 = _auth(client, await _user(db_engine, ["reports:read"]))
+    assert (await c2.get(f"{API}/profit-report")).status_code == 403
