@@ -70,6 +70,15 @@ export default function CostingReport({ range }: { range: DateRange }) {
   const products = d?.products ?? [];
   const withRecipe = products.filter((p) => p.has_recipe);
 
+  /**
+   * Sof foyda faqat qamrov yuqori bo'lganda ma'noli: operatsion xarajat BUTUN
+   * davr uchun olinadi, yalpi foyda esa faqat kalkulyatsiyali mahsulotlardan.
+   * Qamrov past bo'lsa ularni ayirish katta manfiy "zarar" ko'rsatadi — bu
+   * noto'g'ri, shuning uchun raqam ko'rsatilmaydi.
+   */
+  const COVERAGE_MIN = 90;
+  const netUsable = !!d && d.coverage_percent >= COVERAGE_MIN;
+
   // Foyda bo'yicha eng yaxshi 12 ta (grafik o'qilishi uchun cheklangan)
   const topProducts = [...withRecipe]
     .sort((a, b) => (b.profit_uzs ?? 0) - (a.profit_uzs ?? 0))
@@ -176,10 +185,26 @@ export default function CostingReport({ range }: { range: DateRange }) {
           sub={d?.gross_margin_percent != null ? `marja ${d.gross_margin_percent}%` : undefined} />
         <StatTile label="Operatsion xarajat" value={d ? formatUZS(d.opex_uzs) : '—'} tone="warning"
           sub="moliya bo'limidan" />
-        <StatTile label="Sof foyda" value={d ? formatUZS(d.net_profit_uzs) : '—'}
-          tone={d && d.net_profit_uzs >= 0 ? 'primary' : 'danger'}
-          sub={d?.net_margin_percent != null ? `marja ${d.net_margin_percent}%` : undefined} />
+        <StatTile label="Sof foyda"
+          value={d && netUsable ? formatUZS(d.net_profit_uzs) : '—'}
+          tone={d && netUsable && d.net_profit_uzs >= 0 ? 'primary' : netUsable ? 'danger' : 'default'}
+          sub={!d ? undefined
+            : !netUsable ? `qamrov ${d.coverage_percent}% — hisoblab bo'lmaydi`
+            : d.net_margin_percent != null ? `marja ${d.net_margin_percent}%` : undefined} />
       </div>
+
+      {/* Sotuv bo'limi bilan farqni ochib berish — «nega raqamlar mos emas» */}
+      {d && (d.excluded_rejected_uzs > 0 || d.excluded_additional_uzs > 0) && (
+        <p className="text-xs text-ink-soft">
+          Sotuv bo'limidagi «Savdo» — {formatUZS(d.sales_total_uzs)}. Bu hisobotda
+          {d.excluded_rejected_uzs > 0 && <> rad etilgan buyurtmalar
+            ({formatUZS(d.excluded_rejected_uzs)})</>}
+          {d.excluded_rejected_uzs > 0 && d.excluded_additional_uzs > 0 && ' va'}
+          {d.excluded_additional_uzs > 0 && <> qo'shimcha mahsulotlar
+            ({formatUZS(d.excluded_additional_uzs)})</>}
+          {' '}chiqarib tashlangan — qolgani {formatUZS(d.revenue_uzs)}.
+        </p>
+      )}
 
       {/* Kalkulyatsiyasi yo'q mahsulotlar — hisob to'liq emas */}
       {d && d.uncovered_count > 0 && (
@@ -190,13 +215,18 @@ export default function CostingReport({ range }: { range: DateRange }) {
             {' '}{formatUZS(d.uncovered_revenue_uzs)}) kalkulyatsiyasiz sotilgan — tannarxi
             noma'lum bo'lgani uchun foyda hisobiga kirmadi. Tushumning{' '}
             {d.coverage_percent}% qismi qamrab olingan.
+            {!netUsable && (
+              <> <b>Shu sababli sof foyda hisoblanmadi:</b> operatsion xarajat butun davr
+              uchun, foyda esa tushumning atigi {d.coverage_percent}% qismidan — ularni
+              ayirish noto'g'ri natija beradi. Qolgan mahsulotlarga tannarx kiriting.</>
+            )}
           </div>
         </div>
       )}
 
       {/* Foyda qanday shakllandi — waterfall */}
-      <Card title="Sof foyda qanday shakllandi">
-        {d && <Waterfall data={d} />}
+      <Card title={netUsable ? 'Sof foyda qanday shakllandi' : 'Yalpi foyda qanday shakllandi'}>
+        {d && <Waterfall data={d} showNet={netUsable} />}
 
         {/* Xarajat nimalardan iborat — moliyaga kiritilmagani ko'rinmasligi uchun */}
         {d && d.opex_by_category.length > 0 && (
@@ -375,15 +405,19 @@ export default function CostingReport({ range }: { range: DateRange }) {
  * Foydaning shakllanishi (waterfall): har bir qadam qayerdan boshlanib
  * qayerda tugashini ko'rsatadi — manfiy sof foyda ham to'g'ri chiziladi.
  */
-function Waterfall({ data }: { data: ProfitReport }) {
+function Waterfall({ data, showNet = true }: { data: ProfitReport; showNet?: boolean }) {
   const gross = data.gross_profit_uzs;
   const net = data.net_profit_uzs;
   const steps = [
     { label: 'Tushum', from: 0, to: data.covered_revenue_uzs, value: data.covered_revenue_uzs, color: C_REVENUE },
     { label: 'Tannarx', from: gross, to: data.covered_revenue_uzs, value: -data.cogs_uzs, color: C_COST },
     { label: 'Yalpi foyda', from: Math.min(0, gross), to: Math.max(0, gross), value: gross, color: C_PROFIT },
-    { label: 'Operatsion xarajat', from: Math.min(net, gross), to: Math.max(net, gross), value: -data.opex_uzs, color: C_OPEX },
-    { label: 'Sof foyda', from: Math.min(0, net), to: Math.max(0, net), value: net, color: net >= 0 ? C_NET : C_COST },
+    // Qamrov past bo'lsa xarajat/sof foyda qadamlari ko'rsatilmaydi — davr
+    // xarajatini tushumning bir qismidan ayirish yolg'on "zarar" beradi
+    ...(showNet ? [
+      { label: 'Operatsion xarajat', from: Math.min(net, gross), to: Math.max(net, gross), value: -data.opex_uzs, color: C_OPEX },
+      { label: 'Sof foyda', from: Math.min(0, net), to: Math.max(0, net), value: net, color: net >= 0 ? C_NET : C_COST },
+    ] : []),
   ];
 
   const lo = Math.min(0, ...steps.map((s) => s.from));

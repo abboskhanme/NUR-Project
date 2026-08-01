@@ -929,6 +929,23 @@ async def profit_report(
     opex = sum((_q(a) for _n, a, _c in opex_rows), Decimal(0))
     opex_count = sum(int(c or 0) for _n, _a, c in opex_rows)
 
+    # --- Sotuv bo'limi bilan solishtirish (nega raqamlar farq qiladi) ---
+    # U yerdagi «Savdo» KPI barcha buyurtmalarni (rad etilganini ham) va barcha
+    # mahsulot turlarini qo'shadi. Ikki chetlatilgan qism kesishmaydi, shuning
+    # uchun uchtasi aniq yig'iladi.
+    async def _sum_sold(*conds) -> Decimal:
+        return _q((await db.execute(
+            select(func.coalesce(func.sum(OrderItem.total_uzs), 0))
+            .join(Order, Order.id == OrderItem.order_id)
+            .join(Product, Product.id == OrderItem.product_id)
+            .where(Order.order_date >= date_from, Order.order_date <= date_to, *conds)
+        )).scalar())
+
+    rejected_uzs = await _sum_sold(Order.status == "rejected")
+    additional_uzs = await _sum_sold(
+        Order.status != "rejected", Product.product_type != "main"
+    )
+
     gross = covered_revenue - cogs
     net = gross - opex
 
@@ -939,6 +956,9 @@ async def profit_report(
         usd_rate=_f(rate),
         units_sold=int(units_sold),
         revenue_uzs=_r2(revenue),
+        sales_total_uzs=_r2(revenue + rejected_uzs + additional_uzs),
+        excluded_rejected_uzs=_r2(rejected_uzs),
+        excluded_additional_uzs=_r2(additional_uzs),
         covered_revenue_uzs=_r2(covered_revenue),
         uncovered_revenue_uzs=_r2(uncovered_revenue),
         uncovered_units=uncovered_units,

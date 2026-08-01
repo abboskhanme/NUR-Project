@@ -106,6 +106,10 @@ export interface ProfitReport {
 
   units_sold: number;
   revenue_uzs: number;
+  /** Sotuv bo'limidagi «Savdo» KPI bilan bir xil baza (rad etilgan + qo'shimcha bilan) */
+  sales_total_uzs: number;
+  excluded_rejected_uzs: number;
+  excluded_additional_uzs: number;
   covered_revenue_uzs: number;
   uncovered_revenue_uzs: number;
   uncovered_units: number;
