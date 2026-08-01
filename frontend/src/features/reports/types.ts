@@ -116,6 +116,8 @@ export interface ProfitReport {
   gross_profit_uzs: number;
   gross_margin_percent: number | null;
   opex_uzs: number;
+  opex_count: number;
+  opex_by_category: Array<{ category: string; amount_uzs: number; count: number }>;
   net_profit_uzs: number;
   net_margin_percent: number | null;
 

@@ -197,11 +197,31 @@ export default function CostingReport({ range }: { range: DateRange }) {
       {/* Foyda qanday shakllandi — waterfall */}
       <Card title="Sof foyda qanday shakllandi">
         {d && <Waterfall data={d} />}
+
+        {/* Xarajat nimalardan iborat — moliyaga kiritilmagani ko'rinmasligi uchun */}
+        {d && d.opex_by_category.length > 0 && (
+          <div className="mt-3 pt-3 border-t border-black/5">
+            <div className="text-xs text-ink-soft mb-1.5">
+              Operatsion xarajat tarkibi ({d.opex_count} ta yozuv):
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {d.opex_by_category.map((c) => (
+                <span key={c.category}
+                      className="inline-flex items-center gap-1.5 px-2 py-1 rounded-button bg-black/[0.04] text-xs">
+                  <span className="text-ink-soft">{c.category}</span>
+                  <span className="font-medium">{formatUZS(c.amount_uzs)}</span>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
         <p className="text-[11px] text-ink-soft mt-3 flex items-start gap-1.5">
           <Info size={13} className="shrink-0 mt-0.5" />
-          Operatsion xarajat — moliya bo'limidagi davr chiqimlari (UZS). Agar material
-          xaridlari ham chiqim sifatida kiritilgan bo'lsa, ular tannarxda bir marta
-          hisoblangan bo'ladi — sof foyda shu qadar kamayib ko'rinadi.
+          Manbalar: tushum — Sotuv bo'limidan (buyurtmalar), tannarx — Tannarx
+          bo'limidan, xarajat — Moliya bo'limidan. Moliyadagi KIRIM ishlatilmaydi
+          (u faqat kassadagi naqd oqim). Moliyaga kiritilmagan chiqim bu yerda ham
+          hisoblanmaydi — yuqoridagi ro'yxatdan to'liqligini tekshiring.
         </p>
       </Card>
 

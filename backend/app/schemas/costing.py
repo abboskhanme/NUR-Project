@@ -236,8 +236,20 @@ class ProfitStructure(BaseModel):
     profit_uzs: float = 0
 
 
+class OpexRow(BaseModel):
+    """Moliyadagi chiqim kategoriyasi — xarajat to'liqligini ko'rish uchun."""
+    category: str
+    amount_uzs: float = 0
+    count: int = 0
+
+
 class ProfitReport(BaseModel):
     """Tannarx asosidagi foyda hisoboti (davr bo'yicha).
+
+    MANBALAR: tushum — Sotuv bo'limi (buyurtma satrlari), tannarx — Tannarx
+    bo'limi kalkulyatsiyasi, xarajat — Moliya bo'limi. Moliyadagi KIRIM
+    ishlatilmaydi (u faqat kassa/naqd oqimini ko'rsatadi, sotuvning hammasi
+    unga tushmaydi).
 
     Yalpi foyda FAQAT kalkulyatsiyasi kiritilgan mahsulotlar bo'yicha
     hisoblanadi — kalkulyatsiyasizlari alohida ko'rsatiladi (`uncovered_*`),
@@ -260,6 +272,8 @@ class ProfitReport(BaseModel):
     gross_profit_uzs: float = 0       # yalpi foyda = qamrab olingan tushum − tannarx
     gross_margin_percent: Optional[float] = None
     opex_uzs: float = 0               # moliyadagi operatsion xarajatlar (UZS)
+    opex_count: int = 0               # nechta chiqim yozuvi hisobga olindi
+    opex_by_category: list[OpexRow] = []
     net_profit_uzs: float = 0         # sof foyda = yalpi foyda − xarajatlar
     net_margin_percent: Optional[float] = None
 

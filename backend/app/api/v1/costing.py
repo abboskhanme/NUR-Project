@@ -26,7 +26,7 @@ from app.core.dependencies import CurrentUser
 from app.core.permissions import module_guard
 from app.db.session import get_db
 from app.models.costing import CostingMaterial, ProductRecipe, ProductRecipeItem
-from app.models.finance import FinanceTransaction
+from app.models.finance import FinanceCategory, FinanceTransaction
 from app.models.order import Order, OrderItem
 from app.models.product import Product
 from app.schemas.costing import (
@@ -38,6 +38,7 @@ from app.schemas.costing import (
     MatrixRowOut,
     MatrixSave,
     ProductCostDetail,
+    OpexRow,
     ProductCostRow,
     ProfitProductRow,
     ProfitReport,
@@ -898,14 +899,28 @@ async def profit_report(
     rows.sort(key=lambda r: r.profit_uzs if r.profit_uzs is not None else -1, reverse=True)
 
     # --- Operatsion xarajatlar (moliya, faqat UZS va faol tranzaksiyalar) ---
-    opex = _q((await db.execute(
-        select(func.coalesce(func.sum(FinanceTransaction.amount), 0))
-        .where(FinanceTransaction.date >= date_from,
-               FinanceTransaction.date <= date_to,
-               FinanceTransaction.status == "active",
-               FinanceTransaction.currency == "UZS",
-               FinanceTransaction.type == "expense")
-    )).scalar())
+    # DIQQAT: moliyadagi KIRIM ishlatilmaydi — u kassa/naqd oqimini ko'rsatadi,
+    # sotuvning hammasi (karta bilan to'langani) unga tushmaydi. Tushum har doim
+    # Sotuv bo'limidan olinadi.
+    opex_cond = (
+        FinanceTransaction.date >= date_from,
+        FinanceTransaction.date <= date_to,
+        FinanceTransaction.status == "active",
+        FinanceTransaction.currency == "UZS",
+        FinanceTransaction.type == "expense",
+    )
+    opex_rows = (await db.execute(
+        select(FinanceCategory.name,
+               func.coalesce(func.sum(FinanceTransaction.amount), 0),
+               func.count(FinanceTransaction.id))
+        .join(FinanceCategory,
+              FinanceCategory.id == FinanceTransaction.category_id, isouter=True)
+        .where(*opex_cond)
+        .group_by(FinanceCategory.name)
+        .order_by(func.sum(FinanceTransaction.amount).desc())
+    )).all()
+    opex = sum((_q(a) for _n, a, _c in opex_rows), Decimal(0))
+    opex_count = sum(int(c or 0) for _n, _a, c in opex_rows)
 
     gross = covered_revenue - cogs
     net = gross - opex
@@ -926,6 +941,11 @@ async def profit_report(
         gross_profit_uzs=_r2(gross),
         gross_margin_percent=_r2(gross / covered_revenue * 100) if covered_revenue > 0 else None,
         opex_uzs=_r2(opex),
+        opex_count=opex_count,
+        opex_by_category=[
+            OpexRow(category=n or "Boshqa", amount_uzs=_r2(_q(a)), count=int(c or 0))
+            for n, a, c in opex_rows
+        ],
         net_profit_uzs=_r2(net),
         net_margin_percent=_r2(net / covered_revenue * 100) if covered_revenue > 0 else None,
         structure=ProfitStructure(

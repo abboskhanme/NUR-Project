@@ -446,6 +446,11 @@ async def test_profit_report(client, db_engine):
     assert d["cogs_uzs"] == 2_200_000                # 2 × 1 100 000
     assert d["gross_profit_uzs"] == 21_800_000
     assert d["opex_uzs"] == 3_000_000                # void va USD chiqimlarsiz
+    # Xarajat tarkibi ko'rinib turadi (moliyaga nima kiritilgani tekshirilsin)
+    assert d["opex_count"] == 1
+    assert d["opex_by_category"] == [
+        {"category": "Boshqa", "amount_uzs": 3_000_000, "count": 1},
+    ]
     assert d["net_profit_uzs"] == 18_800_000
     assert d["uncovered_count"] == 1 and d["uncovered_revenue_uzs"] == 6_000_000
     assert d["coverage_percent"] == 80.0
