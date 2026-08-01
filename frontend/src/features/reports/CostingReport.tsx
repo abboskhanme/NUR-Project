@@ -132,7 +132,7 @@ export default function CostingReport({ range }: { range: DateRange }) {
     return (
       <Card>
         <div className="py-12 text-center text-sm text-ink-soft">
-          Bu davrda sotuv bo'lmagan — foyda hisoblanmadi
+          Bu davrda asosiy mahsulot sotilmagan — foyda hisoblanmadi
         </div>
       </Card>
     );
@@ -186,7 +186,7 @@ export default function CostingReport({ range }: { range: DateRange }) {
         <div className="rounded-card border border-warning/30 bg-warning/10 px-4 py-3 flex items-start gap-3">
           <AlertTriangle size={18} className="text-warning shrink-0 mt-0.5" />
           <div className="text-sm text-warning">
-            {d.uncovered_count} ta mahsulot ({d.uncovered_units} dona,
+            {d.uncovered_count} ta asosiy mahsulot ({d.uncovered_units} dona,
             {' '}{formatUZS(d.uncovered_revenue_uzs)}) kalkulyatsiyasiz sotilgan — tannarxi
             noma'lum bo'lgani uchun foyda hisobiga kirmadi. Tushumning{' '}
             {d.coverage_percent}% qismi qamrab olingan.
@@ -218,10 +218,12 @@ export default function CostingReport({ range }: { range: DateRange }) {
 
         <p className="text-[11px] text-ink-soft mt-3 flex items-start gap-1.5">
           <Info size={13} className="shrink-0 mt-0.5" />
-          Manbalar: tushum — Sotuv bo'limidan (buyurtmalar), tannarx — Tannarx
-          bo'limidan, xarajat — Moliya bo'limidan. Moliyadagi KIRIM ishlatilmaydi
-          (u faqat kassadagi naqd oqim). Moliyaga kiritilmagan chiqim bu yerda ham
-          hisoblanmaydi — yuqoridagi ro'yxatdan to'liqligini tekshiring.
+          Faqat ASOSIY mahsulotlar hisoblanadi — qo'shimcha mahsulotlar (ehtiyot
+          qismlar) bu hisobotga kirmaydi. Manbalar: tushum — Sotuv bo'limidan
+          (buyurtmalar), tannarx — Tannarx bo'limidan, xarajat — Moliya bo'limidan.
+          Moliyadagi KIRIM ishlatilmaydi (u faqat kassadagi naqd oqim). Moliyaga
+          kiritilmagan chiqim bu yerda ham hisoblanmaydi — yuqoridagi ro'yxatdan
+          to'liqligini tekshiring.
         </p>
       </Card>
 
@@ -335,7 +337,7 @@ export default function CostingReport({ range }: { range: DateRange }) {
       </div>
 
       {/* To'liq jadval */}
-      <Card title="Mahsulotlar kesimida">
+      <Card title="Asosiy mahsulotlar kesimida">
         <ReportTable
           rows={products}
           columns={cols}

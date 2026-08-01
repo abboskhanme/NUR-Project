@@ -782,6 +782,7 @@ async def _profit_trend(
                func.coalesce(func.sum(OrderItem.quantity), 0),
                func.coalesce(func.sum(OrderItem.total_uzs), 0))
         .join(Order, Order.id == OrderItem.order_id)
+        .join(Product, Product.id == OrderItem.product_id)
         .where(*sold_cond)
         .group_by("p", OrderItem.product_id)
     )).all()
@@ -824,10 +825,12 @@ async def profit_report(
         yalpi foyda    = tushum − tannarx
         sof foyda      = yalpi foyda − moliyadagi operatsion xarajatlar
 
-    MUHIM: tannarx JORIY narxlar bo'yicha hisoblanadi (o'sha kundagi narx
-    tarixi saqlanmaydi), rad etilgan buyurtmalar hisobga olinmaydi va
-    kalkulyatsiyasi kiritilmagan mahsulotlar foyda hisobiga KIRMAYDI —
-    ular alohida `uncovered_*` maydonlarida ko'rsatiladi.
+    MUHIM: faqat ASOSIY mahsulotlar (product_type="main") hisoblanadi —
+    qo'shimcha mahsulotlar (ehtiyot qismlar) tannarx yuritilmagani uchun bu
+    hisobotga umuman kirmaydi. Tannarx JORIY narxlar bo'yicha hisoblanadi
+    (o'sha kundagi narx tarixi saqlanmaydi), rad etilgan buyurtmalar hisobga
+    olinmaydi va kalkulyatsiyasi kiritilmagan asosiy mahsulotlar foyda
+    hisobiga KIRMAYDI — ular alohida `uncovered_*` maydonlarida ko'rsatiladi.
     """
     date_from, date_to = _resolve_report_range(date_from, date_to)
     rate = _q(await latest_exchange_rate(db)) or Decimal(0)
@@ -835,6 +838,9 @@ async def profit_report(
         Order.status != "rejected",
         Order.order_date >= date_from,
         Order.order_date <= date_to,
+        # Tannarx faqat asosiy mahsulotlar uchun yuritiladi (Tannarx bo'limi ham
+        # shunday) — qo'shimcha mahsulotlar foyda hisobiga aralashmaydi
+        Product.product_type == "main",
     )
 
     # --- Davr ichida sotilganlar (mahsulot kesimida) ---
@@ -843,6 +849,7 @@ async def profit_report(
                func.coalesce(func.sum(OrderItem.quantity), 0),
                func.coalesce(func.sum(OrderItem.total_uzs), 0))
         .join(Order, Order.id == OrderItem.order_id)
+        .join(Product, Product.id == OrderItem.product_id)
         .where(*sold_cond)
         .group_by(OrderItem.product_id)
     )).all()

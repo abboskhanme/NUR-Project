@@ -413,12 +413,14 @@ async def test_profit_report(client, db_engine):
         ],
     })
 
-    # Kalkulyatsiyasi YO'Q ikkinchi mahsulot
+    # Kalkulyatsiyasi YO'Q ikkinchi ASOSIY mahsulot + qo'shimcha mahsulot
     Session = async_sessionmaker(db_engine, class_=AsyncSession, expire_on_commit=False)
     async with Session() as db:
         other = Product(product_type="main", model="BAZA", kvm=100, year=2026,
                         base_price_usd=Decimal(500), status="active")
-        db.add(other)
+        extra = Product(product_type="additional", name="Ventil (kran)",
+                        base_price_usd=Decimal(10), status="active")
+        db.add_all([other, extra])
         db.add(FinanceTransaction(date=date.today(), type="expense", amount=Decimal(3_000_000),
                                   currency="UZS", status="active"))
         # Bekor qilingan chiqim va USD chiqim — hisobga kirmasligi kerak
@@ -428,11 +430,14 @@ async def test_profit_report(client, db_engine):
                                   currency="USD", status="active"))
         await db.commit()
         await db.refresh(other)
+        await db.refresh(extra)
 
     await _sell(db_engine, product.id, qty=2, total_uzs=24_000_000)
     await _sell(db_engine, other.id, qty=1, total_uzs=6_000_000)
     # Rad etilgan buyurtma — hisobga kirmaydi
     await _sell(db_engine, product.id, qty=5, total_uzs=60_000_000, status="rejected")
+    # Qo'shimcha mahsulot — tannarx yuritilmaydi, hisobotga UMUMAN kirmaydi
+    await _sell(db_engine, extra.id, qty=4, total_uzs=1_200_000)
 
     r = await c.get(f"{API}/profit-report", params={
         "date_from": str(date.today()), "date_to": str(date.today()), "granularity": "day",
@@ -467,6 +472,8 @@ async def test_profit_report(client, db_engine):
     assert row["profit_uzs"] == 21_800_000
     missing = next(x for x in d["products"] if x["product_id"] == str(other.id))
     assert missing["has_recipe"] is False and missing["profit_uzs"] is None
+    # Qo'shimcha mahsulot hech qayerda ko'rinmaydi (tushumga ham qo'shilmagan)
+    assert all(x["product_id"] != str(extra.id) for x in d["products"])
 
     # Dinamika: bugungi nuqtada tushum va tannarx (kalkulyatsiyasizlarsiz)
     today_point = next(p for p in d["trend"] if p["date"] == str(date.today()))
