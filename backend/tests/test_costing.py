@@ -447,13 +447,13 @@ async def test_profit_report(client, db_engine):
 
     assert d["units_sold"] == 3                      # 2 + 1 (rad etilgani emas)
     assert d["revenue_uzs"] == 30_000_000
-    # Sotuv bo'limidagi «Savdo» KPI bilan solishtirish aniq yig'ilishi kerak:
-    # 30 mln (asosiy) + 60 mln (rad etilgan) + 1.2 mln (qo'shimcha) = 91.2 mln
-    assert d["excluded_rejected_uzs"] == 60_000_000
+    # Sotuv bo'limidagi «Savdo» bazasi: rad etilganlarsiz, qo'shimcha bilan —
+    # 30 mln (asosiy) + 1.2 mln (qo'shimcha) = 31.2 mln
     assert d["excluded_additional_uzs"] == 1_200_000
-    assert d["sales_total_uzs"] == 91_200_000
-    assert (d["sales_total_uzs"]
-            == d["revenue_uzs"] + d["excluded_rejected_uzs"] + d["excluded_additional_uzs"])
+    assert d["sales_total_uzs"] == 31_200_000
+    assert d["sales_total_uzs"] == d["revenue_uzs"] + d["excluded_additional_uzs"]
+    # Rad etilgan summa faqat ma'lumot uchun — hech qayerda qo'shilmaydi
+    assert d["excluded_rejected_uzs"] == 60_000_000
     assert d["covered_revenue_uzs"] == 24_000_000    # faqat kalkulyatsiyalisi
     assert d["cogs_uzs"] == 2_200_000                # 2 × 1 100 000
     assert d["gross_profit_uzs"] == 21_800_000

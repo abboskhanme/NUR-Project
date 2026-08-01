@@ -71,11 +71,12 @@ async def build_digest(day: date | None = None) -> DailyDigest:
             db, select(func.count(Order.id)).where(Order.delivered_at == day)))
 
         # --- Savdo tushumi (shu kun, OrderItem.total_uzs) ---
+        # Rad etilgan buyurtma sotuv emas (Sotuv bo'limi bilan bir xil qoida)
         d.revenue_uzs = await _scalar(
             db,
             select(func.coalesce(func.sum(OrderItem.total_uzs), 0))
             .join(Order, Order.id == OrderItem.order_id)
-            .where(Order.order_date == day),
+            .where(and_(Order.order_date == day, Order.status != "rejected")),
         )
 
         # --- Qabul qilingan to'lovlar (zaklad, shu kun) ---
@@ -103,9 +104,16 @@ async def build_digest(day: date | None = None) -> DailyDigest:
             db, select(func.count(Order.id)).where(Order.status.in_(["new", "ready"]))))
 
         # --- Umumiy qarzdorlik (jami savdo - jami to'lov) ---
+        # Rad etilgan buyurtmalar ikkala tomondan ham chiqariladi (aks holda
+        # ularning to'lovi qarzni sun'iy kamaytirib yuboradi)
         total_rev = await _scalar(
-            db, select(func.coalesce(func.sum(OrderItem.total_uzs), 0)))
-        total_paid = await _scalar(db, select(_PAID_EXPR))
+            db, select(func.coalesce(func.sum(OrderItem.total_uzs), 0))
+            .join(Order, Order.id == OrderItem.order_id)
+            .where(Order.status != "rejected"))
+        total_paid = await _scalar(
+            db, select(_PAID_EXPR)
+            .join(Order, Order.id == Payment.order_id)
+            .where(Order.status != "rejected"))
         d.outstanding_uzs = max(Decimal(0), total_rev - total_paid)
 
         # --- Status taqsimoti (shu kun) ---

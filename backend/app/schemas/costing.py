@@ -262,12 +262,12 @@ class ProfitReport(BaseModel):
 
     units_sold: int = 0
     revenue_uzs: float = 0            # asosiy mahsulotlar tushumi (rad etilganlarsiz)
-    # Sotuv bo'limi bilan solishtirish uchun — u yerdagi «Savdo» KPI barcha
-    # buyurtmalarni (rad etilganini ham) va barcha mahsulot turlarini qo'shadi.
-    # sales_total_uzs = revenue_uzs + excluded_rejected_uzs + excluded_additional_uzs
+    # Sotuv bo'limidagi «Savdo» KPI bilan bir xil baza: rad etilganlarsiz, lekin
+    # qo'shimcha mahsulotlar bilan.  sales_total = revenue + excluded_additional
     sales_total_uzs: float = 0
-    excluded_rejected_uzs: float = 0
     excluded_additional_uzs: float = 0
+    # Rad etilganlar ikkala joyda ham hisoblanmaydi — bu faqat ma'lumot uchun
+    excluded_rejected_uzs: float = 0
     covered_revenue_uzs: float = 0    # kalkulyatsiyasi bor mahsulotlar tushumi
     uncovered_revenue_uzs: float = 0  # kalkulyatsiyasizlar tushumi
     uncovered_units: int = 0

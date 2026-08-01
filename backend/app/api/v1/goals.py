@@ -43,7 +43,10 @@ def _pct(actual: float, target: Optional[float]) -> Optional[float]:
 
 async def _current_actuals(db: AsyncSession, month_start: date, today: date) -> tuple[int, float]:
     """Joriy oydagi haqiqiy sotuv soni va tushum (UZS)."""
-    cond = and_(Order.order_date >= month_start, Order.order_date <= today)
+    # Rad etilgan buyurtma sotuv emas — maqsad bajarilishiga qo'shilmaydi
+    # (Sotuv bo'limi va hisobotlar bilan bir xil qoida).
+    cond = and_(Order.order_date >= month_start, Order.order_date <= today,
+                Order.status != "rejected")
     orders = int((await db.execute(
         select(func.count(Order.id)).where(cond)
     )).scalar() or 0)

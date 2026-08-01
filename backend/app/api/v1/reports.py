@@ -39,6 +39,11 @@ from app.models.user import User
 
 router = APIRouter(dependencies=[Depends(module_guard("reports"))])
 
+# Rad etilgan buyurtma SOTUV emas — jami son va summa ko'rsatkichlariga
+# qo'shilmaydi (Sotuv bo'limi, hisobotlar va bosh sahifada bir xil qoida).
+# Uni faqat status kesimi va alohida "rad etilgan" sanog'i ko'rsatadi.
+NOT_REJECTED = Order.status != "rejected"
+
 
 # --------------------------------------------------------------------------- #
 # Helpers
@@ -67,7 +72,8 @@ def _orders_revenue_subq(date_from: date, date_to: date):
     return (
         select(func.coalesce(func.sum(OrderItem.total_uzs), 0))
         .join(Order, Order.id == OrderItem.order_id)
-        .where(and_(Order.order_date >= date_from, Order.order_date <= date_to))
+        .where(and_(Order.order_date >= date_from, Order.order_date <= date_to,
+                    NOT_REJECTED))
     )
 
 
@@ -99,8 +105,10 @@ async def dashboard(
     cur_cond = and_(Order.order_date >= month_start, Order.order_date <= today)
     prev_cond = and_(Order.order_date >= prev_month_start, Order.order_date <= prev_cmp_end)
 
-    orders_total = int(await _scalar(db, select(func.count(Order.id)).where(cur_cond)))
-    orders_prev = int(await _scalar(db, select(func.count(Order.id)).where(prev_cond)))
+    orders_total = int(await _scalar(db, select(func.count(Order.id))
+                                     .where(and_(cur_cond, NOT_REJECTED))))
+    orders_prev = int(await _scalar(db, select(func.count(Order.id))
+                                    .where(and_(prev_cond, NOT_REJECTED))))
     orders_delivered = int(await _scalar(db, select(func.count(Order.id)).where(
         and_(cur_cond, Order.status == "delivered"))))
     delivered_prev = int(await _scalar(db, select(func.count(Order.id)).where(
@@ -214,7 +222,9 @@ async def sales_kpi(
     date_from, date_to = _resolve_range(date_from, date_to, month_start=True)
 
     cond = and_(Order.order_date >= date_from, Order.order_date <= date_to)
-    cnt = int(await _scalar(db, select(func.count(Order.id)).where(cond)))
+    # Umumiy son ham SOTUV soni — rad etilganlar chiqariladi (ular quyida
+    # alohida `orders_rejected` da ko'rinadi). O'rtacha chek shunga bo'linadi.
+    cnt = int(await _scalar(db, select(func.count(Order.id)).where(and_(cond, NOT_REJECTED))))
     delivered = int(await _scalar(db, select(func.count(Order.id))
                                   .where(and_(cond, Order.status == "delivered"))))
     ready = int(await _scalar(db, select(func.count(Order.id))
@@ -247,7 +257,8 @@ async def _daily_revenue(db: AsyncSession, date_from: date, date_to: date) -> li
         select(Order.order_date, func.coalesce(func.sum(OrderItem.total_uzs), 0),
                func.count(func.distinct(Order.id)))
         .join(OrderItem, OrderItem.order_id == Order.id)
-        .where(and_(Order.order_date >= date_from, Order.order_date <= date_to))
+        .where(and_(Order.order_date >= date_from, Order.order_date <= date_to,
+                    NOT_REJECTED))
         .group_by(Order.order_date)
     )).all()
     by_day = {d: (float(t or 0), int(c or 0)) for d, t, c in rows}
@@ -266,7 +277,8 @@ async def _monthly_revenue(db: AsyncSession, date_from: date, date_to: date) -> 
         select(month_col.label("m"), func.coalesce(func.sum(OrderItem.total_uzs), 0),
                func.count(func.distinct(Order.id)))
         .join(OrderItem, OrderItem.order_id == Order.id)
-        .where(and_(Order.order_date >= date_from, Order.order_date <= date_to))
+        .where(and_(Order.order_date >= date_from, Order.order_date <= date_to,
+                    NOT_REJECTED))
         .group_by("m").order_by("m")
     )).all()
     return [
@@ -343,7 +355,8 @@ async def sales_by_model(
         select(Product.model, func.count(OrderItem.id), func.coalesce(func.sum(OrderItem.total_uzs), 0))
         .join(OrderItem, OrderItem.product_id == Product.id)
         .join(Order, Order.id == OrderItem.order_id)
-        .where(and_(Order.order_date >= date_from, Order.order_date <= date_to))
+        .where(and_(Order.order_date >= date_from, Order.order_date <= date_to,
+                    NOT_REJECTED))
         .group_by(Product.model)
         .order_by(func.sum(OrderItem.total_uzs).desc())
     )
@@ -367,7 +380,8 @@ async def sales_by_region(
                func.coalesce(func.sum(OrderItem.total_uzs), 0))
         .join(Order, Order.customer_id == Customer.id)
         .join(OrderItem, OrderItem.order_id == Order.id)
-        .where(and_(Order.order_date >= date_from, Order.order_date <= date_to))
+        .where(and_(Order.order_date >= date_from, Order.order_date <= date_to,
+                    NOT_REJECTED))
         .group_by(Customer.region)
         .order_by(func.sum(OrderItem.total_uzs).desc())
     )
@@ -391,7 +405,8 @@ async def sales_by_seller(
                func.coalesce(func.sum(OrderItem.total_uzs), 0))
         .join(Order, Order.salesperson_id == User.id)
         .join(OrderItem, OrderItem.order_id == Order.id)
-        .where(and_(Order.order_date >= date_from, Order.order_date <= date_to))
+        .where(and_(Order.order_date >= date_from, Order.order_date <= date_to,
+                    NOT_REJECTED))
         .group_by(User.full_name)
         .order_by(func.sum(OrderItem.total_uzs).desc())
     )
@@ -418,7 +433,8 @@ async def sales_by_customer(
                func.coalesce(func.sum(OrderItem.total_uzs), 0))
         .join(Order, Order.customer_id == Customer.id)
         .join(OrderItem, OrderItem.order_id == Order.id)
-        .where(and_(Order.order_date >= date_from, Order.order_date <= date_to))
+        .where(and_(Order.order_date >= date_from, Order.order_date <= date_to,
+                    NOT_REJECTED))
         .group_by(Customer.id, Customer.full_name, Customer.phone)
         .order_by(func.sum(OrderItem.total_uzs).desc())
         .limit(limit)

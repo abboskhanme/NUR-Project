@@ -194,15 +194,13 @@ export default function CostingReport({ range }: { range: DateRange }) {
       </div>
 
       {/* Sotuv bo'limi bilan farqni ochib berish — «nega raqamlar mos emas» */}
-      {d && (d.excluded_rejected_uzs > 0 || d.excluded_additional_uzs > 0) && (
+      {d && d.excluded_additional_uzs > 0 && (
         <p className="text-xs text-ink-soft">
-          Sotuv bo'limidagi «Savdo» — {formatUZS(d.sales_total_uzs)}. Bu hisobotda
-          {d.excluded_rejected_uzs > 0 && <> rad etilgan buyurtmalar
-            ({formatUZS(d.excluded_rejected_uzs)})</>}
-          {d.excluded_rejected_uzs > 0 && d.excluded_additional_uzs > 0 && ' va'}
-          {d.excluded_additional_uzs > 0 && <> qo'shimcha mahsulotlar
-            ({formatUZS(d.excluded_additional_uzs)})</>}
-          {' '}chiqarib tashlangan — qolgani {formatUZS(d.revenue_uzs)}.
+          Sotuv bo'limidagi «Savdo» — {formatUZS(d.sales_total_uzs)}. Bundan
+          qo'shimcha mahsulotlar ({formatUZS(d.excluded_additional_uzs)}) chiqarib
+          tashlangan — qolgani {formatUZS(d.revenue_uzs)}.
+          {d.excluded_rejected_uzs > 0 && <> Rad etilgan buyurtmalar
+            ({formatUZS(d.excluded_rejected_uzs)}) ikkala joyda ham hisoblanmaydi.</>}
         </p>
       )}
 

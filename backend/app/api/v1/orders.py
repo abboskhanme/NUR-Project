@@ -247,14 +247,23 @@ async def sales_summary(
 ):
     paid_expr = func.coalesce(func.sum(func.coalesce(func.nullif(Payment.amount_uzs_equiv, 0), Payment.amount)), 0)
 
+    def _sold_only(q):
+        """Rad etilgan buyurtma SOTUV emas — jami son va summalarga qo'shilmaydi.
+
+        Foydalanuvchi ro'yxatda aynan "Rad etilgan" statusini tanlagan bo'lsa,
+        o'shalarni ko'rmoqchi degani — bunda filtr qo'llanmaydi.
+        """
+        return q if status == "rejected" else q.where(Order.status != "rejected")
+
     async def _period(d_from: Optional[date], d_to: Optional[date]):
         """Berilgan sana oralig'i uchun: status_counts, tushum, to'langan, sotuvchi→son."""
-        base = _apply_filters(select(Order), current, status, salesperson_id,
-                              customer_id, d_from, d_to, search)
+        base = _sold_only(_apply_filters(select(Order), current, status, salesperson_id,
+                                         customer_id, d_from, d_to, search))
         order_ids = select(base.with_only_columns(Order.id).subquery().c.id)
         status_rows = (await db.execute(
-            _apply_filters(select(Order.status, func.count(Order.id)), current, status,
-                           salesperson_id, customer_id, d_from, d_to, search)
+            _sold_only(_apply_filters(
+                select(Order.status, func.count(Order.id)), current, status,
+                salesperson_id, customer_id, d_from, d_to, search))
             .group_by(Order.status)
         )).all()
         st = {s: c for s, c in status_rows}
@@ -262,11 +271,11 @@ async def sales_summary(
             select(func.coalesce(func.sum(OrderItem.total_uzs), 0)).where(OrderItem.order_id.in_(order_ids))
         )).scalar() or Decimal(0)
         paid = (await db.execute(select(paid_expr).where(Payment.order_id.in_(order_ids)))).scalar() or Decimal(0)
-        sp_rows = (await db.execute(_apply_filters(
+        sp_rows = (await db.execute(_sold_only(_apply_filters(
             select(User.id, User.full_name, func.count(Order.id))
             .select_from(Order).join(User, User.id == Order.salesperson_id),
             current, status, salesperson_id, customer_id, d_from, d_to, search,
-        ).group_by(User.id, User.full_name))).all()
+        )).group_by(User.id, User.full_name))).all()
         sp = {i: (n, int(c)) for i, n, c in sp_rows}
         return st, rev, paid, sp
 
@@ -297,8 +306,10 @@ async def sales_summary(
     # "This month" bloki — har doim JORIY kalendar oy (filtrdan qat'i nazar, orqaga moslik)
     today = date.today()
     month_start = today.replace(day=1)
-    month_base = _apply_filters(select(Order), current, status, salesperson_id,
-                                customer_id, None, None, search).where(Order.order_date >= month_start)
+    month_base = _sold_only(
+        _apply_filters(select(Order), current, status, salesperson_id,
+                       customer_id, None, None, search)
+    ).where(Order.order_date >= month_start)
     month_ids = select(month_base.with_only_columns(Order.id).subquery().c.id)
     month_orders = (await db.execute(select(func.count()).select_from(month_base.subquery()))).scalar() or 0
     month_revenue = (await db.execute(
