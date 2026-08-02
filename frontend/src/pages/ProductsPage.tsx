@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Archive, RotateCcw } from 'lucide-react';
 
 import { api } from '@/api/client';
 import Card from '@/components/ui/Card';
@@ -23,6 +23,8 @@ export default function ProductsPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [toDelete, setToDelete] = useState<Product | null>(null);
   const [deleting, setDeleting] = useState(false);
+  // Buyurtmalarda ishlatilgan mahsulot o'chirilmaydi — arxivga o'tadi. Shu yerdan ko'riladi/tiklanadi.
+  const [showArchived, setShowArchived] = useState(false);
 
   const TABS: Array<{ key: ProductType; label: string; hint: string }> = [
     { key: 'main', label: "Asosiy (kotyollar)", hint: "Isitish kotyollari" },
@@ -30,9 +32,14 @@ export default function ProductsPage() {
   ];
 
   const { data, isLoading } = useQuery({
-    queryKey: ['products', tab],
+    queryKey: ['products', tab, showArchived ? 'archived' : 'active'],
     queryFn: () =>
-      api.get('/products', { params: { product_type: tab, page_size: 200 } }).then((r) => r.data),
+      api.get('/products', {
+        params: {
+          product_type: tab, page_size: 200,
+          status: showArchived ? 'archived' : 'active',
+        },
+      }).then((r) => r.data),
   });
   const items: Product[] = data?.items ?? [];
 
@@ -57,6 +64,16 @@ export default function ProductsPage() {
   function openEdit(p: Product) { setEditing(p); setModalOpen(true); }
   function refresh() { qc.invalidateQueries({ queryKey: ['products'] }); }
 
+  async function restore(p: Product) {
+    try {
+      await api.patch(`/products/${p.id}`, { status: 'active' });
+      toast.success('Katalogga qaytarildi');
+      refresh();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || 'Xatolik');
+    }
+  }
+
   async function confirmDelete() {
     if (!toDelete) return;
     setDeleting(true);
@@ -79,9 +96,22 @@ export default function ProductsPage() {
           <h1 className="text-2xl font-bold">Mahsulot katalogi</h1>
           <p className="text-sm text-ink-soft">{active.hint}</p>
         </div>
-        <button className="btn-primary" onClick={openCreate}>
-          <Plus size={16} /> {tab === 'main' ? 'Yangi kotyol' : 'Yangi mahsulot'}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowArchived((v) => !v)}
+            className={
+              'px-3 py-2 text-sm rounded-button border transition-colors ' +
+              (showArchived
+                ? 'border-primary bg-primary/10 text-primary font-medium'
+                : 'border-black/10 text-ink-soft hover:bg-black/5')
+            }>
+            <Archive size={15} className="inline -mt-0.5 mr-1" />
+            Arxiv
+          </button>
+          <button className="btn-primary" onClick={openCreate}>
+            <Plus size={16} /> {tab === 'main' ? 'Yangi kotyol' : 'Yangi mahsulot'}
+          </button>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -106,7 +136,7 @@ export default function ProductsPage() {
           ))}
         </div>
       ) : items.length === 0 ? (
-        <EmptyState title="Mahsulotlar yo'q" />
+        <EmptyState title={showArchived ? "Arxivda mahsulot yo'q" : "Mahsulotlar yo'q"} />
       ) : tab === 'main' ? (
         <div className="space-y-6">
           {sizeGroups.map(({ kvm, rows }) => (
@@ -129,6 +159,7 @@ export default function ProductsPage() {
                       <RowActions
                         onEdit={() => openEdit(p)}
                         onDelete={() => setToDelete(p)}
+                        onRestore={showArchived ? () => restore(p) : undefined}
                         editTooltip="Tahrirlash"
                         deleteTooltip="O'chirish"
                       />
@@ -164,6 +195,7 @@ export default function ProductsPage() {
                     <RowActions
                       onEdit={() => openEdit(p)}
                       onDelete={() => setToDelete(p)}
+                      onRestore={showArchived ? () => restore(p) : undefined}
                       editTooltip="Tahrirlash"
                       deleteTooltip="O'chirish"
                     />
@@ -202,11 +234,13 @@ export default function ProductsPage() {
 function RowActions({
   onEdit,
   onDelete,
+  onRestore,
   editTooltip,
   deleteTooltip,
 }: {
   onEdit: () => void;
   onDelete: () => void;
+  onRestore?: () => void;
   editTooltip: string;
   deleteTooltip: string;
 }) {
@@ -215,9 +249,15 @@ function RowActions({
       <button onClick={onEdit} className="p-1.5 rounded hover:bg-black/5 text-ink-soft" title={editTooltip}>
         <Pencil size={15} />
       </button>
-      <button onClick={onDelete} className="p-1.5 rounded hover:bg-danger/10 text-danger" title={deleteTooltip}>
-        <Trash2 size={15} />
-      </button>
+      {onRestore ? (
+        <button onClick={onRestore} className="p-1.5 rounded hover:bg-primary/10 text-primary" title="Katalogga qaytarish">
+          <RotateCcw size={15} />
+        </button>
+      ) : (
+        <button onClick={onDelete} className="p-1.5 rounded hover:bg-danger/10 text-danger" title={deleteTooltip}>
+          <Trash2 size={15} />
+        </button>
+      )}
     </div>
   );
 }

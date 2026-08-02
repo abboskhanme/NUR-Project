@@ -31,7 +31,12 @@ export interface OrderEditData {
   exchange_rate: string;
   delivery_address?: string | null;
   note?: string | null;
-  items: Array<{ product_id: string; bunker_direction?: string | null; quantity: number; unit_price_usd: string; discount_usd?: string; discount?: string }>;
+  items: Array<{
+    product_id: string; bunker_direction?: string | null; quantity: number;
+    unit_price_usd: string; discount_usd?: string; discount?: string;
+    // Arxivlangan mahsulot katalog ro'yxatiga tushmaydi — nomi shu yerdan olinadi
+    product?: { display_name?: string; model?: string | null; name?: string | null } | null;
+  }>;
 }
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -78,14 +83,23 @@ export default function OrderModal({
   );
   // Dropdown variantlari — rasmi bor mahsulotlar (ayniqsa qo'shimchalar) rasm bilan
   // ko'rsatiladi (dropdownda va tanlangandan keyin trigger'da ham).
-  const productOptions: SelectOption[] = useMemo(
-    () => products.map((p) => ({
+  const productOptions: SelectOption[] = useMemo(() => {
+    const opts: SelectOption[] = products.map((p) => ({
       value: p.id,
       label: p.display_name ?? p.model ?? p.name ?? '—',
       icon: p.has_image ? <ProductThumb id={p.id} hasImage size={26} /> : undefined,
-    })),
-    [products],
-  );
+    }));
+    // Buyurtmadagi arxivlangan mahsulotlar ham ko'rinsin (katalogda yo'q, lekin
+    // buyurtma yozuvi saqlanib qolgan) — aks holda tanlov bo'sh ko'rinadi.
+    for (const it of order?.items ?? []) {
+      if (opts.some((op) => op.value === it.product_id)) continue;
+      const label = it.product
+        ? (it.product.display_name ?? it.product.model ?? it.product.name ?? '—')
+        : it.product_id.slice(0, 8);
+      opts.unshift({ value: it.product_id, label: `${label} (arxiv)` });
+    }
+    return opts;
+  }, [products, order]);
 
   useEffect(() => {
     const esc = (e: KeyboardEvent) => e.key === 'Escape' && onClose();

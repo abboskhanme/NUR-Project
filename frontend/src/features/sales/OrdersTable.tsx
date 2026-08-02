@@ -189,6 +189,19 @@ function Row({
   const mainIdx = Math.max(0, o.items.findIndex((it) => it.product?.product_type !== 'additional'));
   const main: OrderItem | undefined = o.items[mainIdx];
   const isAdditionalMain = main?.product?.product_type === 'additional';
+  // Mahsulot ro'yxati faqat aktiv mahsulotlardan iborat. Agar buyurtmadagi mahsulot
+  // arxivlangan bo'lsa (katalogdan o'chirilgan), tanlov bo'sh ko'rinib qolmasligi
+  // uchun uni ham variant sifatida qo'shamiz — buyurtma ma'lumoti joyida qoladi.
+  const productOptions = (() => {
+    const opts = products.map((p) => ({ value: p.id, label: p.display_name ?? p.model ?? p.name ?? '—' }));
+    if (main && !opts.some((op) => op.value === main.product_id)) {
+      const label = main.product
+        ? (main.product.display_name ?? main.product.model ?? main.product.name ?? '—')
+        : main.product_id.slice(0, 8);
+      opts.unshift({ value: main.product_id, label: `${label} (arxiv)` });
+    }
+    return opts;
+  })();
   const balance = num(o.balance_uzs);
   const locked = o.status === 'delivered';
 
@@ -452,7 +465,7 @@ function Row({
           <CellSelect
             value={main?.product_id ?? ''}
             triggerClassName={inp}
-            options={products.map((p) => ({ value: p.id, label: p.display_name ?? p.model ?? p.name ?? '—' }))}
+            options={productOptions}
             onChange={(v) => {
               const p = products.find((pp) => pp.id === v);
               const items = itemsWith({
