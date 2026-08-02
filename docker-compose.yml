@@ -42,7 +42,10 @@ services:
       DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/nur_erp
       SECRET_KEY: dev-secret-change-me-in-production
       DEBUG: "true"
-      ALLOWED_ORIGINS_STR: "http://localhost:5173,http://127.0.0.1:5173"
+      # Frontend host porti 5174 (5173 boshqa loyiha tomonidan band) — CORS ro'yxati
+      # port bilan mos bo'lishi SHART, aks holda brauzer preflight (OPTIONS) 400 oladi
+      # va login so'rovi umuman ketmaydi. Ikkalasi ham qoldirildi.
+      ALLOWED_ORIGINS_STR: "http://localhost:5174,http://127.0.0.1:5174,http://localhost:5173,http://127.0.0.1:5173"
       INIT_ADMIN_PHONE: "+998901234567"
       INIT_ADMIN_PASSWORD: Admin@12345
       INIT_ADMIN_NAME: Super Admin
@@ -72,13 +75,48 @@ services:
     environment:
       VITE_API_BASE_URL: http://localhost:8011/api/v1
     ports:
-      - "5173:5173"
+      # Host 5174 -> container 5173. 5173 boshqa loyiha (zinnur) tomonidan band
+      # qilingani uchun ziddiyatdan qochamiz — postgres (5434) va backend (8011)
+      # bilan bir xil yondashuv. Lokal sayt: http://localhost:5174
+      - "5174:5173"
     volumes:
       - ./frontend:/app
       - /app/node_modules
     depends_on:
       - backend
     command: npm run dev -- --host 0.0.0.0
+
+  # NUR Agent (Instagram AI sotuv agenti) — ERP'dan ALOHIDA image.
+  # Odatiy `up` da ishga tushmaydi; faqat profil bilan:
+  #   docker compose --profile agent up -d agent agent-redis
+  # Avval agent/.env ni to'ldiring (cp agent/.env.example agent/.env).
+  # Webhook lokal test: ngrok http 8020  -> Meta webhook URL.
+  agent:
+    profiles: ["agent"]
+    build:
+      context: ./agent
+      dockerfile: Dockerfile
+    container_name: nur-agent
+    restart: unless-stopped
+    env_file: ./agent/.env
+    environment:
+      # ERP ichki tarmoq orqali (compose ichida backend:8000)
+      ERP_INGEST_URL: http://backend:8000/api/v1/leads/ingest
+      AGENT_INGEST_KEY: ${AGENT_INGEST_KEY:-dev-agent-key-change-me}
+      REDIS_URL: redis://agent-redis:6379/0
+    ports:
+      - "8020:8000"
+    volumes:
+      - ./agent:/app
+    depends_on:
+      - backend
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  agent-redis:
+    profiles: ["agent"]
+    image: redis:7-alpine
+    container_name: nur-agent-redis
+    restart: unless-stopped
 
   # Telegram bot (dev) — odatiy `up` da ishga tushmaydi; faqat profil bilan:
   #   docker compose --profile bot up -d telegram-bot

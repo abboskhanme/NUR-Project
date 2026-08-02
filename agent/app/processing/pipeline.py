@@ -1,0 +1,167 @@
+"""Pipeline — webhook hodisasidan to javob + lead + bildirishnomagacha.
+
+Har bosqich alohida try/except: biri yiqilsa boshqalari ishlashda davom etadi
+(masalan ERP tushib qolsa ham kommentга javob berilgan bo'ladi).
+"""
+from __future__ import annotations
+
+from loguru import logger
+
+from app.agent.core import SalesAgent
+from app.config import settings
+from app.instagram.client import instagram
+from app.instagram.models import IncomingEvent
+from app.leads import client as leads_client
+from app.models import AgentOutput, LeadPayload
+from app.state.store import store
+from app.telegram import notifier
+
+_agent = SalesAgent()
+
+
+async def process_event(event: IncomingEvent) -> None:
+    # 0. Echo — akkauntimizdan chiqqan xabar. Agar uni bot yubormagan bo'lsa,
+    #    demak operator telefondan qo'lda javob yozdi → bot o'sha suhbatda jim turadi.
+    if event.kind == "echo":
+        await _handle_echo(event)
+        return
+
+    # 1. Dedup — bir xil komment/xabarni takror ishlamaymiz
+    try:
+        if await store.seen_once(event.dedup_key, settings.DEDUP_TTL):
+            logger.info("Dublikat o'tkazib yuborildi: {}", event.dedup_key)
+            return
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Dedup xatosi (davom etamiz): {}", exc)
+
+    # 1b. Operator aralashgan suhbatga bot aralashmaydi
+    if event.kind == "dm":
+        try:
+            if await store.is_paused(event.sender_id):
+                logger.info("Bot pauzada (operator javob bermoqda): {}", event.sender_id)
+                return
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Pauza tekshiruvida xato (davom etamiz): {}", exc)
+
+    notifier.bump("total")
+
+    # 2. Kontekst — DM bo'lsa oldingi suhbat tarixi
+    history: list[dict] = []
+    if event.kind == "dm":
+        try:
+            history = await store.get_history(event.sender_id)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Tarixni olishда xato: {}", exc)
+
+    # 3. AI javobi
+    try:
+        out = await _agent.handle(
+            event.text,
+            is_comment=event.kind == "comment",
+            username=event.username,
+            media_caption=event.media_caption,
+            history=history,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Agent javob berolmadi: {}", exc)
+        return
+
+    logger.info(
+        "Javob tayyor: intent={} score={} hot={} dm={} esc={}\n  ➜ javob: {}",
+        out.intent, out.lead_score, out.is_hot_lead, out.move_to_dm,
+        out.escalate_to_human, out.reply,
+    )
+
+    # 4. Javob yuborish (Instagram)
+    try:
+        await _deliver(event, out)
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Javob yuborishда xato: {}", exc)
+
+    # 5. DM tarixini saqlash
+    if event.kind == "dm":
+        try:
+            await store.append_turn(event.sender_id, "user", event.text)
+            await store.append_turn(event.sender_id, "assistant", out.reply)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Tarixni saqlashда xato: {}", exc)
+
+    # 6. Qaynoq lead → ERP
+    if out.is_hot_lead or out.lead.contact:
+        try:
+            await leads_client.push(_to_payload(event, out))
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Lead ERP'ga yuborishда xato: {}", exc)
+
+    # 7. Telegram bildirishnoma
+    try:
+        if out.is_hot_lead:
+            notifier.bump("hot")
+        if out.escalate_to_human:
+            notifier.bump("escalated")
+        if out.is_hot_lead or out.escalate_to_human:
+            await notifier.notify_hot_lead(event.username, out)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Telegram bildirishnomada xato: {}", exc)
+
+
+async def _handle_echo(event: IncomingEvent) -> None:
+    """Akkauntimizdan chiqqan xabar: bizniki bo'lsa — e'tibor bermaymiz;
+    operator qo'lda yozgan bo'lsa — botni o'sha suhbatda pauza qilamiz."""
+    if not event.sender_id:
+        return
+    try:
+        if await store.was_sent_by_bot(event.sender_id, event.text):
+            return  # bu botning o'z javobi, qaytib kelgan
+        await store.pause(event.sender_id, settings.BOT_PAUSE_HOURS)
+        logger.info(
+            "Operator qo'lda javob berdi — bot {} soat pauzada: {}",
+            settings.BOT_PAUSE_HOURS, event.sender_id,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Echo ishlashда xato: {}", exc)
+
+
+async def _deliver(event: IncomingEvent, out: AgentOutput) -> None:
+    if event.kind == "comment" and event.comment_id:
+        # Ochiq kommentга ≤1 daqiqa javob
+        await instagram.reply_to_comment(event.comment_id, out.reply)
+        # Shaxsiy ma'lumot kerak bo'lsa DM'ga o'tkazamiz (private reply)
+        if out.move_to_dm:
+            text = _with_disclosure(
+                "Salom! Batafsil ma'lumot uchun shu yerda yozib turamiz 👇"
+            )
+            await instagram.send_private_reply(event.comment_id, text)
+            await store.mark_sent(event.sender_id, text)
+    elif event.kind == "dm":
+        text = out.reply
+        # Meta talabi: birinchi xabarda bot ekanini oshkor qilish
+        if not await store.get_history(event.sender_id):
+            text = _with_disclosure(text)
+        await instagram.send_dm(event.sender_id, text)
+        await store.mark_sent(event.sender_id, text)
+
+
+def _with_disclosure(text: str) -> str:
+    """Suhbatning BIRINCHI xabariga bot ekanligini qo'shadi (Meta tavsiyasi)."""
+    return f"{text}\n\n🤖 Men {settings.COMPANY_NAME}ning AI yordamchisiman. Operator kerak bo'lsa yozing — ulaymiz."
+
+
+def _to_payload(event: IncomingEvent, out: AgentOutput) -> LeadPayload:
+    return LeadPayload(
+        source="instagram",
+        ig_user_id=event.sender_id or None,
+        ig_username=event.username,
+        media_id=event.media_id,
+        comment_id=event.comment_id,
+        name=out.lead.name,
+        contact=out.lead.contact,
+        product_interest=out.lead.product_interest,
+        language=out.language,
+        intent=out.intent,
+        lead_score=out.lead_score,
+        summary=out.lead.summary,
+        message_text=event.text,
+        agent_reply=out.reply,
+        extra={"is_hot_lead": out.is_hot_lead, "escalate": out.escalate_to_human},
+    )

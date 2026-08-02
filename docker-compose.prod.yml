@@ -80,6 +80,36 @@ services:
         condition: service_started
     command: ["python", "-m", "app.integrations.telegram"]
 
+  # NUR Agent (Instagram AI sotuv agenti) — ERP'dan ALOHIDA image.
+  # HOZIRCHA "agent" profili ortida — oddiy `up -d` da ishga tushmaydi.
+  # Yoqish (agent/.env to'ldirilgach):
+  #   docker compose -f docker-compose.prod.yml --env-file .env.prod --profile agent up -d --build
+  # Webhook Caddy orqali: https://<DOMAIN>/agent/webhook/instagram
+  agent:
+    profiles: ["agent"]
+    build:
+      context: ./agent
+      dockerfile: Dockerfile
+    container_name: nur-agent
+    restart: unless-stopped
+    env_file: ./agent/.env
+    environment:
+      ERP_INGEST_URL: http://backend:8000/api/v1/leads/ingest
+      REDIS_URL: redis://agent-redis:6379/0
+    expose:
+      - "8000"          # faqat ichki tarmoq (Caddy orqali marshrutlanadi)
+    depends_on:
+      - backend
+      - agent-redis
+
+  agent-redis:
+    profiles: ["agent"]
+    image: redis:7-alpine
+    container_name: nur-agent-redis
+    restart: unless-stopped
+    volumes:
+      - agent_redis_data:/data
+
   frontend:
     build:
       context: ./frontend
@@ -112,3 +142,4 @@ volumes:
   backend_uploads:
   caddy_data:
   caddy_config:
+  agent_redis_data:    # faqat "agent" profili yoqilganda ishlatiladi

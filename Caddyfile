@@ -11,6 +11,13 @@
         reverse_proxy backend:8000
     }
 
+    # NUR Agent (Instagram webhook) — /agent/* -> agent:8000 (prefiks olib tashlanadi).
+    # Meta webhook URL: https://<DOMAIN>/agent/webhook/instagram
+    # Faqat "agent" profili yoqilganda ishlaydi (aks holda 502 — hech kim urmaydi).
+    handle_path /agent/* {
+        reverse_proxy agent:8000
+    }
+
     # Qolgan hamma narsa (React SPA) frontend nginx'ga
     handle {
         reverse_proxy frontend:80

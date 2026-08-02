@@ -1,0 +1,15 @@
+# NUR Agent — Instagram AI sotuv agenti (ERP'dan MUSTAQIL image)
+fastapi>=0.110.0
+uvicorn[standard]>=0.27.0
+pydantic>=2.6.0
+pydantic-settings>=2.2.1
+httpx>=0.27.0
+loguru>=0.7.2
+apscheduler>=3.10.4
+
+# AI provayderlar (ikkalasi ham qo'llab-quvvatlanadi; .env dagi AI_PROVIDER tanlaydi)
+anthropic>=0.116.0          # Claude — jonli sotuvda tavsiya etiladi
+google-genai>=0.3.0         # Gemini — arzon/tez test uchun
+
+# Holat (DM konteksti + dedup). Redis bo'lmasa ichki xotira fallback ishlaydi.
+redis>=5.0.1
