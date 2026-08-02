@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import {
   Plus, Wallet, ArrowDownLeft, ArrowUpRight, Trash2,
   TrendingUp, TrendingDown, Banknote, RefreshCw, ArrowRightLeft,
-  ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight, Pencil,
 } from 'lucide-react';
 
 import { api } from '@/api/client';
@@ -60,6 +60,7 @@ export default function FinancePage() {
   const [txModal, setTxModal] = useState(false);
   const [catModal, setCatModal] = useState(false);
   const [catKind, setCatKind] = useState<'income' | 'expense'>('expense');
+  const [editCat, setEditCat] = useState<Category | null>(null);
   const [rateModal, setRateModal] = useState(false);
   const [transferModal, setTransferModal] = useState(false);
 
@@ -345,7 +346,7 @@ export default function FinancePage() {
               <Plus size={15} /> Qo'shish
             </button>
           }>
-            <CatList items={incomeCats} onDelete={setDelCat} />
+            <CatList items={incomeCats} onEdit={setEditCat} onDelete={setDelCat} />
           </Card>
           <Card title="Chiqim kategoriyalari" action={
             <button className="btn-primary !py-1.5 !text-sm"
@@ -353,7 +354,7 @@ export default function FinancePage() {
               <Plus size={15} /> Qo'shish
             </button>
           }>
-            <CatList items={expenseCats} onDelete={setDelCat} />
+            <CatList items={expenseCats} onEdit={setEditCat} onDelete={setDelCat} />
           </Card>
         </div>
       )}
@@ -405,6 +406,8 @@ export default function FinancePage() {
       {txModal && <TransactionModal onClose={() => setTxModal(false)} onSaved={refreshAll} />}
       {catModal && <CategoryModal defaultKind={catKind} onClose={() => setCatModal(false)}
                      onSaved={() => qc.invalidateQueries({ queryKey: ['categories'] })} />}
+      {editCat && <CategoryModal category={editCat} onClose={() => setEditCat(null)}
+                     onSaved={() => { qc.invalidateQueries({ queryKey: ['categories'] }); refreshAll(); }} />}
       {rateModal && <ExchangeRateModal onClose={() => setRateModal(false)}
                       onSaved={() => qc.invalidateQueries({ queryKey: ['exchange-rates'] })} />}
       {transferModal && <GaznaTransferModal usdBalance={Number(balance.data?.usd ?? 0)}
@@ -420,17 +423,25 @@ export default function FinancePage() {
   );
 }
 
-function CatList({ items, onDelete }: { items: Category[]; onDelete: (c: Category) => void }) {
+function CatList({ items, onEdit, onDelete }: {
+  items: Category[]; onEdit: (c: Category) => void; onDelete: (c: Category) => void;
+}) {
   if (items.length === 0) return <EmptyState title="Kategoriyalar yo'q" />;
   return (
     <div className="space-y-1">
       {items.map((c) => (
         <div key={c.id} className="flex items-center justify-between px-3 py-2 rounded-button hover:bg-black/5 group">
           <span className="text-sm">{c.name}</span>
-          <button onClick={() => onDelete(c)}
-            className="p-1 rounded text-ink-soft/40 hover:text-danger hover:bg-danger/10 opacity-0 group-hover:opacity-100 transition">
-            <Trash2 size={15} />
-          </button>
+          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+            <button onClick={() => onEdit(c)} title="Nomini o'zgartirish"
+              className="p-1 rounded text-ink-soft/40 hover:text-primary hover:bg-primary/10">
+              <Pencil size={15} />
+            </button>
+            <button onClick={() => onDelete(c)} title="O'chirish"
+              className="p-1 rounded text-ink-soft/40 hover:text-danger hover:bg-danger/10">
+              <Trash2 size={15} />
+            </button>
+          </div>
         </div>
       ))}
     </div>

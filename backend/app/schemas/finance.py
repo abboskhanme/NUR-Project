@@ -38,6 +38,10 @@ class CategoryCreate(CategoryBase):
     pass
 
 
+class CategoryUpdate(BaseModel):
+    name: str
+
+
 class CategoryOut(ORMBase):
     id: uuid.UUID
     name: str

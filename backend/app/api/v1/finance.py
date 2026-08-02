@@ -19,7 +19,7 @@ from app.models.hr import Employee, SalaryAdvance
 from app.schemas.common import Page
 from app.schemas.finance import (
     AccountCreate, AccountOut, BalanceSummary,
-    CategoryCreate, CategoryOut,
+    CategoryCreate, CategoryOut, CategoryUpdate,
     DailyAccountRow, DailyReport, DailyRow,
     EmployeePaymentIn,
     ExchangeRateBase, ExchangeRateOut,
@@ -87,6 +87,33 @@ async def create_category(payload: CategoryCreate, db: Annotated[AsyncSession, D
     await db.commit()
     await db.refresh(c)
     return c
+
+
+@router.patch("/categories/{category_id}", response_model=CategoryOut)
+async def update_category(category_id: uuid.UUID, payload: CategoryUpdate,
+                          db: Annotated[AsyncSession, Depends(get_db)]):
+    """Faqat nomini o'zgartiradi — turi (kirim/chiqim) o'zgarmaydi, chunki
+    eski tranzaksiyalar shu kategoriyaga bog'langan."""
+    res = await db.execute(select(FinanceCategory).where(FinanceCategory.id == category_id))
+    cat = res.scalar_one_or_none()
+    if not cat:
+        raise HTTPException(status_code=404, detail="Kategoriya topilmadi")
+    name = payload.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Nomi bo'sh bo'lmasligi kerak")
+    dup = (await db.execute(
+        select(func.count()).select_from(FinanceCategory).where(
+            FinanceCategory.id != category_id,
+            FinanceCategory.kind == cat.kind,
+            func.lower(FinanceCategory.name) == name.lower(),
+        )
+    )).scalar() or 0
+    if dup:
+        raise HTTPException(status_code=400, detail="Bu nomli kategoriya allaqachon mavjud")
+    cat.name = name
+    await db.commit()
+    await db.refresh(cat)
+    return cat
 
 
 @router.delete("/categories/{category_id}", status_code=204)

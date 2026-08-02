@@ -5,10 +5,18 @@ import { X } from 'lucide-react';
 import { api } from '@/api/client';
 
 export default function CategoryModal({
-  defaultKind = 'expense', onClose, onSaved,
-}: { defaultKind?: 'income' | 'expense'; onClose: () => void; onSaved: () => void }) {
-  const [name, setName] = useState('');
-  const [kind, setKind] = useState<'income' | 'expense'>(defaultKind);
+  defaultKind = 'expense', category, onClose, onSaved,
+}: {
+  defaultKind?: 'income' | 'expense';
+  category?: { id: string; name: string; kind: string } | null;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const editing = !!category;
+  const [name, setName] = useState(category?.name ?? '');
+  const [kind, setKind] = useState<'income' | 'expense'>(
+    (category?.kind as 'income' | 'expense') ?? defaultKind,
+  );
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -21,8 +29,13 @@ export default function CategoryModal({
     if (!name.trim()) { toast.error('Nomini kiriting'); return; }
     setSaving(true);
     try {
-      await api.post('/finance/categories', { name: name.trim(), kind });
-      toast.success("Kategoriya qo'shildi");
+      if (editing) {
+        await api.patch(`/finance/categories/${category!.id}`, { name: name.trim() });
+        toast.success("Kategoriya nomi o'zgartirildi");
+      } else {
+        await api.post('/finance/categories', { name: name.trim(), kind });
+        toast.success("Kategoriya qo'shildi");
+      }
       onSaved();
       onClose();
     } catch (e: any) {
@@ -37,24 +50,33 @@ export default function CategoryModal({
       <div className="bg-card rounded-lg shadow-xl w-full max-w-sm overflow-hidden flex flex-col"
            onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3 border-b border-black/5">
-          <h3 className="font-semibold">Yangi kategoriya</h3>
+          <h3 className="font-semibold">{editing ? 'Kategoriyani tahrirlash' : 'Yangi kategoriya'}</h3>
           <button onClick={onClose} className="p-1 rounded hover:bg-black/5"><X size={18} /></button>
         </div>
         <div className="p-5 space-y-3">
           <div>
             <label className="label">Turi</label>
-            <div className="grid grid-cols-2 gap-2">
-              <button type="button" onClick={() => setKind('income')}
-                className={`py-2 rounded-button border text-sm font-medium ${
-                  kind === 'income' ? 'border-success bg-success/10 text-success' : 'border-black/10 text-ink-soft hover:bg-black/5'}`}>
-                Kirim
-              </button>
-              <button type="button" onClick={() => setKind('expense')}
-                className={`py-2 rounded-button border text-sm font-medium ${
-                  kind === 'expense' ? 'border-danger bg-danger/10 text-danger' : 'border-black/10 text-ink-soft hover:bg-black/5'}`}>
-                Chiqim
-              </button>
-            </div>
+            {editing ? (
+              <div className="text-sm">
+                <span className={`badge ${kind === 'income' ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'}`}>
+                  {kind === 'income' ? 'Kirim' : 'Chiqim'}
+                </span>
+                <span className="ml-2 text-xs text-ink-soft">Turi o'zgartirilmaydi</span>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button" onClick={() => setKind('income')}
+                  className={`py-2 rounded-button border text-sm font-medium ${
+                    kind === 'income' ? 'border-success bg-success/10 text-success' : 'border-black/10 text-ink-soft hover:bg-black/5'}`}>
+                  Kirim
+                </button>
+                <button type="button" onClick={() => setKind('expense')}
+                  className={`py-2 rounded-button border text-sm font-medium ${
+                    kind === 'expense' ? 'border-danger bg-danger/10 text-danger' : 'border-black/10 text-ink-soft hover:bg-black/5'}`}>
+                  Chiqim
+                </button>
+              </div>
+            )}
           </div>
           <div>
             <label className="label">Nomi *</label>
