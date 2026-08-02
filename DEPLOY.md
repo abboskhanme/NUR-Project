@@ -24,7 +24,7 @@ Stack: FastAPI (backend) + React/Vite (frontend) + PostgreSQL — hammasi bir se
 
 ## 0. Sizga kerak bo'ladi
 - DigitalOcean akkaunti ($5 kredit ko'rinib turibdi).
-- Domen (bor dedingiz) — masalan `nurtechno.uz`. ERP'ni `erp.nurtechno.uz` subdomeniga qo'yamiz.
+- Domen: **nurtechnogroup.uz** (DNS Eskiz.uz da). ERP manzili: `www.nurtechnogroup.uz` (DNS allaqachon serverga qaragan).
 - GitHub repo: `github.com/abboskhanme/NUR-Project` (bor).
 
 ---
@@ -63,20 +63,31 @@ git push origin main
 
 ---
 
-## 3. (IXTIYORIY) Domenni serverga yo'naltirish (DNS)
+## 3. Domen (DNS) — allaqachon tayyor
 
-**Domensiz boshlasangiz bu qadamni o'tkazib yuboring** — sayt to'g'ridan-to'g'ri
-`http://SERVER_IP` orqali ochiladi (`.env.prod` da `DOMAIN=:80`).
+Domen: **nurtechnogroup.uz**, DNS **Eskiz.uz** panelida (`ns1.eskiz.uz` / `ns2.eskiz.uz`).
 
-Keyinroq domen qo'shganda: domen panelida (yoki DigitalOcean → Networking → Domains) **A record** qo'shing:
+ERP manzili: **`www.nurtechnogroup.uz`** — u DNS'da allaqachon droplet IP'ga qaragan:
 
-| Type | Host | Value (IP)        |
-|------|------|-------------------|
-| A    | erp  | 209.38.218.18     |
+```bash
+dig +short www.nurtechnogroup.uz     # 209.38.218.18
+```
 
-Ya'ni `erp.nurtechno.uz` → droplet IP. So'ng `.env.prod` da `DOMAIN=erp.nurtechno.uz`
-qilib, `docker compose ... up -d` qayta ishga tushiring — Caddy avtomatik HTTPS oladi.
-DNS tarqalishi 5–30 daqiqa oladi.
+Ya'ni **DNS'da yangi yozuv qo'shish shart emas.** Faqat `.env.prod` da
+`DOMAIN=www.nurtechnogroup.uz` qilib qo'ysangiz, Caddy 1–2 daqiqada Let's Encrypt
+sertifikatini avtomatik oladi (80 va 443 portlar ochiq bo'lishi shart — 4-bo'limda).
+
+### Ixtiyoriy: apex (`nurtechnogroup.uz`) tozalash
+
+Apex hozir **Bubble.io** ga qaragan (4 ta Cloudflare IP) va ishlamayapti.
+Kerak bo'lmasa, o'sha 4 ta A yozuvni o'chirib tashlash mumkin — `www` ga
+ta'sir qilmaydi, chunki u alohida yozuv.
+
+> Apex A yozuvi o'chsa, unga bog'liq `MX` (pochta), `mail` va `ftp` CNAME'lari
+> ham ishlamay qoladi. Pochtadan foydalanmasangiz muammo emas.
+
+Qolgan yozuvlar (`cpanel`, `webmail`, `whm`, `webdisk`, `autoconfig` va h.k.)
+Eskiz hostingniki — ular `www` ga aloqador emas, tegmasa ham bo'ladi.
 
 ---
 
@@ -134,7 +145,7 @@ nano .env.prod
 
 Quyidagilarni to'ldiring:
 
-- **`DOMAIN`** → domensiz boshlasangiz `:80` qoldiring (sayt `http://SERVER_IP` da ochiladi). Domen bor bo'lsa: `erp.nurtechno.uz`.
+- **`DOMAIN`** → domensiz boshlasangiz `:80` qoldiring (sayt `http://SERVER_IP` da ochiladi). Domen bor bo'lsa: `www.nurtechnogroup.uz`.
 - **`POSTGRES_PASSWORD`** → kuchli parol. Yaratish: `openssl rand -hex 16`
 - **`DATABASE_URL`** → yuqoridagi parol bilan **bir xil** bo'lsin:
   `postgresql+asyncpg://postgres:O'SHA_PAROL@postgres:5432/nur_erp`
@@ -165,7 +176,7 @@ Quyidagilarni ko'rsangiz tayyor:
 
 Endi brauzerda oching:
 - domensiz: **http://209.38.218.18**
-- domen bilan: **https://erp.nurtechno.uz**
+- domen bilan: **https://www.nurtechnogroup.uz**
 
 Login: `.env.prod` dagi `INIT_ADMIN_EMAIL` / `INIT_ADMIN_PASSWORD`.
 API hujjatlar: `/api/docs` (masalan `http://209.38.218.18/api/docs`)
@@ -179,7 +190,7 @@ API hujjatlar: `/api/docs` (masalan `http://209.38.218.18/api/docs`)
 docker compose -f docker-compose.prod.yml ps
 
 # Backend sog'ligi
-curl https://erp.nurtechno.uz/health
+curl https://www.nurtechnogroup.uz/health
 # {"status":"ok"} qaytishi kerak
 ```
 
@@ -256,7 +267,7 @@ gunzip < /opt/backups/nur_erp_2026-06-03_0300.sql.gz | docker exec -i nur-postgr
 
 ## Muammolar (troubleshooting)
 
-- **Sayt ochilmayapti / SSL xatosi** → DNS hali tarqalmagan bo'lishi mumkin. `dig erp.nurtechno.uz` bilan IP to'g'ri ko'rsatayotganini tekshiring. Caddy loglarini ko'ring.
+- **Sayt ochilmayapti / SSL xatosi** → DNS hali tarqalmagan bo'lishi mumkin. `dig www.nurtechnogroup.uz` bilan IP to'g'ri ko'rsatayotganini tekshiring. Caddy loglarini ko'ring.
 - **Backend bazaga ulanmayapti** → `.env.prod` da `POSTGRES_PASSWORD` va `DATABASE_URL` dagi parol **bir xil** ekanini, `DATABASE_URL` da `+asyncpg` va `@postgres:5432` borligini tekshiring. `logs -f postgres` ko'ring.
 - **502 Bad Gateway** → backend hali ishga tushmagan yoki seed xato bergan. `logs -f backend` ko'ring.
 - **Frontend "Network Error"** → frontend `/api/v1` nisbiy yo'ldan foydalanadi; Caddy `/api/*` ni backendga uzatayotganini tekshiring.
