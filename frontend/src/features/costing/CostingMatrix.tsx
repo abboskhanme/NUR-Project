@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { Save, Info, RotateCcw } from 'lucide-react';
@@ -6,6 +6,7 @@ import { Save, Info, RotateCcw } from 'lucide-react';
 import { api } from '@/api/client';
 import Card from '@/components/ui/Card';
 import EmptyState from '@/components/ui/EmptyState';
+import StickyScrollbar from '@/components/ui/StickyScrollbar';
 import { formatMoney, formatQty } from '@/lib/format';
 import { cn } from '@/lib/cn';
 import type { MaterialOption } from '@/features/costing/types';
@@ -51,6 +52,10 @@ export default function CostingMatrix({ canWrite }: { canWrite: boolean }) {
 
   const [draft, setDraft] = useState<CellMap>({});
   const [saving, setSaving] = useState(false);
+
+  // Gorizontal scrollbar jadval tepasida turadi (pastdagisi yashirilgan) va
+  // sahifa aylantirilganda ham ko'rinib turadi — StickyScrollbar.
+  const bodyScrollRef = useRef<HTMLDivElement>(null);
 
   // Serverdan kelgan qiymatlarni tahrirlash holatiga ochamiz
   const serverCells = useMemo<CellMap>(() => {
@@ -168,7 +173,11 @@ export default function CostingMatrix({ canWrite }: { canWrite: boolean }) {
           )}
         </div>
 
-        <div className="overflow-x-auto">
+        {/* Gorizontal scrollbar jadval tepasida, doim ko'rinadi va sahifa
+            aylantirilganda joyida qotib turadi */}
+        <StickyScrollbar targetRef={bodyScrollRef} className="sticky top-16 z-20 bg-card py-1.5" />
+
+        <div ref={bodyScrollRef} className="overflow-x-auto no-scrollbar-x">
           <table className="text-sm border-separate border-spacing-0">
             <thead>
               <tr>
