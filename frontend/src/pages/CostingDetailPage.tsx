@@ -130,6 +130,13 @@ export default function CostingDetailPage() {
   const patch = (key: string, next: Partial<EditRow>) =>
     setRows((prev) => prev.map((r) => (r.key === key ? { ...r, ...next } : r)));
 
+  // Bir material faqat bitta satrda bo'ladi — tanlanganlari boshqa satrlarning
+  // dropdown'ida ko'rinmaydi (o'z satridagi tanlov, albatta, qoladi).
+  const takenMaterialIds = useMemo(
+    () => new Set(rows.filter((r) => r.kind === 'material' && r.material_id).map((r) => r.material_id!)),
+    [rows],
+  );
+
   const addMaterial = () => setRows((p) => [...p, {
     key: newKey(), kind: 'material', material_id: null, label: '', mode: 'qty',
     qty: '1', amount: 0, unit: '', manual: false, unit_price: 0, currency: 'UZS',
@@ -141,10 +148,18 @@ export default function CostingDetailPage() {
 
   async function handleSave() {
     // Tekshiruv: material tanlanmagan yoki xarajat nomi bo'sh satrlar
+    const seenMaterials = new Set<string>();
     for (const r of rows) {
       if (r.kind === 'material' && !r.material_id) {
         toast.error('Har bir material satrida material tanlangan bo\'lishi kerak');
         return;
+      }
+      if (r.kind === 'material' && r.material_id) {
+        if (seenMaterials.has(r.material_id)) {
+          toast.error(`«${matById[r.material_id]?.name ?? r.label}» ikki marta kiritilgan — ortiqcha satrni o'chiring`);
+          return;
+        }
+        seenMaterials.add(r.material_id);
       }
       if (r.kind === 'expense' && !r.label.trim()) {
         toast.error('Xarajat satrida nom kiriting');
@@ -260,6 +275,7 @@ export default function CostingDetailPage() {
               )}
               {rows.map((r) => r.kind !== 'material' ? null : (
                 <MaterialRow key={r.key} row={r} materials={materials} matById={matById}
+                             takenIds={takenMaterialIds}
                              rate={rate} canWrite={canWrite}
                              lineUzs={lineUzs(r)}
                              onPatch={(next) => patch(r.key, next)}
@@ -269,7 +285,10 @@ export default function CostingDetailPage() {
             </div>
             {canWrite && (
               <button onClick={addMaterial}
-                      className="mt-3 inline-flex items-center gap-1.5 px-3 py-2 rounded-button text-sm font-medium bg-primary/10 text-primary hover:bg-primary/20 transition">
+                      disabled={materials.length > 0 && takenMaterialIds.size >= materials.length}
+                      title={materials.length > 0 && takenMaterialIds.size >= materials.length
+                        ? 'Katalogdagi barcha materiallar qo\'shilgan' : undefined}
+                      className="mt-3 inline-flex items-center gap-1.5 px-3 py-2 rounded-button text-sm font-medium bg-primary/10 text-primary hover:bg-primary/20 transition disabled:opacity-40 disabled:hover:bg-primary/10">
                 <PackagePlus size={15} /> Material qo'shish
               </button>
             )}
@@ -426,10 +445,11 @@ function Line({ label, value }: { label: string; value: string }) {
  *   qty — Miqdor + Narx (narx katalogdan jonli, qulf bilan qotirish mumkin)
  *   sum — bitta «Summa» maydoni ("50 ming so'mlik kraska sepildi")
  */
-function MaterialRow({ row, materials, matById, rate, canWrite, lineUzs, onPatch, onRemove, onAddMaterial }: {
+function MaterialRow({ row, materials, matById, takenIds, rate, canWrite, lineUzs, onPatch, onRemove, onAddMaterial }: {
   row: EditRow;
   materials: MaterialOption[];
   matById: Record<string, MaterialOption>;
+  takenIds: Set<string>;
   rate: number;
   canWrite: boolean;
   lineUzs: number;
@@ -463,7 +483,8 @@ function MaterialRow({ row, materials, matById, rate, canWrite, lineUzs, onPatch
                       });
                     }}>
               <option value="">— tanlang —</option>
-              {materials.map((m) => (
+              {/* Boshqa satrlarda tanlangan materiallar ro'yxatda ko'rinmaydi */}
+              {materials.filter((m) => m.id === row.material_id || !takenIds.has(m.id)).map((m) => (
                 <option key={m.id} value={m.id}>
                   {m.name}
                   {`${m.unit ? ` (${UNIT_LABEL[m.unit] ?? m.unit})` : ''} — ${m.currency === 'USD' ? `$${m.unit_price}` : `${m.unit_price} so'm`}`}

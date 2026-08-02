@@ -512,6 +512,8 @@ async def save_product_cost(
     await db.flush()
 
     new_items: list[ProductRecipeItem] = []
+    # Bir mahsulot tarkibida bitta material faqat bir marta bo'ladi
+    seen_materials: set[uuid.UUID] = set()
     for idx, row in enumerate(payload.items):
         if row.kind == "material":
             if row.material_id is None:
@@ -521,6 +523,11 @@ async def save_product_cost(
             )).scalar_one_or_none()
             if mat is None:
                 raise HTTPException(422, "Tanlangan material katalogda topilmadi")
+            if row.material_id in seen_materials:
+                raise HTTPException(
+                    422, f"«{mat.name}» materiali bir necha marta kiritilgan — "
+                         "har bir material bitta satrda bo'lishi kerak")
+            seen_materials.add(row.material_id)
             label = row.label or mat.name
             unit = row.unit or mat.unit
             currency = mat.currency if row.unit_price is None else row.currency
