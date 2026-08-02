@@ -25,6 +25,7 @@ from app.api.v1 import (
     production,
     goals,
     leads,
+    system_settings,
 )
 
 api_router = APIRouter()
@@ -52,3 +53,5 @@ api_router.include_router(production.router, prefix="/production", tags=["Produc
 api_router.include_router(goals.router, prefix="/goals", tags=["Goals / Oylik maqsadlar"])
 api_router.include_router(leads.router, prefix="/leads", tags=["Leads / Marketing"])
 api_router.include_router(leads.ingest_router, prefix="/leads", tags=["Leads / Marketing"])
+api_router.include_router(system_settings.router, prefix="/system-settings", tags=["System Settings"])
+api_router.include_router(system_settings.agent_router, prefix="/system-settings", tags=["System Settings"])

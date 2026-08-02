@@ -30,6 +30,7 @@ import EmployeeDetailPage from '@/pages/EmployeeDetailPage';
 import TaminotPage from '@/pages/TaminotPage';
 import ReportsPage from '@/pages/ReportsPage';
 import SettingsPage from '@/pages/SettingsPage';
+import SystemSettingsPage from '@/pages/SystemSettingsPage';
 import UsersPage from '@/pages/UsersPage';
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -42,6 +43,13 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 function RequireModule({ module, children }: { module: string; children: React.ReactNode }) {
   const { canModule } = usePermissions();
   if (!canModule(module)) return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
+
+/** Faqat super-admin uchun (tizim sozlamalari — maxfiy kalitlar). */
+function RequireSuperadmin({ children }: { children: React.ReactNode }) {
+  const { isSuperadmin } = usePermissions();
+  if (!isSuperadmin) return <Navigate to="/settings" replace />;
   return <>{children}</>;
 }
 
@@ -131,6 +139,7 @@ export default function App() {
         <Route path="supply/:scope" element={<RequireTaminot><TaminotPage /></RequireTaminot>} />
         <Route path="reports" element={<RequireModule module="reports"><ReportsPage /></RequireModule>} />
         <Route path="settings" element={<SettingsPage />} />
+        <Route path="system-settings" element={<RequireSuperadmin><SystemSettingsPage /></RequireSuperadmin>} />
         <Route path="users" element={<RequireModule module="users"><UsersPage /></RequireModule>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

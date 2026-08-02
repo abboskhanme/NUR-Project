@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, ShoppingCart, Users, Package, Wrench, Wallet,
   UserSquare2, Truck, BarChart3, Settings, ShieldCheck, ListOrdered, Warehouse,
-  Coins, PackageOpen, Factory, Building2, Globe, Target, Sparkles, Calculator,
+  Coins, PackageOpen, Factory, Building2, Globe, Target, Sparkles, ServerCog, Calculator,
   type LucideIcon,
 } from 'lucide-react';
 import { usePermissions } from '@/lib/permissions';
@@ -11,6 +11,7 @@ export interface NavItem {
   label: string;
   icon: LucideIcon;
   module?: string;   // ruxsat tekshiriladigan modul (yo'q bo'lsa — hammaga ko'rinadi)
+  superadmin?: boolean;  // faqat super-admin ko'radi
   exact?: boolean;
   children?: NavItem[];  // quyi-menyu (masalan: Ta'minot → Ichki / Tashqi)
 }
@@ -22,7 +23,7 @@ export interface NavItem {
  * Foydalanuvchining ruxsati bo'yicha avtomatik filtrlanadi.
  */
 export function useNavItems(): NavItem[] {
-  const { canModule } = usePermissions();
+  const { canModule, isSuperadmin } = usePermissions();
   const items: NavItem[] = [
     { to: '/', label: 'Bosh sahifa', icon: LayoutDashboard, exact: true, module: 'reports' },
     { to: '/targets', label: 'Maqsadlar', icon: Target, module: 'targets' },
@@ -46,8 +47,10 @@ export function useNavItems(): NavItem[] {
     { to: '/reports', label: 'Hisobotlar', icon: BarChart3, module: 'reports' },
     { to: '/users', label: 'Foydalanuvchilar', icon: ShieldCheck, module: 'users' },
     { to: '/settings', label: 'Sozlamalar', icon: Settings },
+    { to: '/system-settings', label: 'Tizim sozlamalari', icon: ServerCog, superadmin: true },
   ];
-  const visible = (it: NavItem) => !it.module || canModule(it.module);
+  const visible = (it: NavItem) =>
+    (!it.module || canModule(it.module)) && (!it.superadmin || isSuperadmin);
   return items
     .map((it) => (it.children ? { ...it, children: it.children.filter(visible) } : it))
     // Quyi-menyu: kamida bitta ko'rinadigan bola bo'lsa otani ko'rsatamiz

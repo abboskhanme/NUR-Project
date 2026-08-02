@@ -9,6 +9,7 @@ from slowapi.middleware import SlowAPIMiddleware
 
 from app.api.v1 import api_router
 from app.core.config import settings
+from app.core.crypto import encrypt_existing_secrets
 from app.core.exceptions import global_exception_handler, rate_limit_handler
 from app.core.limiter import limiter
 
@@ -19,6 +20,12 @@ async def lifespan(app: FastAPI):
     # Xavfsizlik sozlamalarini tekshirish (production'da xato ko'taradi)
     for warning in settings.validate_security():
         logger.warning(f"[security] {warning}")
+    # Tizim sozlamalaridagi eski (shifrlanmagan) sirlarni shifrlab qo'yamiz.
+    # Idempotent; xato bo'lsa ilova baribir ko'tariladi.
+    try:
+        await encrypt_existing_secrets()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(f"[security] sirlarni shifrlash o'tkazib yuborildi: {exc}")
     yield
     logger.info(f"[{settings.APP_NAME}] shutting down")
 
