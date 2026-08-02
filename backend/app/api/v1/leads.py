@@ -28,9 +28,11 @@ from app.schemas.lead import (
     LeadAnalytics,
     LeadConvert,
     LeadDetailOut,
+    LeadEventOut,
     LeadIngest,
     LeadIngestResult,
     LeadNamedCount,
+    LeadNoteIn,
     LeadOut,
     LeadStatusCount,
     LeadUpdate,
@@ -241,6 +243,31 @@ async def delete_lead(
     await db.commit()
 
 
+@router.post("/{lead_id}/notes", response_model=LeadEventOut, status_code=201)
+async def add_note(
+    lead_id: uuid.UUID,
+    payload: LeadNoteIn,
+    user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Bog'lanish jurnaliga izoh qo'shadi (tarix — bir necha marta yozish mumkin)."""
+    lead = await _get_lead(db, lead_id)
+    text = (payload.text or "").strip()
+    if not text:
+        raise HTTPException(400, "Izoh bo'sh bo'lishi mumkin emas")
+    event = LeadEvent(
+        lead_id=lead.id,
+        kind="note",
+        message_text=text,
+        actor="user",
+        meta={"by": str(user.id), "by_name": user.full_name},
+    )
+    db.add(event)
+    await db.commit()
+    await db.refresh(event)
+    return event
+
+
 @router.post("/{lead_id}/convert", response_model=LeadOut)
 async def convert_lead(
     lead_id: uuid.UUID,
@@ -267,16 +294,19 @@ async def convert_lead(
         region=payload.region,
         source="instagram",
         note=payload.note or lead.summary,
-        created_by_id=user.id,
+        created_by_id=user.id,  # mijozni aylantirgan operator — sotuvchi/egasi
     )
     db.add(customer)
     await db.flush()  # customer.id kerak
 
     lead.customer_id = customer.id
     lead.status = "won"
+    # Leadни ham shu operatorga biriktiramiz (uning akkountiga bog'lanadi)
+    lead.assigned_to_id = user.id
     db.add(LeadEvent(
         lead_id=lead.id, kind="status", actor="user",
-        meta={"to": "won", "customer_id": str(customer.id), "by": str(user.id)},
+        meta={"to": "won", "customer_id": str(customer.id), "by": str(user.id),
+              "by_name": user.full_name},
     ))
     await db.commit()
     await db.refresh(lead)

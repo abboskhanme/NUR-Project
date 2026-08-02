@@ -34,6 +34,7 @@ export interface LeadEvent {
   message_text?: string | null;
   agent_reply?: string | null;
   actor: string;
+  meta?: Record<string, any>;
   created_at: string;
 }
 
@@ -103,6 +104,8 @@ export const leadsApi = {
     api.get<{ id: string; full_name: string }[]>('/leads/assignees').then((r) => r.data),
   update: (id: string, body: Partial<Pick<Lead, 'status' | 'assigned_to_id' | 'note' | 'lead_score'>>) =>
     api.patch<Lead>(`/leads/${id}`, body).then((r) => r.data),
+  addNote: (id: string, text: string) =>
+    api.post<LeadEvent>(`/leads/${id}/notes`, { text }).then((r) => r.data),
   remove: (id: string) => api.delete(`/leads/${id}`),
   convert: (id: string, body: { full_name?: string; phone?: string; region?: string; note?: string }) =>
     api.post<Lead>(`/leads/${id}/convert`, body).then((r) => r.data),

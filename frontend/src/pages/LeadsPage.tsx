@@ -1,25 +1,55 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
 import {
-  Search, Sparkles, Flame, TrendingUp, CalendarPlus, Instagram, MessageCircle,
+  Search, Sparkles, Flame, TrendingUp, CalendarPlus, Instagram, MessageCircle, Phone,
 } from 'lucide-react';
 
-import Card from '@/components/ui/Card';
 import EmptyState from '@/components/ui/EmptyState';
-import { formatDate } from '@/lib/format';
+import { cn } from '@/lib/cn';
+import { formatDate, formatPhone } from '@/lib/format';
+import { usePermissions } from '@/lib/permissions';
 import {
-  leadsApi, LEAD_STATUS_LABELS, LEAD_STATUS_ORDER, LANG_LABELS,
+  leadsApi, LEAD_STATUS_LABELS, LEAD_STATUS_ORDER,
   type Lead, type LeadStatus,
 } from '@/features/leads/api';
-import { LeadStatusBadge, ScoreBadge } from '@/features/leads/LeadBadges';
+import { ScoreBadge } from '@/features/leads/LeadBadges';
 
-type Tab = 'all' | LeadStatus;
+// Ustun rang mavzusi — har status sezilarli darajada ajralib tursin
+interface ColTheme { header: string; body: string; border: string; dot: string; count: string; ring: string; }
+const COL_THEME: Record<LeadStatus, ColTheme> = {
+  new: {
+    header: 'bg-blue-100 text-blue-800', body: 'bg-blue-50/60', border: 'border-blue-200',
+    dot: 'bg-blue-500', count: 'bg-blue-200/70 text-blue-800', ring: 'ring-blue-400',
+  },
+  contacted: {
+    header: 'bg-amber-100 text-amber-800', body: 'bg-amber-50/60', border: 'border-amber-200',
+    dot: 'bg-amber-500', count: 'bg-amber-200/70 text-amber-800', ring: 'ring-amber-400',
+  },
+  qualified: {
+    header: 'bg-violet-100 text-violet-800', body: 'bg-violet-50/60', border: 'border-violet-200',
+    dot: 'bg-violet-500', count: 'bg-violet-200/70 text-violet-800', ring: 'ring-violet-400',
+  },
+  won: {
+    header: 'bg-emerald-100 text-emerald-800', body: 'bg-emerald-50/60', border: 'border-emerald-200',
+    dot: 'bg-emerald-500', count: 'bg-emerald-200/70 text-emerald-800', ring: 'ring-emerald-400',
+  },
+  lost: {
+    header: 'bg-slate-200 text-slate-700', body: 'bg-slate-100/70', border: 'border-slate-300',
+    dot: 'bg-slate-400', count: 'bg-slate-300/70 text-slate-700', ring: 'ring-slate-400',
+  },
+};
 
 export default function LeadsPage() {
   const navigate = useNavigate();
-  const [tab, setTab] = useState<Tab>('all');
+  const qc = useQueryClient();
+  const { can } = usePermissions();
+  const canWrite = can('leads:write');
+
   const [search, setSearch] = useState('');
+  const [overCol, setOverCol] = useState<LeadStatus | null>(null);
+  const dragging = useRef<{ id: string; status: LeadStatus } | null>(null);
 
   const analyticsQ = useQuery({
     queryKey: ['leads-analytics'],
@@ -27,26 +57,54 @@ export default function LeadsPage() {
   });
 
   const leadsQ = useQuery({
-    queryKey: ['leads', tab, search],
-    queryFn: () => leadsApi.list({ status: tab, search: search.trim() || undefined }),
+    queryKey: ['leads', 'board', search],
+    queryFn: () => leadsApi.list({ status: 'all', search: search.trim() || undefined }),
   });
   const leads = leadsQ.data ?? [];
   const a = analyticsQ.data;
 
-  // Har status bo'yicha son (tab yorliqlarida ko'rsatish uchun)
-  const statusCount: Record<string, number> = {};
-  a?.by_status.forEach((s) => { statusCount[s.status] = s.count; });
+  // Statusni o'zgartirish — optimistik (karta darrov ustunni almashtiradi)
+  const move = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: LeadStatus }) =>
+      leadsApi.update(id, { status }),
+    onMutate: async ({ id, status }) => {
+      await qc.cancelQueries({ queryKey: ['leads'] });
+      const prev = qc.getQueriesData<Lead[]>({ queryKey: ['leads'] });
+      qc.setQueriesData<Lead[]>({ queryKey: ['leads'] }, (old) =>
+        old?.map((l) => (l.id === id ? { ...l, status } : l)));
+      return { prev };
+    },
+    onError: (_e, _v, ctx) => {
+      ctx?.prev?.forEach(([key, data]) => qc.setQueryData(key, data));
+      toast.error("Statusni o'zgartirib bo'lmadi");
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ['leads'] });
+      qc.invalidateQueries({ queryKey: ['leads-analytics'] });
+    },
+  });
+
+  // Statusga ko'ra guruhlash
+  const byStatus: Record<LeadStatus, Lead[]> = {
+    new: [], contacted: [], qualified: [], won: [], lost: [],
+  };
+  for (const l of leads) (byStatus[l.status] ?? byStatus.new).push(l);
+
+  function handleDrop(status: LeadStatus) {
+    const d = dragging.current;
+    dragging.current = null;
+    setOverCol(null);
+    if (d && d.status !== status) move.mutate({ id: d.id, status });
+  }
 
   return (
     <div className="space-y-4">
       {/* Sarlavha */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Sparkles size={22} className="text-primary" /> Leadlar
-          </h1>
-          <p className="text-sm text-ink-soft">Instagram AI agenti topgan potentsial mijozlar</p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold flex items-center gap-2">
+          <Sparkles size={22} className="text-primary" /> Leadlar
+        </h1>
+        <p className="text-sm text-ink-soft">Instagram AI agenti topgan potentsial mijozlar</p>
       </div>
 
       {/* KPI kartalari */}
@@ -61,117 +119,177 @@ export default function LeadsPage() {
                  hint={`O'rtacha ball: ${a?.avg_score ?? 0}`} icon={<TrendingUp size={18} />} />
       </div>
 
-      {/* Tab + qidiruv */}
+      {/* Qidiruv */}
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex gap-1.5 flex-wrap">
-          <TabButton active={tab === 'all'} onClick={() => setTab('all')}
-                     label="Barchasi" count={a?.total} />
-          {LEAD_STATUS_ORDER.map((st) => (
-            <TabButton key={st} active={tab === st} onClick={() => setTab(st)}
-                       label={LEAD_STATUS_LABELS[st]} count={statusCount[st]} />
-          ))}
-        </div>
         <div className="relative">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft" />
           <input className="input pl-9 w-60" placeholder="Ism, username, mahsulot..."
                  value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
+        {canWrite && (
+          <span className="text-xs text-ink-soft">
+            Kartani ustundan ustunga sudrab statusini o'zgartiring
+          </span>
+        )}
       </div>
 
-      {/* Jadval */}
-      <Card>
-        {leadsQ.isLoading ? (
-          <div className="space-y-2">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="h-14 rounded-button bg-black/5 animate-pulse" />
-            ))}
-          </div>
-        ) : leads.length === 0 ? (
-          <EmptyState
-            title={search || tab !== 'all' ? 'Lead topilmadi' : "Hali lead yo'q"}
-            description={search || tab !== 'all'
-              ? "Qidiruv yoki filtrni o'zgartirib ko'ring"
-              : 'Instagram agenti ishga tushgach, leadlar shu yerda paydo bo\'ladi'}
-          />
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-left text-ink-soft border-b border-black/5">
-                <tr>
-                  <th className="py-2.5 pr-3 font-medium">Mijoz</th>
-                  <th className="py-2.5 px-3 font-medium">Qiziqish</th>
-                  <th className="py-2.5 px-3 font-medium">Ball</th>
-                  <th className="py-2.5 px-3 font-medium">Status</th>
-                  <th className="py-2.5 px-3 font-medium">Mas'ul</th>
-                  <th className="py-2.5 pl-3 font-medium text-right">Sana</th>
-                </tr>
-              </thead>
-              <tbody>
-                {leads.map((l) => (
-                  <LeadRow key={l.id} lead={l} onClick={() => navigate(`/leads/${l.id}`)} />
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Card>
+      {/* Kanban doska */}
+      {leadsQ.isLoading ? (
+        <div className="flex gap-3 overflow-x-auto pb-2">
+          {LEAD_STATUS_ORDER.map((st) => (
+            <div key={st} className="min-w-[240px] flex-1 space-y-2">
+              <div className="h-9 rounded-button bg-black/5 animate-pulse" />
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="h-20 rounded-card bg-black/5 animate-pulse" />
+              ))}
+            </div>
+          ))}
+        </div>
+      ) : leads.length === 0 ? (
+        <EmptyState
+          title={search ? 'Lead topilmadi' : "Hali lead yo'q"}
+          description={search
+            ? "Qidiruvni o'zgartirib ko'ring"
+            : "Instagram agenti ishga tushgach, leadlar shu yerda paydo bo'ladi"}
+        />
+      ) : (
+        <div className="flex gap-3 overflow-x-auto pb-2">
+          {LEAD_STATUS_ORDER.map((st) => (
+            <KanbanColumn
+              key={st}
+              status={st}
+              leads={byStatus[st]}
+              isOver={overCol === st}
+              canWrite={canWrite}
+              onCardClick={(id) => navigate(`/leads/${id}`)}
+              onCardDragStart={(lead) => { dragging.current = { id: lead.id, status: lead.status }; }}
+              onColDragOver={() => canWrite && setOverCol(st)}
+              onColDragLeave={() => setOverCol((c) => (c === st ? null : c))}
+              onColDrop={() => handleDrop(st)}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-function LeadRow({ lead, onClick }: { lead: Lead; onClick: () => void }) {
-  const displayName = lead.name || lead.ig_username || 'Noma\'lum';
+function KanbanColumn({
+  status, leads, isOver, canWrite,
+  onCardClick, onCardDragStart, onColDragOver, onColDragLeave, onColDrop,
+}: {
+  status: LeadStatus;
+  leads: Lead[];
+  isOver: boolean;
+  canWrite: boolean;
+  onCardClick: (id: string) => void;
+  onCardDragStart: (lead: Lead) => void;
+  onColDragOver: () => void;
+  onColDragLeave: () => void;
+  onColDrop: () => void;
+}) {
+  const t = COL_THEME[status];
   return (
-    <tr onClick={onClick}
-        className="border-b border-black/5 last:border-0 hover:bg-black/[0.02] cursor-pointer transition">
-      <td className="py-3 pr-3">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0">
-            <Instagram size={15} />
-          </div>
-          <div className="min-w-0">
-            <div className="font-medium truncate">{displayName}</div>
-            <div className="text-xs text-ink-soft truncate flex items-center gap-1">
-              {lead.ig_username ? `@${lead.ig_username}` : (lead.contact || '—')}
-              {lead.event_count > 0 && (
-                <span className="inline-flex items-center gap-0.5 ml-1">
-                  <MessageCircle size={11} /> {lead.event_count}
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-      </td>
-      <td className="py-3 px-3">
-        <div className="truncate max-w-[180px]">{lead.product_interest || '—'}</div>
-        {lead.language && (
-          <div className="text-xs text-ink-soft">{LANG_LABELS[lead.language] ?? lead.language}</div>
+    <div
+      className={cn('min-w-[240px] flex-1 flex flex-col rounded-card border overflow-hidden shadow-sm transition',
+                    t.border, isOver && cn('ring-2 ring-inset', t.ring))}
+      onDragOver={canWrite ? (e) => { e.preventDefault(); onColDragOver(); } : undefined}
+      onDragLeave={canWrite ? onColDragLeave : undefined}
+      onDrop={canWrite ? (e) => { e.preventDefault(); onColDrop(); } : undefined}
+    >
+      {/* Ustun sarlavhasi — rangli */}
+      <div className={cn('px-3 py-2.5 flex items-center justify-between', t.header)}>
+        <span className="font-bold text-sm flex items-center gap-2">
+          <span className={cn('w-2.5 h-2.5 rounded-full ring-2 ring-white/60', t.dot)} />
+          {LEAD_STATUS_LABELS[status]}
+        </span>
+        <span className={cn('text-xs font-bold rounded-full px-2 py-0.5 min-w-[22px] text-center', t.count)}>
+          {leads.length}
+        </span>
+      </div>
+
+      {/* Kartalar ro'yxati — ustunning yengil rangli foni */}
+      <div className={cn(
+        'flex-1 p-2 space-y-2 min-h-[120px] max-h-[70vh] overflow-y-auto transition',
+        isOver ? 'bg-primary/5' : t.body,
+      )}>
+        {leads.length === 0 ? (
+          <div className="text-xs text-ink-soft/70 text-center py-6">Bo'sh</div>
+        ) : (
+          leads.map((l) => (
+            <LeadCard
+              key={l.id}
+              lead={l}
+              canWrite={canWrite}
+              onClick={() => onCardClick(l.id)}
+              onDragStart={() => onCardDragStart(l)}
+            />
+          ))
         )}
-      </td>
-      <td className="py-3 px-3"><ScoreBadge score={lead.lead_score} /></td>
-      <td className="py-3 px-3"><LeadStatusBadge status={lead.status} /></td>
-      <td className="py-3 px-3 text-ink-soft">{lead.assigned_to_name || '—'}</td>
-      <td className="py-3 pl-3 text-right text-ink-soft whitespace-nowrap">
-        {formatDate(lead.created_at)}
-      </td>
-    </tr>
+      </div>
+    </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-function TabButton({ active, onClick, label, count }: {
-  active: boolean; onClick: () => void; label: string; count?: number;
+function LeadCard({
+  lead, canWrite, onClick, onDragStart,
+}: {
+  lead: Lead;
+  canWrite: boolean;
+  onClick: () => void;
+  onDragStart: () => void;
 }) {
+  const displayName = lead.name || lead.ig_username || "Noma'lum";
   return (
-    <button onClick={onClick}
-      className={`px-3 py-1.5 rounded-button text-sm font-medium transition ${
-        active ? 'bg-primary text-white' : 'bg-black/5 text-ink-soft hover:bg-black/10'}`}>
-      {label}
-      {count != null && count > 0 && (
-        <span className={`ml-1.5 text-xs ${active ? 'opacity-80' : 'opacity-60'}`}>{count}</span>
+    <div
+      draggable={canWrite}
+      onDragStart={canWrite ? (e) => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', lead.id); onDragStart(); } : undefined}
+      onClick={onClick}
+      className={cn(
+        'rounded-card border border-black/5 bg-surface p-2.5 shadow-sm hover:shadow transition select-none',
+        canWrite ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer',
       )}
-    </button>
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="w-7 h-7 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0">
+            <Instagram size={13} />
+          </div>
+          <div className="min-w-0">
+            <div className="font-medium text-sm truncate">{displayName}</div>
+            {lead.ig_username && (
+              <div className="text-xs text-ink-soft truncate">@{lead.ig_username}</div>
+            )}
+          </div>
+        </div>
+        <ScoreBadge score={lead.lead_score} className="shrink-0" />
+      </div>
+
+      {/* Telefon raqami — asosiy ma'lumot */}
+      {lead.contact ? (
+        <div className="mt-2 flex items-center gap-1.5 text-sm font-semibold text-ink tabular-nums">
+          <Phone size={13} className="text-primary shrink-0" />
+          <span className="truncate">{formatPhone(lead.contact)}</span>
+        </div>
+      ) : (
+        <div className="mt-2 text-xs text-ink-soft/60">Raqam kiritilmagan</div>
+      )}
+
+      <div className="mt-2 flex items-center justify-between text-xs text-ink-soft">
+        {lead.event_count > 0 ? (
+          <span className="inline-flex items-center gap-0.5">
+            <MessageCircle size={11} /> {lead.event_count}
+          </span>
+        ) : <span />}
+        <span className="whitespace-nowrap">{formatDate(lead.created_at)}</span>
+      </div>
+
+      {lead.assigned_to_name && (
+        <div className="mt-1.5 text-xs text-ink-soft truncate">👤 {lead.assigned_to_name}</div>
+      )}
+    </div>
   );
 }
 

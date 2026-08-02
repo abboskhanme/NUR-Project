@@ -68,7 +68,14 @@ class LeadEventOut(ORMBase):
     message_text: Optional[str] = None
     agent_reply: Optional[str] = None
     actor: str
+    meta: dict[str, Any] = {}
     created_at: datetime
+
+
+class LeadNoteIn(BaseModel):
+    """Xodim qo'shadigan izoh (bog'lanish jurnaliga yoziladi)."""
+
+    text: str
 
 
 class LeadOut(ORMBase):
