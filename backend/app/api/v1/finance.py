@@ -8,7 +8,7 @@ from typing import Annotated, Optional
 from collections import defaultdict
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import and_, case, select, func
+from sqlalchemy import and_, case, or_, select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import CurrentUser
@@ -28,6 +28,7 @@ from app.schemas.finance import (
 )
 from app.services.finance_service import (
     apply_transaction, current_balances, ensure_today_rate, month_summary,
+    resolve_account,
 )
 
 router = APIRouter(dependencies=[Depends(module_guard("finance", read_exempt=("/exchange-rates",)))])
@@ -145,7 +146,13 @@ async def list_transactions(
     conds = []
     if type:
         conds.append(FinanceTransaction.type == type)
-    if method:
+    if method == "naqd":
+        # Eski yozuvlarda `method` bo'sh (usul tushunchasi kiritilgunga qadar
+        # hammasi naqd edi) — ularni ham naqd deb hisoblaymiz, aks holda
+        # "Naqd" filtrida ko'rinmay qolardi.
+        conds.append(or_(FinanceTransaction.method == "naqd",
+                         FinanceTransaction.method.is_(None)))
+    elif method:
         conds.append(FinanceTransaction.method == method)
     if account_id:
         conds.append(FinanceTransaction.account_id == account_id)
@@ -192,7 +199,19 @@ async def create_transaction(payload: TransactionCreate, user: CurrentUser,
     if payload.amount is None or payload.amount <= 0:
         raise HTTPException(status_code=422, detail="Summa 0 dan katta bo'lishi kerak")
 
-    tx = FinanceTransaction(created_by_id=user.id, **payload.model_dump())
+    data = payload.model_dump()
+    # Kassani SERVER aniqlaydi (valyuta + naqd/karta) — frontend nima yuborsa ham.
+    # Shunda karta puli naqd kassaga tushib qolmaydi.
+    acc = await resolve_account(db, data.get("currency") or "UZS", data.get("method"))
+    if not acc:
+        raise HTTPException(
+            status_code=422,
+            detail=f"{data.get('currency')} uchun "
+                   f"«{data.get('method') or 'naqd'}» kassasi topilmadi",
+        )
+    data["account_id"] = acc.id
+
+    tx = FinanceTransaction(created_by_id=user.id, **data)
     db.add(tx)
     await db.flush()
     await apply_transaction(db, tx)
@@ -452,11 +471,10 @@ async def create_employee_payment(payload: EmployeePaymentIn, user: CurrentUser,
     tx = None
     if affects_finance:
         # 2) Moliya: operatsion hisobvaraq + chiqim tranzaksiyasi
-        acc = (await db.execute(
-            select(Account).where(and_(
-                Account.currency == currency, Account.ledger == "operational"
-            )).limit(1)
-        )).scalar_one_or_none()
+        # Xodimga to'lov (avans/oylik) — NAQD kassadan. Karta kassasi
+        # qo'shilgani uchun kassani aniq ko'rsatamiz, aks holda tasodifiy
+        # birinchi kassa (karta bo'lishi mumkin) tanlanardi.
+        acc = await resolve_account(db, currency, "naqd")
         tx = FinanceTransaction(
             date=pay_date, type="expense", category_id=cat.id if cat else None,
             amount=amount, currency=currency, account_id=acc.id if acc else None,
@@ -528,5 +546,7 @@ async def set_rate(payload: ExchangeRateBase, db: Annotated[AsyncSession, Depend
 async def balance_summary(db: Annotated[AsyncSession, Depends(get_db)], _: CurrentUser):
     bal = await current_balances(db)
     return BalanceSummary(
-        uzs=bal["uzs"], usd=bal["usd"], gazna=bal["gazna"], last_updated=datetime.utcnow(),
+        uzs=bal["uzs"], usd=bal["usd"],
+        uzs_card=bal["uzs_card"], usd_card=bal["usd_card"],
+        gazna=bal["gazna"], last_updated=datetime.utcnow(),
     )

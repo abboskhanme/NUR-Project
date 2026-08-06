@@ -13,6 +13,7 @@ class AccountBase(BaseModel):
     name: str
     currency: str = "UZS"
     ledger: str = "operational"
+    payment_type: str = "naqd"   # naqd | karta
 
 
 class AccountCreate(AccountBase):
@@ -24,6 +25,7 @@ class AccountOut(ORMBase):
     name: str
     currency: str
     ledger: str
+    payment_type: str = "naqd"   # naqd | karta
     balance: Decimal
 
 
@@ -100,8 +102,13 @@ class ExchangeRateOut(ORMBase):
 
 
 class BalanceSummary(BaseModel):
+    # Naqd (sevf) qoldiqlari
     uzs: Decimal
     usd: Decimal
+    # Karta (plastik) qoldiqlari — naqd bilan aralashmaydi
+    uzs_card: Decimal = Decimal(0)
+    usd_card: Decimal = Decimal(0)
+    # Naqd dollar jamg'armasi — naqd/karta bo'linishidan tashqarida
     gazna: Decimal
     last_updated: datetime
 
@@ -147,6 +154,15 @@ class FinanceSummary(BaseModel):
     net: Decimal
     usd_income_total: Decimal = Decimal(0)
     usd_expense_total: Decimal = Decimal(0)
+    # Naqd/karta taqsimoti — yuqoridagi jamilar ichidan
+    income_cash: Decimal = Decimal(0)
+    income_card: Decimal = Decimal(0)
+    expense_cash: Decimal = Decimal(0)
+    expense_card: Decimal = Decimal(0)
+    usd_income_cash: Decimal = Decimal(0)
+    usd_income_card: Decimal = Decimal(0)
+    usd_expense_cash: Decimal = Decimal(0)
+    usd_expense_card: Decimal = Decimal(0)
     by_category: list[CategoryBreakdown]
 
 

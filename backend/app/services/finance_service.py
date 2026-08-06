@@ -10,22 +10,67 @@ from app.models.finance import Account, ExchangeRate, FinanceCategory, FinanceTr
 
 
 async def current_balances(db: AsyncSession) -> dict[str, Decimal]:
-    """Sum account balances per ledger/currency.
+    """Kassa qoldiqlari — naqd va karta ALOHIDA.
 
-    Returns dict with keys: uzs, usd, gazna.
+    Kalitlar:
+      uzs, usd          — NAQD (sevf) qoldig'i
+      uzs_card, usd_card — KARTA (plastik) qoldig'i
+      gazna             — naqd dollar jamg'armasi (naqd/karta bo'linishidan tashqarida)
+
+    `uzs`/`usd` ma'nosi o'zgarmadi (ilgari ham hamma kassa naqd edi), shuning
+    uchun eski hisobotlar avvalgidek ishlayveradi.
     """
     result = await db.execute(select(Account))
     accounts = result.scalars().all()
 
-    out = {"uzs": Decimal(0), "usd": Decimal(0), "gazna": Decimal(0)}
+    out = {
+        "uzs": Decimal(0), "usd": Decimal(0),
+        "uzs_card": Decimal(0), "usd_card": Decimal(0),
+        "gazna": Decimal(0),
+    }
     for acc in accounts:
+        bal = acc.balance or Decimal(0)
         if acc.ledger == "gazna":
-            out["gazna"] += acc.balance
-        elif acc.currency == "USD":
-            out["usd"] += acc.balance
+            out["gazna"] += bal
+            continue
+        card = (acc.payment_type or "naqd") == "karta"
+        if acc.currency == "USD":
+            out["usd_card" if card else "usd"] += bal
         else:
-            out["uzs"] += acc.balance
+            out["uzs_card" if card else "uzs"] += bal
     return out
+
+
+async def resolve_account(
+    db: AsyncSession, currency: str, method: str | None = None, *, gazna: bool = False
+) -> Account | None:
+    """Tranzaksiya uchun kassani aniqlaydi: valyuta + to'lov usuli bo'yicha.
+
+    Bu YAGONA manba — frontend qaysi kassani yuborganidan qat'i nazar, server
+    shu qoida bo'yicha tekshiradi. Aks holda karta puli naqd kassaga tushib
+    qolishi mumkin edi.
+
+    `method` bo'sh bo'lsa "naqd" deb qaraladi (eski yozuvlar bilan moslik).
+    Karta kassasi topilmasa — naqdga QAYTMAYDI (None), chunki jim ravishda
+    noto'g'ri kassaga yozgandan ko'ra, xato ko'rsatgan yaxshiroq.
+    """
+    if gazna:
+        res = await db.execute(
+            select(Account).where(Account.ledger == "gazna").order_by(
+                (Account.currency != "USD")  # avval USD g'azna
+            ).limit(1)
+        )
+        return res.scalar_one_or_none()
+
+    want = "karta" if (method or "naqd") == "karta" else "naqd"
+    res = await db.execute(
+        select(Account).where(
+            Account.ledger != "gazna",
+            Account.currency == currency,
+            Account.payment_type == want,
+        ).limit(1)
+    )
+    return res.scalar_one_or_none()
 
 
 async def latest_exchange_rate(db: AsyncSession) -> Decimal | None:
@@ -92,11 +137,13 @@ async def month_summary(db: AsyncSession, year: int, month: int) -> dict:
         nxt = date_cls(year, month + 1, 1)
     start = date_cls(year, month, 1)
 
-    # Kirim/chiqim jami — valyuta bo'yicha alohida (UZS va USD)
+    # Kirim/chiqim jami — valyuta VA to'lov usuli (naqd/karta) bo'yicha.
+    # Usul bo'sh bo'lgan eski yozuvlar "naqd" deb hisoblanadi.
     totals = (await db.execute(
         select(
             FinanceTransaction.type,
             FinanceTransaction.currency,
+            FinanceTransaction.method,
             func.coalesce(func.sum(FinanceTransaction.amount), 0),
         )
         .where(and_(
@@ -105,16 +152,26 @@ async def month_summary(db: AsyncSession, year: int, month: int) -> dict:
             FinanceTransaction.type.in_(("income", "expense")),
             FinanceTransaction.status == "active",
         ))
-        .group_by(FinanceTransaction.type, FinanceTransaction.currency)
+        .group_by(FinanceTransaction.type, FinanceTransaction.currency,
+                  FinanceTransaction.method)
     )).all()
 
     income_total = Decimal(0)
     expense_total = Decimal(0)
     usd_income_total = Decimal(0)
     usd_expense_total = Decimal(0)
-    for type_, curr, total in totals:
+    # Naqd/karta taqsimoti
+    split = {
+        "income_cash": Decimal(0), "income_card": Decimal(0),
+        "expense_cash": Decimal(0), "expense_card": Decimal(0),
+        "usd_income_cash": Decimal(0), "usd_income_card": Decimal(0),
+        "usd_expense_cash": Decimal(0), "usd_expense_card": Decimal(0),
+    }
+    for type_, curr, method, total in totals:
         total = Decimal(total or 0)
-        if curr == "USD":
+        usd = curr == "USD"
+        card = (method or "naqd") == "karta"
+        if usd:
             if type_ == "income":
                 usd_income_total += total
             else:
@@ -124,6 +181,12 @@ async def month_summary(db: AsyncSession, year: int, month: int) -> dict:
                 income_total += total
             else:
                 expense_total += total
+        key = (
+            ("usd_" if usd else "")
+            + ("income_" if type_ == "income" else "expense_")
+            + ("card" if card else "cash")
+        )
+        split[key] += total
 
     # Kategoriyalar bo'yicha taqsimot (UZS)
     rows = (await db.execute(
@@ -157,5 +220,6 @@ async def month_summary(db: AsyncSession, year: int, month: int) -> dict:
         "net": income_total - expense_total,
         "usd_income_total": usd_income_total,
         "usd_expense_total": usd_expense_total,
+        **{k: v for k, v in split.items()},
         "by_category": by_category,
     }

@@ -7,7 +7,7 @@ export default function BalanceCard({
   title: string;
   value: string;
   icon?: ReactNode;
-  accent?: 'primary' | 'success' | 'warning';
+  accent?: 'primary' | 'success' | 'warning' | 'accent';
   // invert: o'sish yomon (masalan chiqim) — ko'tarilganda qizil, tushganda yashil.
   // kind: 'pct' — foizda (%), 'count' — sonda (... ta). Standart: 'pct'.
   trend?: { value: number; label: string; invert?: boolean; kind?: 'pct' | 'count' };
@@ -16,6 +16,7 @@ export default function BalanceCard({
 }) {
   const ring = accent === 'success' ? 'bg-success/10 text-success'
              : accent === 'warning' ? 'bg-warning/10 text-warning'
+             : accent === 'accent' ? 'bg-accent/10 text-accent'
              : 'bg-primary/10 text-primary';
   const good = trend ? (trend.invert ? trend.value <= 0 : trend.value >= 0) : true;
   return (

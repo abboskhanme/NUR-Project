@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import {
   Plus, Wallet, ArrowDownLeft, ArrowUpRight, Trash2,
   TrendingUp, TrendingDown, Banknote, RefreshCw, ArrowRightLeft,
-  ChevronLeft, ChevronRight, Pencil,
+  ChevronLeft, ChevronRight, Pencil, CreditCard,
 } from 'lucide-react';
 
 import { api } from '@/api/client';
@@ -47,6 +47,21 @@ const MONTH_LABELS: Record<string, string> = {
   '12': 'Dekabr',
 };
 
+/** KPI karta tagidagi naqd/karta taqsimoti (jami summaning ichidan). */
+function Split({ cash, card, usd }: { cash?: string; card?: string; usd?: boolean }) {
+  const f = (v?: string) => (usd ? formatUSD(v ?? 0) : formatUZS(v ?? 0));
+  return (
+    <div className="flex items-center justify-between text-xs text-ink-soft">
+      <span className="inline-flex items-center gap-1">
+        <Wallet size={12} /> {f(cash)}
+      </span>
+      <span className="inline-flex items-center gap-1">
+        <CreditCard size={12} /> {f(card)}
+      </span>
+    </div>
+  );
+}
+
 function TypeBadge({ type }: { type: string }) {
   if (type === 'income')
     return <span className="badge bg-success/10 text-success"><ArrowDownLeft size={12} /> Kirim</span>;
@@ -63,6 +78,8 @@ export default function FinancePage() {
   const [editCat, setEditCat] = useState<Category | null>(null);
   const [rateModal, setRateModal] = useState(false);
   const [transferModal, setTransferModal] = useState(false);
+  // To'lov usuli filtri: '' = hammasi | 'naqd' | 'karta'
+  const [fMethod, setFMethod] = useState('');
 
   const [delTx, setDelTx] = useState<Tx | null>(null);
   const [delCat, setDelCat] = useState<Category | null>(null);
@@ -93,7 +110,7 @@ export default function FinancePage() {
   });
   // Tanlangan oyning BARCHA tranzaksiyalarini bir martda olamiz, keyin kunlik guruhlaymiz.
   const tx = useQuery({
-    queryKey: ['finance-transactions', fType, year, month],
+    queryKey: ['finance-transactions', fType, fMethod, year, month],
     queryFn: () => {
       const mm = String(month).padStart(2, '0');
       const lastDay = new Date(year, month, 0).getDate();
@@ -102,6 +119,7 @@ export default function FinancePage() {
           page: 1,
           page_size: 1000,
           type: fType || undefined,
+          method: fMethod || undefined,
           date_from: `${year}-${mm}-01`,
           date_to: `${year}-${mm}-${String(lastDay).padStart(2, '0')}`,
         },
@@ -174,6 +192,12 @@ export default function FinancePage() {
 
   const MONTH_KEYS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const;
 
+  const METHOD_FILTERS = [
+    { key: '', label: 'Hammasi' },
+    { key: 'naqd', label: 'Naqd' },
+    { key: 'karta', label: 'Karta' },
+  ];
+
   const TYPE_FILTERS = [
     { key: '', label: 'Hammasi' },
     { key: 'income', label: 'Kirim' },
@@ -192,17 +216,31 @@ export default function FinancePage() {
         </button>
       </div>
 
-      {/* Balance cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <BalanceCard title="UZS Balans" value={formatUZS(balance.data?.uzs ?? 0)} icon={<Wallet size={18} />} accent="primary" />
-        <BalanceCard title="USD Balans" value={formatUSD(balance.data?.usd ?? 0)} icon={<Wallet size={18} />} accent="success"
+      {/* Balans kartalari. Tartib: har valyuta uchun naqd → karta juftligi,
+          oxirida G'azna (u naqd/karta bo'linishidan tashqarida — alohida qatorda).
+          2 ustunda juftliklar yonma-yon, 4 ustunda operatsion kassalar bir qatorda. */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <BalanceCard title="Naqd UZS" value={formatUZS(balance.data?.uzs ?? 0)}
+          icon={<Wallet size={18} />} accent="primary" />
+        <BalanceCard title="Karta UZS" value={formatUZS(balance.data?.uzs_card ?? 0)}
+          icon={<CreditCard size={18} />} accent="accent" />
+        <BalanceCard title="Naqd USD" value={formatUSD(balance.data?.usd ?? 0)}
+          icon={<Wallet size={18} />} accent="success"
           action={
             <button onClick={() => setTransferModal(true)}
               className="w-full flex items-center justify-center gap-1.5 text-sm border border-black/10 rounded-button py-1.5 hover:bg-black/5 transition">
               <ArrowRightLeft size={15} /> G'aznaga o'tkazish
             </button>
           } />
-        <BalanceCard title="G'azna (USD)" value={formatUSD(balance.data?.gazna ?? 0)} icon={<Banknote size={18} />} accent="warning" />
+        <BalanceCard title="Karta USD" value={formatUSD(balance.data?.usd_card ?? 0)}
+          icon={<CreditCard size={18} />} accent="accent" />
+        {/* G'azna — jamg'arma, operatsion kassalar qatoridan tashqarida.
+            To'liq kenglikni egallaydi: yolg'iz qolgandek emas, ataylab ajratilgandek ko'rinadi. */}
+        <div className="sm:col-span-2 xl:col-span-4">
+          <BalanceCard title="G'azna (USD) — jamg'arma"
+            value={formatUSD(balance.data?.gazna ?? 0)}
+            icon={<Banknote size={18} />} accent="warning" />
+        </div>
       </div>
 
       {/* Tabs */}
@@ -234,13 +272,17 @@ export default function FinancePage() {
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <BalanceCard title="Kirim (UZS)" value={formatUZS(summary.data?.income_total ?? 0)}
-                         icon={<TrendingUp size={18} />} accent="success" />
+                         icon={<TrendingUp size={18} />} accent="success"
+                         action={<Split cash={summary.data?.income_cash} card={summary.data?.income_card} />} />
             <BalanceCard title="Chiqim (UZS)" value={formatUZS(summary.data?.expense_total ?? 0)}
-                         icon={<TrendingDown size={18} />} accent="warning" />
+                         icon={<TrendingDown size={18} />} accent="warning"
+                         action={<Split cash={summary.data?.expense_cash} card={summary.data?.expense_card} />} />
             <BalanceCard title="Kirim (USD)" value={formatUSD(summary.data?.usd_income_total ?? 0)}
-                         icon={<TrendingUp size={18} />} accent="success" />
+                         icon={<TrendingUp size={18} />} accent="success"
+                         action={<Split cash={summary.data?.usd_income_cash} card={summary.data?.usd_income_card} usd />} />
             <BalanceCard title="Chiqim (USD)" value={formatUSD(summary.data?.usd_expense_total ?? 0)}
-                         icon={<TrendingDown size={18} />} accent="warning" />
+                         icon={<TrendingDown size={18} />} accent="warning"
+                         action={<Split cash={summary.data?.usd_expense_cash} card={summary.data?.usd_expense_card} usd />} />
           </div>
 
           {/* Transactions list */}
@@ -255,6 +297,17 @@ export default function FinancePage() {
                   <button key={f.key} onClick={() => setFilterType(f.key)}
                     className={`px-3 py-1 text-sm rounded-[6px] transition ${
                       fType === f.key ? 'bg-card shadow-sm font-medium' : 'text-ink-soft hover:text-ink'}`}>
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* To'lov usuli: naqd va karta aylanmasini ajratib ko'rish */}
+              <div className="inline-flex bg-black/5 rounded-button p-0.5">
+                {METHOD_FILTERS.map((f) => (
+                  <button key={f.key} onClick={() => { setFMethod(f.key); setPage(1); }}
+                    className={`px-3 py-1 text-sm rounded-[6px] transition ${
+                      fMethod === f.key ? 'bg-card shadow-sm font-medium' : 'text-ink-soft hover:text-ink'}`}>
                     {f.label}
                   </button>
                 ))}

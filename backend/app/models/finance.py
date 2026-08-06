@@ -24,6 +24,12 @@ class Account(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     currency: Mapped[str] = mapped_column(String(3), default="UZS")
     # "operational" or "gazna" - for separating cash USD ledger
     ledger: Mapped[str] = mapped_column(String(20), default="operational")
+    # To'lov usuli: "naqd" (sevf) yoki "karta" (plastik). Tranzaksiyadagi
+    # `method` shu bo'yicha kassani tanlaydi — naqd va karta aylanmasi
+    # aralashmasin. G'azna bundan mustasno (u doim naqd dollar jamg'armasi).
+    payment_type: Mapped[str] = mapped_column(
+        String(10), default="naqd", server_default="naqd", nullable=False
+    )
     balance: Mapped[Decimal] = mapped_column(Numeric(16, 2), default=0)
 
 

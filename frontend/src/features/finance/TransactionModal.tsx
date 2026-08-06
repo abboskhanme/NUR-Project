@@ -5,7 +5,10 @@ import { X, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
 
 import { api } from '@/api/client';
 
-interface Account { id: string; name: string; currency: string; ledger: string }
+interface Account {
+  id: string; name: string; currency: string; ledger: string;
+  payment_type?: 'naqd' | 'karta';
+}
 interface Category { id: string; name: string; kind: string }
 
 type Mode = 'income' | 'expense';
@@ -24,14 +27,21 @@ function formatAmount(s: string): string {
 }
 const toNum = (s: string) => parseFloat(s.replace(/[^\d.]/g, '')) || 0;
 
-// Automatically pick matching account by currency and gazna flag (hidden from user)
-function resolveAccountId(accounts: Account[], currency: string, gazna: boolean): string | null {
+// Kassa avtomatik tanlanadi: valyuta + naqd/karta (foydalanuvchidan yashirin).
+// DIQQAT: server ham xuddi shu qoida bo'yicha qayta aniqlaydi — bu yerdagisi
+// faqat qulaylik uchun, haqiqiy manba backend (finance_service.resolve_account).
+function resolveAccountId(
+  accounts: Account[], currency: string, gazna: boolean, method: 'naqd' | 'karta',
+): string | null {
   if (gazna) {
     const g = accounts.find((a) => a.ledger === 'gazna' && a.currency === 'USD')
            || accounts.find((a) => a.ledger === 'gazna');
     return g?.id ?? null;
   }
-  const a = accounts.find((x) => x.currency === currency && x.ledger !== 'gazna');
+  const a = accounts.find(
+    (x) => x.currency === currency && x.ledger !== 'gazna'
+        && (x.payment_type ?? 'naqd') === method,
+  );
   return a?.id ?? null;
 }
 
@@ -87,7 +97,7 @@ export default function TransactionModal({
         category_id: categoryId || null,
         amount: amt, currency, amount_other_curr: 0,
         method,
-        account_id: resolveAccountId(accounts, currency, gazna),
+        account_id: resolveAccountId(accounts, currency, gazna, method),
         note: note || null,
       });
       toast.success('Tranzaksiya saqlandi');
