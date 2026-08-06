@@ -7,7 +7,7 @@ import { api } from '@/api/client';
 import { formatMoney, formatQty, formatDateTime } from '@/lib/format';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import { cn } from '@/lib/cn';
-import { STOCK_META } from '@/features/taminot/TaminotStockTab';
+import { STOCK_META } from '@/features/taminot/stockMeta';
 import type { TaminotProduct } from '@/features/taminot/TaminotProductModal';
 
 type TxKind = 'purchase' | 'payment' | 'consume' | 'adjust';

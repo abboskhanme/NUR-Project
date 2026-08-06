@@ -3,7 +3,7 @@ import { Navigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import {
-  Plus, Search, Wallet, PackagePlus, PackageMinus, ClipboardCheck, Pencil, Trash2,
+  Plus, Minus, Search, Wallet, PackagePlus, ClipboardCheck, Pencil, Trash2,
   ChevronRight, ChevronLeft, Coins, Building2, Globe, CalendarDays, AlertTriangle, Boxes,
   ClipboardList,
 } from 'lucide-react';
@@ -20,7 +20,7 @@ import TaminotProductModal, { type TaminotProduct } from '@/features/taminot/Tam
 import TaminotActionModal, { type ActionKind } from '@/features/taminot/TaminotActionModal';
 import TaminotTransactionsModal from '@/features/taminot/TaminotTransactionsModal';
 import TaminotReportCharts from '@/features/taminot/TaminotReportCharts';
-import TaminotStockTab, { STOCK_META } from '@/features/taminot/TaminotStockTab';
+import { STOCK_META } from '@/features/taminot/stockMeta';
 import TaminotListModal from '@/features/taminot/TaminotListModal';
 import TaminotListsPanel from '@/features/taminot/TaminotListsTab';
 
@@ -79,7 +79,7 @@ export default function TaminotPage() {
   const canWrite = can(`supply_${scope}:write`);
   const canDelete = can(`supply_${scope}:delete`);
 
-  const [tab, setTab] = useState<'products' | 'stock' | 'reports'>('products');
+  const [tab, setTab] = useState<'products' | 'reports'>('products');
   // «Spiska qilish» — ta'minotchi uchun xarid ro'yxati (qoralama)
   const [listModal, setListModal] = useState(false);
   const [search, setSearch] = useState('');
@@ -107,7 +107,7 @@ export default function TaminotPage() {
   // Filtrlar tabga bog'liq: "faqat qarzi borlar" — mahsulotlar tabida,
   // "faqat kam qolganlar" — ombor tabida ishlaydi.
   const withDebtParam = tab === 'products' && onlyDebt;
-  const lowStockParam = tab === 'stock' && lowOnly;
+  const lowStockParam = tab === 'products' && lowOnly;
   const productsQ = useQuery<TaminotProduct[]>({
     queryKey: ['taminot-products', scope, search, withDebtParam, lowStockParam],
     queryFn: () => api.get('/taminot/products', {
@@ -286,7 +286,7 @@ export default function TaminotPage() {
       {/* Ombor ogohlantirishi — kam qolgan/tugagan mahsulotlar doim ko'rinib turadi */}
       {(s?.low_stock_count || s?.out_of_stock_count) ? (
         <button
-          onClick={() => { setTab('stock'); setLowOnly(true); }}
+          onClick={() => { setTab('products'); setLowOnly((v) => !v); }}
           className="w-full text-left rounded-card border border-danger/30 bg-danger/[0.07] px-4 py-3 flex items-center gap-3 hover:bg-danger/10 transition">
           <div className="w-9 h-9 rounded-button bg-danger/15 text-danger flex items-center justify-center shrink-0">
             <AlertTriangle size={18} />
@@ -309,13 +309,13 @@ export default function TaminotPage() {
       {/* Tabs */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex gap-1.5 flex-wrap">
-          {([['products', 'Mahsulotlar'], ['stock', 'Ombor qoldiq'], ['reports', 'Hisobotlar']] as const).map(([key, label]) => (
+          {([['products', 'Mahsulotlar'], ['reports', 'Hisobotlar']] as const).map(([key, label]) => (
             <button key={key} onClick={() => setTab(key)}
               className={cn('px-2.5 sm:px-3 py-1.5 rounded-button text-xs sm:text-sm font-medium transition flex items-center gap-1.5',
                 tab === key ? 'bg-primary text-white' : 'bg-black/5 text-ink-soft hover:bg-black/10')}>
               {label}
-              {/* Ombor tabida diqqat talab qiladiganlar soni */}
-              {key === 'stock' && attentionCount > 0 && (
+              {/* Kam qolgan/tugagan mahsulotlar soni */}
+              {key === 'products' && attentionCount > 0 && (
                 <span className={cn('px-1.5 py-0.5 rounded-full text-[10px] font-bold',
                   tab === key ? 'bg-white/20 text-white' : 'bg-danger/15 text-danger')}>
                   {attentionCount}
@@ -388,22 +388,40 @@ export default function TaminotPage() {
                       {p.last_purchase_at ? `oxirgi: ${formatDateTime(p.last_purchase_at)}` : 'harakat yo\'q'}
                     </div>
                   </div>
-                  {/* Ombordagi qoldiq — puldan alohida blok (chapda), kam qolganda qizil */}
-                  <div className={cn(
-                    'shrink-0 w-[112px] sm:w-[132px] sm:mr-10 rounded-button border px-2.5 sm:px-3 py-1.5 text-center',
-                    attention ? 'border-danger/25 bg-danger/10' : 'border-black/[0.07] bg-black/[0.03]',
-                  )}>
-                    <div className={cn('font-bold leading-tight', sm.value)}>
-                      {formatQty(p.stock, unit)}
+                  {/* Ombordagi qoldiq + ikki tomonida amal tugmalari:
+                      [−] qoldiq [+]  — chapda sarflash, o'ngda olib kelish. */}
+                  <div className="shrink-0 flex items-center gap-1.5 sm:mr-10"
+                       onClick={(e) => e.stopPropagation()}>
+                    {canWrite && (
+                      <button onClick={() => setAction({ product: p, kind: 'consume' })}
+                              disabled={p.stock <= 0} title="Sarflash (ombordan chiqim)"
+                              className="w-8 h-8 shrink-0 rounded-button flex items-center justify-center bg-warning/10 text-warning hover:bg-warning/20 transition disabled:opacity-40">
+                        <Minus size={15} />
+                      </button>
+                    )}
+                    <div className={cn(
+                      'shrink-0 w-[100px] sm:w-[120px] rounded-button border px-2 sm:px-3 py-1.5 text-center',
+                      attention ? 'border-danger/25 bg-danger/10' : 'border-black/[0.07] bg-black/[0.03]',
+                    )}>
+                      <div className={cn('font-bold leading-tight', sm.value)}>
+                        {formatQty(p.stock, unit)}
+                      </div>
+                      {attention ? (
+                        <div className={cn('text-[10px] font-semibold uppercase tracking-wide', sm.value)}>
+                          {sm.label}
+                        </div>
+                      ) : (
+                        <div className="text-[10px] text-ink-soft">
+                          ombor qoldiq{p.min_qty > 0 ? ` · min ${formatQty(p.min_qty)}` : ''}
+                        </div>
+                      )}
                     </div>
-                    {attention ? (
-                      <div className={cn('text-[10px] font-semibold uppercase tracking-wide', sm.value)}>
-                        {sm.label}
-                      </div>
-                    ) : (
-                      <div className="text-[10px] text-ink-soft">
-                        ombor qoldiq{p.min_qty > 0 ? ` · min ${formatQty(p.min_qty)}` : ''}
-                      </div>
+                    {canWrite && (
+                      <button onClick={() => setAction({ product: p, kind: 'purchase' })}
+                              title="Olib kelish"
+                              className="w-8 h-8 shrink-0 rounded-button flex items-center justify-center bg-primary/10 text-primary hover:bg-primary/20 transition">
+                        <Plus size={15} />
+                      </button>
                     )}
                   </div>
                   <div className="text-right shrink-0 ml-auto sm:ml-0 sm:w-[132px]">
@@ -414,20 +432,6 @@ export default function TaminotPage() {
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0 basis-full sm:basis-auto justify-end"
                        onClick={(e) => e.stopPropagation()}>
-                    {canWrite && (
-                      <button onClick={() => setAction({ product: p, kind: 'purchase' })}
-                              title="Olib kelish"
-                              className="inline-flex items-center gap-1 px-2.5 py-2 lg:py-1.5 rounded-button text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 transition">
-                        <PackagePlus size={14} /> <span className="hidden lg:inline">Olib kelish</span>
-                      </button>
-                    )}
-                    {canWrite && (
-                      <button onClick={() => setAction({ product: p, kind: 'consume' })}
-                              disabled={p.stock <= 0} title="Sarflash (ombordan chiqim)"
-                              className="inline-flex items-center gap-1 px-2.5 py-2 lg:py-1.5 rounded-button text-xs font-medium bg-warning/10 text-warning hover:bg-warning/20 transition disabled:opacity-40">
-                        <PackageMinus size={14} /> <span className="hidden lg:inline">Sarflash</span>
-                      </button>
-                    )}
                     {canWrite && (
                       <button onClick={() => setAction({ product: p, kind: 'payment' })}
                               disabled={p.balance <= 0} title="Qarz to'lash"
@@ -463,27 +467,6 @@ export default function TaminotPage() {
           )}
         </Card>
         </div>
-      ) : tab === 'stock' ? (
-        /* ===================== OMBOR QOLDIQ ===================== */
-        <TaminotStockTab
-          products={products}
-          stats={{
-            low: s?.low_stock_count ?? 0,
-            out: s?.out_of_stock_count ?? 0,
-            ok: s?.ok_stock_count ?? 0,
-            stockValue: (s?.by_currency ?? []).map((c) => ({
-              currency: c.currency, value: c.stock_value,
-            })),
-          }}
-          loading={productsQ.isLoading}
-          canWrite={canWrite}
-          search={search}
-          onSearch={setSearch}
-          lowOnly={lowOnly}
-          onLowOnly={setLowOnly}
-          onAction={(product, kind) => setAction({ product, kind })}
-          onOpenDetail={(product) => setDetail(product)}
-        />
       ) : (
         /* ===================== HISOBOTLAR ===================== */
         <div className="space-y-4">
