@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import {
-  Wallet, ShoppingCart, TrendingUp, TrendingDown, PackageCheck, Banknote,
+  Wallet, ShoppingCart, TrendingUp, TrendingDown, PackageCheck, Banknote, CreditCard,
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend,
@@ -18,7 +18,14 @@ import RevenueArea from '@/features/dashboard/RevenueArea';
 import GoalCard from '@/features/dashboard/GoalCard';
 import type { DashboardData } from '@/features/dashboard/types';
 
-interface BalanceSummary { uzs: number; usd: number; gazna: number }
+interface BalanceSummary {
+  // Naqd (sevf) qoldiqlari
+  uzs: number; usd: number;
+  // Karta (plastik) qoldiqlari
+  uzs_card: number; usd_card: number;
+  // Naqd dollar jamg'armasi
+  gazna: number;
+}
 interface WeekBucket { name: string; income: number; expense: number }
 
 const compact = (n: number) => {
@@ -27,6 +34,19 @@ const compact = (n: number) => {
   if (n >= 1_000) return `${(n / 1_000).toFixed(0)} ming`;
   return String(n);
 };
+
+/** Balans kartasi tagidagi naqd/karta taqsimoti (jami summaning ichidan). */
+function CashCardSplit(
+  { cash, card, usd }: { cash?: number | string; card?: number | string; usd?: boolean },
+) {
+  const f = (v?: number | string) => (usd ? formatUSD(v ?? 0) : formatUZS(v ?? 0));
+  return (
+    <div className="flex items-center justify-between text-xs text-ink-soft">
+      <span className="inline-flex items-center gap-1"><Wallet size={12} /> {f(cash)}</span>
+      <span className="inline-flex items-center gap-1"><CreditCard size={12} /> {f(card)}</span>
+    </div>
+  );
+}
 
 export default function DashboardPage() {
   const { canModule } = usePermissions();
@@ -82,15 +102,17 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <BalanceCard
           title="UZS balans"
-          value={formatUZS(balance.data?.uzs ?? 0)}
+          value={formatUZS(Number(balance.data?.uzs ?? 0) + Number(balance.data?.uzs_card ?? 0))}
           icon={<Wallet size={18} />}
           accent="primary"
+          action={<CashCardSplit cash={balance.data?.uzs} card={balance.data?.uzs_card} />}
         />
         <BalanceCard
           title="USD balans"
-          value={formatUSD(balance.data?.usd ?? 0)}
+          value={formatUSD(Number(balance.data?.usd ?? 0) + Number(balance.data?.usd_card ?? 0))}
           icon={<Wallet size={18} />}
           accent="success"
+          action={<CashCardSplit cash={balance.data?.usd} card={balance.data?.usd_card} usd />}
         />
         <BalanceCard
           title="G'azna (naqd USD)"
