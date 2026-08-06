@@ -325,12 +325,16 @@ export default function TaminotPage() {
           ))}
         </div>
         {tab === 'products' && (
-          <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="flex items-center gap-x-3 gap-y-2 flex-wrap w-full sm:w-auto">
             <label className="flex items-center gap-1.5 text-xs sm:text-sm text-ink-soft cursor-pointer select-none shrink-0">
               <input type="checkbox" checked={onlyDebt} onChange={(e) => setOnlyDebt(e.target.checked)} />
-              Faqat qarzi borlar
+              Qarzi borlar
             </label>
-            <div className="relative flex-1 sm:flex-none">
+            <label className="flex items-center gap-1.5 text-xs sm:text-sm text-ink-soft cursor-pointer select-none shrink-0">
+              <input type="checkbox" checked={lowOnly} onChange={(e) => setLowOnly(e.target.checked)} />
+              Kam qolgan
+            </label>
+            <div className="relative flex-1 min-w-[140px] sm:flex-none">
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft" />
               <input className="input pl-9 w-full sm:w-56" placeholder="Qidirish..."
                      value={search} onChange={(e) => setSearch(e.target.value)} />

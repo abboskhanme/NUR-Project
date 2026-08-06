@@ -37,6 +37,8 @@ export default function TaminotListsPanel({ scope, canWrite, canDelete }: {
   const [applying, setApplying] = useState<PurchaseList | null>(null);
   const [deleting, setDeleting] = useState<PurchaseList | null>(null);
   const [busy, setBusy] = useState(false);
+  // Qabul qilishda: qarzga olindimi yoki naqd to'landimi
+  const [payMode, setPayMode] = useState<'debt' | 'cash'>('debt');
 
   const q = useQuery<PurchaseList[]>({
     queryKey: ['taminot-lists', scope],
@@ -56,9 +58,12 @@ export default function TaminotListsPanel({ scope, canWrite, canDelete }: {
     if (!applying) return;
     setBusy(true);
     try {
-      await api.post(`/taminot/lists/${applying.id}/apply`);
-      toast.success('Qabul qilindi — ombor qoldig‘i yangilandi');
+      await api.post(`/taminot/lists/${applying.id}/apply`, { payment_mode: payMode });
+      toast.success(payMode === 'cash'
+        ? 'Qabul qilindi — omborga kirdi, naqd to‘langan deb yozildi'
+        : 'Qabul qilindi — omborga kirdi, qarzga yozildi');
       setApplying(null);
+      setPayMode('debt');
       refresh();
     } catch (e: any) {
       toast.error(e?.response?.data?.detail || 'Xatolik');
@@ -112,8 +117,8 @@ export default function TaminotListsPanel({ scope, canWrite, canDelete }: {
                           : <ChevronDown size={16} className="shrink-0 text-ink-soft mt-1" />}
               </button>
 
-              <div className="flex items-center gap-2 flex-wrap">
-                <div className="text-right">
+              <div className="flex items-center gap-2 flex-wrap basis-full sm:basis-auto justify-end">
+                <div className="text-right mr-auto sm:mr-0">
                   {pl.totals.map((t) => (
                     <div key={t.currency} className="font-bold tabular-nums whitespace-nowrap">
                       {fmt(t.amount, t.currency)}
@@ -176,10 +181,36 @@ export default function TaminotListsPanel({ scope, canWrite, canDelete }: {
           variant="primary"
           loading={busy}
           message={
-            `«${applying.title || 'Spiska'}» bo'yicha ${applying.item_count} ta mahsulot `
-            + 'omborga kiritiladi va qarz hisoblanadi ('
-            + applying.totals.map((t) => fmt(t.amount, t.currency)).join(' + ')
-            + '). Bu amalni orqaga qaytarib bo‘lmaydi.'
+            <div className="space-y-3">
+              <div>
+                {applying.item_count} ta mahsulot omborga kiritiladi —{' '}
+                <b>{applying.totals.map((t) => fmt(t.amount, t.currency)).join(' + ')}</b>.
+              </div>
+              <div>
+                <div className="text-xs text-ink-soft mb-1.5">To‘lov holati</div>
+                <div className="grid grid-cols-2 gap-2">
+                  {([
+                    ['debt', 'Qarzga olindi', 'Qarz qoldig‘i oshadi'],
+                    ['cash', 'Naqd to‘landi', 'Qarz oshmaydi'],
+                  ] as const).map(([key, label, hint]) => (
+                    <button key={key} type="button" onClick={() => setPayMode(key)}
+                      className={cn(
+                        'rounded-button border px-3 py-2 text-left transition',
+                        payMode === key
+                          ? 'border-primary bg-primary/10'
+                          : 'border-black/10 hover:bg-black/5',
+                      )}>
+                      <div className="text-sm font-medium">{label}</div>
+                      <div className="text-[11px] text-ink-soft">{hint}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="text-[11px] text-ink-soft">
+                Ombor qoldig‘i ikkala holatda ham bir xil oshadi. Bu amalni orqaga
+                qaytarib bo‘lmaydi.
+              </div>
+            </div>
           }
           confirmText="Qabul qilish"
           onConfirm={doApply}

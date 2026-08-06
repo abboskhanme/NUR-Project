@@ -189,6 +189,16 @@ class PurchaseListUpdate(BaseModel):
     items: Optional[list[PurchaseListItemIn]] = None
 
 
+class PurchaseListApplyIn(BaseModel):
+    """Spiskani qabul qilish. `payment_mode` — `PurchaseCreate` bilan bir xil:
+      - "debt" (sukut) — qarzga olindi, qarz qoldig'i oshadi
+      - "cash"         — naqd to'landi: har mahsulotga to'liq summaga to'lov
+                         yoziladi, qarz qoldig'i o'zgarmaydi
+    Ombor qoldig'i ikkala holatda ham bir xil oshadi.
+    """
+    payment_mode: Literal["debt", "cash"] = "debt"
+
+
 class PurchaseListTotal(BaseModel):
     """Valyuta bo'yicha jami — UZS va USD hech qachon qo'shilmaydi."""
     currency: str

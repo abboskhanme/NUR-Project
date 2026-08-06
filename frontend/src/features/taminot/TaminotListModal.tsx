@@ -29,8 +29,6 @@ const fmt = (v: number, currency: string) =>
 export default function TaminotListModal({
   scope, onClose, onSaved,
 }: { scope: string; onClose: () => void; onSaved: () => void }) {
-  const [title, setTitle] = useState('');
-  const [note, setNote] = useState('');
   const [rows, setRows] = useState<Row[]>([{ productId: '', qty: '' }]);
   const [saving, setSaving] = useState(false);
 
@@ -72,9 +70,7 @@ export default function TaminotListModal({
     if (!items.length) { toast.error('Kamida bitta mahsulot va miqdor kiriting'); return; }
     setSaving(true);
     try {
-      await api.post('/taminot/lists', {
-        scope, title: title.trim() || null, note: note.trim() || null, items,
-      });
+      await api.post('/taminot/lists', { scope, items });
       toast.success('Spiska saqlandi');
       onSaved();
       onClose();
@@ -101,31 +97,19 @@ export default function TaminotListModal({
         </div>
 
         <div className="p-4 sm:p-5 space-y-3 overflow-y-auto">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs text-ink-soft">Nomi (ixtiyoriy)</label>
-              <input className="input w-full mt-1" value={title} placeholder="Masalan: 6-avgust xaridi"
-                     onChange={(e) => setTitle(e.target.value)} />
-            </div>
-            <div>
-              <label className="text-xs text-ink-soft">Izoh (ixtiyoriy)</label>
-              <input className="input w-full mt-1" value={note}
-                     onChange={(e) => setNote(e.target.value)} />
-            </div>
-          </div>
-
           <div className="space-y-2">
             {rows.map((r, i) => {
               const p = byId[r.productId];
               const q = parseFloat(r.qty.replace(',', '.'));
               const line = p && q > 0 ? q * Number(p.unit_price) : 0;
               return (
-                <div key={i} className="flex items-end gap-2">
-                  <div className="flex-1 min-w-0">
-                    {i === 0 && <label className="text-xs text-ink-soft">Mahsulot</label>}
-                    <select className="input w-full mt-1" value={r.productId}
+                <div key={i} className="rounded-button border border-black/[0.07] p-2 sm:p-0 sm:border-0
+                                        flex flex-wrap sm:flex-nowrap items-end gap-2">
+                  {/* Telefonda mahsulot butun kenglikni egallaydi */}
+                  <div className="basis-full sm:basis-0 sm:flex-1 min-w-0">
+                    <select className="input w-full" value={r.productId}
                             onChange={(e) => setRow(i, { productId: e.target.value })}>
-                      <option value="">— tanlang —</option>
+                      <option value="">— mahsulotni tanlang —</option>
                       {products.map((op) => (
                         <option key={op.id} value={op.id}
                                 disabled={op.id !== r.productId && chosen.has(op.id)}>
@@ -134,17 +118,15 @@ export default function TaminotListModal({
                       ))}
                     </select>
                   </div>
-                  <div className="w-24 sm:w-28 shrink-0">
-                    {i === 0 && <label className="text-xs text-ink-soft">Miqdor</label>}
-                    <input className="input w-full mt-1" inputMode="decimal" value={r.qty}
-                           placeholder={p?.unit ?? '0'}
-                           onChange={(e) => setRow(i, { qty: e.target.value })} />
-                  </div>
-                  <div className="w-28 sm:w-36 shrink-0 text-right text-sm pb-2 tabular-nums">
+                  <input className="input w-20 sm:w-24 shrink-0" inputMode="decimal" value={r.qty}
+                         placeholder={p?.unit ?? 'miqdor'}
+                         onChange={(e) => setRow(i, { qty: e.target.value })} />
+                  <div className="flex-1 sm:w-32 sm:flex-none text-right text-sm tabular-nums self-center">
                     {line > 0 ? fmt(line, p!.currency) : <span className="text-ink-soft">—</span>}
                   </div>
                   <button onClick={() => delRow(i)} disabled={rows.length === 1}
-                          className="p-2 mb-1 rounded-button text-danger hover:bg-danger/10 disabled:opacity-30 shrink-0">
+                          title="Qatorni o'chirish"
+                          className="w-9 h-9 shrink-0 rounded-button flex items-center justify-center text-danger hover:bg-danger/10 disabled:opacity-30">
                     <Trash2 size={15} />
                   </button>
                 </div>

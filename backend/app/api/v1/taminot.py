@@ -30,7 +30,7 @@ from app.models.taminot import (
     TaminotProduct, TaminotPurchaseList, TaminotPurchaseListItem, TaminotTransaction,
 )
 from app.schemas.taminot import (
-    PurchaseListCreate, PurchaseListItemIn, PurchaseListItemOut,
+    PurchaseListApplyIn, PurchaseListCreate, PurchaseListItemIn, PurchaseListItemOut,
     PurchaseListOut, PurchaseListTotal, PurchaseListUpdate,
     SCOPES,
     ConsumeCreate,
@@ -687,13 +687,17 @@ async def update_purchase_list(
 @router.post("/lists/{list_id}/apply", response_model=PurchaseListOut)
 async def apply_purchase_list(
     list_id: uuid.UUID,
+    payload: PurchaseListApplyIn,
     user: CurrentUser,
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """Spiskani qabul qiladi: har bir qator uchun `purchase` tranzaksiyasi.
 
-    Shu daqiqadan boshlab ombor qoldig'i va qarz hisoblanadi. Bir marta
-    bajariladi — takroriy chaqiruv xato qaytaradi (qo'sh hisoblanmasin).
+    `payment_mode="cash"` bo'lsa har mahsulotga to'liq summaga to'lov ham
+    yoziladi — ombor qoldig'i oshadi, qarz esa oshmaydi.
+
+    Shu daqiqadan boshlab ombor qoldig'i (va qarzga olingan bo'lsa qarz)
+    hisoblanadi. Bir marta bajariladi — takroriy chaqiruv xato qaytaradi.
     """
     pl = await _load_list(db, list_id)
     _require_scope(user, pl.scope, "write")
@@ -702,7 +706,9 @@ async def apply_purchase_list(
     if not pl.items:
         raise HTTPException(422, "Spiska bo'sh")
 
+    cash = payload.payment_mode == "cash"
     label = pl.title or "Spiska"
+    suffix = " · naqd" if cash else ""
     for it in pl.items:
         amount = (Decimal(it.qty) * Decimal(it.unit_price)).quantize(Decimal("0.01"))
         db.add(TaminotTransaction(
@@ -712,9 +718,22 @@ async def apply_purchase_list(
             unit_price=Decimal(it.unit_price),
             amount=amount,
             currency=it.currency,
-            note=f"{label} bo'yicha qabul qilindi",
+            note=f"{label} bo'yicha qabul qilindi{suffix}",
             created_by_id=user.id,
         ))
+        # Naqd to'langan — shu zahoti to'liq summaga to'lov yoziladi,
+        # shuning uchun qarz qoldig'i o'zgarmaydi (ombor qoldig'i oshaveradi).
+        if cash and amount > 0:
+            db.add(TaminotTransaction(
+                product_id=it.product_id,
+                kind="payment",
+                qty=Decimal("0"),
+                unit_price=Decimal("0"),
+                amount=amount,
+                currency=it.currency,
+                note=f"{label} · naqd to'lov",
+                created_by_id=user.id,
+            ))
     pl.status = "applied"
     pl.applied_at = datetime.now(timezone.utc)
     await db.commit()
