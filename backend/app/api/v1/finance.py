@@ -264,10 +264,10 @@ async def transfer_to_gazna(payload: GaznaTransferIn, user: CurrentUser,
     if payload.amount is None or payload.amount <= 0:
         raise HTTPException(status_code=422, detail="Summa 0 dan katta bo'lishi kerak")
 
-    accounts = (await db.execute(select(Account))).scalars().all()
-    usd_acc = next((a for a in accounts if a.currency == "USD" and a.ledger != "gazna"), None)
-    gazna_acc = (next((a for a in accounts if a.ledger == "gazna" and a.currency == "USD"), None)
-                 or next((a for a in accounts if a.ledger == "gazna"), None))
+    # G'azna — NAQD dollar zaxirasi, shuning uchun manba ham naqd USD kassasi.
+    # (Kassani aniq ko'rsatmasak, karta USD hisobi tanlanib qolishi mumkin edi.)
+    usd_acc = await resolve_account(db, "USD", "naqd")
+    gazna_acc = await resolve_account(db, "USD", gazna=True)
     if not usd_acc or not gazna_acc:
         raise HTTPException(status_code=400, detail="USD yoki G'azna hisobi topilmadi")
 
@@ -280,12 +280,14 @@ async def transfer_to_gazna(payload: GaznaTransferIn, user: CurrentUser,
     tx_date = payload.tx_date or date.today()
     note = payload.note or "USD → G'azna o'tkazmasi"
 
+    # Ikkalasi ham naqd harakati — usulni aniq belgilaymiz, aks holda
+    # filtr/hisobotlarda "usulsiz" bo'lib qolardi.
     expense = FinanceTransaction(
-        created_by_id=user.id, date=tx_date, type="expense",
+        created_by_id=user.id, date=tx_date, type="expense", method="naqd",
         amount=payload.amount, currency="USD", account_id=usd_acc.id, note=note,
     )
     income = FinanceTransaction(
-        created_by_id=user.id, date=tx_date, type="income",
+        created_by_id=user.id, date=tx_date, type="income", method="naqd",
         amount=payload.amount, currency="USD", account_id=gazna_acc.id, note=note,
     )
     db.add(expense)
@@ -470,14 +472,18 @@ async def create_employee_payment(payload: EmployeePaymentIn, user: CurrentUser,
     acc = None
     tx = None
     if affects_finance:
-        # 2) Moliya: operatsion hisobvaraq + chiqim tranzaksiyasi
-        # Xodimga to'lov (avans/oylik) — NAQD kassadan. Karta kassasi
-        # qo'shilgani uchun kassani aniq ko'rsatamiz, aks holda tasodifiy
-        # birinchi kassa (karta bo'lishi mumkin) tanlanardi.
-        acc = await resolve_account(db, currency, "naqd")
+        # 2) Moliya: chiqim tranzaksiyasi. Kassa TANLANGAN usulga qarab
+        # aniqlanadi — avans ham, oylik ham naqd yoki kartadan berilishi mumkin.
+        method = "karta" if payload.method == "karta" else "naqd"
+        acc = await resolve_account(db, currency, method)
+        if not acc:
+            raise HTTPException(
+                status_code=422,
+                detail=f"{currency} uchun «{method}» kassasi topilmadi",
+            )
         tx = FinanceTransaction(
             date=pay_date, type="expense", category_id=cat.id if cat else None,
-            amount=amount, currency=currency, account_id=acc.id if acc else None,
+            amount=amount, currency=currency, method=method, account_id=acc.id,
             note=note, created_by_id=user.id,
         )
         db.add(tx)

@@ -137,6 +137,9 @@ class EmployeePaymentIn(BaseModel):
     # Avans tahminiy oylikdan oshganda — faqat super-admin "baribir berish" uchun.
     override: bool = False
     currency: str = "UZS"
+    # To'lov usuli: "naqd" (sevf) yoki "karta". Avans ham, oylik ham ikkala
+    # yo'l bilan berilishi mumkin — tanlanganiga qarab kassa aniqlanadi.
+    method: str = "naqd"
     note: Optional[str] = None
 
 

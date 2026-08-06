@@ -119,6 +119,9 @@ export default function EmployeeHistoryModal({
   const [advDate, setAdvDate] = useState(defaultAdvDate);
   // Moliyadan ayirish — default yoqilgan; sanaga bog'liq emas, qo'lda boshqariladi
   const [affectFinance, setAffectFinance] = useState(true);
+  // To'lov usuli — avans ham, oylik ham naqd yoki kartadan berilishi mumkin;
+  // tanlangan usulga qarab moliyada tegishli kassadan ayiriladi.
+  const [payMethod, setPayMethod] = useState<'naqd' | 'karta'>('naqd');
   const [saving, setSaving] = useState(false);
   const [confirmVoid, setConfirmVoid] = useState<Advance | null>(null);
   const [voiding, setVoiding] = useState(false);
@@ -169,6 +172,7 @@ export default function EmployeeHistoryModal({
         month,
         pay_date: advDate || null,
         affect_finance: affectFinance,
+        method: payMethod,
         currency: employee.currency || 'UZS',
         note: note || null,
         override,
@@ -178,6 +182,7 @@ export default function EmployeeHistoryModal({
       setNote('');
       setAdvDate(defaultAdvDate);
       setAffectFinance(true);
+      setPayMethod('naqd');
       advQ.refetch();
       invalidateAll();
     } catch (e: any) {
@@ -289,6 +294,18 @@ export default function EmployeeHistoryModal({
                     onChange={(e) => setAdvDate(e.target.value)}
                   />
                 </div>
+                <div className="min-w-[150px]">
+                  <label className="text-xs text-ink-soft">To'lov usuli</label>
+                  <div className="inline-flex bg-black/5 rounded-button p-0.5 mt-1 w-full">
+                    {(['naqd', 'karta'] as const).map((m) => (
+                      <button key={m} type="button" onClick={() => setPayMethod(m)}
+                        className={`flex-1 px-3 py-1 text-sm rounded-[6px] transition ${
+                          payMethod === m ? 'bg-card shadow-sm font-medium' : 'text-ink-soft hover:text-ink'}`}>
+                        {m === 'naqd' ? 'Naqd' : 'Karta'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <div className="flex-1 min-w-[140px]">
                   <label className="text-xs text-ink-soft">Izoh</label>
                   <input
@@ -316,7 +333,9 @@ export default function EmployeeHistoryModal({
                 <span className="text-sm font-medium">Moliyadan ayirilsin</span>
               </label>
               <p className="text-[11px] text-ink-soft mt-1">
-                {affectFinance ? 'Bu to\'lov moliya bo\'limidan ham chiqim sifatida ayiriladi.' : 'Faqat xodim tarixiga yoziladi — moliya balansidan ayirilmaydi.'}
+                {affectFinance
+                  ? `Bu to'lov moliyada ${payMethod === 'karta' ? 'KARTA' : 'NAQD'} kassasidan chiqim sifatida ayiriladi.`
+                  : "Faqat xodim tarixiga yoziladi — moliya balansidan ayirilmaydi."}
               </p>
             </div>
           </div>
