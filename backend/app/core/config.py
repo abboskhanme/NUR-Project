@@ -77,6 +77,18 @@ class Settings(BaseSettings):
     COMPANY_INN_LABEL: str = ""   # masalan: "STIR: 123456789"
     COMPANY_WEBSITE: str = ""
 
+    # Hujjat imzolari — kafolat sertifikatiga avtomatik qo'yiladigan imzo va
+    # pechat rasmlari. Rasmlar `DOC_ASSETS_DIR` papkasidan olinadi (bo'sh bo'lsa
+    # `app/assets/docs`), fayl nomlari: imzo-savdo.png, imzo-servis.png,
+    # pechat.png. Fayl topilmasa — o'rniga bo'sh imzo chizig'i chiziladi.
+    DOC_ASSETS_DIR: str = ""
+    DOC_SALES_SIGNER: str = ""     # Savdo bo'limi mas'ul xodimi F.I.Sh.
+    DOC_SERVICE_SIGNER: str = ""   # Servis bo'limi mas'ul xodimi F.I.Sh.
+
+    # Kafolat sertifikatidagi aloqa raqamlari (vergul bilan ajratiladi)
+    DOC_SALES_PHONES: str = "+998970582025,+998973182025,+998996752022"
+    DOC_SERVICE_PHONES: str = "+998901519331,+998905562134"
+
     INSECURE_SECRET_DEFAULT: str = "change-me"
 
     @property

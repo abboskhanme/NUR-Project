@@ -3,9 +3,10 @@ import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { usePermissions } from '@/lib/permissions';
 import toast from 'react-hot-toast';
-import { ExternalLink, Plus, Pencil, ListPlus, Check, Printer } from 'lucide-react';
+import { ExternalLink, Plus, Pencil, ListPlus, Check, Printer, ShieldCheck } from 'lucide-react';
 
 import { api } from '@/api/client';
+import { downloadPdf } from '@/lib/pdf';
 import { formatUZS, formatPhone, formatDate } from '@/lib/format';
 import { CellDate, CellSelect } from '@/components/ui/TablePickers';
 import ReceiptModal from './ReceiptModal';
@@ -76,7 +77,7 @@ interface Salesperson { id: string; full_name: string }
 // SHU massivdan hisoblanadi (bitta manba), aks holda ular orasidagi
 // nomuvofiqlik oxirgi ustunni (Chek/Ochish tugmalari) scroll orqali
 // hech qachon to'liq ko'rinmaydigan qilib qo'yadi.
-const COL_WIDTHS = [44, 210, 140, 140, 170, 140, 180, 280, 96, 70, 64, 120, 140, 160, 140, 140, 80];
+const COL_WIDTHS = [44, 210, 140, 140, 170, 140, 180, 280, 96, 70, 64, 120, 140, 160, 140, 140, 108];
 const TABLE_WIDTH = COL_WIDTHS.reduce((a, b) => a + b, 0);
 
 // Dollar summasi uchun — raqam va bitta o'nlik nuqta
@@ -184,7 +185,21 @@ function Row({
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState(o.status);
   const [receiptOpen, setReceiptOpen] = useState(false);
+  const [warrantyBusy, setWarrantyBusy] = useState(false);
   useEffect(() => setStatus(o.status), [o.status]);
+
+  // Kafolat hujjati — buyurtma sahifasidagi tugma bilan bir xil PDF.
+  // Fayl nomida qo'lda kiritilgan ID raqami (unit_uid) ishlatiladi.
+  async function downloadWarranty() {
+    setWarrantyBusy(true);
+    try {
+      await downloadPdf(`/orders/${o.id}/warranty.pdf`, `kafolat-${o.unit_uid || o.code}.pdf`);
+    } catch {
+      toast.error("Xatolik yuz berdi");
+    } finally {
+      setWarrantyBusy(false);
+    }
+  }
 
   const mainIdx = Math.max(0, o.items.findIndex((it) => it.product?.product_type !== 'additional'));
   const main: OrderItem | undefined = o.items[mainIdx];
@@ -576,6 +591,11 @@ function Row({
         <div className="flex items-center justify-center gap-0.5">
           <button onClick={() => setReceiptOpen(true)} className="p-1 rounded hover:bg-accent/10 text-accent" title="Chek chiqarish (termal printer)">
             <Printer size={14} />
+          </button>
+          <button onClick={downloadWarranty} disabled={warrantyBusy}
+                  className="p-1 rounded hover:bg-emerald-500/10 text-emerald-600 disabled:opacity-50"
+                  title="Kafolat hujjatini yuklab olish (PDF)">
+            <ShieldCheck size={14} />
           </button>
           <button onClick={() => navigate(`/orders/${o.id}`)} className="p-1 rounded hover:bg-black/5 text-ink-soft" title="Ochish">
             <ExternalLink size={14} />

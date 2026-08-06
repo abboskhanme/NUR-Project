@@ -1,4 +1,5 @@
 """Sales orders, items, payments."""
+import re
 import uuid
 from datetime import date, datetime
 from decimal import Decimal
@@ -550,10 +551,13 @@ async def get_order(order_id: uuid.UUID, _: CurrentUser,
 
 # ---- PDF hujjatlar (faktura / kafolat / to'lov kvitansiyasi) ----
 def _pdf_response(data: bytes, filename: str) -> Response:
+    # Fayl nomida qo'lda kiritilgan ID bo'lishi mumkin — sarlavhani buzmasligi
+    # uchun faqat xavfsiz belgilarni qoldiramiz.
+    safe = re.sub(r"[^A-Za-z0-9._-]+", "-", filename).strip("-") or "hujjat.pdf"
     return Response(
         content=data,
         media_type="application/pdf",
-        headers={"Content-Disposition": f'inline; filename="{filename}"'},
+        headers={"Content-Disposition": f'inline; filename="{safe}"'},
     )
 
 
@@ -576,7 +580,8 @@ async def order_invoice(order_id: uuid.UUID, _: CurrentUser,
 async def order_warranty(order_id: uuid.UUID, _: CurrentUser,
                          db: Annotated[AsyncSession, Depends(get_db)]):
     o = await _load_order_for_pdf(db, order_id)
-    return _pdf_response(pdf_service.warranty_certificate_pdf(o), f"kafolat-{o.code}.pdf")
+    return _pdf_response(pdf_service.warranty_certificate_pdf(o),
+                         f"kafolat-{pdf_service.order_doc_id(o)}.pdf")
 
 
 @router.get("/{order_id}/payments/{payment_id}/receipt.pdf")
