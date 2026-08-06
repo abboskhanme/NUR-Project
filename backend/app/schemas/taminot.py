@@ -1,6 +1,7 @@
 """Ta'minot (ichki/tashqi) — Pydantic sxemalar."""
 import uuid
 from datetime import datetime
+from decimal import Decimal
 from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
@@ -152,3 +153,58 @@ class TaminotSummary(BaseModel):
     out_of_stock_count: int = 0  # tugaganlar
     ok_stock_count: int = 0      # yetarli
     tracked_count: int = 0       # harakati bo'lgan (qoldig'i hisoblanadigan) mahsulotlar
+
+
+# ---------------------------------------------------------------------------
+# Xarid spiskasi (draft ro'yxat)
+# ---------------------------------------------------------------------------
+class PurchaseListItemIn(BaseModel):
+    product_id: uuid.UUID
+    qty: Decimal
+
+
+class PurchaseListItemOut(BaseModel):
+    id: uuid.UUID
+    product_id: uuid.UUID
+    product_name: str
+    unit: str
+    qty: Decimal
+    unit_price: Decimal
+    currency: str
+    amount: Decimal          # qty * unit_price
+
+    model_config = {"from_attributes": True}
+
+
+class PurchaseListCreate(BaseModel):
+    scope: str
+    title: Optional[str] = None
+    note: Optional[str] = None
+    items: list[PurchaseListItemIn]
+
+
+class PurchaseListUpdate(BaseModel):
+    title: Optional[str] = None
+    note: Optional[str] = None
+    items: Optional[list[PurchaseListItemIn]] = None
+
+
+class PurchaseListTotal(BaseModel):
+    """Valyuta bo'yicha jami — UZS va USD hech qachon qo'shilmaydi."""
+    currency: str
+    amount: Decimal
+
+
+class PurchaseListOut(BaseModel):
+    id: uuid.UUID
+    scope: str
+    title: Optional[str] = None
+    status: str
+    note: Optional[str] = None
+    applied_at: Optional[datetime] = None
+    created_at: datetime
+    items: list[PurchaseListItemOut] = []
+    totals: list[PurchaseListTotal] = []
+    item_count: int = 0
+
+    model_config = {"from_attributes": True}

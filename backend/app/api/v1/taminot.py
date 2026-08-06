@@ -14,19 +14,24 @@ Qoldiq mahsulotning `min_qty` chegarasidan past bo'lsa — "kam qoldi" (low),
 0 va past bo'lsa — "tugadi" (out) holati qaytariladi.
 """
 import uuid
-from datetime import date
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import case, func, or_, select
+from sqlalchemy import case, delete as sa_delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.dependencies import CurrentUser
 from app.core.permissions import has_permission
 from app.db.session import get_db
-from app.models.taminot import TaminotProduct, TaminotTransaction
+from app.models.taminot import (
+    TaminotProduct, TaminotPurchaseList, TaminotPurchaseListItem, TaminotTransaction,
+)
 from app.schemas.taminot import (
+    PurchaseListCreate, PurchaseListItemIn, PurchaseListItemOut,
+    PurchaseListOut, PurchaseListTotal, PurchaseListUpdate,
     SCOPES,
     ConsumeCreate,
     CurrencyTotal,
@@ -533,3 +538,202 @@ async def transaction_log(
             created_at=tx.created_at,
         ))
     return out
+
+
+# ===========================================================================
+# Xarid spiskasi — ta'minotchi uchun reja ro'yxati
+# ===========================================================================
+def _list_out(pl: TaminotPurchaseList, products: dict[uuid.UUID, TaminotProduct]) -> PurchaseListOut:
+    items: list[PurchaseListItemOut] = []
+    totals: dict[str, Decimal] = {}
+    for it in pl.items:
+        prod = products.get(it.product_id)
+        amount = (Decimal(it.qty) * Decimal(it.unit_price)).quantize(Decimal("0.01"))
+        totals[it.currency] = totals.get(it.currency, Decimal(0)) + amount
+        items.append(PurchaseListItemOut(
+            id=it.id, product_id=it.product_id,
+            product_name=prod.name if prod else "(o'chirilgan mahsulot)",
+            unit=prod.unit if prod else "dona",
+            qty=it.qty, unit_price=it.unit_price, currency=it.currency, amount=amount,
+        ))
+    return PurchaseListOut(
+        id=pl.id, scope=pl.scope, title=pl.title, status=pl.status, note=pl.note,
+        applied_at=pl.applied_at, created_at=pl.created_at,
+        items=items,
+        totals=[PurchaseListTotal(currency=c, amount=a) for c, a in sorted(totals.items())],
+        item_count=len(items),
+    )
+
+
+async def _load_list(db: AsyncSession, list_id: uuid.UUID) -> TaminotPurchaseList:
+    pl = (await db.execute(
+        select(TaminotPurchaseList)
+        .where(TaminotPurchaseList.id == list_id)
+        .options(selectinload(TaminotPurchaseList.items))
+        # populate_existing — sessiyada allaqachon yuklangan obyektni ham
+        # bazadan qayta o'qiydi. Busiz tahrirlashdan keyin eski qatorlar
+        # identity-map keshidan qaytardi.
+        .execution_options(populate_existing=True)
+    )).scalar_one_or_none()
+    if not pl:
+        raise HTTPException(404, "Spiska topilmadi")
+    return pl
+
+
+async def _products_of(db: AsyncSession, ids: list[uuid.UUID]) -> dict[uuid.UUID, TaminotProduct]:
+    if not ids:
+        return {}
+    rows = (await db.execute(
+        select(TaminotProduct).where(TaminotProduct.id.in_(ids))
+    )).scalars().all()
+    return {p.id: p for p in rows}
+
+
+async def _replace_items(db: AsyncSession, pl: TaminotPurchaseList,
+                         items: list[PurchaseListItemIn]) -> None:
+    """Spiska qatorlarini almashtiradi. Narx/valyuta mahsulotdan nusxalanadi."""
+    if not items:
+        raise HTTPException(422, "Spiskada kamida bitta mahsulot bo'lishi kerak")
+    prods = await _products_of(db, [i.product_id for i in items])
+    for it in items:
+        prod = prods.get(it.product_id)
+        if not prod:
+            raise HTTPException(422, "Mahsulot topilmadi")
+        if prod.scope != pl.scope:
+            raise HTTPException(422, f"«{prod.name}» boshqa ta'minot turiga tegishli")
+        if Decimal(str(it.qty)) <= 0:
+            raise HTTPException(422, f"«{prod.name}» miqdori 0 dan katta bo'lishi kerak")
+
+    # Relationship orqali emas, to'g'ridan-to'g'ri DELETE: yangi yaratilgan
+    # spiskada `pl.items` ga murojaat lazy-load chaqirib yuboradi (async
+    # kontekstda MissingGreenlet xatosi).
+    await db.execute(
+        sa_delete(TaminotPurchaseListItem)
+        .where(TaminotPurchaseListItem.list_id == pl.id)
+        .execution_options(synchronize_session="fetch")
+    )
+    await db.flush()
+
+    for it in items:
+        prod = prods[it.product_id]
+        db.add(TaminotPurchaseListItem(
+            list_id=pl.id, product_id=prod.id, qty=Decimal(str(it.qty)),
+            unit_price=prod.unit_price, currency=prod.currency,
+        ))
+
+
+@router.get("/lists", response_model=list[PurchaseListOut])
+async def list_purchase_lists(
+    user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    scope: str = Query(...),
+    status: Optional[str] = None,
+):
+    scope = _require_scope(user, _check_scope(scope), "read")
+    q = select(TaminotPurchaseList).where(TaminotPurchaseList.scope == scope)
+    if status:
+        q = q.where(TaminotPurchaseList.status == status)
+    q = q.order_by(TaminotPurchaseList.created_at.desc()).options(
+        selectinload(TaminotPurchaseList.items)
+    )
+    lists = (await db.execute(q)).scalars().all()
+    prods = await _products_of(db, [i.product_id for pl in lists for i in pl.items])
+    return [_list_out(pl, prods) for pl in lists]
+
+
+@router.post("/lists", response_model=PurchaseListOut, status_code=201)
+async def create_purchase_list(
+    payload: PurchaseListCreate,
+    user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    scope = _require_scope(user, _check_scope(payload.scope), "write")
+    pl = TaminotPurchaseList(
+        scope=scope, title=(payload.title or None), note=(payload.note or None),
+        status="draft", created_by_id=user.id,
+    )
+    db.add(pl)
+    await db.flush()
+    await _replace_items(db, pl, payload.items)
+    await db.commit()
+    pl = await _load_list(db, pl.id)
+    prods = await _products_of(db, [i.product_id for i in pl.items])
+    return _list_out(pl, prods)
+
+
+@router.patch("/lists/{list_id}", response_model=PurchaseListOut)
+async def update_purchase_list(
+    list_id: uuid.UUID,
+    payload: PurchaseListUpdate,
+    user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    pl = await _load_list(db, list_id)
+    _require_scope(user, pl.scope, "write")
+    if pl.status != "draft":
+        raise HTTPException(400, "Qabul qilingan spiskani o'zgartirib bo'lmaydi")
+    if payload.title is not None:
+        pl.title = payload.title or None
+    if payload.note is not None:
+        pl.note = payload.note or None
+    if payload.items is not None:
+        await _replace_items(db, pl, payload.items)
+    await db.commit()
+    pl = await _load_list(db, list_id)
+    prods = await _products_of(db, [i.product_id for i in pl.items])
+    return _list_out(pl, prods)
+
+
+@router.post("/lists/{list_id}/apply", response_model=PurchaseListOut)
+async def apply_purchase_list(
+    list_id: uuid.UUID,
+    user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Spiskani qabul qiladi: har bir qator uchun `purchase` tranzaksiyasi.
+
+    Shu daqiqadan boshlab ombor qoldig'i va qarz hisoblanadi. Bir marta
+    bajariladi — takroriy chaqiruv xato qaytaradi (qo'sh hisoblanmasin).
+    """
+    pl = await _load_list(db, list_id)
+    _require_scope(user, pl.scope, "write")
+    if pl.status == "applied":
+        raise HTTPException(400, "Bu spiska allaqachon qabul qilingan")
+    if not pl.items:
+        raise HTTPException(422, "Spiska bo'sh")
+
+    label = pl.title or "Spiska"
+    for it in pl.items:
+        amount = (Decimal(it.qty) * Decimal(it.unit_price)).quantize(Decimal("0.01"))
+        db.add(TaminotTransaction(
+            product_id=it.product_id,
+            kind="purchase",
+            qty=Decimal(it.qty),
+            unit_price=Decimal(it.unit_price),
+            amount=amount,
+            currency=it.currency,
+            note=f"{label} bo'yicha qabul qilindi",
+            created_by_id=user.id,
+        ))
+    pl.status = "applied"
+    pl.applied_at = datetime.now(timezone.utc)
+    await db.commit()
+    pl = await _load_list(db, list_id)
+    prods = await _products_of(db, [i.product_id for i in pl.items])
+    return _list_out(pl, prods)
+
+
+@router.delete("/lists/{list_id}", status_code=204)
+async def delete_purchase_list(
+    list_id: uuid.UUID,
+    user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Spiskani o'chiradi. Qabul qilinganini o'chirib bo'lmaydi — u bilan
+    yaratilgan tranzaksiyalar tarixda qolishi kerak."""
+    pl = await _load_list(db, list_id)
+    _require_scope(user, pl.scope, "delete")
+    if pl.status == "applied":
+        raise HTTPException(400, "Qabul qilingan spiskani o'chirib bo'lmaydi")
+    await db.delete(pl)
+    await db.commit()

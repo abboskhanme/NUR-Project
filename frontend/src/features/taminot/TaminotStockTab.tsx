@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import {
-  Boxes, AlertTriangle, PackageX, PackageMinus, ClipboardCheck, PackagePlus, Search,
+  Boxes, AlertTriangle, PackageX, ClipboardCheck, PackagePlus, Search, Plus, Minus,
 } from 'lucide-react';
 
 import Card from '@/components/ui/Card';
@@ -182,8 +182,10 @@ export default function TaminotStockTab({
                       <td className="py-2.5 pr-3 text-right whitespace-nowrap text-ink-soft">
                         {formatQty(p.out_qty)}
                       </td>
-                      <td className={cn('py-2.5 pr-3 text-right whitespace-nowrap font-bold', m.value)}>
-                        {formatQty(p.stock, unit)}
+                      <td className="py-2.5 pr-3 text-right whitespace-nowrap"
+                          onClick={(e) => e.stopPropagation()}>
+                        <StockStepper product={p} unit={unit} valueCls={m.value}
+                                      canWrite={canWrite} onAction={onAction} />
                       </td>
                       <td className="py-2.5 pr-3 text-right whitespace-nowrap text-ink-soft">
                         {p.min_qty > 0 ? formatQty(p.min_qty) : '—'}
@@ -231,8 +233,9 @@ export default function TaminotStockTab({
                       </div>
                     </div>
                     <div className="text-right shrink-0">
-                      <div className={cn('font-bold leading-tight', m.value)}>
-                        {formatQty(p.stock, unit)}
+                      <div className="leading-tight" onClick={(e) => e.stopPropagation()}>
+                        <StockStepper product={p} unit={unit} valueCls={m.value}
+                                      canWrite={canWrite} onAction={onAction} />
                       </div>
                       <span className={cn('badge mt-0.5 !px-1.5 !py-0 text-[10px] whitespace-nowrap', m.badge)}>
                         {m.label}
@@ -267,22 +270,51 @@ export default function TaminotStockTab({
   );
 }
 
-/** Bitta mahsulot uchun amal tugmalari (jadval ham, mobil karta ham shuni ishlatadi). */
+/**
+ * Qoldiq + ikki tomonidagi amal tugmalari:
+ *   [−] qoldiq [+]   — chapda sarflash, o'ngda olib kelish.
+ * Tugmalar qoldiq yonida turgani uchun qaysi mahsulotga tegishli ekani aniq
+ * ko'rinadi (ilgari ular alohida ustunda edi).
+ */
+function StockStepper({ product, unit, valueCls, onAction, canWrite }: {
+  product: TaminotProduct;
+  unit: string;
+  valueCls: string;
+  canWrite: boolean;
+  onAction: (product: TaminotProduct, kind: ActionKind) => void;
+}) {
+  const btn = 'w-7 h-7 md:w-6 md:h-6 shrink-0 rounded-button flex items-center justify-center transition';
+  return (
+    <div className="inline-flex items-center gap-1.5">
+      {canWrite && (
+        <button onClick={(e) => { e.stopPropagation(); onAction(product, 'consume'); }}
+                title="Sarflash" aria-label="Sarflash"
+                disabled={product.stock <= 0}
+                className={cn(btn, 'bg-warning/10 text-warning hover:bg-warning/20 disabled:opacity-40')}>
+          <Minus size={14} />
+        </button>
+      )}
+      <span className={cn('font-bold tabular-nums whitespace-nowrap min-w-[3.5rem] text-center', valueCls)}>
+        {formatQty(product.stock, unit)}
+      </span>
+      {canWrite && (
+        <button onClick={(e) => { e.stopPropagation(); onAction(product, 'purchase'); }}
+                title="Olib kelish" aria-label="Olib kelish"
+                className={cn(btn, 'bg-primary/10 text-primary hover:bg-primary/20')}>
+          <Plus size={14} />
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** Qolgan amallar (qoldiqni to'g'rilash) — alohida ustunda. */
 function StockActions({ product, onAction }: {
   product: TaminotProduct;
   onAction: (product: TaminotProduct, kind: ActionKind) => void;
 }) {
   return (
     <div className="flex items-center gap-1.5 justify-end">
-      <button onClick={() => onAction(product, 'purchase')} title="Olib kelish"
-              className="p-2 md:p-1.5 rounded-button bg-primary/10 text-primary hover:bg-primary/20 transition">
-        <PackagePlus size={15} />
-      </button>
-      <button onClick={() => onAction(product, 'consume')} title="Sarflash"
-              disabled={product.stock <= 0}
-              className="p-2 md:p-1.5 rounded-button bg-warning/10 text-warning hover:bg-warning/20 transition disabled:opacity-40">
-        <PackageMinus size={15} />
-      </button>
       <button onClick={() => onAction(product, 'stock')} title="Qoldiqni to'g'rilash"
               className="p-2 md:p-1.5 rounded-button bg-black/5 text-ink-soft hover:bg-black/10 hover:text-ink transition">
         <ClipboardCheck size={15} />

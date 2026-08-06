@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import {
   Plus, Search, Wallet, PackagePlus, PackageMinus, ClipboardCheck, Pencil, Trash2,
   ChevronRight, ChevronLeft, Coins, Building2, Globe, CalendarDays, AlertTriangle, Boxes,
+  ClipboardList,
 } from 'lucide-react';
 
 import { api } from '@/api/client';
@@ -20,6 +21,8 @@ import TaminotActionModal, { type ActionKind } from '@/features/taminot/TaminotA
 import TaminotTransactionsModal from '@/features/taminot/TaminotTransactionsModal';
 import TaminotReportCharts from '@/features/taminot/TaminotReportCharts';
 import TaminotStockTab, { STOCK_META } from '@/features/taminot/TaminotStockTab';
+import TaminotListModal from '@/features/taminot/TaminotListModal';
+import TaminotListsTab from '@/features/taminot/TaminotListsTab';
 
 interface CurrencyTotal {
   currency: string;
@@ -76,7 +79,9 @@ export default function TaminotPage() {
   const canWrite = can(`supply_${scope}:write`);
   const canDelete = can(`supply_${scope}:delete`);
 
-  const [tab, setTab] = useState<'products' | 'stock' | 'reports'>('products');
+  const [tab, setTab] = useState<'products' | 'stock' | 'lists' | 'reports'>('products');
+  // «Spiska qilish» — ta'minotchi uchun xarid ro'yxati (qoralama)
+  const [listModal, setListModal] = useState(false);
   const [search, setSearch] = useState('');
   const [onlyDebt, setOnlyDebt] = useState(false);
   const [lowOnly, setLowOnly] = useState(false);
@@ -242,9 +247,16 @@ export default function TaminotPage() {
           </div>
         </div>
         {canWrite && (
-          <button className="btn-primary w-full sm:w-auto" onClick={() => setEditProduct(null)}>
-            <Plus size={16} /> Yangi mahsulot
-          </button>
+          <div className="flex gap-2 w-full sm:w-auto">
+            <button
+              className="flex-1 sm:flex-none px-3 py-2 rounded-button border border-black/10 hover:bg-black/5 text-sm font-medium inline-flex items-center justify-center gap-1.5"
+              onClick={() => setListModal(true)}>
+              <ClipboardList size={16} /> Spiska qilish
+            </button>
+            <button className="btn-primary flex-1 sm:flex-none" onClick={() => setEditProduct(null)}>
+              <Plus size={16} /> Yangi mahsulot
+            </button>
+          </div>
         )}
       </div>
 
@@ -297,7 +309,7 @@ export default function TaminotPage() {
       {/* Tabs */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex gap-1.5 flex-wrap">
-          {([['products', 'Mahsulotlar'], ['stock', 'Ombor qoldiq'], ['reports', 'Hisobotlar']] as const).map(([key, label]) => (
+          {([['products', 'Mahsulotlar'], ['stock', 'Ombor qoldiq'], ['lists', 'Spiskalar'], ['reports', 'Hisobotlar']] as const).map(([key, label]) => (
             <button key={key} onClick={() => setTab(key)}
               className={cn('px-2.5 sm:px-3 py-1.5 rounded-button text-xs sm:text-sm font-medium transition flex items-center gap-1.5',
                 tab === key ? 'bg-primary text-white' : 'bg-black/5 text-ink-soft hover:bg-black/10')}>
@@ -446,6 +458,9 @@ export default function TaminotPage() {
             </div>
           )}
         </Card>
+      ) : tab === 'lists' ? (
+        /* ===================== SPISKALAR ===================== */
+        <TaminotListsTab scope={scope} canWrite={canWrite} canDelete={canDelete} />
       ) : tab === 'stock' ? (
         /* ===================== OMBOR QOLDIQ ===================== */
         <TaminotStockTab
@@ -578,6 +593,16 @@ export default function TaminotPage() {
       {editProduct !== undefined && (
         <TaminotProductModal scope={scope} product={editProduct}
           onClose={() => setEditProduct(undefined)} onSaved={refetchAll} />
+      )}
+      {listModal && (
+        <TaminotListModal
+          scope={scope}
+          onClose={() => setListModal(false)}
+          onSaved={() => {
+            qc.invalidateQueries({ queryKey: ['taminot-lists'] });
+            setTab('lists');
+          }}
+        />
       )}
       {action && (
         <TaminotActionModal product={action.product} kind={action.kind}

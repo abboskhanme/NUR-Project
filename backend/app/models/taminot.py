@@ -17,10 +17,11 @@ Ombor qoldig'i (miqdor bo'yicha, puldan mustaqil):
 Qoldiq `min_qty` chegarasidan pastga tushsa mahsulot "kam qoldi" hisoblanadi.
 """
 import uuid
+from datetime import datetime
 from decimal import Decimal
 from typing import Optional
 
-from sqlalchemy import ForeignKey, Numeric, String, Text
+from sqlalchemy import DateTime, ForeignKey, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -85,3 +86,57 @@ class TaminotTransaction(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
 
     product: Mapped["TaminotProduct"] = relationship(back_populates="transactions")
+
+
+class TaminotPurchaseList(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    """Xarid spiskasi — ta'minotchi uchun reja ro'yxati.
+
+    Ta'minotchi kerakli mahsulotlarni tanlab, har biridan qancha olib kelishini
+    yozadi. Tizim jami qancha pul kerakligini chiqarib beradi (valyuta bo'yicha
+    alohida) — shu bilan ta'minotchi ketishdan oldin puli aniq bo'ladi.
+
+    `draft` holatida spiska FAQAT REJA: ombor qoldig'iga ham, qarzga ham ta'sir
+    qilmaydi. Mahsulot haqiqatan olib kelinganda «Qabul qilish» bosiladi va har
+    bir qator uchun `purchase` tranzaksiyasi yaratiladi — shundagina qoldiq va
+    qarz hisoblanadi.
+    """
+    __tablename__ = "taminot_purchase_lists"
+
+    scope: Mapped[str] = mapped_column(String(10), nullable=False, index=True)
+    title: Mapped[Optional[str]] = mapped_column(String(255))
+    # draft — reja; applied — qabul qilingan (tranzaksiyalar yaratilgan)
+    status: Mapped[str] = mapped_column(
+        String(10), default="draft", server_default="draft", nullable=False, index=True
+    )
+    note: Mapped[Optional[str]] = mapped_column(Text)
+    applied_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+
+    created_by_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+    )
+
+    items: Mapped[list["TaminotPurchaseListItem"]] = relationship(
+        back_populates="plist", cascade="all, delete-orphan", passive_deletes=True,
+    )
+
+
+class TaminotPurchaseListItem(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    """Spiskadagi bitta qator: mahsulot + miqdor.
+
+    `unit_price` va `currency` spiska tuzilgan paytdagi narxdan nusxalanadi —
+    keyin mahsulot narxi o'zgarsa ham spiskadagi hisob o'zgarmaydi.
+    """
+    __tablename__ = "taminot_purchase_list_items"
+
+    list_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("taminot_purchase_lists.id", ondelete="CASCADE"),
+        index=True,
+    )
+    product_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("taminot_products.id", ondelete="CASCADE"), index=True
+    )
+    qty: Mapped[Decimal] = mapped_column(Numeric(14, 3), default=0)
+    unit_price: Mapped[Decimal] = mapped_column(Numeric(16, 2), default=0)
+    currency: Mapped[str] = mapped_column(String(3), default="UZS")
+
+    plist: Mapped["TaminotPurchaseList"] = relationship(back_populates="items")

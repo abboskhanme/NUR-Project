@@ -34,7 +34,9 @@ from app.models.system import (
 )
 from app.models.debt import DebtProduct, DebtTransaction
 from app.models.target import Target, TargetContribution
-from app.models.taminot import TaminotProduct, TaminotTransaction
+from app.models.taminot import (
+    TaminotProduct, TaminotPurchaseList, TaminotPurchaseListItem, TaminotTransaction,
+)
 from app.models.costing import CostingMaterial, ProductRecipe, ProductRecipeItem
 from app.models.shipping import Shipment
 from app.models.production import ProductionRecord
