@@ -41,9 +41,9 @@ function CashCardSplit(
 ) {
   const f = (v?: number | string) => (usd ? formatUSD(v ?? 0) : formatUZS(v ?? 0));
   return (
-    <div className="flex items-center justify-between text-xs text-ink-soft">
-      <span className="inline-flex items-center gap-1"><Wallet size={12} /> {f(cash)}</span>
-      <span className="inline-flex items-center gap-1"><CreditCard size={12} /> {f(card)}</span>
+    <div className="flex items-center justify-between flex-wrap gap-x-3 gap-y-0.5 text-[11px] sm:text-xs text-ink-soft">
+      <span className="inline-flex items-center gap-1 whitespace-nowrap"><Wallet size={12} className="shrink-0" /> {f(cash)}</span>
+      <span className="inline-flex items-center gap-1 whitespace-nowrap"><CreditCard size={12} className="shrink-0" /> {f(card)}</span>
     </div>
   );
 }

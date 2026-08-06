@@ -18,7 +18,7 @@ body {
 /* Cozy card */
 @layer components {
   .card {
-    @apply bg-card rounded-card shadow-cozy p-5 border border-black/5;
+    @apply bg-card rounded-card shadow-cozy p-4 sm:p-5 border border-black/5;
   }
   .btn {
     @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-button font-medium transition-colors select-none;

@@ -87,34 +87,56 @@ function spColor(name: string): string {
 
 // Oldingi davrga nisbatan o'zgarish. kind: 'pct' — foizda (summa uchun),
 // 'count' — sonda (... ta). invert: o'sish yomon (masalan qoldiq).
-type Trend = { delta: number; kind: 'pct' | 'count'; note: string; invert?: boolean };
+type Trend = {
+  delta: number; kind: 'pct' | 'count'; note: string;
+  /** Telefon uchun qisqa izoh (bo'lmasa to'liq izoh ishlatiladi) */
+  noteShort?: string;
+  invert?: boolean;
+};
 
 function moneyTrend(cur: string | number | undefined, prev: string | number | null | undefined,
-                    note: string, invert = false): Trend | undefined {
+                    note: string, noteShort?: string, invert = false): Trend | undefined {
   if (prev == null) return undefined;
   const c = Number(cur || 0), p = Number(prev || 0);
   if (p <= 0) return undefined; // oldingi davr 0 — foiz hisoblab bo'lmaydi
-  return { delta: Math.round(((c - p) / p) * 100), kind: 'pct', note, invert };
+  return { delta: Math.round(((c - p) / p) * 100), kind: 'pct', note, noteShort, invert };
 }
 function countTrend(cur: number | undefined, prev: number | null | undefined,
-                    note: string, invert = false): Trend | undefined {
+                    note: string, noteShort?: string, invert = false): Trend | undefined {
   if (prev == null) return undefined;
-  return { delta: (cur || 0) - prev, kind: 'count', note, invert };
+  return { delta: (cur || 0) - prev, kind: 'count', note, noteShort, invert };
 }
 
 function TrendBadge({ t }: { t: Trend }) {
-  const { delta, kind, note, invert } = t;
+  const { delta, kind, note, noteShort, invert } = t;
   const unit = kind === 'count' ? ' ta' : '%';
   if (delta === 0) {
-    return <div className="text-xs text-ink-soft mt-1">0{unit} · {note}</div>;
+    return (
+      <div className="text-[11px] sm:text-xs text-ink-soft mt-1">
+        0{unit} · <Note full={note} short={noteShort} />
+      </div>
+    );
   }
   const up = delta > 0;
   const good = invert ? delta < 0 : delta > 0;
   const Icon = up ? TrendingUp : TrendingDown;
   return (
-    <div className={'text-xs mt-1 flex items-center gap-1 ' + (good ? 'text-success' : 'text-danger')}>
-      <Icon size={13} /> {up ? '+' : ''}{delta}{unit} <span className="text-ink-soft">{note}</span>
+    <div className={'text-[11px] sm:text-xs mt-1 ' + (good ? 'text-success' : 'text-danger')}>
+      <Icon size={12} className="inline align-[-2px] mr-0.5" />
+      <span className="font-medium">{up ? '+' : ''}{delta}{unit}</span>{' '}
+      <span className="text-ink-soft"><Note full={note} short={noteShort} /></span>
     </div>
+  );
+}
+
+/** Izoh: telefonda qisqa, sm dan boshlab to'liq ko'rinadi. */
+function Note({ full, short }: { full: string; short?: string }) {
+  if (!short) return <>{full}</>;
+  return (
+    <>
+      <span className="sm:hidden">{short}</span>
+      <span className="hidden sm:inline">{full}</span>
+    </>
   );
 }
 
@@ -165,6 +187,9 @@ export default function OrdersPage() {
 
   const cmpLabel = month === 0 ? "o'tgan yilga nisbatan" : "o'tgan oyga nisbatan";
   const cmp2Label = `o'tgan oyning ${cmp2Day}-sanasigacha`;
+  // Telefon uchun qisqa variant — uzun izoh tor kartada 3-4 qatorga bo'linib ketardi
+  const cmpShort = month === 0 ? "o'tgan yil" : "o'tgan oy";
+  const cmp2Short = `${cmp2Day}-sanagacha`;
 
   const YEARS = Array.from({ length: 5 }, (_, i) => now.getFullYear() - i);
 
@@ -288,32 +313,32 @@ export default function OrdersPage() {
       </div>
 
       {/* KPI — songa oid kartalar (alohida qator) */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
         <Kpi icon={<ShoppingCart size={18} />} label={`Buyurtma · ${periodLabel}`} value={s ? String(s.total_orders) : '—'}
-             trend={s ? countTrend(s.total_orders, s.orders_prev, cmpLabel) : undefined}
-             trend2={s ? countTrend(s.total_orders, s.orders_prev2, cmp2Label) : undefined} />
+             trend={s ? countTrend(s.total_orders, s.orders_prev, cmpLabel, cmpShort) : undefined}
+             trend2={s ? countTrend(s.total_orders, s.orders_prev2, cmp2Label, cmp2Short) : undefined} />
         <Kpi icon={<PackageCheck size={18} />} label={`Yetkazildi · ${periodLabel}`}
              value={s ? String(s.status_counts?.delivered ?? 0) : '—'} accent="text-success"
-             trend={s ? countTrend(s.status_counts?.delivered ?? 0, s.delivered_prev, cmpLabel) : undefined}
-             trend2={s ? countTrend(s.status_counts?.delivered ?? 0, s.delivered_prev2, cmp2Label) : undefined} />
+             trend={s ? countTrend(s.status_counts?.delivered ?? 0, s.delivered_prev, cmpLabel, cmpShort) : undefined}
+             trend2={s ? countTrend(s.status_counts?.delivered ?? 0, s.delivered_prev2, cmp2Label, cmp2Short) : undefined} />
         <Kpi icon={<Clock size={18} />} label={`Qoldi · ${periodLabel}`}
              value={s ? String((s.status_counts?.new ?? 0) + (s.status_counts?.ready ?? 0)) : '—'} accent="text-warning"
-             trend={s ? countTrend((s.status_counts?.new ?? 0) + (s.status_counts?.ready ?? 0), s.pending_prev, cmpLabel) : undefined}
-             trend2={s ? countTrend((s.status_counts?.new ?? 0) + (s.status_counts?.ready ?? 0), s.pending_prev2, cmp2Label) : undefined} />
+             trend={s ? countTrend((s.status_counts?.new ?? 0) + (s.status_counts?.ready ?? 0), s.pending_prev, cmpLabel, cmpShort) : undefined}
+             trend2={s ? countTrend((s.status_counts?.new ?? 0) + (s.status_counts?.ready ?? 0), s.pending_prev2, cmp2Label, cmp2Short) : undefined} />
       </div>
 
       {/* KPI — pulga oid kartalar (alohida qator) */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <Kpi icon={<Wallet size={18} />} label={`Savdo · ${periodLabel}`} value={s ? formatUZS(s.revenue_total) : '—'} accent="text-ink"
-             trend={s ? moneyTrend(s.revenue_total, s.revenue_prev, cmpLabel) : undefined}
-             trend2={s ? moneyTrend(s.revenue_total, s.revenue_prev2, cmp2Label) : undefined} />
+             trend={s ? moneyTrend(s.revenue_total, s.revenue_prev, cmpLabel, cmpShort) : undefined}
+             trend2={s ? moneyTrend(s.revenue_total, s.revenue_prev2, cmp2Label, cmp2Short) : undefined} />
         <Kpi icon={<DollarSign size={18} />} label={`Savdo ($) · ${periodLabel}`}
              value={s && rate > 0 ? formatUSD(Number(s.revenue_total) / rate) : '—'} accent="text-ink"
-             trend={s ? moneyTrend(s.revenue_total, s.revenue_prev, cmpLabel) : undefined}
-             trend2={s ? moneyTrend(s.revenue_total, s.revenue_prev2, cmp2Label) : undefined} />
+             trend={s ? moneyTrend(s.revenue_total, s.revenue_prev, cmpLabel, cmpShort) : undefined}
+             trend2={s ? moneyTrend(s.revenue_total, s.revenue_prev2, cmp2Label, cmp2Short) : undefined} />
         <Kpi icon={<CalendarClock size={18} />} label={`To'langan · ${periodLabel}`} value={s ? formatUZS(s.paid_total) : '—'} accent="text-success"
-             trend={s ? moneyTrend(s.paid_total, s.paid_prev, cmpLabel) : undefined}
-             trend2={s ? moneyTrend(s.paid_total, s.paid_prev2, cmp2Label) : undefined} />
+             trend={s ? moneyTrend(s.paid_total, s.paid_prev, cmpLabel, cmpShort) : undefined}
+             trend2={s ? moneyTrend(s.paid_total, s.paid_prev2, cmp2Label, cmp2Short) : undefined} />
         <Kpi icon={<AlertCircle size={18} />} label={`Qoldiq · ${periodLabel}`}
              value={s ? formatUZS(s.outstanding_total) : '—'} accent="text-danger" />
       </div>
@@ -370,12 +395,13 @@ function Kpi({ icon, label, value, sub, accent, trend, trend2 }: {
   trend?: Trend; trend2?: Trend;
 }) {
   return (
-    <div className="card !p-4">
-      <div className="flex items-center gap-2 text-ink-soft text-xs">
-        <span className="text-primary">{icon}</span> {label}
+    <div className="card !p-3 sm:!p-4">
+      <div className="flex items-start gap-1.5 text-ink-soft text-[11px] sm:text-xs">
+        <span className="text-primary shrink-0">{icon}</span>
+        <span className="min-w-0">{label}</span>
       </div>
-      <div className={'text-2xl font-bold mt-1 ' + (accent ?? 'text-ink')}>{value}</div>
-      {trend ? <TrendBadge t={trend} /> : (sub && <div className="text-xs text-ink-soft mt-0.5">{sub}</div>)}
+      <div className={'text-lg sm:text-2xl font-bold mt-1 break-words ' + (accent ?? 'text-ink')}>{value}</div>
+      {trend ? <TrendBadge t={trend} /> : (sub && <div className="text-[11px] sm:text-xs text-ink-soft mt-0.5">{sub}</div>)}
       {trend2 && <TrendBadge t={trend2} />}
     </div>
   );

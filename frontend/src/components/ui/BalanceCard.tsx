@@ -21,17 +21,22 @@ export default function BalanceCard({
   const good = trend ? (trend.invert ? trend.value <= 0 : trend.value >= 0) : true;
   return (
     <div className="card">
-      <div className="flex items-start justify-between">
-        <div>
-          <div className="text-sm text-ink-soft">{title}</div>
-          <div className="text-2xl font-bold mt-2">{value}</div>
+      <div className="flex items-start justify-between gap-2">
+        {/* min-w-0 — busiz uzun summa ikonkani siqib, o'zi tor ustunga tushib ketadi */}
+        <div className="min-w-0 flex-1">
+          <div className="text-xs sm:text-sm text-ink-soft">{title}</div>
+          <div className="text-xl sm:text-2xl font-bold mt-1.5 sm:mt-2 break-words">{value}</div>
           {trend && (
-            <div className={cn('text-xs mt-1', good ? 'text-success' : 'text-danger')}>
+            <div className={cn('text-[11px] sm:text-xs mt-1', good ? 'text-success' : 'text-danger')}>
               {trend.value >= 0 ? '+' : ''}{trend.value}{trend.kind === 'count' ? ' ta' : '%'} {trend.label}
             </div>
           )}
         </div>
-        {icon && <div className={cn('w-10 h-10 rounded-button flex items-center justify-center', ring)}>{icon}</div>}
+        {icon && (
+          <div className={cn(
+            'shrink-0 w-9 h-9 sm:w-10 sm:h-10 rounded-button flex items-center justify-center', ring,
+          )}>{icon}</div>
+        )}
       </div>
       {action && <div className="mt-3">{action}</div>}
     </div>

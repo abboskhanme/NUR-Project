@@ -51,12 +51,12 @@ const MONTH_LABELS: Record<string, string> = {
 function Split({ cash, card, usd }: { cash?: string; card?: string; usd?: boolean }) {
   const f = (v?: string) => (usd ? formatUSD(v ?? 0) : formatUZS(v ?? 0));
   return (
-    <div className="flex items-center justify-between text-xs text-ink-soft">
-      <span className="inline-flex items-center gap-1">
-        <Wallet size={12} /> {f(cash)}
+    <div className="flex items-center justify-between flex-wrap gap-x-3 gap-y-0.5 text-[11px] sm:text-xs text-ink-soft">
+      <span className="inline-flex items-center gap-1 whitespace-nowrap">
+        <Wallet size={12} className="shrink-0" /> {f(cash)}
       </span>
-      <span className="inline-flex items-center gap-1">
-        <CreditCard size={12} /> {f(card)}
+      <span className="inline-flex items-center gap-1 whitespace-nowrap">
+        <CreditCard size={12} className="shrink-0" /> {f(card)}
       </span>
     </div>
   );
@@ -270,7 +270,7 @@ export default function FinancePage() {
             </select>
           </div>
 
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <BalanceCard title="Kirim (UZS)" value={formatUZS(summary.data?.income_total ?? 0)}
                          icon={<TrendingUp size={18} />} accent="success"
                          action={<Split cash={summary.data?.income_cash} card={summary.data?.income_card} />} />
