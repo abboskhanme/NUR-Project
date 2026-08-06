@@ -16,7 +16,7 @@ const productLabel = (p: ProductOpt) =>
 
 /**
  * Ishlab chiqarilgan tayyor kotyolni ombor skladiga o'tkazish.
- * Parametrlar kotyol yozuvidan oldindan to'ldiriladi (model, ID, yo'nalish, sana, izoh);
+ * Parametrlar kotyol yozuvidan oldindan to'ldiriladi (model, ID, yo'nalish, sana);
  * kerak bo'lsa tahrirlanadi, so'ng `POST /inventory/units` orqali ombor birligi yaratiladi.
  */
 export default function KotyolToWarehouseModal({
@@ -28,7 +28,9 @@ export default function KotyolToWarehouseModal({
   const [uniqueId, setUniqueId] = useState(record.unit_code ?? '');
   const [direction, setDirection] = useState(record.bunker_direction ?? '');
   const [addedDate, setAddedDate] = useState(record.production_date ?? '');
-  const [notes, setNotes] = useState(record.notes ?? '');
+  // Ishlab chiqarish yozuvidagi izohni KO'CHIRMAYMIZ — u modul UI'sidan olib
+  // tashlandi va eski demo qiymatlar ([seed_fill]) omborga o'tib ketmasin.
+  const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
 
   const { data: products } = useQuery<{ items: ProductOpt[] }>({

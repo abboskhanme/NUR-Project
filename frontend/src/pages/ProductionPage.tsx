@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { Plus, Pencil, Trash2, Search, Flame, Boxes, Cylinder, Warehouse, CheckCircle2, Container, CalendarDays } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Flame, Boxes, Cylinder, Warehouse, CheckCircle2, Container, CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react';
 
 import { api } from '@/api/client';
 import Card from '@/components/ui/Card';
@@ -56,28 +56,27 @@ export default function ProductionPage() {
   const [deleteRec, setDeleteRec] = useState<ProductionRecord | null>(null);
   const [xferRec, setXferRec] = useState<ProductionRecord | null>(null);
 
-  // Hisobot davri filtri (oy / yil / kun). month 0 = butun yil, day 0 = butun oy.
+  // Davr filtri — oy / yil (month 0 = butun yil). Kun uchun alohida filtr YO'Q:
+  // ichki bo'limlarda kunlar sahifalash sifatida ishlaydi (pastdagi dayPager).
   const now = new Date();
   const [repYear, setRepYear] = useState(now.getFullYear());
   const [repMonth, setRepMonth] = useState(now.getMonth() + 1);
-  const [repDay, setRepDay] = useState(0);
+  // Sahifalash kursori — tanlangan kun (ISO). Ro'yxatda bo'lmasa birinchisiga tushadi.
+  const [dayCursor, setDayCursor] = useState<string | null>(null);
 
-  const daysInMonth = repMonth === 0 ? 0 : new Date(repYear, repMonth, 0).getDate();
-  const effectiveDay = repMonth !== 0 && repDay >= 1 && repDay <= daysInMonth ? repDay : 0;
   const { dateFrom, dateTo } = useMemo(() => {
     if (repMonth === 0) return { dateFrom: `${repYear}-01-01`, dateTo: `${repYear}-12-31` };
     const last = new Date(repYear, repMonth, 0).getDate();
-    if (effectiveDay === 0)
-      return {
-        dateFrom: `${repYear}-${rpad2(repMonth)}-01`,
-        dateTo: `${repYear}-${rpad2(repMonth)}-${rpad2(last)}`,
-      };
-    const iso = `${repYear}-${rpad2(repMonth)}-${rpad2(effectiveDay)}`;
-    return { dateFrom: iso, dateTo: iso };
-  }, [repYear, repMonth, effectiveDay]);
+    return {
+      dateFrom: `${repYear}-${rpad2(repMonth)}-01`,
+      dateTo: `${repYear}-${rpad2(repMonth)}-${rpad2(last)}`,
+    };
+  }, [repYear, repMonth]);
   const YEARS = Array.from({ length: 5 }, (_, i) => now.getFullYear() - i);
-  const isDefaultPeriod =
-    repYear === now.getFullYear() && repMonth === now.getMonth() + 1 && effectiveDay === 0;
+  const isDefaultPeriod = repYear === now.getFullYear() && repMonth === now.getMonth() + 1;
+  const periodLabel = repMonth === 0
+    ? `${repYear}-yil`
+    : `${REPORT_MONTHS[repMonth]} ${repYear}`;
 
   // KPI kartalar uchun — butun davr (filtrsiz) jami
   const summaryQ = useQuery<Summary>({
@@ -95,17 +94,49 @@ export default function ProductionPage() {
   });
   const rs = reportQ.data;
 
+  // Ichki bo'limlar (kotyol/bunker/garelka/tana) ham xuddi hisobot kabi
+  // tanlangan davr bo'yicha filtrlanadi — kunlik ko'rish uchun.
   const category = tab === 'summary' ? null : tab;
   const recordsQ = useQuery<ProductionRecord[]>({
-    queryKey: ['prod-records', category, search],
+    queryKey: ['prod-records', category, search, dateFrom, dateTo],
     queryFn: () => api.get('/production/records', {
-      params: { category, search: search.trim() || undefined },
+      params: {
+        category,
+        search: search.trim() || undefined,
+        date_from: dateFrom,
+        date_to: dateTo,
+      },
     }).then((r) => r.data),
     enabled: category !== null,
   });
 
   const s = summaryQ.data;
-  const records = recordsQ.data ?? [];
+  const records = useMemo(() => recordsQ.data ?? [], [recordsQ.data]);
+
+  // --- Kunlar bo'yicha sahifalash -----------------------------------------
+  // Yozuvlar bor kunlar (yangidan eskiga). Bo'sh kunlar ro'yxatga tushmaydi —
+  // shunda "keyingi/oldingi" bosganda bo'sh sahifalar orasidan o'tilmaydi.
+  const dayGroups = useMemo(() => {
+    const map = new Map<string, ProductionRecord[]>();
+    for (const r of records) {
+      const list = map.get(r.production_date);
+      if (list) list.push(r);
+      else map.set(r.production_date, [r]);
+    }
+    return [...map.entries()].sort((a, b) => b[0].localeCompare(a[0]));
+  }, [records]);
+
+  // Qidiruv paytida sahifalash o'chadi — natijalar butun oy bo'yicha ko'rsatiladi
+  const searching = search.trim().length > 0;
+  const dayKeys = dayGroups.map(([d]) => d);
+  const activeDay = dayCursor && dayKeys.includes(dayCursor) ? dayCursor : (dayKeys[0] ?? null);
+  const dayIdx = activeDay ? dayKeys.indexOf(activeDay) : -1;
+  const visibleRecords = searching || !activeDay
+    ? records
+    : (dayGroups.find(([d]) => d === activeDay)?.[1] ?? []);
+
+  // Davr jamlanmasi — doim ko'rinib turadi (kun almashsa ham o'zgarmaydi)
+  const periodTotal = records.reduce((sum, r) => sum + (r.quantity ?? 0), 0);
 
   function refresh() {
     qc.invalidateQueries({ queryKey: ['prod-summary'] });
@@ -129,6 +160,35 @@ export default function ProductionPage() {
     d === 'right' ? "Oʻngga" : d === 'left' ? "Chapga" : '—';
 
   const addBtnLabel = category ? ADD_LABELS[category] : null;
+
+  // Davr filtri — hisobotda ham, ichki bo'limlarda ham bir xil ishlaydi
+  const periodFilter = (
+    <div className="flex items-center gap-2 flex-wrap mb-4">
+      <span className="text-sm text-ink-soft inline-flex items-center gap-1.5">
+        <CalendarDays size={15} /> Davr:
+      </span>
+      <select className="input w-36" value={repMonth}
+              onChange={(e) => { setRepMonth(Number(e.target.value)); setDayCursor(null); }}>
+        <option value={0}>Butun yil</option>
+        {Object.entries(REPORT_MONTHS).map(([n, l]) => (
+          <option key={n} value={n}>{l}</option>
+        ))}
+      </select>
+      <select className="input w-24" value={repYear}
+              onChange={(e) => { setRepYear(Number(e.target.value)); setDayCursor(null); }}>
+        {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
+      </select>
+      {!isDefaultPeriod && (
+        <button
+          onClick={() => {
+            setRepYear(now.getFullYear()); setRepMonth(now.getMonth() + 1); setDayCursor(null);
+          }}
+          className="text-xs text-ink-soft hover:text-primary px-2 py-1 rounded-button hover:bg-black/5">
+          Joriy oy
+        </button>
+      )}
+    </div>
+  );
 
   return (
     <div className="space-y-4">
@@ -171,37 +231,7 @@ export default function ProductionPage() {
 
       {tab === 'summary' ? (
         <Card title="Kunlik hisobot">
-          {/* Davr filtri — oy / yil / kun */}
-          <div className="flex items-center gap-2 flex-wrap mb-4">
-            <span className="text-sm text-ink-soft inline-flex items-center gap-1.5">
-              <CalendarDays size={15} /> Davr:
-            </span>
-            <select className="input w-36" value={repMonth}
-                    onChange={(e) => { setRepMonth(Number(e.target.value)); setRepDay(0); }}>
-              <option value={0}>Butun yil</option>
-              {Object.entries(REPORT_MONTHS).map(([n, l]) => (
-                <option key={n} value={n}>{l}</option>
-              ))}
-            </select>
-            <select className="input w-24" value={repYear}
-                    onChange={(e) => { setRepYear(Number(e.target.value)); setRepDay(0); }}>
-              {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
-            </select>
-            <select className="input w-32" value={effectiveDay} disabled={repMonth === 0}
-                    onChange={(e) => setRepDay(Number(e.target.value))}>
-              <option value={0}>Butun oy</option>
-              {Array.from({ length: daysInMonth }, (_, i) => i + 1).map((d) => (
-                <option key={d} value={d}>{d}-kun</option>
-              ))}
-            </select>
-            {!isDefaultPeriod && (
-              <button
-                onClick={() => { setRepYear(now.getFullYear()); setRepMonth(now.getMonth() + 1); setRepDay(0); }}
-                className="text-xs text-ink-soft hover:text-primary px-2 py-1 rounded-button hover:bg-black/5">
-                Joriy oy
-              </button>
-            )}
-          </div>
+          {periodFilter}
 
           {/* Tanlangan davr jamlanmasi */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
@@ -253,6 +283,54 @@ export default function ProductionPage() {
         </Card>
       ) : (
         <Card title={TAB_LABELS[tab]}>
+          {periodFilter}
+
+          {/* Davr jamlanmasi — DOIM ko'rinadi, kun almashsa ham o'zgarmaydi */}
+          <div className="mb-3 rounded-lg bg-black/[0.03] px-3 py-2 text-sm">
+            <b>{periodLabel}</b>{' '}
+            <span className="text-ink-soft">jami:</span>{' '}
+            <b className="tabular-nums">{periodTotal}</b> dona
+            <span className="text-ink-soft"> · {records.length} ta yozuv</span>
+            {dayKeys.length > 0 && (
+              <span className="text-ink-soft"> · {dayKeys.length} kun</span>
+            )}
+          </div>
+
+          {/* Kunlar bo'yicha sahifalash */}
+          {!searching && activeDay && (
+            <div className="mb-4 flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setDayCursor(dayKeys[dayIdx + 1])}
+                  disabled={dayIdx >= dayKeys.length - 1}
+                  title="Oldingi kun"
+                  className="p-1.5 rounded-button border border-black/10 hover:bg-black/5 disabled:opacity-40 disabled:cursor-not-allowed">
+                  <ChevronLeft size={16} />
+                </button>
+                <div className="px-3 py-1.5 text-sm font-medium min-w-[9rem] text-center">
+                  {formatDate(activeDay)}
+                </div>
+                <button
+                  onClick={() => setDayCursor(dayKeys[dayIdx - 1])}
+                  disabled={dayIdx <= 0}
+                  title="Keyingi kun"
+                  className="p-1.5 rounded-button border border-black/10 hover:bg-black/5 disabled:opacity-40 disabled:cursor-not-allowed">
+                  <ChevronRight size={16} />
+                </button>
+                <span className="ml-2 text-xs text-ink-soft tabular-nums">
+                  {dayIdx + 1} / {dayKeys.length}
+                </span>
+              </div>
+              <div className="text-sm">
+                <span className="text-ink-soft">Shu kunda:</span>{' '}
+                <b className="tabular-nums">
+                  {visibleRecords.reduce((sum, r) => sum + (r.quantity ?? 0), 0)}
+                </b>{' '}
+                dona
+              </div>
+            </div>
+          )}
+
           {tab === 'kotyol' && (
             <div className="relative mb-4 w-full max-w-xs">
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft" />
@@ -263,8 +341,8 @@ export default function ProductionPage() {
 
           {recordsQ.isLoading ? (
             <Skeleton />
-          ) : records.length === 0 ? (
-            <EmptyState title="Yozuv topilmadi" description="Yangi yozuv qoʻshing" />
+          ) : visibleRecords.length === 0 ? (
+            <EmptyState title="Yozuv topilmadi" description="Boshqa oyni tanlang yoki yangi yozuv qoʻshing" />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -287,12 +365,11 @@ export default function ProductionPage() {
                     ) : (
                       <th className="py-2 pr-3 text-right">Soni</th>
                     )}
-                    <th className="py-2 pr-3">Izoh</th>
                     <th className="py-2 pr-3"></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {records.map((r) => (
+                  {visibleRecords.map((r) => (
                     <tr key={r.id} className="border-b border-black/5 hover:bg-black/5">
                       <td className="py-2 pr-3 whitespace-nowrap font-medium">{formatDate(r.production_date)}</td>
                       {tab === 'kotyol' ? (
@@ -311,7 +388,6 @@ export default function ProductionPage() {
                       ) : (
                         <td className="py-2 pr-3 text-right font-semibold">{r.quantity}</td>
                       )}
-                      <td className="py-2 pr-3 text-ink-soft">{r.notes ?? '—'}</td>
                       <td className="py-2 pr-3 text-right">
                         <div className="flex items-center justify-end gap-1">
                           {tab === 'kotyol' && (

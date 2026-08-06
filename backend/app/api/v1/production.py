@@ -278,7 +278,9 @@ async def transfer_to_warehouse(record_id: uuid.UUID, payload: RecordTransfer, _
         unique_id=code,
         status="available",
         added_date=payload.added_date or rec.production_date or date.today(),
-        notes=payload.notes if payload.notes is not None else rec.notes,
+        # Izoh FAQAT shu formadan olinadi — ishlab chiqarish yozuvining eski
+        # izohi omborga ko'chib o'tmasin (u modul UI'sidan olib tashlangan).
+        notes=payload.notes,
         bunker_direction=(payload.bunker_direction
                           if payload.bunker_direction is not None
                           else rec.bunker_direction) or None,

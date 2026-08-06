@@ -67,7 +67,6 @@ export default function ProductionModal({
   const [unitCode, setUnitCode] = useState(record?.unit_code ?? '');
   const [bodySize, setBodySize] = useState(record?.body_size ?? '');
   const [qty, setQty] = useState<number | ''>(record?.quantity ?? 1);
-  const [notes, setNotes] = useState(record?.notes ?? '');
   const [saving, setSaving] = useState(false);
 
   // Ombor (kotyol) modellari — ombor moduli endpointidan (inventory:read yetadi)
@@ -97,7 +96,6 @@ export default function ProductionModal({
     try {
       const payload: Record<string, unknown> = {
         production_date: date || null,
-        notes: notes.trim() || null,
       };
       if (isKotyol) {
         payload.product_id = productId;
@@ -203,11 +201,6 @@ export default function ProductionModal({
                      onChange={(e) => setQty(e.target.value === '' ? '' : Number(e.target.value))} />
             </div>
           )}
-
-          <div>
-            <label className="text-xs text-ink-soft">Izoh (ixtiyoriy)</label>
-            <input className="input w-full mt-1" value={notes} onChange={(e) => setNotes(e.target.value)} />
-          </div>
         </div>
 
         <div className="px-5 py-3 border-t border-black/5 flex justify-end gap-2">
