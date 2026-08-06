@@ -303,14 +303,14 @@ export default function OrdersPage() {
 
       {/* KPI — songa oid kartalar (alohida qator) */}
       <div className="grid grid-cols-3 gap-2 sm:gap-3">
-        <Kpi compact icon={<ShoppingCart size={18} />} label={`Buyurtma · ${periodLabel}`} value={s ? String(s.total_orders) : '—'}
+        <Kpi compact icon={<ShoppingCart size={18} />} label="Buyurtma" period={periodLabel} value={s ? String(s.total_orders) : '—'}
              trend={s ? countTrend(s.total_orders, s.orders_prev, cmpLabel) : undefined}
              trend2={s ? countTrend(s.total_orders, s.orders_prev2, cmp2Label) : undefined} />
-        <Kpi compact icon={<PackageCheck size={18} />} label={`Yetkazildi · ${periodLabel}`}
+        <Kpi compact icon={<PackageCheck size={18} />} label="Yetkazildi" period={periodLabel}
              value={s ? String(s.status_counts?.delivered ?? 0) : '—'} accent="text-success"
              trend={s ? countTrend(s.status_counts?.delivered ?? 0, s.delivered_prev, cmpLabel) : undefined}
              trend2={s ? countTrend(s.status_counts?.delivered ?? 0, s.delivered_prev2, cmp2Label) : undefined} />
-        <Kpi compact icon={<Clock size={18} />} label={`Qoldi · ${periodLabel}`}
+        <Kpi compact icon={<Clock size={18} />} label="Qoldi" period={periodLabel}
              value={s ? String((s.status_counts?.new ?? 0) + (s.status_counts?.ready ?? 0)) : '—'} accent="text-warning"
              trend={s ? countTrend((s.status_counts?.new ?? 0) + (s.status_counts?.ready ?? 0), s.pending_prev, cmpLabel) : undefined}
              trend2={s ? countTrend((s.status_counts?.new ?? 0) + (s.status_counts?.ready ?? 0), s.pending_prev2, cmp2Label) : undefined} />
@@ -318,17 +318,17 @@ export default function OrdersPage() {
 
       {/* KPI — pulga oid kartalar (alohida qator) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <Kpi icon={<Wallet size={18} />} label={`Savdo · ${periodLabel}`} value={s ? formatUZS(s.revenue_total) : '—'} accent="text-ink"
+        <Kpi icon={<Wallet size={18} />} label="Savdo" period={periodLabel} value={s ? formatUZS(s.revenue_total) : '—'} accent="text-ink"
              trend={s ? moneyTrend(s.revenue_total, s.revenue_prev, cmpLabel) : undefined}
              trend2={s ? moneyTrend(s.revenue_total, s.revenue_prev2, cmp2Label) : undefined} />
-        <Kpi icon={<DollarSign size={18} />} label={`Savdo ($) · ${periodLabel}`}
+        <Kpi icon={<DollarSign size={18} />} label="Savdo ($)" period={periodLabel}
              value={s && rate > 0 ? formatUSD(Number(s.revenue_total) / rate) : '—'} accent="text-ink"
              trend={s ? moneyTrend(s.revenue_total, s.revenue_prev, cmpLabel) : undefined}
              trend2={s ? moneyTrend(s.revenue_total, s.revenue_prev2, cmp2Label) : undefined} />
-        <Kpi icon={<CalendarClock size={18} />} label={`To'langan · ${periodLabel}`} value={s ? formatUZS(s.paid_total) : '—'} accent="text-success"
+        <Kpi icon={<CalendarClock size={18} />} label="To'langan" period={periodLabel} value={s ? formatUZS(s.paid_total) : '—'} accent="text-success"
              trend={s ? moneyTrend(s.paid_total, s.paid_prev, cmpLabel) : undefined}
              trend2={s ? moneyTrend(s.paid_total, s.paid_prev2, cmp2Label) : undefined} />
-        <Kpi icon={<AlertCircle size={18} />} label={`Qoldiq · ${periodLabel}`}
+        <Kpi icon={<AlertCircle size={18} />} label="Qoldiq" period={periodLabel}
              value={s ? formatUZS(s.outstanding_total) : '—'} accent="text-danger" />
       </div>
 
@@ -379,21 +379,35 @@ export default function OrdersPage() {
   );
 }
 
-function Kpi({ icon, label, value, sub, accent, trend, trend2, compact }: {
+function Kpi({ icon, label, period, value, sub, accent, trend, trend2, compact }: {
   icon: React.ReactNode; label: string; value: string; sub?: string; accent?: string;
+  /** Davr (masalan "Avgust 2026") — tor kartalarda telefonda ko'rsatilmaydi,
+   *  chunki u yuqoridagi davr tanlagichda allaqachon turibdi va sarlavhani
+   *  uch qatorga bo'lib yuborardi. */
+  period?: string;
   trend?: Trend; trend2?: Trend;
-  /** Tor (3 ustunli) kartalar — telefonda trend izohi yashiriladi */
+  /** Tor (3 ustunli) kartalar — telefonda davr va trend izohi yashiriladi */
   compact?: boolean;
 }) {
+  // Tor kartada nol o'zgarish ("0 ta") telefonda ko'rsatilmaydi — izohsiz
+  // holda u ma'no bermaydi va kartani bo'sh qatorlar bilan cho'zadi.
+  const showTrend = (t?: Trend) => !!t && !(compact && t.delta === 0);
   return (
     <div className="card !p-3 sm:!p-4">
-      <div className="flex items-start gap-1.5 text-ink-soft text-[11px] sm:text-xs">
+      <div className="flex items-center gap-1.5 text-ink-soft text-[11px] sm:text-xs">
         <span className="text-primary shrink-0">{icon}</span>
-        <span className="min-w-0">{label}</span>
+        <span className="truncate">
+          {label}
+          {period && (
+            <span className={compact ? 'hidden sm:inline' : ''}> · {period}</span>
+          )}
+        </span>
       </div>
-      <div className={'text-lg sm:text-2xl font-bold mt-1 break-words ' + (accent ?? 'text-ink')}>{value}</div>
-      {trend ? <TrendBadge t={trend} compact={compact} /> : (sub && <div className="text-[11px] sm:text-xs text-ink-soft mt-0.5">{sub}</div>)}
-      {trend2 && <TrendBadge t={trend2} compact={compact} />}
+      <div className={'text-xl sm:text-2xl font-bold mt-1 break-words ' + (accent ?? 'text-ink')}>{value}</div>
+      {showTrend(trend)
+        ? <TrendBadge t={trend!} compact={compact} />
+        : (sub && <div className="text-[11px] sm:text-xs text-ink-soft mt-0.5">{sub}</div>)}
+      {showTrend(trend2) && <TrendBadge t={trend2!} compact={compact} />}
     </div>
   );
 }
