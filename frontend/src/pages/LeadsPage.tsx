@@ -248,7 +248,7 @@ function LeadCard({
       onDragStart={canWrite ? (e) => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', lead.id); onDragStart(); } : undefined}
       onClick={onClick}
       className={cn(
-        'rounded-card border border-black/5 bg-surface p-2.5 shadow-sm hover:shadow transition select-none',
+        'rounded-card border border-black/5 bg-card p-2.5 shadow-sm hover:shadow transition select-none',
         canWrite ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer',
       )}
     >

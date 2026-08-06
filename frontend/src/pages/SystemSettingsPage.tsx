@@ -210,7 +210,7 @@ export default function SystemSettingsPage() {
 
       {/* Yopishqoq saqlash paneli — kontent oqimida, sidebar'ni avtomatik hisobga oladi */}
       {!loading && (
-        <div className="sticky bottom-0 mt-4 -mb-4 sm:-mb-6 py-3 border-t border-black/10 bg-surface/90 backdrop-blur z-20 flex items-center justify-between gap-3">
+        <div className="sticky bottom-0 mt-4 -mb-4 sm:-mb-6 py-3 border-t border-black/10 bg-card/90 backdrop-blur z-20 flex items-center justify-between gap-3">
           <span className="text-sm text-ink-soft">
             {dirty
               ? <><b className="text-ink">{dirty}</b> ta saqlanmagan o'zgarish</>

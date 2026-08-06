@@ -22,7 +22,7 @@ import TaminotTransactionsModal from '@/features/taminot/TaminotTransactionsModa
 import TaminotReportCharts from '@/features/taminot/TaminotReportCharts';
 import TaminotStockTab, { STOCK_META } from '@/features/taminot/TaminotStockTab';
 import TaminotListModal from '@/features/taminot/TaminotListModal';
-import TaminotListsTab from '@/features/taminot/TaminotListsTab';
+import TaminotListsPanel from '@/features/taminot/TaminotListsTab';
 
 interface CurrencyTotal {
   currency: string;
@@ -79,7 +79,7 @@ export default function TaminotPage() {
   const canWrite = can(`supply_${scope}:write`);
   const canDelete = can(`supply_${scope}:delete`);
 
-  const [tab, setTab] = useState<'products' | 'stock' | 'lists' | 'reports'>('products');
+  const [tab, setTab] = useState<'products' | 'stock' | 'reports'>('products');
   // «Spiska qilish» — ta'minotchi uchun xarid ro'yxati (qoralama)
   const [listModal, setListModal] = useState(false);
   const [search, setSearch] = useState('');
@@ -309,7 +309,7 @@ export default function TaminotPage() {
       {/* Tabs */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex gap-1.5 flex-wrap">
-          {([['products', 'Mahsulotlar'], ['stock', 'Ombor qoldiq'], ['lists', 'Spiskalar'], ['reports', 'Hisobotlar']] as const).map(([key, label]) => (
+          {([['products', 'Mahsulotlar'], ['stock', 'Ombor qoldiq'], ['reports', 'Hisobotlar']] as const).map(([key, label]) => (
             <button key={key} onClick={() => setTab(key)}
               className={cn('px-2.5 sm:px-3 py-1.5 rounded-button text-xs sm:text-sm font-medium transition flex items-center gap-1.5',
                 tab === key ? 'bg-primary text-white' : 'bg-black/5 text-ink-soft hover:bg-black/10')}>
@@ -350,6 +350,10 @@ export default function TaminotPage() {
 
       {/* ===================== MAHSULOTLAR ===================== */}
       {tab === 'products' ? (
+        <div className="space-y-3">
+        {/* Qoralama spiskalar — mahsulotlar ro'yxati tepasida. Qoralama
+            bo'lmasa umuman chizilmaydi. */}
+        <TaminotListsPanel scope={scope} canWrite={canWrite} canDelete={canDelete} />
         <Card>
           {productsQ.isLoading ? (
             <div className="space-y-2">
@@ -458,9 +462,7 @@ export default function TaminotPage() {
             </div>
           )}
         </Card>
-      ) : tab === 'lists' ? (
-        /* ===================== SPISKALAR ===================== */
-        <TaminotListsTab scope={scope} canWrite={canWrite} canDelete={canDelete} />
+        </div>
       ) : tab === 'stock' ? (
         /* ===================== OMBOR QOLDIQ ===================== */
         <TaminotStockTab
@@ -598,10 +600,7 @@ export default function TaminotPage() {
         <TaminotListModal
           scope={scope}
           onClose={() => setListModal(false)}
-          onSaved={() => {
-            qc.invalidateQueries({ queryKey: ['taminot-lists'] });
-            setTab('lists');
-          }}
+          onSaved={() => qc.invalidateQueries({ queryKey: ['taminot-lists'] })}
         />
       )}
       {action && (

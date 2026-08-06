@@ -5,7 +5,6 @@ import { ClipboardList, Check, Trash2, ChevronDown, ChevronUp } from 'lucide-rea
 
 import { api } from '@/api/client';
 import Card from '@/components/ui/Card';
-import EmptyState from '@/components/ui/EmptyState';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 import { cn } from '@/lib/cn';
 import { formatDate } from '@/lib/format';
@@ -30,7 +29,7 @@ const fmt = (v: number, currency: string) =>
  * har bir qator uchun olib kelish tranzaksiyasi yaratiladi va shundagina
  * ombor qoldig'i hamda qarz hisoblanadi.
  */
-export default function TaminotListsTab({ scope, canWrite, canDelete }: {
+export default function TaminotListsPanel({ scope, canWrite, canDelete }: {
   scope: string; canWrite: boolean; canDelete: boolean;
 }) {
   const qc = useQueryClient();
@@ -43,7 +42,9 @@ export default function TaminotListsTab({ scope, canWrite, canDelete }: {
     queryKey: ['taminot-lists', scope],
     queryFn: () => api.get('/taminot/lists', { params: { scope } }).then((r) => r.data),
   });
-  const lists = q.data ?? [];
+  // Faqat QORALAMA spiskalar ko'rsatiladi — ular ustida ish qilinadi.
+  // Qabul qilinganlarning natijasi ombor qoldig'i va tranzaksiyalarda ko'rinadi.
+  const lists = (q.data ?? []).filter((l) => l.status === 'draft');
 
   function refresh() {
     qc.invalidateQueries({ queryKey: ['taminot-lists'] });
@@ -77,21 +78,14 @@ export default function TaminotListsTab({ scope, canWrite, canDelete }: {
     } finally { setBusy(false); }
   }
 
-  if (q.isLoading) return <Card><div className="h-24 animate-pulse bg-black/5 rounded" /></Card>;
-
-  if (!lists.length) {
-    return (
-      <Card>
-        <EmptyState title="Spiska yo‘q"
-          description={canWrite
-            ? "«Spiska qilish» tugmasi orqali xarid ro‘yxatini tuzing"
-            : 'Hozircha bo‘sh'} />
-      </Card>
-    );
-  }
+  // Qoralama yo'q bo'lsa panel umuman chizilmaydi
+  if (q.isLoading || !lists.length) return null;
 
   return (
     <div className="space-y-3">
+      <div className="text-sm font-medium text-ink-soft">
+        Qoralama spiskalar ({lists.length})
+      </div>
       {lists.map((pl) => {
         const isDraft = pl.status === 'draft';
         const expanded = open === pl.id;

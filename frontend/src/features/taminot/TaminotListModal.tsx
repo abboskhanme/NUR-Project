@@ -13,8 +13,6 @@ export interface ListProduct {
 
 interface Row { productId: string; qty: string }
 
-const CURRENCY_LABEL: Record<string, string> = { UZS: "so'm", USD: '$' };
-
 const fmt = (v: number, currency: string) =>
   currency === 'USD'
     ? `$${v.toLocaleString('en-US', { maximumFractionDigits: 2 })}`
@@ -90,7 +88,7 @@ export default function TaminotListModal({
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-3 sm:p-4"
          onClick={onClose}>
-      <div className="bg-surface rounded-card w-full max-w-2xl shadow-lg max-h-[92vh] flex flex-col"
+      <div className="bg-card rounded-card w-full max-w-2xl shadow-lg max-h-[92vh] flex flex-col"
            onClick={(e) => e.stopPropagation()}>
         <div className="px-4 sm:px-5 py-3 border-b border-black/5 flex items-center justify-between">
           <div>
@@ -200,4 +198,3 @@ export default function TaminotListModal({
   );
 }
 
-export { CURRENCY_LABEL };
