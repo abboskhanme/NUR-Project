@@ -230,7 +230,7 @@ def _signature_block(st: dict, labels: tuple[str, str] = ("Sotuvchi", "Mijoz")) 
     return t
 
 
-# ---- Imzo / pechat rasmlari -------------------------------------------------
+# ---- Imzo rasmlari ----------------------------------------------------------
 #  Rasmlar `app/assets/docs` (yoki DOC_ASSETS_DIR) papkasidan olinadi. Fayl
 #  qo'yilmagan bo'lsa hujjat baribir chiqadi — faqat imzo chizig'i bo'sh qoladi.
 _ASSET_EXTS = (".png", ".jpg", ".jpeg", ".webp")
@@ -255,18 +255,16 @@ def _asset(base_name: str) -> Optional[str]:
 
 
 class _SignatureRow(Flowable):
-    """Ikkita imzo maydoni (chap/o'ng) va ular orasida pechat.
+    """Ikkita imzo maydoni (chap/o'ng).
 
-    Imzo hamda pechat rasmlari mavjud bo'lsa avtomatik chiziladi — hujjatni
-    qo'lda imzolab, pechat bosish shart bo'lmaydi. Rasm topilmasa imzo chizig'i
-    bo'sh qoladi (qo'lda imzolash uchun).
+    Imzo rasmlari mavjud bo'lsa avtomatik chiziladi — hujjatni qo'lda imzolash
+    shart bo'lmaydi. Rasm topilmasa imzo chizig'i bo'sh qoladi.
     """
 
-    def __init__(self, entries: list[dict], stamp_path: Optional[str] = None,
-                 height: float = 40 * mm, hint: str = "(imzo / F.I.Sh.)"):
+    def __init__(self, entries: list[dict], height: float = 40 * mm,
+                 hint: str = "(imzo / F.I.Sh.)"):
         super().__init__()
         self.entries = entries
-        self.stamp_path = stamp_path
         self.hint = hint
         self.width = 170 * mm
         self.height = height
@@ -324,13 +322,9 @@ class _SignatureRow(Flowable):
                 c.setFillColor(INK_SOFT)
                 c.drawString(x, line_y - 4.5 * mm, self.hint)
 
-        if self.stamp_path:
-            self._image(self.stamp_path, self.width / 2, line_y + 9 * mm,
-                        42 * mm, 42 * mm)
-
 
 def _department_signatures(L: dict) -> _SignatureRow:
-    """Savdo va Servis bo'limi imzolari + o'rtada kompaniya pechati."""
+    """Savdo va Servis bo'limi imzolari."""
     return _SignatureRow(
         [
             {"title": L["sign_sales"], "name": settings.DOC_SALES_SIGNER,
@@ -338,7 +332,6 @@ def _department_signatures(L: dict) -> _SignatureRow:
             {"title": L["sign_service"], "name": settings.DOC_SERVICE_SIGNER,
              "image": _asset("imzo-servis")},
         ],
-        stamp_path=_asset("pechat"),
         hint=L["sign_hint"],
     )
 

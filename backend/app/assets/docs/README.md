@@ -1,21 +1,19 @@
-# Hujjat imzolari va pechat
+# Hujjat imzolari
 
-Kafolat sertifikatiga **avtomatik** qo'yiladigan rasmlar shu papkada turadi.
-Fayl nomlari qat'iy (kengaytma: `.png`, `.jpg`, `.jpeg`, `.webp` — birinchi
-topilgani ishlatiladi):
+Kafolat sertifikatiga **avtomatik** qo'yiladigan imzo rasmlari shu papkada
+turadi. Fayl nomlari qat'iy (kengaytma: `.png`, `.jpg`, `.jpeg`, `.webp` —
+birinchi topilgani ishlatiladi):
 
-| Fayl             | Nima uchun                              |
-|------------------|-----------------------------------------|
-| `imzo-savdo.png` | Savdo bo'limi mas'ul xodimining imzosi   |
-| `imzo-servis.png`| Servis bo'limi mas'ul xodimining imzosi  |
-| `pechat.png`     | Kompaniya pechati (imzolar orasida)      |
+| Fayl              | Nima uchun                              |
+|-------------------|-----------------------------------------|
+| `imzo-savdo.png`  | Savdo bo'limi mas'ul xodimining imzosi   |
+| `imzo-servis.png` | Servis bo'limi mas'ul xodimining imzosi  |
 
 Talablar:
 
 - **Fon shaffof PNG** bo'lgani ma'qul (oq fon hujjatda quti bo'lib ko'rinadi).
-- Imzo uchun taxminan 600×250 px, pechat uchun 600×600 px yetarli.
-- Rasm nisbati saqlanadi: imzo maks. 54×16 mm, pechat maks. 38×38 mm doirasiga
-  joylashtiriladi.
+- Taxminan 600×250 px yetarli; atrofidagi bo'sh joy kesilgan bo'lsin.
+- Rasm nisbati saqlanadi: maks. 50×18 mm doirasiga joylashtiriladi.
 
 Fayl qo'yilmasa hujjat baribir chiqadi — o'sha joyda bo'sh imzo chizig'i qoladi
 (qo'lda imzolash uchun).
