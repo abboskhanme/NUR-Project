@@ -9,10 +9,13 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 # System deps for asyncpg, bcrypt, reportlab fonts, etc.
+# fonts-dejavu-core — PDF hujjatlarda KIRILL yozuvi uchun shart (reportlab bilan
+# keladigan Vera shriftida kirill glifi yo'q — matn bo'sh chiqib qoladi).
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libpq-dev \
     curl \
+    fonts-dejavu-core \
  && rm -rf /var/lib/apt/lists/*
 
 # Install Python deps first (for layer caching)

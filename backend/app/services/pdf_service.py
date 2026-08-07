@@ -7,6 +7,7 @@ ham qo'llab-quvvatlanadi, aks holda Helvetica'ga qaytadi.
 from __future__ import annotations
 
 import io
+import logging
 import os
 from datetime import date, timedelta
 from decimal import Decimal
@@ -31,6 +32,8 @@ from reportlab.platypus import (
 
 from app.core.config import settings
 
+log = logging.getLogger(__name__)
+
 # Brend ranglari (frontend bilan mos: #1E3A5F asosiy, #2980B9 akssent)
 BRAND_PRIMARY = colors.HexColor("#1E3A5F")
 BRAND_ACCENT = colors.HexColor("#2980B9")
@@ -43,11 +46,21 @@ _FONT_BOLD = "Helvetica-Bold"
 _FONT_REGISTERED = False
 
 
+def _has_cyrillic(ttf_path: str) -> bool:
+    """TTF ichida kirill glifi bormi (kafolat hujjati kirill/ruschada chiqadi)."""
+    try:
+        return ord("А") in TTFont("nur_probe", ttf_path).face.charToGlyph
+    except Exception:  # pragma: no cover — buzuq shriftni mos emas deb hisoblaymiz
+        return False
+
+
 def _register_fonts() -> None:
     """Yunikod TTF shriftni topib ro'yxatdan o'tkazadi (bir marta).
 
-    reportlab bilan keladigan Vera shriftlari kirill/lotinni qo'llaydi; tizimda
-    DejaVu bo'lsa ham ishlatamiz. Topilmasa Helvetica (lotin) qoladi.
+    Kafolat sertifikati KIRILL va RUS tilida chiqadi, shuning uchun kirill
+    glifi bor shrift (DejaVu) birinchi o'ringa qo'yiladi. reportlab bilan
+    keladigan Vera'da kirill YO'Q — u faqat oxirgi chora sifatida ishlatiladi
+    (u holda kirill matn bo'sh chiqadi, shu sababli ogohlantirish yoziladi).
     """
     global _FONT, _FONT_BOLD, _FONT_REGISTERED
     if _FONT_REGISTERED:
@@ -61,7 +74,7 @@ def _register_fonts() -> None:
     except Exception:  # pragma: no cover
         rl_fonts = ""
 
-    # (oddiy, qalin) shrift juftliklari — birinchi mavjud bo'lgani tanlanadi
+    # (oddiy, qalin) shrift juftliklari — kirillni qo'llaydigani ustun
     candidates = [
         (
             os.path.join(rl_fonts, "DejaVuSans.ttf"),
@@ -76,20 +89,32 @@ def _register_fonts() -> None:
             os.path.join(rl_fonts, "VeraBd.ttf"),
         ),
     ]
-    for regular, bold in candidates:
-        try:
-            if os.path.exists(regular) and os.path.exists(bold):
-                pdfmetrics.registerFont(TTFont("NurSans", regular))
-                pdfmetrics.registerFont(TTFont("NurSans-Bold", bold))
-                # <b>…</b> paragraf ichida ishlashi uchun oila sifatida bog'laymiz
-                pdfmetrics.registerFontFamily(
-                    "NurSans", normal="NurSans", bold="NurSans-Bold",
-                    italic="NurSans", boldItalic="NurSans-Bold",
-                )
-                _FONT, _FONT_BOLD = "NurSans", "NurSans-Bold"
-                return
-        except Exception:  # pragma: no cover — shrift buzuq bo'lsa keyingisiga o'tamiz
-            continue
+    available = [(r, b) for r, b in candidates
+                 if os.path.exists(r) and os.path.exists(b)]
+    if not available:  # pragma: no cover — Helvetica (lotin) qoladi
+        log.warning("PDF: yunikod shrift topilmadi — kirill matn chiqmaydi")
+        return
+
+    chosen = next((pair for pair in available if _has_cyrillic(pair[0])), None)
+    if chosen is None:
+        chosen = available[0]
+        log.warning(
+            "PDF: kirill glifi bor shrift topilmadi (%s ishlatilmoqda) — kafolat "
+            "sertifikatidagi kirill/rus matni BO'SH chiqadi. Yechim: image'ni "
+            "fonts-dejavu-core bilan qayta build qiling.", os.path.basename(chosen[0]),
+        )
+
+    try:
+        pdfmetrics.registerFont(TTFont("NurSans", chosen[0]))
+        pdfmetrics.registerFont(TTFont("NurSans-Bold", chosen[1]))
+        # <b>…</b> paragraf ichida ishlashi uchun oila sifatida bog'laymiz
+        pdfmetrics.registerFontFamily(
+            "NurSans", normal="NurSans", bold="NurSans-Bold",
+            italic="NurSans", boldItalic="NurSans-Bold",
+        )
+        _FONT, _FONT_BOLD = "NurSans", "NurSans-Bold"
+    except Exception:  # pragma: no cover — shrift buzuq bo'lsa Helvetica qoladi
+        log.exception("PDF: shriftni ro'yxatdan o'tkazib bo'lmadi")
 
 
 def _fmt_uzs(value) -> str:
@@ -238,10 +263,11 @@ class _SignatureRow(Flowable):
     """
 
     def __init__(self, entries: list[dict], stamp_path: Optional[str] = None,
-                 height: float = 40 * mm):
+                 height: float = 40 * mm, hint: str = "(imzo / F.I.Sh.)"):
         super().__init__()
         self.entries = entries
         self.stamp_path = stamp_path
+        self.hint = hint
         self.width = 170 * mm
         self.height = height
 
@@ -296,23 +322,24 @@ class _SignatureRow(Flowable):
                 # Na imzo rasmi, na F.I.Sh. bor — qo'lda to'ldirish uchun eslatma
                 c.setFont(_FONT, 7.5)
                 c.setFillColor(INK_SOFT)
-                c.drawString(x, line_y - 4.5 * mm, "(imzo / F.I.Sh.)")
+                c.drawString(x, line_y - 4.5 * mm, self.hint)
 
         if self.stamp_path:
             self._image(self.stamp_path, self.width / 2, line_y + 9 * mm,
                         42 * mm, 42 * mm)
 
 
-def _department_signatures() -> _SignatureRow:
+def _department_signatures(L: dict) -> _SignatureRow:
     """Savdo va Servis bo'limi imzolari + o'rtada kompaniya pechati."""
     return _SignatureRow(
         [
-            {"title": "SAVDO BO'LIMI", "name": settings.DOC_SALES_SIGNER,
+            {"title": L["sign_sales"], "name": settings.DOC_SALES_SIGNER,
              "image": _asset("imzo-savdo")},
-            {"title": "SERVIS BO'LIMI", "name": settings.DOC_SERVICE_SIGNER,
+            {"title": L["sign_service"], "name": settings.DOC_SERVICE_SIGNER,
              "image": _asset("imzo-servis")},
         ],
         stamp_path=_asset("pechat"),
+        hint=L["sign_hint"],
     )
 
 
@@ -328,11 +355,11 @@ def _phones(raw: str) -> list[str]:
     return [_fmt_phone(p) for p in raw.split(",") if p.strip()]
 
 
-def _contacts_box(st: dict) -> Optional[Table]:
+def _contacts_box(st: dict, L: dict) -> Optional[Table]:
     """Savdo va servis bo'limi aloqa raqamlari — kafolat hujjati ostidagi quti."""
     cols = [
-        ("SAVDO BO'LIMI", _phones(settings.DOC_SALES_PHONES)),
-        ("SERVIS XIZMATI", _phones(settings.DOC_SERVICE_PHONES)),
+        (L["sales"], _phones(settings.DOC_SALES_PHONES)),
+        (L["service"], _phones(settings.DOC_SERVICE_PHONES)),
     ]
     if not any(phones for _, phones in cols):
         return None
@@ -369,7 +396,7 @@ def _build(elements: list) -> bytes:
     return buf.getvalue()
 
 
-def _customer_lines(order) -> list[str]:
+def _customer_lines(order, L: Optional[dict] = None) -> list[str]:
     c = order.customer
     if not c:
         return ["—"]
@@ -377,13 +404,13 @@ def _customer_lines(order) -> list[str]:
                                 getattr(c, "address", None)] if x)
     lines = [c.full_name]
     if c.phone:
-        lines.append(f"Tel: {c.phone}")
+        lines.append(f"{(L or {}).get('phone', 'Tel')}: {c.phone}")
     if loc:
         lines.append(loc)
     return lines
 
 
-def _item_label(it) -> str:
+def _item_label(it, L: Optional[dict] = None) -> str:
     p = getattr(it, "product", None)
     if p is not None:
         name = getattr(p, "display_name", None) or getattr(p, "model", None) \
@@ -392,7 +419,9 @@ def _item_label(it) -> str:
             base = str(name)
             d = getattr(it, "bunker_direction", None)
             if d and getattr(p, "product_type", None) != "additional":
-                base += " (o'ng)" if d == "right" else " (chap)" if d == "left" else ""
+                right = (L or {}).get("right", "o'ng")
+                left = (L or {}).get("left", "chap")
+                base += f" ({right})" if d == "right" else f" ({left})" if d == "left" else ""
             return base
     return str(it.product_id)[:8]
 
@@ -546,19 +575,44 @@ def payment_receipt_pdf(order, payment) -> bytes:
 
 
 # ============================================================================
-#  Kafolat sertifikati (warranty certificate)
+#  Kafolat sertifikati (warranty certificate) — o'zbekcha, KIRILL yozuvda
 # ============================================================================
-#  Kafolat shartlari — hujjatda raqamlangan ro'yxat bo'lib chiqadi
-WARRANTY_TERMS = [
-    "Mahsulot jami <b>3 (uch) yil</b> kafolat muddatiga ega.",
-    "<b>1-yil</b> davomida barcha ehtiyot qismlar va servis xizmati mutlaqo bepul.",
-    "Keyingi 2 yil davomida, ya'ni <b>2- va 3-yillar</b> davomida faqat servis "
-    "xizmati bepul, ehtiyot qismlar esa mijoz hisobidan bo'ladi.",
-    "Kafolat noto'g'ri foydalanish, mexanik shikastlanish yoki ruxsatsiz "
-    "ta'mirlash holatlarida bekor qilinishi mumkin.",
-    "Kafolat muddati yuk yetkazilgan va qabul qilingan vaqtdan boshlab "
-    "hisoblanadi.",
-]
+#  Hujjatdagi barcha matn shu lug'atda — tuzilma `_warranty_page`da.
+#  DIQQAT: kirill glifi uchun DejaVu shrifti kerak (Dockerfile: fonts-dejavu-core).
+WARRANTY_TEXT = {
+    "doc_title": "КАФОЛАТ СЕРТИФИКАТИ",
+    "doc_id": "Буюртма ID",
+    "customer": "МИЖОЗ",
+    "phone": "Тел",
+    "product": "МАҲСУЛОТ",
+    "delivered_at": "Етказилган (қабул қилинган) сана",
+    "year1": "1-йил — эҳтиёт қисм + сервис бепул",
+    "year23": "2–3-йил — фақат сервис бепул",
+    "status": "Ҳолат",
+    "not_delivered": "Ҳали етказилмаган — кафолат бошланмаган",
+    "terms_title": "КАФОЛАТ ШАРТЛАРИ",
+    "terms": [
+        "Маҳсулот жами <b>3 (уч) йил</b> кафолат муддатига эга.",
+        "<b>1-йил</b> давомида барча эҳтиёт қисмлар ва сервис хизмати "
+        "мутлақо бепул.",
+        "Кейинги 2 йил давомида, яъни <b>2- ва 3-йиллар</b> давомида фақат "
+        "сервис хизмати бепул, эҳтиёт қисмлар эса мижоз ҳисобидан бўлади. "
+        "Бузилган эҳтиёт қисмни мижоз бизга жўнатиб бериши керак — биз уни "
+        "янгисига алмаштириб берамиз. Йўл (жўнатиш) харажатлари қопланмайди.",
+        "Кафолат нотўғри фойдаланиш, механик шикастланиш ёки рухсатсиз "
+        "таъмирлаш ҳолатларида бекор қилиниши мумкин.",
+        "Кафолат муддати юк етказилган ва қабул қилинган вақтдан бошлаб "
+        "ҳисобланади.",
+    ],
+    "contacts_title": "АЛОҚА УЧУН",
+    "sales": "САВДО БЎЛИМИ",
+    "service": "СЕРВИС ХИЗМАТИ",
+    "sign_sales": "САВДО БЎЛИМИ",
+    "sign_service": "СЕРВИС БЎЛИМИ",
+    "sign_hint": "(имзо / Ф.И.Ш.)",
+    "right": "ўнг",
+    "left": "чап",
+}
 
 
 def order_doc_id(order) -> str:
@@ -571,27 +625,27 @@ def order_doc_id(order) -> str:
     return (getattr(order, "unit_uid", None) or "").strip() or order.code
 
 
-def warranty_certificate_pdf(order) -> bytes:
-    st = _styles()
+def _warranty_page(st: dict, order, L: dict) -> list:
+    """Kafolat sertifikatining bitta varag'i — `L` lug'atidagi tilda."""
     el: list = []
 
     el.append(_company_header(
-        st, "KAFOLAT SERTIFIKATI",
-        [("Buyurtma ID", order_doc_id(order))],
+        st, L["doc_title"],
+        [(L["doc_id"], order_doc_id(order))],
     ))
     el.append(Spacer(1, 3 * mm))
     el.append(_rule())
     el.append(Spacer(1, 6 * mm))
 
-    el.extend(_party_block(st, "MIJOZ", _customer_lines(order)))
+    el.extend(_party_block(st, L["customer"], _customer_lines(order, L)))
     el.append(Spacer(1, 5 * mm))
 
     # Mahsulot(lar)
     prod_lines = []
     for it in order.items:
         sn = f" · S/N: {it.serial_id}" if getattr(it, "serial_id", None) else ""
-        prod_lines.append(f"{_item_label(it)} × {it.quantity}{sn}")
-    el.extend(_party_block(st, "MAHSULOT", prod_lines or ["—"]))
+        prod_lines.append(f"{_item_label(it, L)} × {it.quantity}{sn}")
+    el.extend(_party_block(st, L["product"], prod_lines or ["—"]))
     el.append(Spacer(1, 6 * mm))
 
     # Kafolat muddati
@@ -600,43 +654,49 @@ def warranty_certificate_pdf(order) -> bytes:
         y1 = delivered + timedelta(days=365)
         y3 = delivered + timedelta(days=365 * 3)
         terms = [
-            ["Yetkazilgan (qabul qilingan) sana", _fmt_date(delivered)],
-            ["1-yil — ehtiyot qism + servis bepul",
-             f"{_fmt_date(delivered)} — {_fmt_date(y1)}"],
-            ["2–3-yil — faqat servis bepul", f"{_fmt_date(y1)} — {_fmt_date(y3)}"],
+            [L["delivered_at"], _fmt_date(delivered)],
+            [L["year1"], f"{_fmt_date(delivered)} — {_fmt_date(y1)}"],
+            [L["year23"], f"{_fmt_date(y1)} — {_fmt_date(y3)}"],
         ]
     else:
-        terms = [["Holat", "Hali yetkazilmagan — kafolat boshlanmagan"]]
-    tbl = Table(terms, colWidths=[70 * mm, 80 * mm])
+        terms = [[L["status"], L["not_delivered"]]]
+    # Yorliqlar Paragraph'da — uzun ruscha matn ustunga sig'may qolsa o'raladi
+    rows = [[Paragraph(f'<font color="#64748B">{lab}</font>', st["normal"]),
+             Paragraph(f"<b>{val}</b>", st["normal"])] for lab, val in terms]
+    tbl = Table(rows, colWidths=[78 * mm, 72 * mm])
     tbl.setStyle(TableStyle([
-        ("FONTNAME", (0, 0), (0, -1), _FONT),
-        ("FONTNAME", (1, 0), (1, -1), _FONT_BOLD),
-        ("FONTSIZE", (0, 0), (-1, -1), 10),
-        ("TEXTCOLOR", (0, 0), (0, -1), INK_SOFT),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("LINEBELOW", (0, 0), (-1, -1), 0.5, SOFT_LINE),
+        ("LEFTPADDING", (0, 0), (0, -1), 0),
         ("TOPPADDING", (0, 0), (-1, -1), 6),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
     ]))
     el.append(tbl)
 
     el.append(Spacer(1, 7 * mm))
-    el.append(Paragraph("KAFOLAT SHARTLARI", st["h2"]))
+    el.append(Paragraph(L["terms_title"], st["h2"]))
     el.append(Spacer(1, 2 * mm))
-    for i, line in enumerate(WARRANTY_TERMS, start=1):
+    for i, line in enumerate(L["terms"], start=1):
         el.append(Paragraph(line, st["normal"], bulletText=f"{i}."))
         el.append(Spacer(1, 1.5 * mm))
 
-    contacts = _contacts_box(st)
+    contacts = _contacts_box(st, L)
     if contacts is not None:
         el.append(Spacer(1, 7 * mm))
-        el.append(Paragraph("ALOQA UCHUN", st["h2"]))
+        el.append(Paragraph(L["contacts_title"], st["h2"]))
         el.append(Spacer(1, 2 * mm))
         el.append(contacts)
 
     el.append(Spacer(1, 10 * mm))
-    el.append(_department_signatures())
+    el.append(_department_signatures(L))
     # Mijozga beriladigan hujjat — pastda "tizimda shakllantirildi" izohi yo'q.
-    return _build(el)
+    return el
+
+
+def warranty_certificate_pdf(order) -> bytes:
+    """Kafolat sertifikati — bitta varaq, o'zbekcha (kirill yozuvda)."""
+    st = _styles()
+    return _build(_warranty_page(st, order, WARRANTY_TEXT))
 
 
 def _status_label(status: str) -> str:
