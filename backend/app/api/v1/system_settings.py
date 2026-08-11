@@ -160,7 +160,8 @@ async def agent_config(db: Annotated[AsyncSession, Depends(get_db)]):
 # va 60 kunlik tokenni avtomatik yangilash). Boshqa kalitlarga tegolmaydi —
 # ro'yxat ataylab tor, aks holda servis kaliti butun sozlamani boshqarardi.
 AGENT_WRITABLE_KEYS = frozenset(
-    {"IG_ACCESS_TOKEN", "IG_USER_ID", "IG_TOKEN_ISSUED_AT"}
+    {"IG_ACCESS_TOKEN", "IG_USER_ID", "IG_ACCOUNT_ID", "IG_USERNAME",
+     "IG_TOKEN_ISSUED_AT"}
 )
 
 

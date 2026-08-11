@@ -94,6 +94,10 @@ CATALOG: tuple[SettingItem, ...] = (
     # Quyidagilarni «Ulash» tugmasi avtomatik to'ldiradi — UI'da ko'rinmaydi.
     SettingItem("IG_ACCESS_TOKEN", "Access token", "instagram", secret=True, hidden=True),
     SettingItem("IG_USER_ID", "Instagram User ID", "instagram", hidden=True),
+    # Akkauntning o'z ID'si va username'i — agent webhook'da O'Z izohini
+    # tanish uchun ishlatadi (aks holda o'ziga javob berib halqaga tushadi).
+    SettingItem("IG_ACCOUNT_ID", "Instagram Account ID", "instagram", hidden=True),
+    SettingItem("IG_USERNAME", "Instagram username", "instagram", hidden=True),
     SettingItem("IG_TOKEN_ISSUED_AT", "Token olingan sana", "instagram", hidden=True),
     SettingItem("GRAPH_API_VERSION", "Graph API versiyasi", "instagram",
                 placeholder="v23.0", hidden=True),

@@ -31,6 +31,7 @@ class _MemoryStore:
         self._seen: dict[str, float] = {}
         self._history: dict[str, list[dict]] = {}
         self._paused: dict[str, float] = {}
+        self._rate: dict[str, tuple[float, int]] = {}
 
     async def seen_once(self, key: str, ttl: int) -> bool:
         now = time.time()
@@ -42,6 +43,16 @@ class _MemoryStore:
             return True
         self._seen[key] = now + ttl
         return False
+
+    async def bump_rate(self, key: str, window: int) -> int:
+        """Oynadagi hisoblagichni oshiradi va yangi qiymatini qaytaradi."""
+        now = time.time()
+        exp, cnt = self._rate.get(key, (0.0, 0))
+        if exp < now:
+            exp, cnt = now + window, 0
+        cnt += 1
+        self._rate[key] = (exp, cnt)
+        return cnt
 
     async def get_history(self, user_id: str) -> list[dict]:
         return list(self._history.get(user_id, []))
@@ -81,6 +92,14 @@ class _RedisStore:
         # SET NX: kalit yo'q bo'lsa qo'yadi va True qaytaradi (ya'ni birinchi marta)
         was_set = await self._r.set(f"dedup:{key}", "1", nx=True, ex=ttl)
         return not was_set
+
+    async def bump_rate(self, key: str, window: int) -> int:
+        """Oynadagi hisoblagichni oshiradi va yangi qiymatini qaytaradi."""
+        k = f"rate:{key}"
+        cnt = await self._r.incr(k)
+        if cnt == 1:
+            await self._r.expire(k, window)
+        return int(cnt)
 
     async def get_history(self, user_id: str) -> list[dict]:
         raw = await self._r.lrange(f"hist:{user_id}", 0, -1)

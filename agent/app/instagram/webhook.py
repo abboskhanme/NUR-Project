@@ -63,7 +63,14 @@ async def receive(
     except json.JSONDecodeError:
         return Response(content="bad json", status_code=400)
 
-    events = parse_webhook(payload, settings.IG_USER_ID)
+    # BARCHA ma'lum ID'larimizni beramiz: Instagram webhook'da qaysi birini
+    # yuborishiga ishonib bo'lmaydi, mos kelmasa esa bot o'z izohiga javob
+    # berib cheksiz halqaga tushadi.
+    events = parse_webhook(
+        payload,
+        {settings.IG_USER_ID, settings.IG_ACCOUNT_ID},
+        settings.IG_USERNAME,
+    )
     for event in events:
         background.add_task(process_event, event)
 

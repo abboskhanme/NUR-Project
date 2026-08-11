@@ -18,6 +18,16 @@ from app.telegram import notifier
 
 _agent = SalesAgent()
 
+# XAVFSIZLIK CHEKLOVI (circuit breaker). Bot o'z izohini begona deb hisoblab
+# qolsa cheksiz halqa boshlanadi va akkaunt spam sifatida cheklanishi mumkin.
+# Shuning uchun bir post ostida qisqa vaqtda beriladigan javoblar soni qat'iy
+# cheklangan: normal muloqotda bunga hech qachon yetilmaydi, halqada esa
+# darhol to'xtaydi.
+_COMMENT_LIMIT = 8          # bitta post ostida
+_COMMENT_WINDOW = 600       # 10 daqiqada
+_GLOBAL_LIMIT = 30          # butun akkaunt bo'yicha
+_GLOBAL_WINDOW = 600
+
 
 async def process_event(event: IncomingEvent) -> None:
     # 0. Echo — akkauntimizdan chiqqan xabar. Agar uni bot yubormagan bo'lsa,
@@ -33,6 +43,10 @@ async def process_event(event: IncomingEvent) -> None:
             return
     except Exception as exc:  # noqa: BLE001
         logger.warning("Dedup xatosi (davom etamiz): {}", exc)
+
+    # 1a. Halqadan himoya — izohlar bo'yicha tezlik cheklovi
+    if event.kind == "comment" and not await _within_comment_limits(event):
+        return
 
     # 1b. Operator aralashgan suhbatga bot aralashmaydi
     if event.kind == "dm":
@@ -140,6 +154,34 @@ async def _deliver(event: IncomingEvent, out: AgentOutput) -> None:
             text = _with_disclosure(text)
         await instagram.send_dm(event.sender_id, text)
         await store.mark_sent(event.sender_id, text)
+
+
+async def _within_comment_limits(event: IncomingEvent) -> bool:
+    """Izohga javob berish cheklovdan oshmaganini tekshiradi.
+
+    Xatolik bo'lsa `True` qaytaradi — hisoblagich ishlamay qolgani uchun
+    butun xizmatni to'xtatib qo'yish noto'g'ri bo'lardi.
+    """
+    try:
+        media = event.media_id or "unknown"
+        per_media = await store.bump_rate(f"cmt:{media}", _COMMENT_WINDOW)
+        if per_media > _COMMENT_LIMIT:
+            logger.error(
+                "CHEKLOV: {} post ostida {} daqiqada {} ta javob — TO'XTATILDI. "
+                "Sabab halqa bo'lishi mumkin (bot o'z izohiga javob beryapti).",
+                media, _COMMENT_WINDOW // 60, per_media,
+            )
+            return False
+        total = await store.bump_rate("cmt:all", _GLOBAL_WINDOW)
+        if total > _GLOBAL_LIMIT:
+            logger.error(
+                "CHEKLOV: {} daqiqada jami {} ta izoh javobi — TO'XTATILDI.",
+                _GLOBAL_WINDOW // 60, total,
+            )
+            return False
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Cheklov tekshiruvida xato (davom etamiz): {}", exc)
+    return True
 
 
 def _with_disclosure(text: str) -> str:

@@ -109,8 +109,10 @@ async def connect_callback(request: Request):
     try:
         token, user_id = await _exchange_code(code)
         long_token = await _to_long_lived(token)
-        # user_id ni tokenga qarab aniqlashtiramiz (ba'zan callback'da bo'lmaydi)
-        user_id = user_id or await _fetch_user_id(long_token)
+        # Akkauntning BARCHA identifikatorlarini olamiz — webhook'da o'z
+        # izohimizni tanish uchun ularning hammasi kerak
+        me = await _fetch_me(long_token)
+        user_id = user_id or me.get("user_id") or me.get("id")
     except Exception as exc:  # noqa: BLE001
         logger.exception("Instagram ulashda xato: {}", exc)
         return _page("Ulashda xato", f"<p><code>{exc}</code></p>", ok=False)
@@ -118,6 +120,8 @@ async def connect_callback(request: Request):
     # Ishlab turgan holatda qo'llaymiz (restartsiz)
     settings.IG_ACCESS_TOKEN = long_token
     settings.IG_USER_ID = str(user_id or "")
+    settings.IG_ACCOUNT_ID = str(me.get("id") or "")
+    settings.IG_USERNAME = str(me.get("username") or "")
     settings.IG_TOKEN_ISSUED_AT = datetime.now(timezone.utc).isoformat()
 
     # Webhook maydonlariga obuna (comments + messages)
@@ -131,11 +135,17 @@ async def connect_callback(request: Request):
         {
             "IG_ACCESS_TOKEN": long_token,
             "IG_USER_ID": settings.IG_USER_ID,
+            "IG_ACCOUNT_ID": settings.IG_ACCOUNT_ID,
+            "IG_USERNAME": settings.IG_USERNAME,
             "IG_TOKEN_ISSUED_AT": settings.IG_TOKEN_ISSUED_AT,
         }
     )
 
-    logger.info("Instagram ulandi: user_id={} obuna={} ERP={}", user_id, subscribed, saved)
+    logger.info(
+        "Instagram ulandi: user_id={} account_id={} username={} obuna={} ERP={}",
+        settings.IG_USER_ID, settings.IG_ACCOUNT_ID, settings.IG_USERNAME,
+        subscribed, saved,
+    )
     sub_txt = "ha" if subscribed else "tekshiring"
     saved_txt = "ha" if saved else "YO'Q — tokenni qo'lda kiriting"
     return _page(
@@ -186,17 +196,22 @@ async def _to_long_lived(short_token: str) -> str:
     return resp.json()["access_token"]
 
 
-async def _fetch_user_id(token: str) -> str | None:
+async def _fetch_me(token: str) -> dict:
+    """Akkaunt haqidagi barcha identifikatorlar: `id`, `user_id`, `username`.
+
+    Uchalasi ham kerak: webhook'da `from.id` ba'zan akkauntning o'z `id` si,
+    ba'zan app-scoped `user_id` bo'lib keladi. Bittasiga tayanib qolsak, bot
+    o'z izohini begona deb hisoblab, cheksiz javob halqasiga tushadi.
+    """
     async with httpx.AsyncClient(timeout=20.0) as client:
         resp = await client.get(
             f"{settings.IG_API_BASE.rstrip('/')}/{settings.GRAPH_API_VERSION}/me",
-            params={"fields": "user_id,username", "access_token": token},
+            params={"fields": "id,user_id,username", "access_token": token},
         )
     if resp.status_code != 200:
-        logger.warning("me?fields=user_id {}: {}", resp.status_code, resp.text[:200])
-        return None
-    data = resp.json()
-    return str(data.get("user_id") or data.get("id") or "") or None
+        logger.warning("me?fields=id,user_id {}: {}", resp.status_code, resp.text[:200])
+        return {}
+    return resp.json() or {}
 
 
 # ===========================================================================

@@ -26,11 +26,32 @@ class IncomingEvent:
         return f"{self.kind}:{self.sender_id}:{hash(self.text)}"
 
 
-def parse_webhook(payload: dict[str, Any], self_ig_id: str) -> list[IncomingEvent]:
+def parse_webhook(
+    payload: dict[str, Any],
+    self_ig_ids: set[str] | str,
+    self_username: str = "",
+) -> list[IncomingEvent]:
     """Meta 'instagram' webhook payloadidan hodisalarni ajratadi.
 
-    self_ig_id — bizning IG User ID; o'z izoh/xabarlarimizni o'tkazib yuboramiz.
+    `self_ig_ids` — BIZNING barcha ma'lum identifikatorlarimiz. Ataylab to'plam:
+    Instagram bir joyda app-scoped `user_id`, boshqa joyda akkauntning o'z `id`
+    sini beradi va webhook'da qaysi biri kelishiga ishonib bo'lmaydi. Bitta ID
+    bilan solishtirish xavfli — mos kelmasa bot O'Z izohiga javob berib,
+    cheksiz halqaga tushadi.
+
+    `self_username` — o'sha zaxira tekshiruv: username Instagram'da yagona,
+    shuning uchun ID formatlari qanday bo'lishidan qat'i nazar ishlaydi.
     """
+    ids = {self_ig_ids} if isinstance(self_ig_ids, str) else set(self_ig_ids)
+    ids = {str(i) for i in ids if i}
+    me = (self_username or "").strip().lower()
+
+    def _is_self(frm: dict) -> bool:
+        if str(frm.get("id") or "") in ids:
+            return True
+        uname = (frm.get("username") or "").strip().lower()
+        return bool(me and uname == me)
+
     events: list[IncomingEvent] = []
     for entry in payload.get("entry", []):
         # --- Izohlar (changes[].field == "comments") ---
@@ -39,8 +60,8 @@ def parse_webhook(payload: dict[str, Any], self_ig_id: str) -> list[IncomingEven
                 continue
             value = change.get("value", {}) or {}
             frm = value.get("from", {}) or {}
-            if str(frm.get("id")) == str(self_ig_id):
-                continue  # o'z izohimiz
+            if _is_self(frm):
+                continue  # o'z izohimiz — javob bermaymiz (halqadan saqlanish)
             text = (value.get("text") or "").strip()
             if not text:
                 continue
@@ -69,7 +90,7 @@ def parse_webhook(payload: dict[str, Any], self_ig_id: str) -> list[IncomingEven
             # Echo — akkauntimizdan CHIQQAN xabar. Ikki manba bo'lishi mumkin:
             # botning o'zi yoki operator (telefondagi Instagram ilovasi).
             # Ikkinchisi bo'lsa botni o'sha suhbatda pauza qilamiz (pipeline hal qiladi).
-            if message.get("is_echo") or (self_ig_id and sender == str(self_ig_id)):
+            if message.get("is_echo") or (sender and sender in ids):
                 events.append(
                     IncomingEvent(kind="echo", text=text, sender_id=recipient)
                 )

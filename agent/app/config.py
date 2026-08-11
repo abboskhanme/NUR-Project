@@ -31,7 +31,14 @@ class Settings(BaseSettings):
     IG_APP_SECRET: str = ""      # Instagram App Secret (OAuth + webhook imzosi)
     IG_ACCESS_TOKEN: str = ""    # uzoq muddatli (60 kun, avtomatik yangilanadi)
     IG_TOKEN_ISSUED_AT: str = "" # ISO sana — refresh cron shu bo'yicha hisoblaydi
+    # OAuth qaytargan app-scoped foydalanuvchi ID (masalan 280786152...)
     IG_USER_ID: str = ""
+    # Instagram akkauntining O'ZINING ID'si (masalan 178414158...). Webhook'da
+    # `from.id` AYNAN SHU keladi — IG_USER_ID dan boshqacha bo'lishi mumkin.
+    IG_ACCOUNT_ID: str = ""
+    # Akkaunt username'i — ID formatlari mos kelmay qolsa ham o'z izohimizni
+    # aniqlashning ishonchli zaxira yo'li
+    IG_USERNAME: str = ""
     GRAPH_API_VERSION: str = "v23.0"
 
     # Agentning tashqi (HTTPS) manzili — OAuth redirect va webhook uchun.
