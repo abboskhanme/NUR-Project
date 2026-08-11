@@ -284,6 +284,15 @@ async def list_product_costs(
             sold_count=b.sold_count,
             updated_at=recipe.updated_at if recipe else None,
         ))
+
+    # Foyda (marja) bo'yicha kamayuvchi tartib: eng foydalisi tepada.
+    # Marjasi yo'qlar (tannarx yoki narx kiritilmagan) — eng pastda, o'zaro
+    # model tartibida qoladi (sort barqaror).
+    rows.sort(key=lambda r: (
+        r.margin_percent is None,
+        -(r.margin_percent or 0.0),
+        -(r.profit_uzs or 0.0),
+    ))
     return rows
 
 
