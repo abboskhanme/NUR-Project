@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { Plus, Pencil, Trash2, Search, Flame, Boxes, Cylinder, Warehouse, CheckCircle2, Container, CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Flame, Boxes, Cylinder, Warehouse, CheckCircle2, Container, CalendarDays, CalendarRange, ChevronLeft, ChevronRight } from 'lucide-react';
 
 import { api } from '@/api/client';
 import Card from '@/components/ui/Card';
@@ -63,6 +63,8 @@ export default function ProductionPage() {
   const [repMonth, setRepMonth] = useState(now.getMonth() + 1);
   // Sahifalash kursori — tanlangan kun (ISO). Ro'yxatda bo'lmasa birinchisiga tushadi.
   const [dayCursor, setDayCursor] = useState<string | null>(null);
+  // Ko'rinish: kun bo'yicha sahifalash yoki butun tanlangan oy birdaniga
+  const [wholeMonth, setWholeMonth] = useState(false);
 
   const { dateFrom, dateTo } = useMemo(() => {
     if (repMonth === 0) return { dateFrom: `${repYear}-01-01`, dateTo: `${repYear}-12-31` };
@@ -131,9 +133,15 @@ export default function ProductionPage() {
   const dayKeys = dayGroups.map(([d]) => d);
   const activeDay = dayCursor && dayKeys.includes(dayCursor) ? dayCursor : (dayKeys[0] ?? null);
   const dayIdx = activeDay ? dayKeys.indexOf(activeDay) : -1;
-  const visibleRecords = searching || !activeDay
+  const visibleRecords = searching || wholeMonth || !activeDay
     ? records
     : (dayGroups.find(([d]) => d === activeDay)?.[1] ?? []);
+  const visibleTotal = visibleRecords.reduce((sum, r) => sum + (r.quantity ?? 0), 0);
+
+  // Jadval guruhlari: butun oy rejimida kunlar sarlavha qatori bilan ajratiladi
+  const tableGroups: [string | null, ProductionRecord[]][] =
+    wholeMonth && !searching ? dayGroups : [[null, visibleRecords]];
+  const colCount = tab === 'kotyol' ? 6 : tab === 'tana' ? 5 : 3;
 
   // Davr jamlanmasi — doim ko'rinib turadi (kun almashsa ham o'zgarmaydi)
   const periodTotal = records.reduce((sum, r) => sum + (r.quantity ?? 0), 0);
@@ -286,47 +294,95 @@ export default function ProductionPage() {
           {periodFilter}
 
           {/* Davr jamlanmasi — DOIM ko'rinadi, kun almashsa ham o'zgarmaydi */}
-          <div className="mb-3 rounded-lg bg-black/[0.03] px-3 py-2 text-sm">
-            <b>{periodLabel}</b>{' '}
-            <span className="text-ink-soft">jami:</span>{' '}
-            <b className="tabular-nums">{periodTotal}</b> dona
-            <span className="text-ink-soft"> · {records.length} ta yozuv</span>
-            {dayKeys.length > 0 && (
-              <span className="text-ink-soft"> · {dayKeys.length} kun</span>
-            )}
+          <div className="mb-4 rounded-card border border-primary/20 bg-gradient-to-r from-primary/10 to-primary/[0.02] px-4 py-3.5 flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-3">
+              <span className="w-11 h-11 shrink-0 rounded-button bg-primary/15 text-primary inline-flex items-center justify-center">
+                <CalendarRange size={22} />
+              </span>
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
+                  {periodLabel} jami
+                </div>
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-3xl font-extrabold tabular-nums text-primary leading-tight">
+                    {periodTotal}
+                  </span>
+                  <span className="text-sm font-medium text-ink-soft">dona</span>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-5 pr-1">
+              <div className="text-center">
+                <div className="text-xl font-bold tabular-nums leading-tight">{records.length}</div>
+                <div className="text-xs text-ink-soft">ta yozuv</div>
+              </div>
+              <div className="w-px h-8 bg-black/10" />
+              <div className="text-center">
+                <div className="text-xl font-bold tabular-nums leading-tight">{dayKeys.length}</div>
+                <div className="text-xs text-ink-soft">kun</div>
+              </div>
+            </div>
           </div>
 
-          {/* Kunlar bo'yicha sahifalash */}
+          {/* Kunlar bo'yicha sahifalash / butun oy */}
           {!searching && activeDay && (
             <div className="mb-4 flex items-center justify-between gap-2 flex-wrap">
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setDayCursor(dayKeys[dayIdx + 1])}
-                  disabled={dayIdx >= dayKeys.length - 1}
-                  title="Oldingi kun"
-                  className="p-1.5 rounded-button border border-black/10 hover:bg-black/5 disabled:opacity-40 disabled:cursor-not-allowed">
-                  <ChevronLeft size={16} />
-                </button>
-                <div className="px-3 py-1.5 text-sm font-medium min-w-[9rem] text-center">
-                  {formatDate(activeDay)}
+              {wholeMonth ? (
+                <div className="px-1 py-1.5 text-sm font-medium inline-flex items-center gap-1.5">
+                  <CalendarRange size={16} className="text-primary" />
+                  {periodLabel} — barcha kunlar
+                  <span className="ml-1 text-xs text-ink-soft tabular-nums">
+                    ({dayKeys.length} kun)
+                  </span>
                 </div>
-                <button
-                  onClick={() => setDayCursor(dayKeys[dayIdx - 1])}
-                  disabled={dayIdx <= 0}
-                  title="Keyingi kun"
-                  className="p-1.5 rounded-button border border-black/10 hover:bg-black/5 disabled:opacity-40 disabled:cursor-not-allowed">
-                  <ChevronRight size={16} />
-                </button>
-                <span className="ml-2 text-xs text-ink-soft tabular-nums">
-                  {dayIdx + 1} / {dayKeys.length}
-                </span>
-              </div>
-              <div className="text-sm">
-                <span className="text-ink-soft">Shu kunda:</span>{' '}
-                <b className="tabular-nums">
-                  {visibleRecords.reduce((sum, r) => sum + (r.quantity ?? 0), 0)}
-                </b>{' '}
-                dona
+              ) : (
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setDayCursor(dayKeys[dayIdx + 1])}
+                    disabled={dayIdx >= dayKeys.length - 1}
+                    title="Oldingi kun"
+                    className="p-1.5 rounded-button border border-black/10 hover:bg-black/5 disabled:opacity-40 disabled:cursor-not-allowed">
+                    <ChevronLeft size={16} />
+                  </button>
+                  <div className="px-3 py-1.5 text-sm font-medium min-w-[9rem] text-center">
+                    {formatDate(activeDay)}
+                  </div>
+                  <button
+                    onClick={() => setDayCursor(dayKeys[dayIdx - 1])}
+                    disabled={dayIdx <= 0}
+                    title="Keyingi kun"
+                    className="p-1.5 rounded-button border border-black/10 hover:bg-black/5 disabled:opacity-40 disabled:cursor-not-allowed">
+                    <ChevronRight size={16} />
+                  </button>
+                  <span className="ml-2 text-xs text-ink-soft tabular-nums">
+                    {dayIdx + 1} / {dayKeys.length}
+                  </span>
+                </div>
+              )}
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="text-sm">
+                  <span className="text-ink-soft">
+                    {wholeMonth ? (repMonth === 0 ? 'Butun yilda:' : 'Butun oyda:') : 'Shu kunda:'}
+                  </span>{' '}
+                  <b className="tabular-nums">{visibleTotal}</b> dona
+                </div>
+                {/* Ko'rinishni almashtirish: kun / butun oy */}
+                <div className="inline-flex rounded-button border border-black/10 overflow-hidden text-xs font-medium">
+                  <button
+                    onClick={() => setWholeMonth(false)}
+                    className={'px-2.5 py-1.5 transition-colors ' + (wholeMonth
+                      ? 'text-ink-soft hover:bg-black/5'
+                      : 'bg-primary text-white')}>
+                    Kun boʻyicha
+                  </button>
+                  <button
+                    onClick={() => setWholeMonth(true)}
+                    className={'px-2.5 py-1.5 border-l border-black/10 transition-colors ' + (wholeMonth
+                      ? 'bg-primary text-white'
+                      : 'text-ink-soft hover:bg-black/5')}>
+                    {repMonth === 0 ? 'Butun yil' : 'Butun oy'}
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -369,55 +425,73 @@ export default function ProductionPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {visibleRecords.map((r) => (
-                    <tr key={r.id} className="border-b border-black/5 hover:bg-black/5">
-                      <td className="py-2 pr-3 whitespace-nowrap font-medium">{formatDate(r.production_date)}</td>
-                      {tab === 'kotyol' ? (
-                        <>
-                          <td className="py-2 pr-3 font-mono font-medium">{r.unit_code ?? '—'}</td>
-                          <td className="py-2 pr-3">{r.model ?? '—'}</td>
-                          <td className="py-2 pr-3">{r.kvm ? `${r.kvm} kvm` : '—'}</td>
-                          <td className="py-2 pr-3">{dirLabel(r.bunker_direction)}</td>
-                        </>
-                      ) : tab === 'tana' ? (
-                        <>
-                          <td className="py-2 pr-3 font-medium">{r.body_size ?? '—'}</td>
-                          <td className="py-2 pr-3">{dirLabel(r.bunker_direction)}</td>
-                          <td className="py-2 pr-3 text-right font-semibold">{r.quantity}</td>
-                        </>
-                      ) : (
-                        <td className="py-2 pr-3 text-right font-semibold">{r.quantity}</td>
+                  {tableGroups.map(([day, rows]) => (
+                    <Fragment key={day ?? 'all'}>
+                      {day && (
+                        <tr className="bg-primary/5">
+                          <td colSpan={colCount} className="py-1.5 pr-3 text-xs font-semibold text-ink-soft">
+                            {formatDate(day)}
+                            <span className="text-ink">
+                              {' · '}
+                              <b className="tabular-nums">
+                                {rows.reduce((sum, r) => sum + (r.quantity ?? 0), 0)}
+                              </b>{' '}
+                              dona
+                            </span>
+                          </td>
+                        </tr>
                       )}
-                      <td className="py-2 pr-3 text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          {tab === 'kotyol' && (
-                            r.transferred ? (
-                              <span className="p-1 inline-flex items-center text-success"
-                                    title="Omborga oʻtkazilgan">
-                                <CheckCircle2 size={14} />
-                              </span>
-                            ) : can('inventory:write') ? (
-                              <button onClick={() => setXferRec(r)}
-                                      className="p-1 rounded hover:bg-accent/10 text-accent" title="Omborga oʻtkazish">
-                                <Warehouse size={14} />
-                              </button>
-                            ) : null
+                      {rows.map((r) => (
+                        <tr key={r.id} className="border-b border-black/5 hover:bg-black/5">
+                          <td className="py-2 pr-3 whitespace-nowrap font-medium">{formatDate(r.production_date)}</td>
+                          {tab === 'kotyol' ? (
+                            <>
+                              <td className="py-2 pr-3 font-mono font-medium">{r.unit_code ?? '—'}</td>
+                              <td className="py-2 pr-3">{r.model ?? '—'}</td>
+                              <td className="py-2 pr-3">{r.kvm ? `${r.kvm} kvm` : '—'}</td>
+                              <td className="py-2 pr-3">{dirLabel(r.bunker_direction)}</td>
+                            </>
+                          ) : tab === 'tana' ? (
+                            <>
+                              <td className="py-2 pr-3 font-medium">{r.body_size ?? '—'}</td>
+                              <td className="py-2 pr-3">{dirLabel(r.bunker_direction)}</td>
+                              <td className="py-2 pr-3 text-right font-semibold">{r.quantity}</td>
+                            </>
+                          ) : (
+                            <td className="py-2 pr-3 text-right font-semibold">{r.quantity}</td>
                           )}
-                          {can('production:write') && (
-                            <button onClick={() => setModal({ category: tab, record: r })}
-                                    className="p-1 rounded hover:bg-primary/10 text-primary" title="Tahrirlash">
-                              <Pencil size={14} />
-                            </button>
-                          )}
-                          {can('production:delete') && (
-                            <button onClick={() => setDeleteRec(r)}
-                                    className="p-1 rounded hover:bg-danger/10 text-danger" title="O'chirish">
-                              <Trash2 size={14} />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
+                          <td className="py-2 pr-3 text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              {tab === 'kotyol' && (
+                                r.transferred ? (
+                                  <span className="p-1 inline-flex items-center text-success"
+                                        title="Omborga oʻtkazilgan">
+                                    <CheckCircle2 size={14} />
+                                  </span>
+                                ) : can('inventory:write') ? (
+                                  <button onClick={() => setXferRec(r)}
+                                          className="p-1 rounded hover:bg-accent/10 text-accent" title="Omborga oʻtkazish">
+                                    <Warehouse size={14} />
+                                  </button>
+                                ) : null
+                              )}
+                              {can('production:write') && (
+                                <button onClick={() => setModal({ category: tab, record: r })}
+                                        className="p-1 rounded hover:bg-primary/10 text-primary" title="Tahrirlash">
+                                  <Pencil size={14} />
+                                </button>
+                              )}
+                              {can('production:delete') && (
+                                <button onClick={() => setDeleteRec(r)}
+                                        className="p-1 rounded hover:bg-danger/10 text-danger" title="O'chirish">
+                                  <Trash2 size={14} />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </Fragment>
                   ))}
                 </tbody>
               </table>
