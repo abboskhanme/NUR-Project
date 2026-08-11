@@ -6,6 +6,7 @@ import { usePermissions } from '@/lib/permissions';
 import { useNavItems } from '@/components/layout/navItems';
 
 import LoginPage from '@/pages/LoginPage';
+import LegalPage from '@/pages/LegalPage';
 import AppLayout from '@/components/layout/AppLayout';
 import DashboardPage from '@/pages/DashboardPage';
 import OrdersPage from '@/pages/OrdersPage';
@@ -107,6 +108,11 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      {/* Ochiq huquqiy sahifalar — login TALAB QILINMAYDI.
+          Meta (Instagram) ilovani «Live» rejimiga o'tkazishdan oldin bu
+          manzillarni tekshiradi, shuning uchun ular hammaga ochiq bo'lishi shart. */}
+      <Route path="/privacy" element={<LegalPage />} />
+      <Route path="/data-deletion" element={<LegalPage />} />
       <Route
         path="/"
         element={
