@@ -44,7 +44,10 @@ async def process_event(event: IncomingEvent) -> None:
     except Exception as exc:  # noqa: BLE001
         logger.warning("Dedup xatosi (davom etamiz): {}", exc)
 
-    # 1a. Halqadan himoya — izohlar bo'yicha tezlik cheklovi
+    # 1a. Halqadan zaxira himoya — izohlar bo'yicha tezlik cheklovi.
+    #     Asosiy himoya `parse_webhook` da: o'z izohimiz ID va username bo'yicha
+    #     ajratiladi. Bu esa o'sha tekshiruv qandaydir sabab ishlamay qolsa
+    #     spamning oldini oladi.
     if event.kind == "comment" and not await _within_comment_limits(event):
         return
 

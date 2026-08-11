@@ -196,6 +196,50 @@ async def _to_long_lived(short_token: str) -> str:
     return resp.json()["access_token"]
 
 
+async def ensure_identity() -> bool:
+    """Akkauntimiz ID va username'ini bilishimizga KAFOLAT beradi.
+
+    Nima uchun kerak: webhook'da o'z izohimizni aynan shu ID/username bo'yicha
+    ajratamiz. Bilmasak — bot o'z javobini begona izoh deb hisoblab, o'ziga
+    javob yozadi va cheksiz halqa boshlanadi.
+
+    Ilgari bu qiymatlar faqat «Ulash» tugmasi bosilganda saqlanardi, ya'ni eski
+    ulanishlarda ular bo'sh qolib ketardi. Endi agent ishga tushganda tokendan
+    foydalanib o'zi aniqlaydi va ERP'ga yozib qo'yadi — qo'lda qayta ulash
+    talab qilinmaydi.
+    """
+    if not settings.IG_ACCESS_TOKEN:
+        return False
+    if settings.IG_ACCOUNT_ID and settings.IG_USERNAME:
+        return True  # allaqachon ma'lum
+
+    me = await _fetch_me(settings.IG_ACCESS_TOKEN)
+    if not me:
+        logger.error(
+            "Akkaunt ID sini aniqlab bo'lmadi — bot o'z izohini tanimasligi va "
+            "halqaga tushishi mumkin. Tokenni tekshiring."
+        )
+        return False
+
+    settings.IG_ACCOUNT_ID = str(me.get("id") or "")
+    settings.IG_USERNAME = str(me.get("username") or "")
+    if not settings.IG_USER_ID:
+        settings.IG_USER_ID = str(me.get("user_id") or "")
+
+    from app.remote_config import push_config
+
+    await push_config({
+        "IG_USER_ID": settings.IG_USER_ID,
+        "IG_ACCOUNT_ID": settings.IG_ACCOUNT_ID,
+        "IG_USERNAME": settings.IG_USERNAME,
+    })
+    logger.info(
+        "Akkaunt aniqlandi: account_id={} user_id={} username={}",
+        settings.IG_ACCOUNT_ID, settings.IG_USER_ID, settings.IG_USERNAME,
+    )
+    return True
+
+
 async def _fetch_me(token: str) -> dict:
     """Akkaunt haqidagi barcha identifikatorlar: `id`, `user_id`, `username`.
 
