@@ -24,6 +24,7 @@ class ShipmentCreate(BaseModel):
     driver_name: Optional[str] = None
     driver_phone: Optional[str] = None
     freight: Optional[Decimal] = None
+    freight_paid: bool = False
     card_number: Optional[str] = None
     card_holder: Optional[str] = None
     reason: Optional[str] = None
@@ -43,6 +44,7 @@ class ShipmentUpdate(BaseModel):
     driver_name: Optional[str] = None
     driver_phone: Optional[str] = None
     freight: Optional[Decimal] = None
+    freight_paid: Optional[bool] = None
     card_number: Optional[str] = None
     card_holder: Optional[str] = None
     reason: Optional[str] = None
@@ -62,6 +64,7 @@ class ShipmentOut(ORMBase):
     driver_name: Optional[str] = None
     driver_phone: Optional[str] = None
     freight: Optional[Decimal] = None
+    freight_paid: bool = False
     card_number: Optional[str] = None
     card_holder: Optional[str] = None
     reason: Optional[str] = None

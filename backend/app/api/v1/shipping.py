@@ -33,6 +33,9 @@ async def list_shipments(
     _: CurrentUser,
     year: Optional[int] = Query(None, ge=2000, le=2100),
     month: Optional[int] = Query(None, ge=1, le=12),
+    freight_paid: Optional[bool] = Query(
+        None, description="Yo'l kira holati: true — to'langan, false — qarz",
+    ),
 ):
     """Yuklar ro'yxati. year+month berilsa o'sha oy, aks holda yil/barchasi.
 
@@ -40,6 +43,8 @@ async def list_shipments(
     qo'shilgani yuqorida — shu sabab yangi qator har doim tepaga tushadi.
     """
     q = select(Shipment)
+    if freight_paid is not None:
+        q = q.where(Shipment.freight_paid.is_(freight_paid))
     if year and month:
         start = date(year, month, 1)
         end = date(year, month, calendar.monthrange(year, month)[1])

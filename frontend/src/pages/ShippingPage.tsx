@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import {
   Plus, Trash2, Truck, BarChart3, ClipboardList, Package, Coins,
+  CheckCircle2, AlertCircle, X,
 } from 'lucide-react';
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell,
@@ -31,6 +32,8 @@ export interface Shipment {
   driver_name?: string | null;
   driver_phone?: string | null;
   freight?: string | number | null;
+  /** Yo'l kira shofyorga to'langanmi. false — hali qarz. */
+  freight_paid: boolean;
   card_number?: string | null;
   card_holder?: string | null;
   reason?: string | null;
@@ -39,7 +42,9 @@ export interface Shipment {
 interface Driver { name: string; phone?: string | null; }
 interface ShipProduct { name: string; price_usd: string | number; }
 
-type ColType = 'date' | 'int' | 'money' | 'text' | 'country' | 'region' | 'direction' | 'driver' | 'product';
+type ColType =
+  | 'date' | 'int' | 'money' | 'text' | 'country' | 'region' | 'direction'
+  | 'driver' | 'product' | 'paid';
 interface Col {
   key: keyof Shipment; label: string; type: ColType; px: number;
   align?: string; fmt?: (s: string | number | null | undefined) => string;
@@ -57,6 +62,8 @@ const COLS: Col[] = [
   { key: 'driver_name', label: 'colDriverName', type: 'driver', px: 160 },
   { key: 'driver_phone', label: 'colDriverPhone', type: 'text', px: 152, fmt: formatPhoneInput },
   { key: 'freight', label: 'colFreight', type: 'money', px: 124 },
+  // Yo'l kira to'langanmi — summaning o'zidan keyin turadi
+  { key: 'freight_paid', label: 'colFreightPaid', type: 'paid', px: 132 },
   { key: 'card_number', label: 'colCardNumber', type: 'text', px: 182, fmt: formatCardInput },
   { key: 'card_holder', label: 'colCardHolder', type: 'text', px: 162 },
   { key: 'reason', label: 'colReason', type: 'text', px: 220 },
@@ -66,7 +73,7 @@ const COLS: Col[] = [
 const GROUP_DEFS = [
   { key: 'grpCargo', span: 7, text: 'text-accent', border: 'border-accent' },
   { key: 'grpDriver', span: 2, text: 'text-warning', border: 'border-warning' },
-  { key: 'grpPayment', span: 3, text: 'text-success', border: 'border-success' },
+  { key: 'grpPayment', span: 4, text: 'text-success', border: 'border-success' },
   { key: 'grpStatus', span: 1, text: 'text-danger', border: 'border-danger' },
 ];
 
@@ -97,6 +104,7 @@ const SHIP_TEXT: Record<string, string> = {
   colDriverName: 'Shofyor',
   colDriverPhone: 'Shofyor tel',
   colFreight: "Yo'l kira",
+  colFreightPaid: 'Holati',
   colCardNumber: 'Karta raqami',
   colCardHolder: 'Karta egasi',
   colReason: 'Izoh',
@@ -168,6 +176,8 @@ function Journal() {
   const [delRow, setDelRow] = useState<Shipment | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [adding, setAdding] = useState(false);
+  // Yo'l kira holati filtri: null — hammasi, true — to'langan, false — qarz
+  const [paidFilter, setPaidFilter] = useState<boolean | null>(null);
 
   const yearOptions = [now.getFullYear(), now.getFullYear() - 1, now.getFullYear() - 2];
 
@@ -194,9 +204,21 @@ function Journal() {
   });
   const rate = rateQ.data ?? 0;
 
-  const rows = listQ.data ?? [];
-  const totalFreight = rows.reduce((a, s) => a + Number(s.freight || 0), 0);
-  const totalQty = rows.reduce((a, s) => a + Number(s.qty || 0), 0);
+  const allRows = listQ.data ?? [];
+  // Yig'indilar HAR DOIM butun oy bo'yicha — holat filtri faqat jadvalni
+  // toraytiradi, kartalardagi manzara esa to'liq qolishi kerak.
+  const totalFreight = allRows.reduce((a, s) => a + Number(s.freight || 0), 0);
+  const totalQty = allRows.reduce((a, s) => a + Number(s.qty || 0), 0);
+  const paidFreight = allRows.reduce(
+    (a, s) => a + (s.freight_paid ? Number(s.freight || 0) : 0), 0);
+  const dueFreight = totalFreight - paidFreight;
+
+  // Kartalar filtr vazifasini ham bajaradi: bosilsa shu holatdagi qatorlar qoladi
+  const rows = paidFilter === null ? allRows : allRows.filter((s) => s.freight_paid === paidFilter);
+  // Jadval pastidagi «Jami» — aynan ko'rinib turgan qatorlar bo'yicha
+  const visibleQty = rows.reduce((a, s) => a + Number(s.qty || 0), 0);
+  const visibleFreight = rows.reduce((a, s) => a + Number(s.freight || 0), 0);
+  const visiblePaid = rows.reduce((a, s) => a + (s.freight_paid ? Number(s.freight || 0) : 0), 0);
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ['shipments'] });
@@ -238,10 +260,17 @@ function Journal() {
 
   return (
     <div className="space-y-4">
-      {/* KPI chiplar */}
-      <div className="grid grid-cols-2 gap-3">
+      {/* KPI chiplar. Oxirgi ikkitasi ayni paytda filtr ham: bosilsa jadval
+          faqat o'sha holatdagi qatorlarni ko'rsatadi (qayta bosilsa — bekor). */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <Kpi icon={<Package size={16} />} label="Soni" value={formatNumberInput(String(totalQty))} tone="warning" />
-        <Kpi icon={<Coins size={16} />} label="Jami yo'l kira" value={formatUZS(totalFreight)} tone="success" />
+        <Kpi icon={<Coins size={16} />} label="Jami yo'l kira" value={formatUZS(totalFreight)} tone="ink" />
+        <Kpi icon={<CheckCircle2 size={16} />} label="To'langan" value={formatUZS(paidFreight)} tone="success"
+             active={paidFilter === true}
+             onClick={() => setPaidFilter((p) => (p === true ? null : true))} />
+        <Kpi icon={<AlertCircle size={16} />} label="Qarz (to'lanmagan)" value={formatUZS(dueFreight)} tone="danger"
+             active={paidFilter === false}
+             onClick={() => setPaidFilter((p) => (p === false ? null : false))} />
       </div>
 
       {/* Filter + qo'shish */}
@@ -256,6 +285,20 @@ function Journal() {
           <select className="input !w-auto" value={year} onChange={(e) => setYear(Number(e.target.value))}>
             {yearOptions.map((y) => <option key={y} value={y}>{y}</option>)}
           </select>
+          {/* Yo'l kira holati — kartalar bilan bir xil filtr */}
+          <select className="input !w-auto"
+                  value={paidFilter === null ? '' : String(paidFilter)}
+                  onChange={(e) => setPaidFilter(e.target.value === '' ? null : e.target.value === 'true')}>
+            <option value="">Yo'l kira: hammasi</option>
+            <option value="true">Yo'l kira: to'langan</option>
+            <option value="false">Yo'l kira: qarz</option>
+          </select>
+          {paidFilter !== null && (
+            <button onClick={() => setPaidFilter(null)} title="Filtrni bekor qilish"
+                    className="p-2 rounded-button text-ink-soft hover:bg-black/5 hover:text-ink">
+              <X size={15} />
+            </button>
+          )}
         </div>
         <button className="btn-primary" onClick={addRow} disabled={adding}>
           <Plus size={16} /> Qator qo'shish
@@ -273,7 +316,14 @@ function Journal() {
             {Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-9 rounded bg-black/5 animate-pulse" />)}
           </div>
         ) : rows.length === 0 ? (
-          <div className="p-6"><EmptyState title="Yozuvlar yo'q" description="Yangi qator qo'shing va joyida to'ldiring (Excel kabi)" /></div>
+          <div className="p-6">
+            <EmptyState
+              title={paidFilter === null ? "Yozuvlar yo'q"
+                : paidFilter ? "To'langan yozuv yo'q" : 'Qarz yozuvi yo\'q'}
+              description={paidFilter === null
+                ? 'Yangi qator qo\'shing va joyida to\'ldiring (Excel kabi)'
+                : 'Holat filtrini bekor qilib ko\'ring'} />
+          </div>
         ) : (
           <div className="overflow-auto max-h-[72vh]">
             <table className="text-sm border-collapse table-fixed" style={{ width: tableWidth }}>
@@ -310,12 +360,18 @@ function Journal() {
               <tfoot>
                 <tr className="sticky bottom-0 z-10 font-bold bg-primary-50 [&>td]:py-2 [&>td]:px-2 [&>td]:border-t-2 [&>td]:border-black/10">
                   <td>Jami</td>
-                  <td className="tabular-nums">{formatNumberInput(String(totalQty))}</td>
+                  <td className="tabular-nums">{formatNumberInput(String(visibleQty))}</td>
                   <td colSpan={3} />
                   <td />
                   <td />
                   <td colSpan={2} />
-                  <td className="tabular-nums text-success">{formatUZS(totalFreight)}</td>
+                  <td className="tabular-nums">{formatUZS(visibleFreight)}</td>
+                  {/* Ko'rinib turgan qatorlar bo'yicha to'langan / qarz taqsimoti */}
+                  <td className="text-[11px] leading-tight whitespace-nowrap">
+                    <span className="text-success">{formatUZS(visiblePaid)}</span>
+                    {' / '}
+                    <span className="text-danger">{formatUZS(visibleFreight - visiblePaid)}</span>
+                  </td>
                   <td colSpan={4} />
                 </tr>
               </tfoot>
@@ -340,19 +396,41 @@ const TONE: Record<string, string> = {
   accent: 'bg-accent/10 text-accent',
   warning: 'bg-warning/10 text-warning',
   success: 'bg-success/10 text-success',
+  danger: 'bg-danger/10 text-danger',
   ink: 'bg-ink/5 text-ink',
 };
+// Filtr sifatida ishlayotgan karta tanlanganda ajralib turadi
+const TONE_ACTIVE: Record<string, string> = {
+  accent: 'border-accent bg-accent/[0.06]',
+  warning: 'border-warning bg-warning/[0.06]',
+  success: 'border-success bg-success/[0.06]',
+  danger: 'border-danger bg-danger/[0.06]',
+  ink: 'border-ink/30 bg-ink/[0.04]',
+};
 
-function Kpi({ icon, label, value, tone }: { icon: React.ReactNode; label: string; value: string; tone: string }) {
-  return (
-    <div className="rounded-card border border-black/5 bg-card p-3 flex items-center gap-3">
+function Kpi({ icon, label, value, tone, onClick, active }: {
+  icon: React.ReactNode; label: string; value: string; tone: string;
+  /** Berilsa karta filtr tugmasiga aylanadi */
+  onClick?: () => void;
+  active?: boolean;
+}) {
+  const cls = `rounded-card border p-3 flex items-center gap-3 text-left w-full transition ${
+    active ? TONE_ACTIVE[tone] : 'border-black/5 bg-card'
+  } ${onClick ? 'cursor-pointer hover:border-black/15' : ''}`;
+  const inner = (
+    <>
       <div className={`w-9 h-9 rounded-button flex items-center justify-center shrink-0 ${TONE[tone]}`}>{icon}</div>
       <div className="min-w-0">
-        <div className="text-xs text-ink-soft truncate">{label}</div>
+        <div className="text-xs text-ink-soft truncate">
+          {label}{onClick && active ? ' · filtr yoqilgan' : ''}
+        </div>
         <div className="text-lg font-bold tabular-nums leading-tight truncate">{value}</div>
       </div>
-    </div>
+    </>
   );
+  return onClick
+    ? <button type="button" onClick={onClick} className={cls}>{inner}</button>
+    : <div className={cls}>{inner}</div>;
 }
 
 function Row({ s, zebra, drivers, products, rate, onChanged, onDelete }: {
@@ -412,10 +490,35 @@ function Row({ s, zebra, drivers, products, rate, onChanged, onDelete }: {
     if (Object.keys(body).length) await patch(body);
   }
 
+  // Qator rangi yo'l kira holatiga qarab: to'langan — ochroq yashil, qarz —
+  // ochroq qizil. Yo'l kira hali kiritilmagan qatorlar neytral qoladi, aks
+  // holda har bir yangi bo'sh qator qizil bo'lib chalg'itadi.
+  const freightVal = Number(s.freight || 0);
+  const tone = freightVal > 0
+    ? (s.freight_paid
+        ? 'bg-success/[0.07] hover:bg-success/[0.13]'
+        : 'bg-danger/[0.06] hover:bg-danger/[0.12]')
+    : `hover:bg-accent/[0.04] ${zebra ? 'bg-black/[0.015]' : ''}`;
+
   return (
-    <tr className={`border-b border-black/5 hover:bg-accent/[0.04] transition-colors group ${zebra ? 'bg-black/[0.015]' : ''}`}>
+    <tr className={`border-b border-black/5 transition-colors group ${tone}`}>
       {COLS.map((c) => {
         const v = s[c.key];
+
+        if (c.type === 'paid') {
+          const paid = !!s.freight_paid;
+          return (
+            <td key={c.key} className={td}>
+              <select
+                className={`${SEL} font-medium ${paid ? 'text-success' : 'text-danger'}`}
+                value={paid ? 'true' : 'false'}
+                onChange={(e) => patch({ freight_paid: e.target.value === 'true' })}>
+                <option value="false">To'lanmadi</option>
+                <option value="true">To'landi</option>
+              </select>
+            </td>
+          );
+        }
 
         if (c.type === 'country') {
           return (

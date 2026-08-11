@@ -9,7 +9,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Optional
 
-from sqlalchemy import Date, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy import Boolean, Date, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -32,6 +32,10 @@ class Shipment(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     driver_name: Mapped[Optional[str]] = mapped_column(String(120))       # SHOPIR (ism)
     driver_phone: Mapped[Optional[str]] = mapped_column(String(40))       # SHOPIR TEL
     freight: Mapped[Optional[Decimal]] = mapped_column(Numeric(14, 2))    # YUL KIRA
+    # Yo'l kira shofyorga to'langanmi. False — hali qarz (to'lanmagan).
+    freight_paid: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false", nullable=False, index=True
+    )
     card_number: Mapped[Optional[str]] = mapped_column(String(40))        # KARTA RAQAMI
     card_holder: Mapped[Optional[str]] = mapped_column(String(120))       # KARTA EGASI
     reason: Mapped[Optional[str]] = mapped_column(Text)                   # SABABI
