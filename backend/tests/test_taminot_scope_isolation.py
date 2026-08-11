@@ -53,16 +53,30 @@ def _auth(client, user):
 API = "/api/v1/taminot"
 
 
+async def _supplier(c, scope, name="Umumiy yetkazib beruvchi"):
+    """Har bo'lim uchun alohida yetkazib beruvchi (nomi bir xil bo'lsa ham)."""
+    r = await c.post(f"{API}/suppliers", json={"scope": scope, "name": name})
+    assert r.status_code == 201, r.text
+    return r.json()
+
+
+async def _supplier_balance(c, supplier_id, scope, currency="UZS"):
+    rows = (await c.get(f"{API}/suppliers", params={"scope": scope})).json()
+    sp = next(s for s in rows if s["id"] == supplier_id)
+    return next((t["balance"] for t in sp["totals"] if t["currency"] == currency), 0)
+
+
 async def test_same_name_in_both_scopes_stays_separate(client, db_engine):
     """Bir xil nom ikki bo'limda — ikki alohida mahsulot, qoldiqlar aralashmaydi."""
     admin = await _make_user(db_engine, ["supply_ichki:*", "supply_tashqi:*"])
     c = _auth(client, admin)
 
-    ids = {}
+    ids, sups = {}, {}
     for scope in ("ichki", "tashqi"):
+        sups[scope] = await _supplier(c, scope)
         r = await c.post(f"{API}/products", json={
-            "scope": scope, "name": NAME, "unit": "metr", "unit_price": 1000,
-            "currency": "UZS", "min_qty": 10,
+            "scope": scope, "supplier_id": sups[scope]["id"], "name": NAME,
+            "unit": "metr", "unit_price": 1000, "currency": "UZS", "min_qty": 10,
         })
         assert r.status_code == 201, r.text
         ids[scope] = r.json()["id"]
@@ -85,9 +99,9 @@ async def test_same_name_in_both_scopes_stays_separate(client, db_engine):
     assert ichki[0]["stock"] == 10 and ichki[0]["in_qty"] == 100 and ichki[0]["out_qty"] == 90
     assert tashqi[0]["stock"] == 5 and tashqi[0]["out_qty"] == 0
 
-    # Qarz ham alohida: ichki 100 000, tashqi 5 000
-    assert ichki[0]["balance"] == 100000
-    assert tashqi[0]["balance"] == 5000
+    # Qarz ham alohida (yetkazib beruvchi darajasida): ichki 100 000, tashqi 5 000
+    assert await _supplier_balance(c, sups["ichki"]["id"], "ichki") == 100000
+    assert await _supplier_balance(c, sups["tashqi"]["id"], "tashqi") == 5000
 
 
 async def test_summary_and_log_never_mix_scopes(client, db_engine):
@@ -95,11 +109,15 @@ async def test_summary_and_log_never_mix_scopes(client, db_engine):
     admin = await _make_user(db_engine, ["supply_ichki:*", "supply_tashqi:*"])
     c = _auth(client, admin)
 
+    sup_ich = await _supplier(c, "ichki")
+    sup_tash = await _supplier(c, "tashqi")
     ich = (await c.post(f"{API}/products", json={
-        "scope": "ichki", "name": NAME, "unit": "metr", "unit_price": 1000, "min_qty": 50,
+        "scope": "ichki", "supplier_id": sup_ich["id"], "name": NAME,
+        "unit": "metr", "unit_price": 1000, "min_qty": 50,
     })).json()
     tash = (await c.post(f"{API}/products", json={
-        "scope": "tashqi", "name": NAME, "unit": "metr", "unit_price": 2000,
+        "scope": "tashqi", "supplier_id": sup_tash["id"], "name": NAME,
+        "unit": "metr", "unit_price": 2000,
     })).json()
     await c.post(f"{API}/products/{ich['id']}/purchase", json={"qty": 10, "unit_price": 1000})
     await c.post(f"{API}/products/{tash['id']}/purchase", json={"qty": 3, "unit_price": 2000})
@@ -125,8 +143,10 @@ async def test_scope_permissions_are_independent(client, db_engine):
     """Faqat ichkiga ruxsati bor xodim tashqi ma'lumotga umuman kira olmaydi."""
     admin = await _make_user(db_engine, ["supply_ichki:*", "supply_tashqi:*"])
     c = _auth(client, admin)
+    sup = await _supplier(c, "tashqi")
     tash = (await c.post(f"{API}/products", json={
-        "scope": "tashqi", "name": NAME, "unit": "metr", "unit_price": 1000,
+        "scope": "tashqi", "supplier_id": sup["id"], "name": NAME,
+        "unit": "metr", "unit_price": 1000,
     })).json()
 
     ichki_only = await _make_user(db_engine, ["supply_ichki:read", "supply_ichki:write"])
@@ -154,8 +174,11 @@ async def test_scope_cannot_be_changed_or_faked(client, db_engine):
     """Mahsulot bo'limi yaratilgandan keyin o'zgarmaydi; noto'g'ri scope rad etiladi."""
     admin = await _make_user(db_engine, ["supply_ichki:*", "supply_tashqi:*"])
     c = _auth(client, admin)
+    sup_ich = await _supplier(c, "ichki")
+    sup_tash = await _supplier(c, "tashqi")
     p = (await c.post(f"{API}/products", json={
-        "scope": "ichki", "name": NAME, "unit": "metr", "unit_price": 1000,
+        "scope": "ichki", "supplier_id": sup_ich["id"], "name": NAME,
+        "unit": "metr", "unit_price": 1000,
     })).json()
 
     # PATCH orqali scope yuborilsa — e'tiborsiz qoldiriladi (sxemada bunday maydon yo'q)
@@ -164,8 +187,13 @@ async def test_scope_cannot_be_changed_or_faked(client, db_engine):
     assert r.json()["scope"] == "ichki"
     assert (await c.get(f"{API}/products", params={"scope": "tashqi"})).json() == []
 
+    # Boshqa bo'limning yetkazib beruvchisiga ko'chirib bo'lmaydi
+    r = await c.patch(f"{API}/products/{p['id']}", json={"supplier_id": sup_tash["id"]})
+    assert r.status_code == 422
+
     # Mavjud bo'lmagan bo'lim — 422
     assert (await c.get(f"{API}/products", params={"scope": "boshqa"})).status_code == 422
     assert (await c.post(f"{API}/products", json={
-        "scope": "boshqa", "name": "X",
+        "scope": "boshqa", "supplier_id": sup_ich["id"], "name": "X",
     })).status_code == 422
+    assert (await c.get(f"{API}/suppliers", params={"scope": "boshqa"})).status_code == 422

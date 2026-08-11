@@ -9,10 +9,12 @@ import { formatMoney, formatQty } from '@/lib/format';
 
 interface TxLog {
   id: string;
-  product_id: string;
-  product_name: string;
+  supplier_id: string;
+  supplier_name?: string | null;
+  // Yetkazib beruvchiga qilingan umumiy to'lovda mahsulot bo'lmaydi
+  product_id?: string | null;
+  product_name?: string | null;
   unit: string;
-  supplier?: string | null;
   kind: 'purchase' | 'payment' | 'consume' | 'adjust';
   qty: number;
   unit_price: number;
@@ -20,6 +22,8 @@ interface TxLog {
   currency: string;
   note?: string | null;
   created_at: string;
+  /** Arxivga o'tgan yozuv — grafiklarda hisobga olinmaydi */
+  deleted_at?: string | null;
 }
 
 const CURRENCY_LABEL: Record<string, string> = { UZS: "so'm", USD: 'dollar' };
@@ -40,8 +44,10 @@ const compact = (n: number) => {
  * mijoz tomonda hisoblaydi — qo'shimcha so'rov yo'q. Valyutalar aralashmasligi
  * uchun eng ko'p uchragan valyuta tanlanadi (qolganiga eslatma ko'rsatiladi).
  */
-export default function TaminotReportCharts({ log }: { log: TxLog[] }) {
+export default function TaminotReportCharts({ log: rawLog }: { log: TxLog[] }) {
   const view = useMemo(() => {
+    // Arxivdagilar grafiklarga kirmaydi — ular hisobdan chiqarilgan
+    const log = rawLog.filter((t) => !t.deleted_at);
     if (!log.length) return null;
 
     // Eng ko'p uchragan valyutani aniqlash (aralashtirmaslik uchun)
@@ -73,7 +79,7 @@ export default function TaminotReportCharts({ log }: { log: TxLog[] }) {
     // Mahsulot bo'yicha olib kelish (top)
     const byProduct = new Map<string, number>();
     for (const t of rows) {
-      if (t.kind !== 'purchase') continue;
+      if (t.kind !== 'purchase' || !t.product_name) continue;
       byProduct.set(t.product_name, (byProduct.get(t.product_name) ?? 0) + t.amount);
     }
     const topProducts = [...byProduct.entries()]
@@ -84,7 +90,7 @@ export default function TaminotReportCharts({ log }: { log: TxLog[] }) {
     // Eng ko'p sarflangan mahsulotlar (miqdor bo'yicha, barcha valyutalardan)
     const byConsume = new Map<string, { name: string; unit: string; value: number }>();
     for (const t of log) {
-      if (t.kind !== 'consume') continue;
+      if (t.kind !== 'consume' || !t.product_name) continue;
       const slot = byConsume.get(t.product_name)
         ?? { name: t.product_name, unit: t.unit, value: 0 };
       slot.value += t.qty;
@@ -97,7 +103,7 @@ export default function TaminotReportCharts({ log }: { log: TxLog[] }) {
       currency, otherCurrencies, rows, purchased, paid, daily, topProducts,
       topConsumed, consumedCount,
     };
-  }, [log]);
+  }, [rawLog]);
 
   if (!view) return null;
   const {

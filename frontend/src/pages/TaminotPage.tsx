@@ -3,9 +3,9 @@ import { Navigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import {
-  Plus, Minus, Search, Wallet, PackagePlus, ClipboardCheck, Pencil, Trash2,
+  Plus, Search, Wallet, PackagePlus, Pencil, Trash2,
   ChevronRight, ChevronLeft, Coins, Building2, Globe, CalendarDays, AlertTriangle, Boxes,
-  ClipboardList,
+  Phone, Users, Archive, RotateCcw,
 } from 'lucide-react';
 
 import { api } from '@/api/client';
@@ -16,13 +16,17 @@ import { formatMoney, formatQty, formatDateTime, formatDate } from '@/lib/format
 import { usePermissions } from '@/lib/permissions';
 import { cn } from '@/lib/cn';
 
-import TaminotProductModal, { type TaminotProduct } from '@/features/taminot/TaminotProductModal';
+import TaminotProductModal from '@/features/taminot/TaminotProductModal';
 import TaminotActionModal, { type ActionKind } from '@/features/taminot/TaminotActionModal';
 import TaminotTransactionsModal from '@/features/taminot/TaminotTransactionsModal';
 import TaminotReportCharts from '@/features/taminot/TaminotReportCharts';
-import { STOCK_META } from '@/features/taminot/stockMeta';
-import TaminotListModal from '@/features/taminot/TaminotListModal';
 import TaminotListsPanel from '@/features/taminot/TaminotListsTab';
+import TaminotFlow from '@/features/taminot/TaminotFlow';
+import TaminotSupplierModal from '@/features/taminot/TaminotSupplierModal';
+import TaminotSupplierDetailModal from '@/features/taminot/TaminotSupplierDetailModal';
+import TaminotSupplierPaymentModal from '@/features/taminot/TaminotSupplierPaymentModal';
+import TaminotPurchaseDocModal from '@/features/taminot/TaminotPurchaseDocModal';
+import { UNIT_LABEL, type TaminotProduct, type TaminotSupplier } from '@/features/taminot/types';
 
 interface CurrencyTotal {
   currency: string;
@@ -35,6 +39,8 @@ interface CurrencyTotal {
 interface Summary {
   by_currency: CurrencyTotal[];
   product_count: number;
+  supplier_count: number;
+  supplier_with_debt_count: number;
   low_stock_count: number;
   out_of_stock_count: number;
   ok_stock_count: number;
@@ -42,10 +48,11 @@ interface Summary {
 }
 interface TxLog {
   id: string;
-  product_id: string;
-  product_name: string;
+  supplier_id: string;
+  supplier_name?: string | null;
+  product_id?: string | null;
+  product_name?: string | null;
   unit: string;
-  supplier?: string | null;
   kind: 'purchase' | 'payment' | 'consume' | 'adjust';
   qty: number;
   unit_price: number;
@@ -53,10 +60,11 @@ interface TxLog {
   currency: string;
   note?: string | null;
   created_at: string;
+  /** To'ldirilgan bo'lsa — arxivda: hisobga qo'shilmaydi, chizib ko'rsatiladi */
+  deleted_at?: string | null;
 }
 
 const CURRENCY_LABEL: Record<string, string> = { UZS: "so'm", USD: 'dollar' };
-const UNIT_LABEL: Record<string, string> = { dona: 'dona', kg: 'kg', metr: 'metr', list: 'list' };
 const SCOPE_META: Record<string, { title: string; icon: typeof Building2 }> = {
   ichki: { title: 'Ichki taʼminot', icon: Building2 },
   tashqi: { title: 'Tashqi taʼminot', icon: Globe },
@@ -79,14 +87,24 @@ export default function TaminotPage() {
   const canWrite = can(`supply_${scope}:write`);
   const canDelete = can(`supply_${scope}:delete`);
 
-  const [tab, setTab] = useState<'products' | 'reports'>('products');
-  // «Spiska qilish» — ta'minotchi uchun xarid ro'yxati (qoralama)
-  const [listModal, setListModal] = useState(false);
+  // Asosiy tab — yetkazib beruvchilar: pul hisobi shu daraja bo'yicha
+  const [tab, setTab] = useState<'suppliers' | 'products' | 'reports'>('suppliers');
   const [search, setSearch] = useState('');
   const [onlyDebt, setOnlyDebt] = useState(false);
   const [lowOnly, setLowOnly] = useState(false);
+  // Arxiv rejimi — o'chirilgan (lekin saqlangan) mahsulotlar
+  const [archived, setArchived] = useState(false);
 
-  // Modal holatlari
+  // Yetkazib beruvchi modallari
+  const [editSupplier, setEditSupplier] = useState<TaminotSupplier | null | undefined>(undefined);
+  const [detailSupplier, setDetailSupplier] = useState<TaminotSupplier | null>(null);
+  const [paySupplier, setPaySupplier] = useState<TaminotSupplier | null>(null);
+  const [purchaseSupplier, setPurchaseSupplier] = useState<TaminotSupplier | null>(null);
+  const [delSupplier, setDelSupplier] = useState<TaminotSupplier | null>(null);
+
+  // Mahsulot modallari. `addToSupplier` — oqimdagi «+ Mahsulot» tugmasi:
+  // yangi mahsulot to'g'ridan-to'g'ri o'sha tugunga qo'shiladi.
+  const [addToSupplier, setAddToSupplier] = useState<TaminotSupplier | null>(null);
   const [editProduct, setEditProduct] = useState<TaminotProduct | null | undefined>(undefined);
   const [action, setAction] = useState<{ product: TaminotProduct; kind: ActionKind } | null>(null);
   const [detail, setDetail] = useState<TaminotProduct | null>(null);
@@ -104,21 +122,33 @@ export default function TaminotPage() {
     queryFn: () => api.get('/taminot/summary', { params: { scope } }).then((r) => r.data),
     enabled: valid,
   });
-  // Filtrlar tabga bog'liq: "faqat qarzi borlar" — mahsulotlar tabida,
-  // "faqat kam qolganlar" — ombor tabida ishlaydi.
-  const withDebtParam = tab === 'products' && onlyDebt;
-  const lowStockParam = tab === 'products' && lowOnly;
+  // Qidiruv/qarz filtri faqat «Yetkazib beruvchilar» tabiga tegishli.
+  // Mahsulotlar tabida qidiruv mahsulot nomi bo'yicha ketadi, tugunlar esa
+  // to'liq kerak — aks holda oqim uzilib qoladi.
+  const supplierFilter = tab === 'suppliers';
+  const suppliersQ = useQuery<TaminotSupplier[]>({
+    queryKey: ['taminot-suppliers', scope, supplierFilter ? search : '', supplierFilter && onlyDebt],
+    queryFn: () => api.get('/taminot/suppliers', {
+      params: {
+        scope,
+        search: (supplierFilter && search.trim()) || undefined,
+        with_debt: (supplierFilter && onlyDebt) || undefined,
+      },
+    }).then((r) => r.data),
+    enabled: valid,
+  });
   const productsQ = useQuery<TaminotProduct[]>({
-    queryKey: ['taminot-products', scope, search, withDebtParam, lowStockParam],
+    queryKey: ['taminot-products', scope, search, lowOnly, archived],
     queryFn: () => api.get('/taminot/products', {
       params: {
         scope,
         search: search.trim() || undefined,
-        with_debt: withDebtParam || undefined,
-        low_stock: lowStockParam || undefined,
+        low_stock: (!archived && lowOnly) || undefined,
+        archived: archived || undefined,
+        sort: 'stock',
       },
     }).then((r) => r.data),
-    enabled: valid,
+    enabled: valid && tab === 'products',
   });
   const logQ = useQuery<TxLog[]>({
     queryKey: ['taminot-log', scope, dateFrom, dateTo],
@@ -128,31 +158,55 @@ export default function TaminotPage() {
     enabled: valid && tab === 'reports',
   });
 
+  const suppliers = suppliersQ.data ?? [];
   const products = productsQ.data ?? [];
   const s = summaryQ.data;
   // Kam qolgan + tugagan mahsulotlar soni (tab belgisi uchun)
   const attentionCount = (s?.low_stock_count ?? 0) + (s?.out_of_stock_count ?? 0);
 
-  // Ochiq tarix modalini yangilangan ma'lumot bilan sinxronlash
+  // Ochiq modallarni yangilangan ma'lumot bilan sinxronlash
   useEffect(() => {
     if (!detail) return;
     const fresh = products.find((p) => p.id === detail.id);
     if (fresh && fresh !== detail) setDetail(fresh);
   }, [products]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!detailSupplier) return;
+    const fresh = suppliers.find((x) => x.id === detailSupplier.id);
+    if (fresh && fresh !== detailSupplier) setDetailSupplier(fresh);
+  }, [suppliers]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const refetchAll = () => {
+    suppliersQ.refetch();
     productsQ.refetch();
     summaryQ.refetch();
     qc.invalidateQueries({ queryKey: ['taminot-tx'] });
+    qc.invalidateQueries({ queryKey: ['taminot-supplier-tx'] });
     qc.invalidateQueries({ queryKey: ['taminot-log', scope] });
   };
+
+  async function confirmDeleteSupplier() {
+    if (!delSupplier) return;
+    setDeleting(true);
+    try {
+      await api.delete(`/taminot/suppliers/${delSupplier.id}`);
+      toast.success("O'chirildi");
+      setDelSupplier(null);
+      refetchAll();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || 'Xatolik yuz berdi');
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   async function confirmDeleteProduct() {
     if (!delProduct) return;
     setDeleting(true);
     try {
       await api.delete(`/taminot/products/${delProduct.id}`);
-      toast.success("O'chirildi");
+      // Harakati bo'lsa arxivga o'tadi, bo'lmasa butunlay o'chadi
+      toast.success(delProduct.tx_count > 0 ? 'Arxivga o‘tkazildi' : "O'chirildi");
       setDelProduct(null);
       refetchAll();
     } catch (e: any) {
@@ -162,12 +216,23 @@ export default function TaminotPage() {
     }
   }
 
+  /** Arxivdagi mahsulotni yozuvlari bilan birga tiklaydi. */
+  async function restoreProduct(p: TaminotProduct) {
+    try {
+      await api.post(`/taminot/products/${p.id}/restore`);
+      toast.success('Tiklandi');
+      refetchAll();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || 'Xatolik yuz berdi');
+    }
+  }
+
   async function confirmDeleteTx() {
     if (!delTx) return;
     setDeleting(true);
     try {
       await api.delete(`/taminot/transactions/${delTx.id}`);
-      toast.success("O'chirildi");
+      toast.success('Arxivga o‘tkazildi');
       setDelTx(null);
       logQ.refetch();
       refetchAll();
@@ -175,6 +240,18 @@ export default function TaminotPage() {
       toast.error(e?.response?.data?.detail || 'Xatolik yuz berdi');
     } finally {
       setDeleting(false);
+    }
+  }
+
+  /** Arxivdagi yozuvni tiklaydi — summa yana hisobga qo'shiladi. */
+  async function restoreTx(id: string) {
+    try {
+      await api.post(`/taminot/transactions/${id}/restore`);
+      toast.success('Tiklandi');
+      logQ.refetch();
+      refetchAll();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || 'Xatolik yuz berdi');
     }
   }
 
@@ -203,7 +280,8 @@ export default function TaminotPage() {
     const currency = [...count.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'UZS';
     let purchased = 0, paid = 0;
     for (const t of dayRows) {
-      if (t.currency !== currency) continue;
+      // Arxivdagilar hisobga qo'shilmaydi — ular faqat tarix uchun ko'rinadi
+      if (t.currency !== currency || t.deleted_at) continue;
       // consume/adjust — faqat miqdor harakati, pulga ta'sir qilmaydi
       if (t.kind === 'purchase') purchased += t.amount;
       else if (t.kind === 'payment') paid += t.amount;
@@ -213,13 +291,19 @@ export default function TaminotPage() {
   // Filtr/scope o'zgarsa — eng yangi kunga qaytamiz
   useEffect(() => { setRepPage(1); }, [dateFrom, dateTo, scope]);
 
-  // Ichki ↔ tashqi almashganda oldingi bo'limdan hech narsa qolib ketmasin:
-  // qidiruv, filtrlar va ochiq modallar tozalanadi (ma'lumot esa scope bo'yicha
-  // alohida so'raladi — query key ichida scope bor).
+  // Ichki ↔ tashqi almashganda oldingi bo'limdan hech narsa qolib ketmasin
   useEffect(() => {
+    setTab('suppliers');
     setSearch('');
     setOnlyDebt(false);
     setLowOnly(false);
+    setArchived(false);
+    setEditSupplier(undefined);
+    setDetailSupplier(null);
+    setPaySupplier(null);
+    setPurchaseSupplier(null);
+    setDelSupplier(null);
+    setAddToSupplier(null);
     setEditProduct(undefined);
     setAction(null);
     setDetail(null);
@@ -242,19 +326,14 @@ export default function TaminotPage() {
           <div className="min-w-0">
             <h1 className="text-xl sm:text-2xl font-bold">{meta.title}</h1>
             <p className="text-xs sm:text-sm text-ink-soft">
-              Olib kelinadigan mahsulotlar, to'lovlar va ombordagi aniq qoldiq
+              Yetkazib beruvchilar bo'yicha qarz, olib kelishlar va ombordagi aniq qoldiq
             </p>
           </div>
         </div>
         {canWrite && (
           <div className="flex gap-2 w-full sm:w-auto">
-            <button
-              className="flex-1 sm:flex-none px-3 py-2 rounded-button border border-black/10 hover:bg-black/5 text-sm font-medium inline-flex items-center justify-center gap-1.5"
-              onClick={() => setListModal(true)}>
-              <ClipboardList size={16} /> Spiska qilish
-            </button>
-            <button className="btn-primary flex-1 sm:flex-none" onClick={() => setEditProduct(null)}>
-              <Plus size={16} /> Yangi mahsulot
+            <button className="btn-primary flex-1 sm:flex-none" onClick={() => setEditSupplier(null)}>
+              <Plus size={16} /> Yangi yetkazib beruvchi
             </button>
           </div>
         )}
@@ -275,7 +354,8 @@ export default function TaminotPage() {
               <KpiCard tone="success" label="To'langan"
                 value={formatMoney(c.total_paid, c.currency)} icon={<Wallet size={18} />} />
               <KpiCard tone="danger" label="Qarz qoldiq"
-                value={formatMoney(c.total_balance, c.currency)} icon={<Coins size={18} />} />
+                value={formatMoney(c.total_balance, c.currency)} icon={<Coins size={18} />}
+                hint={c.with_debt_count ? `${c.with_debt_count} ta yetkazib beruvchi` : undefined} />
               <KpiCard tone="neutral" label="Ombordagi qoldiq"
                 value={formatMoney(c.stock_value, c.currency)} icon={<Boxes size={18} />} />
             </div>
@@ -286,7 +366,7 @@ export default function TaminotPage() {
       {/* Ombor ogohlantirishi — kam qolgan/tugagan mahsulotlar doim ko'rinib turadi */}
       {(s?.low_stock_count || s?.out_of_stock_count) ? (
         <button
-          onClick={() => { setTab('products'); setLowOnly((v) => !v); }}
+          onClick={() => { setTab('products'); setArchived(false); setLowOnly(true); }}
           className="w-full text-left rounded-card border border-danger/30 bg-danger/[0.07] px-4 py-3 flex items-center gap-3 hover:bg-danger/10 transition">
           <div className="w-9 h-9 rounded-button bg-danger/15 text-danger flex items-center justify-center shrink-0">
             <AlertTriangle size={18} />
@@ -309,7 +389,11 @@ export default function TaminotPage() {
       {/* Tabs */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex gap-1.5 flex-wrap">
-          {([['products', 'Mahsulotlar'], ['reports', 'Hisobotlar']] as const).map(([key, label]) => (
+          {([
+            ['suppliers', 'Yetkazib beruvchilar'],
+            ['products', 'Mahsulotlar'],
+            ['reports', 'Hisobotlar'],
+          ] as const).map(([key, label]) => (
             <button key={key} onClick={() => setTab(key)}
               className={cn('px-2.5 sm:px-3 py-1.5 rounded-button text-xs sm:text-sm font-medium transition flex items-center gap-1.5',
                 tab === key ? 'bg-primary text-white' : 'bg-black/5 text-ink-soft hover:bg-black/10')}>
@@ -324,24 +408,33 @@ export default function TaminotPage() {
             </button>
           ))}
         </div>
-        {tab === 'products' && (
+        {tab !== 'reports' ? (
           <div className="flex items-center gap-x-3 gap-y-2 flex-wrap w-full sm:w-auto">
-            <label className="flex items-center gap-1.5 text-xs sm:text-sm text-ink-soft cursor-pointer select-none shrink-0">
-              <input type="checkbox" checked={onlyDebt} onChange={(e) => setOnlyDebt(e.target.checked)} />
-              Qarzi borlar
-            </label>
-            <label className="flex items-center gap-1.5 text-xs sm:text-sm text-ink-soft cursor-pointer select-none shrink-0">
-              <input type="checkbox" checked={lowOnly} onChange={(e) => setLowOnly(e.target.checked)} />
-              Kam qolgan
-            </label>
+            {tab === 'suppliers' && (
+              <label className="flex items-center gap-1.5 text-xs sm:text-sm text-ink-soft cursor-pointer select-none shrink-0">
+                <input type="checkbox" checked={onlyDebt} onChange={(e) => setOnlyDebt(e.target.checked)} />
+                Qarzi borlar
+              </label>
+            )}
+            {tab === 'products' && !archived && (
+              <label className="flex items-center gap-1.5 text-xs sm:text-sm text-ink-soft cursor-pointer select-none shrink-0">
+                <input type="checkbox" checked={lowOnly} onChange={(e) => setLowOnly(e.target.checked)} />
+                Kam qolgan
+              </label>
+            )}
+            {tab === 'products' && (
+              <label className="flex items-center gap-1.5 text-xs sm:text-sm text-ink-soft cursor-pointer select-none shrink-0">
+                <input type="checkbox" checked={archived} onChange={(e) => setArchived(e.target.checked)} />
+                Arxiv
+              </label>
+            )}
             <div className="relative flex-1 min-w-[140px] sm:flex-none">
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft" />
               <input className="input pl-9 w-full sm:w-56" placeholder="Qidirish..."
                      value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
           </div>
-        )}
-        {tab === 'reports' && (
+        ) : (
           <div className="flex items-center gap-2 text-sm w-full sm:w-auto">
             <input type="date" className="input flex-1 sm:flex-none sm:w-auto"
                    value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
@@ -352,12 +445,112 @@ export default function TaminotPage() {
         )}
       </div>
 
-      {/* ===================== MAHSULOTLAR ===================== */}
-      {tab === 'products' ? (
+      {/* ===================== YETKAZIB BERUVCHILAR ===================== */}
+      {tab === 'suppliers' ? (
         <div className="space-y-3">
-        {/* Qoralama spiskalar — mahsulotlar ro'yxati tepasida. Qoralama
-            bo'lmasa umuman chizilmaydi. */}
-        <TaminotListsPanel scope={scope} canWrite={canWrite} canDelete={canDelete} />
+          {/* Qoralama spiskalar — barcha yetkazib beruvchilar bo'yicha */}
+          <TaminotListsPanel scope={scope} canWrite={canWrite} canDelete={canDelete}
+                             onChanged={refetchAll} />
+          <Card>
+            {suppliersQ.isLoading ? (
+              <div className="space-y-2">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="h-16 rounded-button bg-black/5 animate-pulse" />
+                ))}
+              </div>
+            ) : suppliers.length === 0 ? (
+              <EmptyState title={onlyDebt ? 'Qarzi bor yetkazib beruvchi yo\'q' : 'Hali yetkazib beruvchi qo\'shilmagan'}
+                description={canWrite && !onlyDebt
+                  ? "«Yangi yetkazib beruvchi» tugmasi orqali mahsulot olinadigan joyni qo'shing — keyin uning ichida mahsulotlar yaratiladi"
+                  : 'Hozircha bo\'sh'} />
+            ) : (
+              <div className="divide-y divide-black/5">
+                {suppliers.map((sp) => {
+                  const debts = sp.totals.filter((t) => t.balance > 0);
+                  const attention = sp.low_stock_count + sp.out_of_stock_count;
+                  return (
+                    <div key={sp.id}
+                         className="flex flex-wrap items-center gap-x-3 gap-y-2 py-3 -mx-2 px-2 rounded-button transition cursor-pointer hover:bg-black/[0.02]"
+                         onClick={() => setDetailSupplier(sp)}>
+                      <div className="w-9 h-9 rounded-button bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                        <Building2 size={17} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium truncate flex items-center gap-1.5">
+                          <span className="truncate">{sp.name}</span>
+                          {attention > 0 && (
+                            <span className="badge bg-danger/15 text-danger text-[10px] shrink-0">
+                              {attention} ta kam qoldi
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-ink-soft truncate flex items-center gap-2">
+                          <span>{sp.product_count} ta mahsulot</span>
+                          {sp.phone && (
+                            <span className="inline-flex items-center gap-1">
+                              <Phone size={11} /> {sp.phone}
+                            </span>
+                          )}
+                          {sp.last_purchase_at && (
+                            <span className="hidden sm:inline">
+                              oxirgi: {formatDate(sp.last_purchase_at)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Qarz — har valyuta alohida qator */}
+                      <div className="text-right shrink-0 min-w-[130px]">
+                        {debts.length > 0 ? debts.map((t) => (
+                          <div key={t.currency} className="font-bold text-danger tabular-nums">
+                            {formatMoney(t.balance, t.currency)}
+                          </div>
+                        )) : (
+                          <div className="font-bold text-success">Qarz yo'q</div>
+                        )}
+                        <div className="text-[11px] text-ink-soft">qarz qoldiq</div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0 basis-full sm:basis-auto justify-end"
+                           onClick={(e) => e.stopPropagation()}>
+                        {canWrite && (
+                          <button onClick={() => setPaySupplier(sp)}
+                                  disabled={!debts.length} title="Qarz to'lash"
+                                  className="inline-flex items-center gap-1 px-2.5 py-2 lg:py-1.5 rounded-button text-xs font-medium bg-success/10 text-success hover:bg-success/20 transition disabled:opacity-40">
+                            <Wallet size={14} /> <span className="hidden lg:inline">To'lash</span>
+                          </button>
+                        )}
+                        {canWrite && (
+                          <button onClick={() => setPurchaseSupplier(sp)} title="Olib kelish"
+                                  className="inline-flex items-center gap-1 px-2.5 py-2 lg:py-1.5 rounded-button text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 transition">
+                            <PackagePlus size={14} /> <span className="hidden lg:inline">Olib kelish</span>
+                          </button>
+                        )}
+                        {canWrite && (
+                          <button onClick={() => setEditSupplier(sp)} title="Tahrirlash"
+                                  className="p-1.5 rounded hover:bg-black/5 text-ink-soft hover:text-primary">
+                            <Pencil size={15} />
+                          </button>
+                        )}
+                        {canDelete && (
+                          <button onClick={() => setDelSupplier(sp)} title="O'chirish"
+                                  className="p-1.5 rounded hover:bg-danger/10 text-ink-soft hover:text-danger">
+                            <Trash2 size={15} />
+                          </button>
+                        )}
+                        <ChevronRight size={16} className="text-ink-soft" />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Card>
+        </div>
+      ) : tab === 'products' ? (
+        /* ===== MAHSULOTLAR — yetkazib beruvchi → mahsulot oqimi (flow) =====
+           Chiziqlar orqali qaysi mahsulot qaysi joydan olinishi ko'rinadi va
+           ikkalasi ham shu yerdan boshqariladi. */
         <Card>
           {productsQ.isLoading ? (
             <div className="space-y-2">
@@ -365,112 +558,62 @@ export default function TaminotPage() {
                 <div key={i} className="h-14 rounded-button bg-black/5 animate-pulse" />
               ))}
             </div>
-          ) : products.length === 0 ? (
-            <EmptyState title="Hali mahsulot qo'shilmagan"
-              description={canWrite ? '«Yangi mahsulot» tugmasi orqali birinchisini qo\'shing' : 'Hozircha bo\'sh'} />
-          ) : (
-            <div className="divide-y divide-black/5">
-              {products.map((p) => {
-                const sm = STOCK_META[p.stock_status];
-                const attention = p.stock_status === 'low' || p.stock_status === 'out';
-                const unit = UNIT_LABEL[p.unit] ?? p.unit;
-                return (
-                <div key={p.id}
-                     className={cn(
-                       // Mobilda ustma-ust qatorlar, sm dan boshlab bitta qator
-                       'flex flex-wrap items-center gap-x-3 gap-y-2 py-3 -mx-2 px-2 rounded-button transition cursor-pointer',
-                       attention ? 'bg-danger/[0.04] hover:bg-danger/[0.07]' : 'hover:bg-black/[0.02]')}
-                     onClick={() => setDetail(p)}>
-                  <div className="min-w-0 basis-full sm:basis-0 sm:flex-1">
-                    <div className="font-medium truncate flex items-center gap-1.5">
-                      {attention && <AlertTriangle size={13} className="text-danger shrink-0" />}
-                      <span className="truncate">{p.name}</span>
-                      <span className="text-ink-soft font-normal shrink-0">· {unit}</span>
-                    </div>
-                    <div className="text-xs text-ink-soft truncate">
-                      {p.supplier ? `${p.supplier} · ` : ''}
-                      {p.last_purchase_at ? `oxirgi: ${formatDateTime(p.last_purchase_at)}` : 'harakat yo\'q'}
-                    </div>
-                  </div>
-                  {/* Ombordagi qoldiq + ikki tomonida amal tugmalari:
-                      [−] qoldiq [+]  — chapda sarflash, o'ngda olib kelish. */}
-                  <div className="shrink-0 flex items-center gap-1.5 sm:mr-10"
-                       onClick={(e) => e.stopPropagation()}>
-                    {canWrite && (
-                      <button onClick={() => setAction({ product: p, kind: 'consume' })}
-                              disabled={p.stock <= 0} title="Sarflash (ombordan chiqim)"
-                              className="w-8 h-8 shrink-0 rounded-button flex items-center justify-center bg-warning/10 text-warning hover:bg-warning/20 transition disabled:opacity-40">
-                        <Minus size={15} />
-                      </button>
-                    )}
-                    <div className={cn(
-                      'shrink-0 w-[100px] sm:w-[120px] rounded-button border px-2 sm:px-3 py-1.5 text-center',
-                      attention ? 'border-danger/25 bg-danger/10' : 'border-black/[0.07] bg-black/[0.03]',
-                    )}>
-                      <div className={cn('font-bold leading-tight', sm.value)}>
-                        {formatQty(p.stock, unit)}
-                      </div>
-                      {attention ? (
-                        <div className={cn('text-[10px] font-semibold uppercase tracking-wide', sm.value)}>
-                          {sm.label}
-                        </div>
-                      ) : (
-                        <div className="text-[10px] text-ink-soft">
-                          ombor qoldiq{p.min_qty > 0 ? ` · min ${formatQty(p.min_qty)}` : ''}
-                        </div>
-                      )}
-                    </div>
-                    {canWrite && (
-                      <button onClick={() => setAction({ product: p, kind: 'purchase' })}
-                              title="Olib kelish"
-                              className="w-8 h-8 shrink-0 rounded-button flex items-center justify-center bg-primary/10 text-primary hover:bg-primary/20 transition">
-                        <Plus size={15} />
-                      </button>
-                    )}
-                  </div>
-                  <div className="text-right shrink-0 ml-auto sm:ml-0 sm:w-[132px]">
-                    <div className={cn('font-bold', p.balance > 0 ? 'text-danger' : 'text-success')}>
-                      {formatMoney(p.balance, p.currency)}
-                    </div>
-                    <div className="text-[11px] text-ink-soft">qarz qoldiq</div>
-                  </div>
-                  <div className="flex items-center gap-1.5 shrink-0 basis-full sm:basis-auto justify-end"
-                       onClick={(e) => e.stopPropagation()}>
-                    {canWrite && (
-                      <button onClick={() => setAction({ product: p, kind: 'payment' })}
-                              disabled={p.balance <= 0} title="Qarz to'lash"
-                              className="inline-flex items-center gap-1 px-2.5 py-2 lg:py-1.5 rounded-button text-xs font-medium bg-success/10 text-success hover:bg-success/20 transition disabled:opacity-40">
-                        <Wallet size={14} /> <span className="hidden lg:inline">To'lash</span>
-                      </button>
-                    )}
-                    {canWrite && (
-                      <button onClick={() => setAction({ product: p, kind: 'stock' })}
-                              title="Qoldiqni to'g'rilash"
-                              className="p-1.5 rounded hover:bg-black/5 text-ink-soft hover:text-primary">
-                        <ClipboardCheck size={15} />
-                      </button>
-                    )}
-                    {canWrite && (
-                      <button onClick={() => setEditProduct(p)}
-                              className="p-1.5 rounded hover:bg-black/5 text-ink-soft hover:text-primary">
-                        <Pencil size={15} />
-                      </button>
-                    )}
-                    {canDelete && (
-                      <button onClick={() => setDelProduct(p)}
-                              className="p-1.5 rounded hover:bg-danger/10 text-ink-soft hover:text-danger">
-                        <Trash2 size={15} />
-                      </button>
-                    )}
-                    <ChevronRight size={16} className="text-ink-soft" />
-                  </div>
+          ) : archived ? (
+            /* ===== ARXIV: o'chirilgan mahsulotlar — tarixi saqlangan ===== */
+            products.length === 0 ? (
+              <EmptyState title="Arxiv bo'sh"
+                description="O'chirilgan mahsulotlar shu yerda saqlanadi — hisobdan chiqadi, lekin tarixi yo'qolmaydi" />
+            ) : (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-xs text-ink-soft">
+                  <Archive size={14} />
+                  Bu mahsulotlar hisobga qo'shilmaydi. Tiklansa — yozuvlari bilan
+                  birga qarz va ombor qoldig'iga qaytadi.
                 </div>
-                );
-              })}
-            </div>
+                {products.map((p) => (
+                  <div key={p.id}
+                       className="flex flex-wrap items-center gap-x-3 gap-y-2 py-2.5 px-3 rounded-button border border-black/[0.07] bg-black/[0.02]">
+                    <div className="min-w-0 flex-1">
+                      <div className="font-medium truncate line-through text-ink-soft">
+                        {p.name}
+                      </div>
+                      <div className="text-xs text-ink-soft truncate">
+                        {p.supplier_name ? `${p.supplier_name} · ` : ''}
+                        {p.tx_count} ta arxiv yozuvi
+                      </div>
+                    </div>
+                    <span className="badge bg-black/5 text-ink-soft text-[10px] shrink-0">
+                      Arxivda
+                    </span>
+                    {canDelete && (
+                      <button onClick={() => restoreProduct(p)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-button text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 transition shrink-0">
+                        <RotateCcw size={14} /> Tiklash
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )
+          ) : (
+            <TaminotFlow
+              suppliers={suppliers}
+              products={products}
+              canWrite={canWrite}
+              canDelete={canDelete}
+              hideEmpty={!!search.trim() || lowOnly}
+              onOpenSupplier={setDetailSupplier}
+              onEditSupplier={setEditSupplier}
+              onPay={setPaySupplier}
+              onPurchase={setPurchaseSupplier}
+              onAddProduct={(sp) => setAddToSupplier(sp)}
+              onProductAction={(product, kind) => setAction({ product, kind })}
+              onEditProduct={setEditProduct}
+              onDeleteProduct={setDelProduct}
+              onOpenProduct={setDetail}
+            />
           )}
         </Card>
-        </div>
       ) : (
         /* ===================== HISOBOTLAR ===================== */
         <div className="space-y-4">
@@ -504,7 +647,7 @@ export default function TaminotPage() {
                 <thead className="text-left text-ink-soft border-b border-black/5">
                   <tr>
                     <th className="py-2 pr-3">Vaqt</th>
-                    <th className="py-2 pr-3">Mahsulot</th>
+                    <th className="py-2 pr-3">Mahsulot / joy</th>
                     <th className="py-2 pr-3">Turi</th>
                     <th className="py-2 pr-3 text-right">Miqdor × narx</th>
                     <th className="py-2 pr-3 text-right">Summa</th>
@@ -515,16 +658,25 @@ export default function TaminotPage() {
                   {dayRows.map((tx) => {
                     const km = KIND_META[tx.kind];
                     const unit = UNIT_LABEL[tx.unit] ?? tx.unit;
+                    // Arxivdagi yozuv — ustidan chizilgan, so'nik holda
+                    const gone = !!tx.deleted_at;
                     return (
-                      <tr key={tx.id} className="border-b border-black/5 hover:bg-black/[0.02]">
+                      <tr key={tx.id} className={cn('border-b border-black/5 hover:bg-black/[0.02]',
+                        gone && 'line-through opacity-50')}>
                         <td className="py-2.5 pr-3 whitespace-nowrap">{formatDateTime(tx.created_at)}</td>
                         <td className="py-2.5 pr-3 font-medium">
-                          {tx.product_name}
-                          {tx.supplier ? <span className="text-ink-soft font-normal"> · {tx.supplier}</span> : ''}
+                          {/* Guruhga qilingan to'lovda mahsulot bo'lmaydi */}
+                          {tx.product_name ?? `${tx.supplier_name ?? ''} — umumiy to'lov`}
+                          {tx.product_name && tx.supplier_name
+                            ? <span className="text-ink-soft font-normal"> · {tx.supplier_name}</span>
+                            : null}
                           {tx.note ? <div className="text-xs text-ink-soft font-normal">{tx.note}</div> : null}
                         </td>
                         <td className="py-2.5 pr-3">
-                          <span className={cn('badge whitespace-nowrap', km.badge)}>{km.label}</span>
+                          <span className={cn('badge whitespace-nowrap',
+                            gone ? 'bg-black/5 text-ink-soft' : km.badge)}>
+                            {gone ? `${km.label} · arxiv` : km.label}
+                          </span>
                         </td>
                         <td className="py-2.5 pr-3 text-right text-ink-soft whitespace-nowrap">
                           {tx.kind === 'purchase'
@@ -541,11 +693,18 @@ export default function TaminotPage() {
                             : '—'}
                         </td>
                         {canDelete && (
-                          <td className="py-2.5 pl-3">
-                            <button onClick={() => setDelTx(tx)}
-                                    className="p-1.5 rounded hover:bg-danger/10 text-ink-soft hover:text-danger">
-                              <Trash2 size={15} />
-                            </button>
+                          <td className="py-2.5 pl-3 no-underline">
+                            {gone ? (
+                              <button onClick={() => restoreTx(tx.id)} title="Tiklash"
+                                      className="p-1.5 rounded hover:bg-primary/10 text-ink-soft hover:text-primary">
+                                <RotateCcw size={15} />
+                              </button>
+                            ) : (
+                              <button onClick={() => setDelTx(tx)} title="Arxivga o'tkazish"
+                                      className="p-1.5 rounded hover:bg-danger/10 text-ink-soft hover:text-danger">
+                                <Trash2 size={15} />
+                              </button>
+                            )}
                           </td>
                         )}
                       </tr>
@@ -579,16 +738,30 @@ export default function TaminotPage() {
       )}
 
       {/* ===== Modallar ===== */}
+      {editSupplier !== undefined && (
+        <TaminotSupplierModal scope={scope} supplier={editSupplier}
+          onClose={() => setEditSupplier(undefined)} onSaved={refetchAll} />
+      )}
+      {detailSupplier && (
+        <TaminotSupplierDetailModal supplier={detailSupplier}
+          canWrite={canWrite} canDelete={canDelete}
+          onClose={() => setDetailSupplier(null)} onChanged={refetchAll} />
+      )}
+      {paySupplier && (
+        <TaminotSupplierPaymentModal supplier={paySupplier}
+          onClose={() => setPaySupplier(null)} onSaved={refetchAll} />
+      )}
+      {purchaseSupplier && (
+        <TaminotPurchaseDocModal supplier={purchaseSupplier}
+          onClose={() => setPurchaseSupplier(null)} onSaved={refetchAll} />
+      )}
+      {addToSupplier && (
+        <TaminotProductModal scope={scope} supplierId={addToSupplier.id} product={null}
+          onClose={() => setAddToSupplier(null)} onSaved={refetchAll} />
+      )}
       {editProduct !== undefined && (
         <TaminotProductModal scope={scope} product={editProduct}
           onClose={() => setEditProduct(undefined)} onSaved={refetchAll} />
-      )}
-      {listModal && (
-        <TaminotListModal
-          scope={scope}
-          onClose={() => setListModal(false)}
-          onSaved={() => qc.invalidateQueries({ queryKey: ['taminot-lists'] })}
-        />
       )}
       {action && (
         <TaminotActionModal product={action.product} kind={action.kind}
@@ -599,9 +772,20 @@ export default function TaminotPage() {
           onClose={() => setDetail(null)} onChanged={refetchAll} />
       )}
       <ConfirmModal
+        open={!!delSupplier}
+        title={delSupplier?.name ?? ''}
+        message="Ushbu yetkazib beruvchi o'chiriladi. Unda mahsulot yoki harakat tarixi bo'lsa o'chirilmaydi — avval mahsulotlarni boshqa joyga ko'chiring."
+        confirmText="O'chirish"
+        loading={deleting}
+        onConfirm={confirmDeleteSupplier}
+        onCancel={() => setDelSupplier(null)}
+      />
+      <ConfirmModal
         open={!!delProduct}
         title={delProduct?.name ?? ''}
-        message="Ushbu mahsulot va uning barcha harakatlari o'chiriladi. Davom etamizmi?"
+        message={delProduct && delProduct.tx_count > 0
+          ? "Mahsulot va uning yozuvlari ARXIVGA o'tadi: qarz hamda ombor qoldig'idan chiqadi, lekin tarixda ustidan chizilgan holda saqlanib qoladi va keyin tiklash mumkin."
+          : "Ushbu mahsulot o'chiriladi. Hech qanday harakati bo'lmagani uchun saqlanadigan tarix yo'q."}
         confirmText="O'chirish"
         loading={deleting}
         onConfirm={confirmDeleteProduct}
@@ -609,9 +793,9 @@ export default function TaminotPage() {
       />
       <ConfirmModal
         open={!!delTx}
-        title="Harakatni o'chirish"
-        message="Ushbu kirim/to'lov yozuvini o'chirasizmi?"
-        confirmText="O'chirish"
+        title="Harakatni arxivga o'tkazish"
+        message="Yozuv hisobdan chiqadi (summa to'g'ri ayiriladi), lekin yo'qolmaydi — tarixda ustidan chizilgan holda qoladi va kerak bo'lsa tiklanadi."
+        confirmText="Arxivga"
         loading={deleting}
         onConfirm={confirmDeleteTx}
         onCancel={() => setDelTx(null)}
@@ -627,11 +811,12 @@ const KPI_TONES = {
   neutral: { card: 'border-black/10 bg-black/[0.03]', text: 'text-ink', icon: 'bg-black/5 text-ink-soft' },
 } as const;
 
-function KpiCard({ tone, label, value, icon }: {
+function KpiCard({ tone, label, value, icon, hint }: {
   tone: keyof typeof KPI_TONES;
   label: string;
   value: string;
   icon: React.ReactNode;
+  hint?: string;
 }) {
   const tn = KPI_TONES[tone];
   return (
@@ -639,6 +824,11 @@ function KpiCard({ tone, label, value, icon }: {
       <div className="min-w-0">
         <div className={`text-xs sm:text-sm font-medium ${tn.text}`}>{label}</div>
         <div className={`text-[15px] sm:text-2xl font-bold mt-1 sm:mt-2 truncate ${tn.text}`}>{value}</div>
+        {hint && (
+          <div className="text-[10px] sm:text-[11px] text-ink-soft mt-0.5 flex items-center gap-1 truncate">
+            <Users size={11} className="shrink-0" /> {hint}
+          </div>
+        )}
       </div>
       {/* Ikonka telefonda yashiriladi — summaga joy bo'shatadi */}
       <div className={`w-10 h-10 rounded-button hidden sm:flex items-center justify-center shrink-0 ${tn.icon}`}>

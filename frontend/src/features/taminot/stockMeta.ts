@@ -1,4 +1,4 @@
-import type { StockStatus } from '@/features/taminot/TaminotProductModal';
+import type { StockStatus } from '@/features/taminot/types';
 
 /**
  * Ombor qoldig'i holati uchun ko'rinish: qizil — tugagan/kam qolgan.

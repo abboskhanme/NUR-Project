@@ -14,7 +14,8 @@ interface ListItem {
   qty: number; unit_price: number; currency: string; amount: number;
 }
 interface PurchaseList {
-  id: string; scope: string; title?: string | null; status: string;
+  id: string; scope: string; supplier_id: string; supplier_name?: string | null;
+  title?: string | null; status: string;
   note?: string | null; applied_at?: string | null; created_at: string;
   items: ListItem[]; totals: { currency: string; amount: number }[]; item_count: number;
 }
@@ -27,10 +28,19 @@ const fmt = (v: number, currency: string) =>
 /**
  * Xarid spiskalari. Qoralama (draft) — faqat reja; «Qabul qilish» bosilganda
  * har bir qator uchun olib kelish tranzaksiyasi yaratiladi va shundagina
- * ombor qoldig'i hamda qarz hisoblanadi.
+ * ombor qoldig'i hamda yetkazib beruvchining qarzi hisoblanadi.
+ *
+ * `supplierId` berilsa — faqat o'sha joyning spiskalari (yetkazib beruvchi
+ * kartochkasi ichida shunday), aks holda bo'limdagi barcha qoralamalar.
  */
-export default function TaminotListsPanel({ scope, canWrite, canDelete }: {
-  scope: string; canWrite: boolean; canDelete: boolean;
+export default function TaminotListsPanel({
+  scope, supplierId, canWrite, canDelete, onChanged,
+}: {
+  scope: string;
+  supplierId?: string;
+  canWrite: boolean;
+  canDelete: boolean;
+  onChanged?: () => void;
 }) {
   const qc = useQueryClient();
   const [open, setOpen] = useState<string | null>(null);
@@ -41,8 +51,10 @@ export default function TaminotListsPanel({ scope, canWrite, canDelete }: {
   const [payMode, setPayMode] = useState<'debt' | 'cash'>('debt');
 
   const q = useQuery<PurchaseList[]>({
-    queryKey: ['taminot-lists', scope],
-    queryFn: () => api.get('/taminot/lists', { params: { scope } }).then((r) => r.data),
+    queryKey: ['taminot-lists', scope, supplierId ?? 'all'],
+    queryFn: () => api.get('/taminot/lists', {
+      params: { scope, supplier_id: supplierId || undefined },
+    }).then((r) => r.data),
   });
   // Faqat QORALAMA spiskalar ko'rsatiladi — ular ustida ish qilinadi.
   // Qabul qilinganlarning natijasi ombor qoldig'i va tranzaksiyalarda ko'rinadi.
@@ -52,6 +64,8 @@ export default function TaminotListsPanel({ scope, canWrite, canDelete }: {
     qc.invalidateQueries({ queryKey: ['taminot-lists'] });
     qc.invalidateQueries({ queryKey: ['taminot-products'] });
     qc.invalidateQueries({ queryKey: ['taminot-summary'] });
+    qc.invalidateQueries({ queryKey: ['taminot-suppliers'] });
+    onChanged?.();
   }
 
   async function doApply() {
@@ -109,6 +123,9 @@ export default function TaminotListsPanel({ scope, canWrite, canDelete }: {
                     </span>
                   </div>
                   <div className="text-xs text-ink-soft">
+                    {/* Yetkazib beruvchi nomi faqat umumiy ro'yxatda kerak —
+                        uning kartochkasi ichida allaqachon ma'lum */}
+                    {!supplierId && pl.supplier_name ? `${pl.supplier_name} · ` : ''}
                     {formatDate(pl.created_at)} · {pl.item_count} ta mahsulot
                     {pl.note ? ` · ${pl.note}` : ''}
                   </div>
@@ -184,13 +201,14 @@ export default function TaminotListsPanel({ scope, canWrite, canDelete }: {
             <div className="space-y-3">
               <div>
                 {applying.item_count} ta mahsulot omborga kiritiladi —{' '}
-                <b>{applying.totals.map((t) => fmt(t.amount, t.currency)).join(' + ')}</b>.
+                <b>{applying.totals.map((t) => fmt(t.amount, t.currency)).join(' + ')}</b>
+                {applying.supplier_name ? <> (<b>{applying.supplier_name}</b>)</> : null}.
               </div>
               <div>
                 <div className="text-xs text-ink-soft mb-1.5">To‘lov holati</div>
                 <div className="grid grid-cols-2 gap-2">
                   {([
-                    ['debt', 'Qarzga olindi', 'Qarz qoldig‘i oshadi'],
+                    ['debt', 'Qarzga olindi', 'Yetkazib beruvchining qarzi oshadi'],
                     ['cash', 'Naqd to‘landi', 'Qarz oshmaydi'],
                   ] as const).map(([key, label, hint]) => (
                     <button key={key} type="button" onClick={() => setPayMode(key)}

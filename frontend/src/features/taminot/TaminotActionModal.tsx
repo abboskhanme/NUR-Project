@@ -1,23 +1,16 @@
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import {
-  X, PackagePlus, Wallet, PackageMinus, ClipboardCheck, ArrowRight, Coins, Banknote,
+  X, PackagePlus, PackageMinus, ClipboardCheck, ArrowRight, Coins, Banknote,
 } from 'lucide-react';
 
 import { api } from '@/api/client';
 import { formatMoney, formatQty } from '@/lib/format';
 import { cn } from '@/lib/cn';
 import MoneyInput from '@/components/ui/MoneyInput';
-import type { TaminotProduct } from '@/features/taminot/TaminotProductModal';
+import { CURRENCY_LABEL, UNIT_LABEL, type TaminotProduct } from '@/features/taminot/types';
 
-const UNIT_LABEL: Record<string, string> = {
-  dona: 'dona', kg: 'kg', metr: 'metr', list: 'list',
-};
-const CURRENCY_LABEL: Record<string, string> = {
-  UZS: "so'm", USD: 'dollar',
-};
-
-export type ActionKind = 'purchase' | 'payment' | 'consume' | 'stock';
+export type ActionKind = 'purchase' | 'consume' | 'stock';
 
 const META: Record<ActionKind, {
   title: string; icon: typeof PackagePlus; tone: string; btn: string; save: string;
@@ -25,10 +18,6 @@ const META: Record<ActionKind, {
   purchase: {
     title: 'Olib kelish', icon: PackagePlus, tone: 'text-primary',
     btn: 'bg-primary hover:bg-primary-700', save: "Qo'shish",
-  },
-  payment: {
-    title: "Qarz to'lash", icon: Wallet, tone: 'text-success',
-    btn: 'bg-success hover:bg-success/90', save: "To'lash",
   },
   consume: {
     title: 'Sarflash (ombordan chiqim)', icon: PackageMinus, tone: 'text-warning',
@@ -41,11 +30,15 @@ const META: Record<ActionKind, {
 };
 
 /**
- * Bitta mahsulot uchun amal modali.
- *   kind="purchase" — olib kelish (miqdor + birlik narxi → qarz va ombor qoldig'i oshadi)
- *   kind="payment"  — qarz to'lash (bitta summa)
+ * Bitta mahsulot uchun tezkor amal modali.
+ *   kind="purchase" — olib kelish: guruhdan faqat bitta mahsulot kerak
+ *                     bo'lganda. Summa mahsulotning yetkazib beruvchisi
+ *                     hisobiga (umumiy qarziga) boradi.
  *   kind="consume"  — sarflash: faqat ombor qoldig'i kamayadi (pulga ta'siri yo'q)
  *   kind="stock"    — inventarizatsiya: ombordagi haqiqiy qoldiqni belgilash
+ *
+ * QARZ TO'LASH bu yerda yo'q — to'lov yetkazib beruvchiga qilinadi
+ * (`TaminotSupplierPaymentModal`), chunki qarz guruh darajasida yuritiladi.
  */
 export default function TaminotActionModal({
   product, kind, onClose, onSaved,
@@ -57,7 +50,6 @@ export default function TaminotActionModal({
 }) {
   const [qty, setQty] = useState(kind === 'stock' ? String(product.stock ?? 0) : '');
   const [unitPrice, setUnitPrice] = useState<number>(product.unit_price ?? 0);
-  const [amount, setAmount] = useState<number>(0);
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
   // Olib kelish turi: qarzga (qarz qoldig'i oshadi) yoki naqd (darhol to'langan)
@@ -91,12 +83,6 @@ export default function TaminotActionModal({
           qty: q, unit_price: unitPrice || 0, payment_mode: payMode, note: note.trim() || null,
         });
         toast.success(payMode === 'cash' ? "Naqd olib kelish qo'shildi" : "Olib kelish qo'shildi");
-      } else if (kind === 'payment') {
-        if (!amount || amount <= 0) { toast.error("To'lov summasini kiriting"); setSaving(false); return; }
-        await api.post(`/taminot/products/${product.id}/payment`, {
-          amount, note: note.trim() || null,
-        });
-        toast.success("To'lov qo'shildi");
       } else if (kind === 'consume') {
         if (!q || q <= 0) { toast.error('Miqdorni kiriting'); setSaving(false); return; }
         await api.post(`/taminot/products/${product.id}/consume`, {
@@ -120,7 +106,7 @@ export default function TaminotActionModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div className="bg-card rounded-lg shadow-xl w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3 border-b border-black/5">
           <h3 className="font-semibold flex items-center gap-2">
@@ -136,11 +122,9 @@ export default function TaminotActionModal({
               <span className="font-medium">{product.name}</span>
               <span className="text-ink-soft"> · {unitLabel}</span>
             </div>
-            {kind !== 'payment' && (
-              <span className="text-xs text-ink-soft shrink-0">
-                ombor: <span className="font-semibold text-ink">{formatQty(stock, unitLabel)}</span>
-              </span>
-            )}
+            <span className="text-xs text-ink-soft shrink-0">
+              ombor: <span className="font-semibold text-ink">{formatQty(stock, unitLabel)}</span>
+            </span>
           </div>
 
           {kind === 'purchase' && (
@@ -202,19 +186,6 @@ export default function TaminotActionModal({
             </>
           )}
 
-          {kind === 'payment' && (
-            <>
-              <div className="rounded-button bg-danger/10 border border-danger/20 px-4 py-3 flex items-center justify-between">
-                <span className="text-sm font-medium text-danger/90">Joriy qarz</span>
-                <span className="text-lg font-bold text-danger">{formatMoney(product.balance, product.currency)}</span>
-              </div>
-              <div>
-                <label className="label">To'lov summasi *</label>
-                <MoneyInput value={amount} onChange={setAmount} autoFocus suffix={curLabel} />
-              </div>
-            </>
-          )}
-
           {kind === 'consume' && (
             <div>
               <label className="label">Sarflangan miqdor *</label>
@@ -248,7 +219,7 @@ export default function TaminotActionModal({
           )}
 
           {/* Amaldan keyingi qoldiq ko'rinishi */}
-          {kind !== 'payment' && q > 0 && (
+          {q > 0 && (
             <div className="rounded-button bg-black/[0.03] border border-black/10 px-4 py-2.5 flex items-center justify-between text-sm">
               <span className="text-ink-soft">Qoldiq</span>
               <span className="flex items-center gap-2 font-semibold">

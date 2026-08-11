@@ -24,6 +24,7 @@ from app.schemas.debt import (
     PaymentCreate,
     PurchaseCreate,
 )
+from app.schemas.taminot import SupplierCurrencyTotal, TaminotDebtView
 
 router = APIRouter(dependencies=[Depends(module_guard("debts"))])
 
@@ -292,3 +293,61 @@ async def delete_transaction(
         raise HTTPException(404, "Tranzaksiya topilmadi")
     await db.delete(tx)
     await db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Ta'minot qarzlari — FAQAT KO'RISH
+# ---------------------------------------------------------------------------
+# Ta'minot bo'limining (ichki + tashqi) yetkazib beruvchilari bo'yicha qarz
+# manzarasi. Bu yerdan hech qanday amal bajarilmaydi — to'lov, tahrir va
+# kirimlar Ta'minot bo'limida qoladi. Shu sabab ta'minot ruxsati ham talab
+# qilinmaydi: `debts` moduliga kirgan rahbar umumiy holatni ko'ra oladi.
+@router.get("/taminot-suppliers", response_model=list[TaminotDebtView])
+async def taminot_debt_view(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: CurrentUser,
+    with_debt: bool = Query(False, description="Faqat qarzi qolganlar"),
+):
+    from app.api.v1.taminot import _supplier_money, _supplier_stock
+    from app.models.taminot import TaminotSupplier
+
+    suppliers = (await db.execute(
+        select(TaminotSupplier).order_by(TaminotSupplier.scope, TaminotSupplier.name)
+    )).scalars().all()
+    ids = [s.id for s in suppliers]
+    money = await _supplier_money(db, ids)
+    stock = await _supplier_stock(db, ids)
+
+    out: list[TaminotDebtView] = []
+    for sp in suppliers:
+        per_cur = money.get(sp.id, {})
+        st = stock.get(sp.id, {})
+        stock_value: dict = st.get("stock_value", {})
+        totals: list[SupplierCurrencyTotal] = []
+        last_purchase = None
+        for cur in sorted(set(per_cur.keys()) | set(stock_value.keys())):
+            m = per_cur.get(cur, {})
+            purchased = float(m.get("purchased", 0.0))
+            paid = float(m.get("paid", 0.0))
+            totals.append(SupplierCurrencyTotal(
+                currency=cur,
+                total_purchased=round(purchased, 2),
+                total_paid=round(paid, 2),
+                balance=round(purchased - paid, 2),
+                stock_value=round(float(stock_value.get(cur, 0.0)), 2),
+            ))
+            lp = m.get("last_purchase_at")
+            if lp and (last_purchase is None or lp > last_purchase):
+                last_purchase = lp
+        if with_debt and not any(t.balance > 0 for t in totals):
+            continue
+        out.append(TaminotDebtView(
+            supplier_id=sp.id,
+            scope=sp.scope,
+            name=sp.name,
+            phone=sp.phone,
+            product_count=st.get("product_count", 0),
+            totals=totals or [SupplierCurrencyTotal(currency="UZS")],
+            last_purchase_at=last_purchase,
+        ))
+    return out

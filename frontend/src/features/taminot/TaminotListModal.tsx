@@ -5,6 +5,7 @@ import { X, Plus, Trash2 } from 'lucide-react';
 
 import { api } from '@/api/client';
 import { cn } from '@/lib/cn';
+import type { TaminotSupplier } from '@/features/taminot/types';
 
 export interface ListProduct {
   id: string; name: string; unit: string;
@@ -27,14 +28,22 @@ const fmt = (v: number, currency: string) =>
  * Mahsulot haqiqatan kelganda «Qabul qilish» bosiladi.
  */
 export default function TaminotListModal({
-  scope, onClose, onSaved,
-}: { scope: string; onClose: () => void; onSaved: () => void }) {
+  scope, supplier, onClose, onSaved,
+}: {
+  scope: string;
+  /** Spiska shu joyga borish uchun — faqat uning mahsulotlari chiqadi */
+  supplier: TaminotSupplier;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
   const [rows, setRows] = useState<Row[]>([{ productId: '', qty: '' }]);
   const [saving, setSaving] = useState(false);
 
   const productsQ = useQuery<ListProduct[]>({
-    queryKey: ['taminot-products', scope],
-    queryFn: () => api.get('/taminot/products', { params: { scope } }).then((r) => r.data),
+    queryKey: ['taminot-products', scope, supplier.id],
+    queryFn: () => api.get('/taminot/products', {
+      params: { scope, supplier_id: supplier.id },
+    }).then((r) => r.data),
   });
   const products = useMemo(() => productsQ.data ?? [], [productsQ.data]);
   const byId = useMemo(
@@ -70,7 +79,7 @@ export default function TaminotListModal({
     if (!items.length) { toast.error('Kamida bitta mahsulot va miqdor kiriting'); return; }
     setSaving(true);
     try {
-      await api.post('/taminot/lists', { scope, items });
+      await api.post('/taminot/lists', { scope, supplier_id: supplier.id, items });
       toast.success('Spiska saqlandi');
       onSaved();
       onClose();
@@ -82,7 +91,7 @@ export default function TaminotListModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-3 sm:p-4"
+    <div className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-3 sm:p-4"
          onClick={onClose}>
       <div className="bg-card rounded-card w-full max-w-2xl shadow-lg max-h-[92vh] flex flex-col"
            onClick={(e) => e.stopPropagation()}>
@@ -90,7 +99,8 @@ export default function TaminotListModal({
           <div>
             <h3 className="font-semibold">Spiska qilish</h3>
             <p className="text-xs text-ink-soft">
-              Kerakli mahsulotlarni tanlang — jami qancha pul kerakligi chiqadi
+              {supplier.name} — kerakli mahsulotlarni tanlang, jami qancha pul
+              kerakligi chiqadi
             </p>
           </div>
           <button onClick={onClose} className="p-1 rounded hover:bg-black/5"><X size={18} /></button>

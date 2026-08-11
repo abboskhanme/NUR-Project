@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import {
   Plus, Search, Wallet, PackagePlus, Pencil, Trash2, ChevronRight, Coins,
+  Building2, Globe, Eye,
 } from 'lucide-react';
 
 import { api } from '@/api/client';
@@ -26,6 +27,23 @@ interface Summary {
   product_count: number;
 }
 
+/** Ta'minot bo'limidagi yetkazib beruvchi qarzi — bu yerda FAQAT KO'RINADI. */
+interface TaminotDebt {
+  supplier_id: string;
+  scope: string;
+  name: string;
+  phone?: string | null;
+  product_count: number;
+  totals: {
+    currency: string;
+    total_purchased: number;
+    total_paid: number;
+    balance: number;
+    stock_value: number;
+  }[];
+  last_purchase_at?: string | null;
+}
+
 const DEBTS_TYPES: Record<string, string> = {
   product: 'Mahsulot',
   credit: 'Kredit',
@@ -34,6 +52,11 @@ const DEBTS_TYPES: Record<string, string> = {
 const DEBTS_TABS: Record<string, string> = {
   debts: 'Qarzlar',
   products: 'Ehtiyot qismlar',
+};
+/** Ta'minot bo'limlarining ko'rinishi (faqat belgi sifatida). */
+const SCOPE_BADGE: Record<string, { label: string; icon: typeof Building2; cls: string }> = {
+  ichki: { label: "Ichki ta'minot", icon: Building2, cls: 'bg-primary/10 text-primary' },
+  tashqi: { label: "Tashqi ta'minot", icon: Globe, cls: 'bg-warning/15 text-warning' },
 };
 const DEBTS_CURRENCY: Record<string, string> = {
   UZS: "so'm",
@@ -70,8 +93,67 @@ export default function DebtsPage() {
       params: { search: search.trim() || undefined, with_debt: onlyDebt || undefined },
     }).then((r) => r.data),
   });
+  // Ta'minot qarzlari — qarzlar ro'yxatining oxirida FAQAT KO'RISH uchun
+  // chiqadi. Hech qanday amal yo'q: to'lov, kirim va tahrir Ta'minot bo'limida.
+  // KPI kartalarida ham hisobga olingani uchun har doim so'raladi.
+  const taminotQ = useQuery<TaminotDebt[]>({
+    queryKey: ['debts-taminot-suppliers'],
+    queryFn: () => api.get('/debts/taminot-suppliers').then((r) => r.data),
+  });
   const products = productsQ.data ?? [];
   const s = summaryQ.data;
+
+  /**
+   * KPI kartalari uchun umumiy hisob: qarzlar moduli + ta'minot bo'limi.
+   * Valyutalar hech qachon qo'shilmaydi — har biri alohida qator bo'lib chiqadi.
+   * Filtrlar (qidiruv, «faqat qarzi borlar») bu yerga ta'sir qilmaydi: kartalar
+   * doim to'liq manzarani ko'rsatadi.
+   */
+  const currencyTotals = useMemo(() => {
+    const acc = new Map<string, CurrencyTotal>();
+    const slotOf = (currency: string) => {
+      let slot = acc.get(currency);
+      if (!slot) {
+        slot = { currency, total_purchased: 0, total_paid: 0, total_balance: 0, with_debt_count: 0 };
+        acc.set(currency, slot);
+      }
+      return slot;
+    };
+    for (const c of s?.by_currency ?? []) {
+      const slot = slotOf(c.currency);
+      slot.total_purchased += c.total_purchased;
+      slot.total_paid += c.total_paid;
+      slot.total_balance += c.total_balance;
+      slot.with_debt_count += c.with_debt_count;
+    }
+    for (const row of taminotQ.data ?? []) {
+      for (const t of row.totals) {
+        const slot = slotOf(t.currency);
+        slot.total_purchased += t.total_purchased;
+        slot.total_paid += t.total_paid;
+        slot.total_balance += t.balance;
+        if (t.balance > 0) slot.with_debt_count += 1;
+      }
+    }
+    const rows = [...acc.values()].sort((a, b) => a.currency.localeCompare(b.currency));
+    return rows.length
+      ? rows
+      : [{ currency: 'UZS', total_purchased: 0, total_paid: 0, total_balance: 0, with_debt_count: 0 }];
+  }, [s, taminotQ.data]);
+
+  // Ta'minotdan kelgan qarz bormi — kartalar ostidagi izoh shunga qarab chiqadi
+  const hasTaminotDebt = (taminotQ.data ?? []).some(
+    (row) => row.totals.some((t) => t.total_purchased > 0 || t.total_paid > 0),
+  );
+
+  // Qidiruv va «faqat qarzi borlar» filtri bu qatorlarga ham qo'llanadi —
+  // ro'yxat bir butun bo'lib ko'rinishi kerak
+  const taminotRows = (taminotQ.data ?? []).filter((row) => {
+    const q = search.trim().toLowerCase();
+    if (q && !row.name.toLowerCase().includes(q)) return false;
+    if (onlyDebt && !row.totals.some((t) => t.balance > 0)) return false;
+    return true;
+  });
 
   // Tur nomi: tayyor kalitlar tarjima qilinadi, ixtiyoriy nom o'zicha ko'rsatiladi
   const typeLabel = (type: string) =>
@@ -118,11 +200,12 @@ export default function DebtsPage() {
         </button>
       </div>
 
-      {/* KPI Cards — 3 ta: olib kelingan, to'langan, qarz qoldi (har valyuta uchun) */}
+      {/* KPI Cards — 3 ta: olib kelingan, to'langan, qarz qoldi (har valyuta uchun).
+          Summalarga ta'minot qarzlari ham qo'shilgan — pastdagi ro'yxat bilan mos. */}
       <div className="space-y-3">
-        {(s?.by_currency?.length ? s.by_currency : [{ currency: 'UZS', total_purchased: 0, total_paid: 0, total_balance: 0, with_debt_count: 0 }]).map((c) => (
+        {currencyTotals.map((c) => (
           <div key={c.currency}>
-            {(s?.by_currency?.length ?? 0) > 1 && (
+            {currencyTotals.length > 1 && (
               <div className="text-xs font-medium text-ink-soft mb-1.5">
                 {DEBTS_CURRENCY[c.currency] ?? c.currency}
               </div>
@@ -149,11 +232,18 @@ export default function DebtsPage() {
             </div>
           </div>
         ))}
+        {/* Summalar nimadan iboratligi aniq bo'lsin */}
+        {hasTaminotDebt && (
+          <p className="text-[11px] text-ink-soft flex items-center gap-1.5">
+            <Eye size={12} /> Summalarga ta'minot bo'limidagi yetkazib beruvchilar
+            qarzi ham qo'shilgan
+          </p>
+        )}
       </div>
 
       {/* Tabs + Search */}
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex gap-1.5">
+        <div className="flex gap-1.5 flex-wrap">
           {(['debts', 'products'] as const).map((key) => (
             <button key={key} onClick={() => setTab(key)}
               className={`px-3 py-1.5 rounded-button text-sm font-medium transition ${
@@ -185,7 +275,7 @@ export default function DebtsPage() {
               <div key={i} className="h-14 rounded-button bg-black/5 animate-pulse" />
             ))}
           </div>
-        ) : products.length === 0 ? (
+        ) : products.length === 0 && !(tab === 'debts' && taminotRows.length) ? (
           <EmptyState title="Hali ehtiyot qism qo'shilmagan" description={'"Yangi ehtiyot qism" tugmasi orqali birinchisini qo\'shing'} />
         ) : tab === 'debts' ? (
           /* ===================== QARZLAR ===================== */
@@ -227,6 +317,49 @@ export default function DebtsPage() {
                 </div>
               </div>
             ))}
+
+            {/* ===== Ta'minot qarzlari — FAQAT KO'RISH =====
+                Yetkazib beruvchi bo'yicha umumiy qarz shu ro'yxatda ko'rinib
+                turadi, lekin bu yerdan hech narsa o'zgartirilmaydi: to'lov,
+                kirim va tahrir Ta'minot bo'limida qoladi. */}
+            {taminotRows.map((row) => {
+              const badge = SCOPE_BADGE[row.scope];
+              const BadgeIcon = badge?.icon ?? Building2;
+              const debts = row.totals.filter((t) => t.balance > 0);
+              return (
+                <div key={row.supplier_id} className="flex items-center gap-3 py-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium truncate flex items-center gap-2">
+                      <span className="truncate">{row.name}</span>
+                      {badge && (
+                        <span className={`shrink-0 badge text-[10px] font-medium inline-flex items-center gap-1 ${badge.cls}`}>
+                          <BadgeIcon size={10} /> {badge.label}
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs text-ink-soft truncate">
+                      {row.product_count} ta mahsulot
+                      {row.phone ? ` · ${row.phone}` : ''}
+                      {row.last_purchase_at ? ` · ${formatDate(row.last_purchase_at)}` : ''}
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    {debts.length > 0 ? debts.map((t) => (
+                      <div key={t.currency} className="font-bold text-danger tabular-nums">
+                        {formatMoney(t.balance, t.currency)}
+                      </div>
+                    )) : (
+                      <div className="font-bold text-success">{formatMoney(0, 'UZS')}</div>
+                    )}
+                  </div>
+                  {/* Amal tugmalari o'rniga — faqat ko'rish belgisi */}
+                  <div className="shrink-0 flex items-center gap-1 text-ink-soft"
+                       title="Faqat ko'rish — boshqarish Ta'minot bo'limida">
+                    <Eye size={15} />
+                  </div>
+                </div>
+              );
+            })}
           </div>
         ) : (
           /* ===================== EHTIYOT QISMLAR ===================== */
