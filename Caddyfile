@@ -32,6 +32,11 @@
 # .env.prod da beriladi:  DOMAIN_APEX=nurtechnogroup.uz
 # Berilmasa — hech qachon mos kelmaydigan manzil ishlatiladi va `http://`
 # sxemasi tufayli Caddy unga sertifikat ham so'ramaydi.
+#
+# Manzil `www.` + so'ralgan host sifatida QURILADI, ya'ni {$DOMAIN} ga
+# bog'liq emas. Sababi: DOMAIN ba'zan `:80` yoki `http://IP` bo'lishi mumkin
+# va uni redirect ichiga qo'yish butun konfiguratsiyani buzardi — bitta
+# noto'g'ri o'zgaruvchi sayt umuman ko'tarilmasligiga olib kelmasligi kerak.
 {$DOMAIN_APEX:http://apex.invalid} {
-    redir https://{$DOMAIN}{uri} permanent
+    redir https://www.{host}{uri} permanent
 }
