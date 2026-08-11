@@ -85,6 +85,17 @@ async def fetch_and_apply() -> bool:
             )
         if resp.status_code == 200:
             _apply(resp.json())
+            # Sozlamalar (jumladan Instagram tokeni) YANGI kelgan bo'lishi
+            # mumkin — akkaunt ID sini shu yerda aniqlab olamiz. Startup'da
+            # ERP hali ko'tarilmagan bo'lsa (konteynerlar birga qayta ishga
+            # tushganda shunday bo'ladi) identifikatsiya o'sha payt imkonsiz
+            # edi; shu sabab u HAR sinxronlashda qayta urinib ko'riladi.
+            try:
+                from app.instagram.oauth import ensure_identity
+
+                await ensure_identity()
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Akkaunt identifikatsiyasida xato: {}", exc)
             return True
         logger.warning("ERP config {} : {}", resp.status_code, resp.text[:150])
     except httpx.HTTPError as exc:

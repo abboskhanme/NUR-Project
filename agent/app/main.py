@@ -18,7 +18,7 @@ from pydantic import BaseModel
 from app.agent import knowledge
 from app.config import settings
 from app.instagram.models import IncomingEvent
-from app.instagram.oauth import ensure_identity, refresh_token_if_due
+from app.instagram.oauth import refresh_token_if_due
 from app.instagram.oauth import router as oauth_router
 from app.instagram.webhook import router as webhook_router
 from app.processing.pipeline import process_event
@@ -36,14 +36,10 @@ _scheduler: AsyncIOScheduler | None = None
 async def lifespan(app: FastAPI):
     global _scheduler
     knowledge.get_knowledge()  # bilim bazasini oldindan yuklaymiz
-    # ERP'dan sozlamalarni tortib olamiz (Tizim sozlamalari) — .env ustidan qo'llanadi
+    # ERP'dan sozlamalarni tortib olamiz (Tizim sozlamalari) — .env ustidan
+    # qo'llanadi. Akkaunt ID/username ham shu ichida aniqlanadi: ERP hali
+    # ko'tarilmagan bo'lsa keyingi sinxronlashda (5 daqiqada) qayta urinadi.
     await fetch_and_apply()
-    # Akkauntimiz ID/username'ini bilib olamiz — webhook'da O'Z izohimizni shu
-    # bo'yicha ajratamiz. Bilmasak bot o'ziga javob berib halqaga tushadi.
-    try:
-        await ensure_identity()
-    except Exception as exc:  # noqa: BLE001
-        logger.error("Akkaunt identifikatsiyasida xato: {}", exc)
     logger.info("NUR Agent ishga tushdi (provider={})", settings.AI_PROVIDER)
 
     _scheduler = AsyncIOScheduler(timezone=settings.TIMEZONE)
