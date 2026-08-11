@@ -22,6 +22,7 @@ import TaminotTransactionsModal from '@/features/taminot/TaminotTransactionsModa
 import TaminotReportCharts from '@/features/taminot/TaminotReportCharts';
 import TaminotListsPanel from '@/features/taminot/TaminotListsTab';
 import TaminotFlow from '@/features/taminot/TaminotFlow';
+import TaminotStockTab from '@/features/taminot/TaminotStockTab';
 import TaminotSupplierModal from '@/features/taminot/TaminotSupplierModal';
 import TaminotSupplierDetailModal from '@/features/taminot/TaminotSupplierDetailModal';
 import TaminotSupplierPaymentModal from '@/features/taminot/TaminotSupplierPaymentModal';
@@ -87,8 +88,10 @@ export default function TaminotPage() {
   const canWrite = can(`supply_${scope}:write`);
   const canDelete = can(`supply_${scope}:delete`);
 
-  // Asosiy tab — yetkazib beruvchilar: pul hisobi shu daraja bo'yicha
-  const [tab, setTab] = useState<'suppliers' | 'products' | 'reports'>('suppliers');
+  // Asosiy tab — yetkazib beruvchilar: pul hisobi shu daraja bo'yicha.
+  // `stock` — shu bo'lim mahsulotlarining ombor qoldig'i (asosiy «Ombor»
+  // moduliga aloqasi yo'q).
+  const [tab, setTab] = useState<'suppliers' | 'products' | 'stock' | 'reports'>('suppliers');
   const [search, setSearch] = useState('');
   const [onlyDebt, setOnlyDebt] = useState(false);
   const [lowOnly, setLowOnly] = useState(false);
@@ -137,18 +140,22 @@ export default function TaminotPage() {
     }).then((r) => r.data),
     enabled: valid,
   });
+  // Arxiv va «kam qolgan» filtri faqat Mahsulotlar tabida; Ombor tabi o'z
+  // holat filtriga ega va doim to'liq ro'yxatni oladi
+  const archivedParam = tab === 'products' && archived;
+  const lowParam = tab === 'products' && lowOnly && !archived;
   const productsQ = useQuery<TaminotProduct[]>({
-    queryKey: ['taminot-products', scope, search, lowOnly, archived],
+    queryKey: ['taminot-products', scope, search, lowParam, archivedParam],
     queryFn: () => api.get('/taminot/products', {
       params: {
         scope,
         search: search.trim() || undefined,
-        low_stock: (!archived && lowOnly) || undefined,
-        archived: archived || undefined,
+        low_stock: lowParam || undefined,
+        archived: archivedParam || undefined,
         sort: 'stock',
       },
     }).then((r) => r.data),
-    enabled: valid && tab === 'products',
+    enabled: valid && (tab === 'products' || tab === 'stock'),
   });
   const logQ = useQuery<TxLog[]>({
     queryKey: ['taminot-log', scope, dateFrom, dateTo],
@@ -366,7 +373,7 @@ export default function TaminotPage() {
       {/* Ombor ogohlantirishi — kam qolgan/tugagan mahsulotlar doim ko'rinib turadi */}
       {(s?.low_stock_count || s?.out_of_stock_count) ? (
         <button
-          onClick={() => { setTab('products'); setArchived(false); setLowOnly(true); }}
+          onClick={() => setTab('stock')}
           className="w-full text-left rounded-card border border-danger/30 bg-danger/[0.07] px-4 py-3 flex items-center gap-3 hover:bg-danger/10 transition">
           <div className="w-9 h-9 rounded-button bg-danger/15 text-danger flex items-center justify-center shrink-0">
             <AlertTriangle size={18} />
@@ -392,6 +399,7 @@ export default function TaminotPage() {
           {([
             ['suppliers', 'Yetkazib beruvchilar'],
             ['products', 'Mahsulotlar'],
+            ['stock', 'Ombor'],
             ['reports', 'Hisobotlar'],
           ] as const).map(([key, label]) => (
             <button key={key} onClick={() => setTab(key)}
@@ -399,7 +407,7 @@ export default function TaminotPage() {
                 tab === key ? 'bg-primary text-white' : 'bg-black/5 text-ink-soft hover:bg-black/10')}>
               {label}
               {/* Kam qolgan/tugagan mahsulotlar soni */}
-              {key === 'products' && attentionCount > 0 && (
+              {key === 'stock' && attentionCount > 0 && (
                 <span className={cn('px-1.5 py-0.5 rounded-full text-[10px] font-bold',
                   tab === key ? 'bg-white/20 text-white' : 'bg-danger/15 text-danger')}>
                   {attentionCount}
@@ -614,6 +622,17 @@ export default function TaminotPage() {
             />
           )}
         </Card>
+      ) : tab === 'stock' ? (
+        /* ===== OMBOR — shu bo'lim mahsulotlarining qoldig'i =====
+           Asosiy «Ombor» moduliga aloqasi yo'q: bu yerda faqat ta'minot
+           orqali kelgan materiallar hisoblanadi. */
+        <TaminotStockTab
+          products={products}
+          loading={productsQ.isLoading}
+          canWrite={canWrite}
+          onAction={(product, kind) => setAction({ product, kind })}
+          onOpenProduct={setDetail}
+        />
       ) : (
         /* ===================== HISOBOTLAR ===================== */
         <div className="space-y-4">

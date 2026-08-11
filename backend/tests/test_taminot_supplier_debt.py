@@ -400,3 +400,103 @@ async def test_product_with_stock_cannot_be_deleted(client, db_engine):
     arch = (await c.get(f"{API}/products",
                         params={"scope": "tashqi", "archived": True})).json()
     assert [x["id"] for x in arch] == [p["id"]]
+
+
+# ===========================================================================
+# SARFLASH — ombor amali butun modulga to'g'ri ta'sir qiladimi
+# ===========================================================================
+async def test_consume_updates_every_view_consistently(client, db_engine):
+    """Sarflash: qoldiq kamayadi, QARZ TEGILMAYDI, hamma ko'rinish yangilanadi.
+
+    Ombor tabidan qilingan sarf ham xuddi shu endpointga boradi, shuning uchun
+    bu test butun modul bo'ylab bog'lanishni tekshiradi: mahsulot ro'yxati,
+    yetkazib beruvchi hisobi, umumiy KPI va harakatlar jurnali.
+    """
+    c = await _admin(client, db_engine)
+    sp = await _supplier(c)
+    p = await _product(c, sp, "Profil", 1000)
+    await c.post(f"{API}/products/{p['id']}/purchase", json={"qty": 10})  # 10 000 qarz
+
+    r = await c.post(f"{API}/products/{p['id']}/consume", json={"qty": 4})
+    assert r.status_code == 201, r.text
+
+    # 1) Mahsulot ro'yxati — qoldiq kamaydi, sarf qayd etildi
+    row = next(x for x in (await c.get(f"{API}/products", params={"scope": "tashqi"})).json()
+               if x["id"] == p["id"])
+    assert row["stock"] == 6 and row["out_qty"] == 4
+    assert row["stock_value"] == 6000          # 6 × 1000
+    assert row["total_purchased"] == 10000      # sarf kirimga tegmaydi
+
+    # 2) Yetkazib beruvchi — QARZ O'ZGARMAYDI, qoldiq qiymati esa kamayadi
+    sup = await _fetch(c, sp["id"])
+    assert _cur(sup)["balance"] == 10000
+    assert _cur(sup)["stock_value"] == 6000
+
+    # 3) Umumiy KPI (summary) ham shu raqamni ko'rsatadi
+    summary = (await c.get(f"{API}/summary", params={"scope": "tashqi"})).json()
+    assert summary["by_currency"][0]["stock_value"] == 6000
+    assert summary["by_currency"][0]["total_balance"] == 10000
+
+    # 4) Yetkazib beruvchi tarixi va bo'lim jurnalida ko'rinadi
+    sup_txs = (await c.get(f"{API}/suppliers/{sp['id']}/transactions")).json()
+    consume = next(t for t in sup_txs if t["kind"] == "consume")
+    assert consume["qty"] == 4 and consume["amount"] == 0
+    assert consume["product_name"] == "Profil"
+
+    log = (await c.get(f"{API}/transactions", params={"scope": "tashqi"})).json()
+    assert any(t["kind"] == "consume" and t["product_id"] == p["id"] for t in log)
+
+
+async def test_consume_beyond_stock_is_rejected(client, db_engine):
+    """Qoldiqdan ko'p sarflab bo'lmaydi — qoldiq manfiy bo'lib ketmaydi."""
+    c = await _admin(client, db_engine)
+    sp = await _supplier(c)
+    p = await _product(c, sp, "Profil", 1000)
+    await c.post(f"{API}/products/{p['id']}/purchase", json={"qty": 3})
+
+    r = await c.post(f"{API}/products/{p['id']}/consume", json={"qty": 5})
+    assert r.status_code == 422
+    row = next(x for x in (await c.get(f"{API}/products", params={"scope": "tashqi"})).json()
+               if x["id"] == p["id"])
+    assert row["stock"] == 3  # o'zgarmadi
+
+
+async def test_archived_consume_returns_stock(client, db_engine):
+    """Sarf yozuvi arxivga o'tsa — qoldiq joyiga qaytadi, qarz tegilmaydi."""
+    c = await _admin(client, db_engine)
+    sp = await _supplier(c)
+    p = await _product(c, sp, "Profil", 1000)
+    await c.post(f"{API}/products/{p['id']}/purchase", json={"qty": 10})
+    await c.post(f"{API}/products/{p['id']}/consume", json={"qty": 4})
+
+    txs = (await c.get(f"{API}/suppliers/{sp['id']}/transactions")).json()
+    consume = next(t for t in txs if t["kind"] == "consume")
+    assert (await c.delete(f"{API}/transactions/{consume['id']}")).status_code == 204
+
+    row = next(x for x in (await c.get(f"{API}/products", params={"scope": "tashqi"})).json()
+               if x["id"] == p["id"])
+    assert row["stock"] == 10 and row["out_qty"] == 0
+    assert _cur(await _fetch(c, sp["id"]))["balance"] == 10000
+
+    # Tiklansa yana kamayadi
+    assert (await c.post(f"{API}/transactions/{consume['id']}/restore")).status_code == 200
+    row = next(x for x in (await c.get(f"{API}/products", params={"scope": "tashqi"})).json()
+               if x["id"] == p["id"])
+    assert row["stock"] == 6
+
+
+async def test_consume_never_crosses_scopes(client, db_engine):
+    """Ichki va tashqi ta'minot omborlari hech qachon aralashmaydi."""
+    c = await _admin(client, db_engine)
+    tash = await _supplier(c, scope="tashqi", name="Tashqi joy")
+    ich = await _supplier(c, scope="ichki", name="Ichki joy")
+    pt = await _product(c, tash, "Profil", 1000)
+    pi = await _product(c, ich, "Profil", 1000)
+    await c.post(f"{API}/products/{pt['id']}/purchase", json={"qty": 10})
+    await c.post(f"{API}/products/{pi['id']}/purchase", json={"qty": 10})
+
+    await c.post(f"{API}/products/{pt['id']}/consume", json={"qty": 7})
+
+    t_row = (await c.get(f"{API}/products", params={"scope": "tashqi"})).json()[0]
+    i_row = (await c.get(f"{API}/products", params={"scope": "ichki"})).json()[0]
+    assert t_row["stock"] == 3 and i_row["stock"] == 10
