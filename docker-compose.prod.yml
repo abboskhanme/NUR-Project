@@ -129,6 +129,10 @@ services:
     environment:
       # .env.prod ichidagi DOMAIN qiymati Caddyfile'ga uzatiladi
       DOMAIN: ${DOMAIN}
+      # «www»siz domen (masalan: nurtechnogroup.uz) — DOMAIN ga yo'naltiriladi.
+      # Ko'rsatilmasa mos kelmaydigan manzil beriladi: apex xizmat qilinmaydi
+      # va Caddy unga sertifikat ham so'ramaydi (bo'sh qiymat sintaksisni buzardi).
+      DOMAIN_APEX: ${DOMAIN_APEX:-http://apex.invalid}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data

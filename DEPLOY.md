@@ -77,14 +77,30 @@ Ya'ni **DNS'da yangi yozuv qo'shish shart emas.** Faqat `.env.prod` da
 `DOMAIN=www.nurtechnogroup.uz` qilib qo'ysangiz, Caddy 1–2 daqiqada Let's Encrypt
 sertifikatini avtomatik oladi (80 va 443 portlar ochiq bo'lishi shart — 4-bo'limda).
 
-### Ixtiyoriy: apex (`nurtechnogroup.uz`) tozalash
+### Apex (`nurtechnogroup.uz`) — «www»siz manzil
 
-Apex hozir **Bubble.io** ga qaragan (4 ta Cloudflare IP) va ishlamayapti.
-Kerak bo'lmasa, o'sha 4 ta A yozuvni o'chirib tashlash mumkin — `www` ga
-ta'sir qilmaydi, chunki u alohida yozuv.
+Odam brauzerga odatda `nurtechnogroup.uz` deb yozadi. Buni ishlatish uchun
+ikki narsa kerak:
 
-> Apex A yozuvi o'chsa, unga bog'liq `MX` (pochta), `mail` va `ftp` CNAME'lari
-> ham ishlamay qoladi. Pochtadan foydalanmasangiz muammo emas.
+1. **DNS** — apex A yozuvi ham droplet IP'ga qarasin:
+   ```bash
+   dig +short nurtechnogroup.uz @ns1.eskiz.uz   # 209.38.218.18 bo'lishi kerak
+   ```
+2. **`.env.prod`** — quyidagi qatorni qo'shing:
+   ```
+   DOMAIN_APEX=nurtechnogroup.uz
+   ```
+   Shundan keyin Caddy apex uchun ham sertifikat oladi va uni `DOMAIN` ga
+   (ya'ni `www.` ga) **doimiy redirect** qiladi.
+
+> Nega redirect, ikkalasida ham ochib qo'ymaymizmi? Chunki brauzer saqlagan
+> token domenga bog'liq: `www`da tizimga kirgan odam apex'da kirmagan bo'lib
+> ko'rinardi. Bitta kanonik manzil shu chalkashlikni yo'q qiladi.
+
+`DOMAIN_APEX` berilmasa apex umuman xizmat qilinmaydi — hech narsa buzilmaydi.
+
+> Apex A yozuvi o'zgarsa, unga bog'liq `MX` (pochta), `mail` va `ftp` CNAME'lari
+> ta'sirlanishi mumkin. Pochtadan foydalansangiz, avval tekshirib oling.
 
 Qolgan yozuvlar (`cpanel`, `webmail`, `whm`, `webdisk`, `autoconfig` va h.k.)
 Eskiz hostingniki — ular `www` ga aloqador emas, tegmasa ham bo'ladi.
@@ -146,6 +162,8 @@ nano .env.prod
 Quyidagilarni to'ldiring:
 
 - **`DOMAIN`** → domensiz boshlasangiz `:80` qoldiring (sayt `http://SERVER_IP` da ochiladi). Domen bor bo'lsa: `www.nurtechnogroup.uz`.
+- **`DOMAIN_APEX`** → «www»siz manzil (`nurtechnogroup.uz`). U `DOMAIN` ga
+  yo'naltiriladi. Kerak bo'lmasa qatorni umuman yozmang.
 - **`POSTGRES_PASSWORD`** → kuchli parol. Yaratish: `openssl rand -hex 16`
 - **`DATABASE_URL`** → yuqoridagi parol bilan **bir xil** bo'lsin:
   `postgresql+asyncpg://postgres:O'SHA_PAROL@postgres:5432/nur_erp`
