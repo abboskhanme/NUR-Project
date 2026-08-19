@@ -91,10 +91,18 @@ class InstagramClient:
         )
 
     async def subscribe_webhooks(self) -> dict:
-        """Akkauntni webhook maydonlariga obuna qiladi (/connect oqimida chaqiriladi)."""
+        """Akkauntni webhook maydonlariga obuna qiladi (/connect oqimida chaqiriladi).
+
+        FAQAT `comments` va `messages`. Ilgari uchinchi bo'lib `message_echoes`
+        ham yuborilardi — Instagram API'da bunday maydon YO'Q va u butun so'rovni
+        rad etardi (400: "Param subscribed_fields[2] must be one of ..."), ya'ni
+        akkaunt hech qaysi maydonga obuna bo'lmay qolardi va webhook umuman
+        kelmasdi. Akkauntdan chiqqan xabarlar (echo) baribir `messages` orqali
+        `is_echo` bayrog'i bilan keladi — alohida maydon shart emas.
+        """
         return await self._post(
             "me/subscribed_apps",
-            params={"subscribed_fields": "comments,messages,message_echoes"},
+            params={"subscribed_fields": "comments,messages"},
         )
 
 
