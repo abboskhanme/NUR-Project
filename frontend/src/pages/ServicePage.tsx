@@ -15,6 +15,7 @@ import ServiceTripPanel from '@/features/service/ServiceTripPanel';
 import ServiceTripsList from '@/features/service/ServiceTripsList';
 import ServicePartsStats from '@/features/service/ServicePartsStats';
 import ServiceMoneyStats from '@/features/service/ServiceMoneyStats';
+import ServiceCategoryReport from '@/features/service/ServiceCategoryReport';
 import { ServiceStatusBadge } from '@/features/service/status';
 
 interface Ticket {
@@ -52,7 +53,7 @@ export default function ServicePage() {
   const [catOpen, setCatOpen] = useState(false);
   const [partsOpen, setPartsOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
-  const [tab, setTab] = useState<'tickets' | 'trips' | 'partsStats' | 'money'>('tickets');
+  const [tab, setTab] = useState<'tickets' | 'trips' | 'partsStats' | 'money' | 'report'>('tickets');
 
   const summaryQ = useQuery<Summary>({
     queryKey: ['service-summary'],
@@ -107,7 +108,7 @@ export default function ServicePage() {
 
       {/* Ichki bo'limlar: Arizalar / Servis safarlari */}
       <div className="flex gap-1 border-b border-black/5">
-        {([['tickets', 'Arizalar'], ['trips', 'Servis safarlari'], ['partsStats', 'Sarflangan qismlar'], ['money', 'Sarflangan mablag']] as const).map(([key, label]) => (
+        {([['tickets', 'Arizalar'], ['trips', 'Servis safarlari'], ['partsStats', 'Sarflangan qismlar'], ['money', 'Sarflangan mablag'], ['report', 'Hisobot']] as const).map(([key, label]) => (
           <button key={key} onClick={() => setTab(key)}
             className={'px-4 py-2 text-sm font-medium -mb-px border-b-2 transition-colors ' +
               (tab === key ? 'border-primary text-primary' : 'border-transparent text-ink-soft hover:text-ink')}>
@@ -122,6 +123,8 @@ export default function ServicePage() {
         <ServicePartsStats />
       ) : tab === 'money' ? (
         <ServiceMoneyStats />
+      ) : tab === 'report' ? (
+        <ServiceCategoryReport />
       ) : (
       <>
       {/* KPI — 3 ta karta */}

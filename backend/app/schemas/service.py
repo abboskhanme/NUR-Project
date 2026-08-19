@@ -123,6 +123,37 @@ class PartStat(BaseModel):
     count: int
 
 
+class ServiceCategoryReportRow(BaseModel):
+    """Bitta toifa bo'yicha hisobot qatori."""
+    category: str
+    total: int = 0
+    new: int = 0
+    scheduled: int = 0
+    completed: int = 0
+    cancelled: int = 0
+    in_warranty: int = 0
+    out_warranty: int = 0
+    client_cost: Decimal = Decimal(0)   # shu toifadagi "Servis xarajati" yig'indisi
+    parts_count: int = 0                # ishlatilgan ehtiyot qismlar (dona)
+    parts: list[PartStat] = []          # qaysi qismdan nechta
+
+
+class ServiceCategoryReport(BaseModel):
+    """Servis hisoboti — BARCHA toifalar bo'yicha (arizasi yo'qlari ham)."""
+    date_from: Optional[date] = None
+    date_to: Optional[date] = None
+    total: int = 0
+    new: int = 0
+    scheduled: int = 0
+    completed: int = 0
+    cancelled: int = 0
+    in_warranty: int = 0
+    out_warranty: int = 0
+    client_cost: Decimal = Decimal(0)
+    parts_count: int = 0
+    rows: list[ServiceCategoryReportRow] = []
+
+
 class TripMoneyStat(BaseModel):
     collected: Decimal = Decimal(0)         # olingan
     spent: Decimal = Decimal(0)             # safar sarflangani (trip.spent yig'indisi)

@@ -2,6 +2,7 @@
 import re
 import uuid
 from datetime import date, datetime, timezone
+from decimal import Decimal
 from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -20,6 +21,7 @@ from app.models.service import (
 from app.schemas.common import Page
 from app.schemas.service import (
     CustomerSearchHit, OrderMini, PartStat, ServiceCategoryIn, ServiceCategoryOut,
+    ServiceCategoryReport, ServiceCategoryReportRow,
     ServiceExpenseItem, ServicePartIn, ServicePartOut,
     ServiceSummary, ServiceTicketCreate, ServiceTicketOut, ServiceTicketUpdate,
     ServiceTripOut, ServiceTripUpdate, TripMoneyStat, ServiceVisitIn, ServiceVisitOut, WarrantyInfo,
@@ -178,6 +180,119 @@ async def service_expenses_list(
             in_warranty=t.in_warranty,
         ))
     return out
+
+
+# --------------------------------------------------------------------------- #
+# Hisobot — barcha toifalar bo'yicha
+# --------------------------------------------------------------------------- #
+UNCATEGORIZED = "Toifasiz"
+
+
+def _ticket_date_ref():
+    """Ish bajarilgan sana (closed_at, bo'lmasa opened_at) — barcha servis
+    hisobotlarida bir xil mezon ishlatiladi."""
+    return func.date(func.coalesce(ServiceTicket.closed_at, ServiceTicket.opened_at))
+
+
+def _category_expr():
+    """Toifa nomi; bo'sh/NULL bo'lsa 'Toifasiz'."""
+    return func.coalesce(func.nullif(func.btrim(ServiceTicket.category), ""), UNCATEGORIZED)
+
+
+@router.get("/report", response_model=ServiceCategoryReport)
+async def category_report(
+    db: Annotated[AsyncSession, Depends(get_db)], _: CurrentUser,
+    date_from: Optional[date] = None, date_to: Optional[date] = None,
+):
+    """Servis hisoboti — har bir toifa kesimida arizalar, holatlar, kafolat,
+    servis xarajati va sarflangan ehtiyot qismlar.
+
+    Arizasi yo'q (faol) toifalar ham nol qiymatlar bilan qaytariladi — hisobot
+    «barcha toifalari bo'yicha» to'liq bo'lishi uchun.
+
+    Vaqt filtri: ish bajarilgan sana (closed_at, bo'lmasa opened_at) — parts/stats
+    va expenses bilan bir xil, shuning uchun summalar mos keladi.
+    """
+    ref = _ticket_date_ref()
+    cat = _category_expr()
+    conds = []
+    if date_from:
+        conds.append(ref >= date_from)
+    if date_to:
+        conds.append(ref <= date_to)
+
+    parts_len = func.coalesce(func.jsonb_array_length(ServiceTicket.parts_used), 0)
+    q = select(
+        cat.label("category"),
+        func.count(ServiceTicket.id).label("total"),
+        func.count(ServiceTicket.id).filter(ServiceTicket.status == "new").label("new"),
+        func.count(ServiceTicket.id).filter(ServiceTicket.status == "scheduled").label("scheduled"),
+        func.count(ServiceTicket.id).filter(ServiceTicket.status == "completed").label("completed"),
+        func.count(ServiceTicket.id).filter(ServiceTicket.status == "cancelled").label("cancelled"),
+        func.count(ServiceTicket.id).filter(ServiceTicket.in_warranty.is_(True)).label("in_warranty"),
+        func.coalesce(func.sum(ServiceTicket.client_cost), 0).label("client_cost"),
+        func.coalesce(func.sum(parts_len), 0).label("parts_count"),
+    ).group_by(cat)
+    if conds:
+        q = q.where(*conds)
+    agg_rows = (await db.execute(q)).all()
+
+    # Toifa × ehtiyot qism kesimi
+    pbase = select(
+        cat.label("category"),
+        func.jsonb_array_elements_text(ServiceTicket.parts_used).label("name"),
+    )
+    if conds:
+        pbase = pbase.where(*conds)
+    psub = pbase.subquery()
+    part_rows = (await db.execute(
+        select(psub.c.category, psub.c.name, func.count().label("cnt"))
+        .group_by(psub.c.category, psub.c.name)
+        .order_by(func.count().desc(), psub.c.name)
+    )).all()
+    parts_by_cat: dict[str, list[PartStat]] = {}
+    for c, n, cnt in part_rows:
+        parts_by_cat.setdefault(c, []).append(PartStat(name=n, count=int(cnt)))
+
+    rows: dict[str, ServiceCategoryReportRow] = {}
+    for r in agg_rows:
+        total = int(r.total)
+        in_w = int(r.in_warranty)
+        rows[r.category] = ServiceCategoryReportRow(
+            category=r.category, total=total,
+            new=int(r.new), scheduled=int(r.scheduled),
+            completed=int(r.completed), cancelled=int(r.cancelled),
+            in_warranty=in_w, out_warranty=total - in_w,
+            client_cost=r.client_cost, parts_count=int(r.parts_count),
+            parts=parts_by_cat.get(r.category, []),
+        )
+
+    # Arizasi yo'q faol toifalar ham ro'yxatda ko'rinsin
+    active_names = (await db.execute(
+        select(ServiceCategory.name).where(ServiceCategory.is_active.is_(True))
+    )).scalars().all()
+    for name in active_names:
+        rows.setdefault(name, ServiceCategoryReportRow(category=name))
+
+    # Ko'p arizali toifa yuqorida; "Toifasiz" doim oxirida
+    ordered = sorted(
+        rows.values(),
+        key=lambda r: (r.category == UNCATEGORIZED, -r.total, r.category.lower()),
+    )
+
+    return ServiceCategoryReport(
+        date_from=date_from, date_to=date_to,
+        total=sum(r.total for r in ordered),
+        new=sum(r.new for r in ordered),
+        scheduled=sum(r.scheduled for r in ordered),
+        completed=sum(r.completed for r in ordered),
+        cancelled=sum(r.cancelled for r in ordered),
+        in_warranty=sum(r.in_warranty for r in ordered),
+        out_warranty=sum(r.out_warranty for r in ordered),
+        client_cost=sum((r.client_cost for r in ordered), Decimal(0)),
+        parts_count=sum(r.parts_count for r in ordered),
+        rows=ordered,
+    )
 
 
 @router.get("/trips", response_model=list[ServiceTripOut])
