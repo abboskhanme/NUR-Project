@@ -11,12 +11,13 @@ from typing import Optional
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
-from fastapi import FastAPI
+from fastapi import BackgroundTasks, FastAPI, Header, HTTPException
 from loguru import logger
 from pydantic import BaseModel
 
 from app.agent import knowledge
 from app.config import settings
+from app.instagram.importer import import_and_notify
 from app.instagram.models import IncomingEvent
 from app.instagram.oauth import refresh_token_if_due
 from app.instagram.oauth import router as oauth_router
@@ -117,3 +118,23 @@ async def simulate(payload: SimulateIn):
     )
     await process_event(event)
     return {"processed": True}
+
+
+# --- Eski suhbatlarni ERP'ga import qilish ---------------------------------
+@app.post("/admin/import-conversations")
+async def import_conversations_endpoint(
+    background: BackgroundTasks,
+    x_agent_key: Optional[str] = Header(default=None),
+):
+    """Instagram'dagi mavjud suhbatlarni (Requests papkasidagilarni ham) ERP'ga
+    ko'chiradi. Uzoq davom etishi mumkin — fon rejimida ishlaydi, natija
+    Telegram'ga yuboriladi.
+
+    Chaqirish:
+      curl -X POST https://<domen>/agent/admin/import-conversations \
+           -H "X-Agent-Key: <AGENT_INGEST_KEY>"
+    """
+    if not settings.AGENT_INGEST_KEY or x_agent_key != settings.AGENT_INGEST_KEY:
+        raise HTTPException(status_code=401, detail="Agent kaliti noto'g'ri")
+    background.add_task(import_and_notify)
+    return {"started": True, "note": "Natija Telegram'ga yuboriladi"}

@@ -13,12 +13,14 @@ from __future__ import annotations
 
 from typing import Annotated, Optional
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.leads import require_agent_key
+from app.core.config import settings as app_settings
 from app.core.dependencies import CurrentUser
 from app.core.permissions import is_superadmin
 from app.core.crypto import decrypt_secret, encrypt_secret
@@ -180,3 +182,39 @@ async def agent_config_write(
         await _upsert(db, key, val)
     await db.commit()
     return {"saved": sorted(payload.values)}
+
+
+# ===========================================================================
+# Eski Instagram suhbatlarini import qilish (agentga buyruq beramiz)
+# ===========================================================================
+@router.post("/agent/import-conversations")
+async def import_instagram_conversations(db: Annotated[AsyncSession, Depends(get_db)]):
+    """Agentga "mavjud Instagram suhbatlarini ERP'ga ko'chir" deb buyruq beradi.
+
+    Webhook ishlamagan davrda kelgan va "Requests" papkasida turgan yozishmalar
+    shu yo'l bilan Leadlar bo'limiga tushadi (Instagram ularni 30 kun saqlaydi).
+    Import fon rejimida ketadi — natija Telegram'ga keladi.
+    """
+    if not app_settings.AGENT_INGEST_KEY:
+        raise HTTPException(503, "AGENT_INGEST_KEY sozlanmagan")
+
+    dbv = await _db_values(db)
+    public = (_resolve("AGENT_PUBLIC_URL", dbv) or "").rstrip("/")
+    # Avval ichki tarmoq (docker), keyin tashqi manzil
+    candidates = ["http://agent:8000"] + ([public] if public else [])
+
+    last_error = ""
+    for base in candidates:
+        url = f"{base}/admin/import-conversations"
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                resp = await client.post(
+                    url, headers={"X-Agent-Key": app_settings.AGENT_INGEST_KEY}
+                )
+            if resp.status_code == 200:
+                return {"started": True, "via": base}
+            last_error = f"{resp.status_code}: {resp.text[:200]}"
+        except httpx.HTTPError as exc:
+            last_error = str(exc)
+
+    raise HTTPException(502, f"Agentga ulanib bo'lmadi — {last_error}")

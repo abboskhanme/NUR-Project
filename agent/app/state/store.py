@@ -2,7 +2,8 @@
 
 REDIS_URL berilgan bo'lsa Redis, aks holda ichki xotira fallback (bitta worker
 uchun yetarli; prod'da bir nechта worker bo'lsa Redis tavsiya etiladi).
-Bu holat ERP bazasida EMAS — agentning o'zida saqlanadi (ERP faqat biznes lead).
+Suhbat tarixining ASOSIY manbasi ERP (leads/ingest/context) — bu yerdagisi
+tezkor kesh; dedup, pauza va tezlik cheklovlari esa faqat shu yerda.
 """
 from __future__ import annotations
 
@@ -14,8 +15,10 @@ from loguru import logger
 
 from app.config import settings
 
-_HISTORY_MAX = 20  # DM suhbatда saqlanadigan oxirgi xabarlar soni
-_HISTORY_TTL = 60 * 60 * 24 * 2  # 2 kun
+# Redis — tezkor kesh (asosiy xotira ERP'da: leads/ingest/context).
+# ERP javob bermay qolsa ham bot kontekstsiz qolmasligi uchun uzoqroq saqlaymiz.
+_HISTORY_MAX = 40  # DM suhbatда saqlanadigan oxirgi xabarlar soni
+_HISTORY_TTL = 60 * 60 * 24 * 30  # 30 kun
 _SENT_TTL = 60 * 10  # bot yuborgan xabar izi (echo shu oraliqda qaytadi)
 
 

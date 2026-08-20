@@ -62,13 +62,30 @@ async def process_event(event: IncomingEvent) -> None:
 
     notifier.bump("total")
 
-    # 2. Kontekst — DM bo'lsa oldingi suhbat tarixi
+    # 2. Kontekst — suhbat tarixi va biz allaqachon bilgan faktlar.
+    #    Asosiy manba ERP (u yerda butun yozishma saqlanadi), Redis esa tezkor
+    #    zaxira: ERP javob bermasa ham bot kontekstsiz qolmaydi.
     history: list[dict] = []
-    if event.kind == "dm":
-        try:
-            history = await store.get_history(event.sender_id)
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Tarixni olishда xato: {}", exc)
+    known: dict = {}
+    if event.sender_id:
+        ctx = await leads_client.fetch_context(event.sender_id)
+        if ctx:
+            history = ctx.get("messages") or []
+            known = {
+                "name": ctx.get("name"),
+                "contact": ctx.get("contact"),
+                "product_interest": ctx.get("product_interest"),
+                "summary": ctx.get("summary"),
+            }
+        elif event.kind == "dm":
+            try:
+                history = await store.get_history(event.sender_id)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Tarixni olishда xato: {}", exc)
+
+    # 2a. Mijoz xabarini DARHOL jurnalga yozamiz — AI javob bera olmasa ham
+    #     yozishma yo'qolmaydi (keyingi safar xotira sifatida ishlatiladi).
+    await _log(event, event.text, role="user")
 
     # 3. AI javobi
     try:
@@ -78,6 +95,8 @@ async def process_event(event: IncomingEvent) -> None:
             username=event.username,
             media_caption=event.media_caption,
             history=history,
+            known=known,
+            has_attachment=event.has_attachment,
         )
     except Exception as exc:  # noqa: BLE001
         logger.exception("Agent javob berolmadi: {}", exc)
@@ -91,11 +110,12 @@ async def process_event(event: IncomingEvent) -> None:
 
     # 4. Javob yuborish (Instagram)
     try:
-        await _deliver(event, out)
+        await _deliver(event, out, is_first=not history)
     except Exception as exc:  # noqa: BLE001
         logger.exception("Javob yuborishда xato: {}", exc)
 
-    # 5. DM tarixini saqlash
+    # 5. Tarixni saqlash — ERP (asosiy xotira) va Redis (tezkor kesh)
+    await _log(event, out.reply, role="assistant")
     if event.kind == "dm":
         try:
             await store.append_turn(event.sender_id, "user", event.text)
@@ -122,6 +142,29 @@ async def process_event(event: IncomingEvent) -> None:
         logger.warning("Telegram bildirishnomada xato: {}", exc)
 
 
+async def _log(event: IncomingEvent, text: str, *, role: str) -> None:
+    """Xabarni ERP suhbat jurnaliga yozadi (xotira). Xato bo'lsa jim o'tadi."""
+    if not event.sender_id or not text:
+        return
+    try:
+        await leads_client.log_message(
+            ig_user_id=event.sender_id,
+            ig_username=event.username,
+            text=text,
+            role=role,
+            kind="comment" if event.kind == "comment" else "dm",
+            # AI javobiga alohida ID yo'q — faqat mijoz xabarini ID bilan yozamiz
+            ig_message_id=event.message_id if role == "user" else None,
+            comment_id=event.comment_id,
+            media_id=event.media_id,
+            # Izohdan yangi lead ochmaymiz (har bir "🔥" izohi ro'yxatni
+            # to'ldirib yubormasin) — DM esa har doim yoziladi.
+            create_lead=event.kind != "comment",
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Suhbatni jurnalga yozishda xato: {}", exc)
+
+
 async def _handle_echo(event: IncomingEvent) -> None:
     """Akkauntimizdan chiqqan xabar: bizniki bo'lsa — e'tibor bermaymiz;
     operator qo'lda yozgan bo'lsa — botni o'sha suhbatda pauza qilamiz."""
@@ -130,6 +173,8 @@ async def _handle_echo(event: IncomingEvent) -> None:
     try:
         if await store.was_sent_by_bot(event.sender_id, event.text):
             return  # bu botning o'z javobi, qaytib kelgan
+        # Operator qo'lda yozgan javob ham suhbat tarixiga tushsin
+        await _log(event, event.text, role="operator")
         await store.pause(event.sender_id, settings.BOT_PAUSE_HOURS)
         logger.info(
             "Operator qo'lda javob berdi — bot {} soat pauzada: {}",
@@ -139,7 +184,7 @@ async def _handle_echo(event: IncomingEvent) -> None:
         logger.warning("Echo ishlashда xato: {}", exc)
 
 
-async def _deliver(event: IncomingEvent, out: AgentOutput) -> None:
+async def _deliver(event: IncomingEvent, out: AgentOutput, *, is_first: bool = False) -> None:
     if event.kind == "comment" and event.comment_id:
         # Ochiq kommentга ≤1 daqiqa javob
         await instagram.reply_to_comment(event.comment_id, out.reply)
@@ -152,8 +197,9 @@ async def _deliver(event: IncomingEvent, out: AgentOutput) -> None:
             await store.mark_sent(event.sender_id, text)
     elif event.kind == "dm":
         text = out.reply
-        # Meta talabi: birinchi xabarda bot ekanini oshkor qilish
-        if not await store.get_history(event.sender_id):
+        # Meta talabi: suhbatning BIRINCHI xabarida bot ekanini oshkor qilish
+        # (tarix ERP'dan olinadi — Redis kesh bo'shab qolsa ham takrorlanmaydi)
+        if is_first:
             text = _with_disclosure(text)
         await instagram.send_dm(event.sender_id, text)
         await store.mark_sent(event.sender_id, text)

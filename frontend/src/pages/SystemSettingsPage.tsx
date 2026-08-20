@@ -278,6 +278,41 @@ function InstagramConnect(
           Avval o‘zgarishlarni saqlang, keyin ulang.
         </p>
       )}
+
+      {connected && <ImportConversations />}
+    </div>
+  );
+}
+
+/**
+ * Eski Instagram suhbatlarini Leadlarga ko'chirish.
+ * Webhook ishlamagan davrda kelgan va "Requests" papkasidagi yozishmalar
+ * shu tugma orqali tizimga tushadi (Instagram ularni 30 kun saqlaydi).
+ */
+function ImportConversations() {
+  const [busy, setBusy] = useState(false);
+
+  async function run() {
+    setBusy(true);
+    try {
+      await systemSettingsApi.importConversations();
+      toast.success('Import boshlandi — natija Telegram\'ga keladi');
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || 'Importni boshlab bo\'lmadi');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mt-3 pt-3 border-t border-black/5 flex items-center justify-between gap-3 flex-wrap">
+      <p className="text-sm text-ink-soft">
+        Eski suhbatlar (jumladan "Requests" papkasidagilar) Leadlarga ko‘chiriladi.
+        Instagram ularni faqat 30 kun saqlaydi.
+      </p>
+      <button onClick={run} disabled={busy} className="btn-ghost text-sm disabled:opacity-50">
+        {busy ? 'Boshlanmoqda…' : 'Eski suhbatlarni import qilish'}
+      </button>
     </div>
   );
 }

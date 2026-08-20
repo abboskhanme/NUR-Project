@@ -15,10 +15,10 @@ agent/
 │   ├── models.py          AgentOutput, LeadPayload (ERP ingest bilan mos)
 │   ├── ai/                Claude + Gemini provayderlar + factory
 │   ├── agent/             SalesAgent, o'zbek/kirill persona prompti, bilim bazasi
-│   ├── instagram/         webhook (HMAC), Graph API klienti, payload parser
-│   ├── leads/             ERP ingest klienti (retry + Telegram fallback)
+│   ├── instagram/         webhook (HMAC), Graph API klienti, parser, importer
+│   ├── leads/             ERP klienti: lead ingest + suhbat xotirasi
 │   ├── telegram/          qaynoq lead alerti + kunlik hisobot
-│   ├── state/             DM konteksti + dedup (Redis yoki ichki xotira)
+│   ├── state/             tezkor kesh: dedup, pauza, tarix keshi (Redis)
 │   └── processing/        pipeline: webhook -> AI -> javob -> lead -> alert
 ├── data/knowledge/        mahsulot/narx/FAQ (SIZ to'ldirasiz)
 └── tests/                 soxta payload bilan uchdan-uchgacha test
@@ -89,3 +89,42 @@ Ruxsatlar: `instagram_manage_comments`, `instagram_manage_messages`,
 `pages_manage_metadata`, `pages_read_engagement`. Tasdiq kelgunча hamma narsani
 `/simulate` va soxta webhook payload bilan to'liq test qilib bo'ladi. Ruxsat
 kelgach faqat `.env` ga tokenlarni qo'yib "yoqamiz".
+
+## Suhbat xotirasi (AI oldingi gaplarni eslaydi)
+
+Har bir DM/izoh va har bir javob darhol ERP'ga yoziladi
+(`POST /api/v1/leads/ingest/message`), javob berishdan oldin esa butun yozishma
+va ma'lum faktlar (telefon, qiziqqan mahsulot) ERP'dan olinadi
+(`GET /api/v1/leads/ingest/context`).
+
+Nima uchun ERP'da: Instagram API tarixni 30 kun saqlaydi, Redis esa faqat kesh.
+Yagona ishonchli manba — ERP bazasi. Shu sababli:
+
+- mijoz bir hafta oldin raqamini yozgan bo'lsa, AI uni **qayta so'ramaydi**;
+- operator telefondan qo'lda yozgan javob ham tarixга tushadi;
+- ovozli xabar/rasm kabi matnsiz xabarlar `[Mijoz ovozli xabar yubordi]` deb
+  yoziladi va AI mazmunini matn bilan yozishni so'raydi.
+
+Izohlar (kommentlar) jurnalga yoziladi, lekin YANGI lead ochmaydi — har bir "🔥"
+izohi Leadlar ro'yxatini to'ldirib yubormasligi uchun.
+
+## Eski suhbatlarni import qilish
+
+Webhook ishlamagan davrda kelgan yoki Instagram'ning "Requests" papkasida
+turgan yozishmalar tizimga tushmaydi. Ularni ko'chirib olish:
+
+```bash
+curl -X POST https://<DOMAIN>/agent/admin/import-conversations \
+     -H "X-Agent-Key: <AGENT_INGEST_KEY>"
+```
+
+yoki ERP'da: **Tizim sozlamalari → Instagram → "Eski suhbatlarni import qilish"**.
+
+Import fon rejimida ketadi, natija Telegram'ga keladi. Leadlar `instagram_import`
+manbasi bilan belgilanadi va ularga AI javob YOZMAYDI (Instagram'da javob oynasi
+mijozning oxirgi xabaridan 24 soat). Instagram bu suhbatlarni **30 kun** saqlaydi
+— shundan keyin API orqali ham olib bo'lmaydi.
+
+> Kelajakda request'ga tushmasligi uchun: Instagram ilovasi → Sozlamalar →
+> Xabarlar va story javoblari → Xabarlarni boshqarish → "Instagramdagi boshqalar"
+> → **Chat**. Shunda kuzatmaydiganlar ham to'g'ridan-to'g'ri inboxga tushadi.

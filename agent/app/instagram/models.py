@@ -5,8 +5,34 @@ aylantiramiz, pipeline faqat shu bilan ishlaydi.
 """
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 from typing import Any
+
+# Matnsiz xabarlar (ovoz, rasm, ...) endi tashlab yuborilmaydi — ular ham
+# suhbat tarixiga tushadi, aks holda mijoz raqamini ovozda yuborsa yo'qolardi.
+_ATTACHMENT_LABELS = {
+    "image": "rasm",
+    "video": "video",
+    "audio": "ovozli xabar",
+    "file": "fayl",
+    "share": "post/reels",
+    "story_mention": "story eslatmasi",
+    "ig_reel": "reels",
+    "location": "manzil",
+}
+
+
+def _attachment_text(attachments: list[dict]) -> str:
+    """Matnsiz xabarni tarixda ko'rinadigan qisqa matnga aylantiradi."""
+    names = []
+    for att in attachments:
+        label = _ATTACHMENT_LABELS.get(str(att.get("type") or "").lower(), "fayl")
+        if label not in names:
+            names.append(label)
+    if not names:
+        return ""
+    return f"[Mijoz {', '.join(names)} yubordi]"
 
 
 @dataclass
@@ -18,12 +44,20 @@ class IncomingEvent:
     comment_id: str | None = None
     media_id: str | None = None
     media_caption: str | None = None
+    # Instagram xabar ID (mid) — dedup va ERP jurnalidagi takrorni oldini oladi
+    message_id: str | None = None
+    # Matnsiz xabar (ovoz/rasm/...) — AI javobida hisobga olinadi
+    has_attachment: bool = False
 
     @property
     def dedup_key(self) -> str:
         if self.comment_id:
             return f"comment:{self.comment_id}"
-        return f"{self.kind}:{self.sender_id}:{hash(self.text)}"
+        if self.message_id:
+            return f"msg:{self.message_id}"
+        # hash() jarayonlar orasida turlicha bo'ladi — barqaror sha1 ishlatamiz
+        digest = hashlib.sha1(self.text.encode()).hexdigest()[:16]
+        return f"{self.kind}:{self.sender_id}:{digest}"
 
 
 def parse_webhook(
@@ -84,17 +118,26 @@ def parse_webhook(
             recipient = str((msg.get("recipient", {}) or {}).get("id") or "")
             message = msg.get("message", {}) or {}
             text = (message.get("text") or "").strip()
+            attachments = message.get("attachments") or []
+            has_attachment = bool(attachments)
+            if not text and has_attachment:
+                text = _attachment_text(attachments)
             if not text:
                 continue
+            mid = str(message.get("mid") or "") or None
 
             # Echo — akkauntimizdan CHIQQAN xabar. Ikki manba bo'lishi mumkin:
             # botning o'zi yoki operator (telefondagi Instagram ilovasi).
             # Ikkinchisi bo'lsa botni o'sha suhbatda pauza qilamiz (pipeline hal qiladi).
             if message.get("is_echo") or (sender and sender in ids):
                 events.append(
-                    IncomingEvent(kind="echo", text=text, sender_id=recipient)
+                    IncomingEvent(kind="echo", text=text, sender_id=recipient,
+                                  message_id=mid)
                 )
                 continue
 
-            events.append(IncomingEvent(kind="dm", text=text, sender_id=sender))
+            events.append(IncomingEvent(
+                kind="dm", text=text, sender_id=sender, message_id=mid,
+                has_attachment=has_attachment,
+            ))
     return events

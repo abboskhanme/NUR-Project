@@ -7,6 +7,7 @@ Ikki xil kirish:
 Boshqa bo'limlarга (moliya, savdo, ombor) hech qanday ta'sir qilmaydi.
 """
 import hmac
+import re
 import uuid
 from datetime import datetime
 from typing import Annotated, Optional
@@ -26,11 +27,15 @@ from app.models.lead import LEAD_STATUSES, Lead, LeadEvent
 from app.models.user import User
 from app.schemas.lead import (
     LeadAnalytics,
+    LeadContextMessage,
+    LeadContextOut,
     LeadConvert,
     LeadDetailOut,
     LeadEventOut,
     LeadIngest,
     LeadIngestResult,
+    LeadMessageIn,
+    LeadMessageResult,
     LeadNamedCount,
     LeadNoteIn,
     LeadOut,
@@ -292,6 +297,8 @@ async def convert_lead(
         full_name=(payload.full_name or lead.name or lead.ig_username or "Instagram lead").strip(),
         phone=phone,
         region=payload.region,
+        # Raqam +998 emas bo'lsa (Rossiya, Qozog'iston...) — davlatni raqamdan olamiz
+        country=_country_of(phone),
         source="instagram",
         note=payload.note or lead.summary,
         created_by_id=user.id,  # mijozni aylantirgan operator — sotuvchi/egasi
@@ -397,3 +404,236 @@ async def ingest_lead(payload: LeadIngest, db: Annotated[AsyncSession, Depends(g
     await db.commit()
     await db.refresh(lead)
     return LeadIngestResult(id=lead.id, status=lead.status, duplicate=duplicate)
+
+
+# ---------------------------------------------------------------------------
+# SUHBAT XOTIRASI — agent har bir xabarni shu yerga yozadi, keyin shu yerdan
+# o'qiydi. Instagram'ning o'zida tarix 30 kundan keyin API'dan yo'qoladi,
+# shuning uchun yagona ishonchli manba — shu jadval.
+# ---------------------------------------------------------------------------
+# Telefon raqamini matndan ajratish. Mijozlar BOSHQA DAVLATLARDAN ham yozadi
+# (Rossiya +7, Qozog'iston +7, Qirg'iziston +996, Tojikiston +992, Turkiya +90),
+# shuning uchun faqat 998 bilan cheklanmaymiz. Ayni paytda narx ("150 000 000")
+# raqam deb topilib qolmasligi uchun har bir nomzod qat'iy tekshiriladi.
+_PHONE_CANDIDATE_RE = re.compile(r"(?<![\w+])(\+?\d[\d\s\-()]{6,20}\d)(?!\w)")
+
+# O'zbek mobil/shahar kodlari — "+998"siz yozilgan 9 xonali raqam uchun
+_UZ_CODES = {
+    "20", "33", "50", "55", "71", "77", "78", "88",
+    "90", "91", "93", "94", "95", "97", "98", "99",
+}
+
+
+def _extract_phone(text: str) -> Optional[str]:
+    """Xabar matnidan telefon raqamini ajratadi (xalqaro formatda qaytaradi).
+
+    Qabul qilinadigan ko'rinishlar:
+      +79145895911 / +7 914 589-59-11  -> +79145895911   (Rossiya/Qozog'iston)
+      +998 90 111 22 33                -> +998901112233
+      998901112233 / 901112233         -> +998901112233
+      89145895911                      -> +79145895911   (RF ichki formati)
+    Narx va boshqa sonlar («150000000», «12 000 000») rad etiladi.
+    """
+    for m in _PHONE_CANDIDATE_RE.finditer(text or ""):
+        raw = m.group(1).strip()
+        digits = re.sub(r"\D", "", raw)
+        has_plus = raw.startswith("+")
+
+        # 1) Xalqaro yozuv ("+" bilan) — davlat kodidan qat'i nazar
+        if has_plus and 10 <= len(digits) <= 15:
+            return f"+{digits}"
+        # 2) "+"siz, lekin tanish davlat kodi bilan
+        if len(digits) == 12 and digits[:3] in ("998", "996", "992"):
+            return f"+{digits}"
+        if len(digits) == 11 and digits[0] in ("7", "8") and digits[1] == "9":
+            return f"+7{digits[1:]}"          # RF/KZ mobil (8 yoki 7 bilan)
+        if len(digits) == 10 and digits[0] == "9":
+            return f"+7{digits}"              # davlat kodisiz RF mobil
+        # 3) O'zbek raqami davlat kodisiz — faqat haqiqiy operator kodi bilan
+        if len(digits) == 9 and digits[:2] in _UZ_CODES:
+            return f"+998{digits}"
+    return None
+
+
+# Davlat kodidan mijoz davlatini aniqlash (chet eldan yozadiganlar uchun).
+# Nomlar mijoz formasidagi qiymatlar bilan bir xil bo'lishi shart.
+_DIAL_COUNTRY = (
+    ("998", "Uzbekistan"),
+    ("996", "Kyrgyzstan"),
+    ("992", "Tajikistan"),
+    ("993", "Turkmenistan"),
+    ("90", "Turkey"),
+)
+
+
+def _country_of(phone: str) -> str:
+    """+7 9xx -> Russia, +7 7xx -> Kazakhstan, +996 -> Kyrgyzstan va h.k.
+
+    Noma'lum bo'lsa Uzbekistan (eng ko'p uchraydigan holat).
+    """
+    raw = (phone or "").strip()
+    digits = re.sub(r"\D", "", raw)
+    # Davlat kodisiz yozilgan mahalliy raqam ("90 111 22 33") — O'zbekiston.
+    # Aks holda "90" Turkiya kodi deb o'qilib ketardi.
+    if not raw.startswith("+") and len(digits) <= 9:
+        return "Uzbekistan"
+    if digits.startswith("7") and len(digits) >= 2:
+        # Rossiya va Qozog'iston bitta kodni bo'lishadi: 7 7xx/7 6xx — Qozog'iston
+        return "Kazakhstan" if digits[1] in ("6", "7") else "Russia"
+    for dial, country in _DIAL_COUNTRY:
+        if digits.startswith(dial):
+            return country
+    return "Uzbekistan"
+
+
+async def _lead_for_conversation(
+    db: AsyncSession, *, source: str, ig_user_id: str, ig_username: Optional[str],
+    create: bool = True,
+) -> Optional[Lead]:
+    """Shu Instagram foydalanuvchisining ochiq leadini topadi.
+
+    `create=False` bo'lsa va lead topilmasa — None (izohlardan har kim uchun
+    lead ochilib ketmasligi uchun).
+    """
+    lead = (await db.execute(
+        select(Lead)
+        .where(Lead.ig_user_id == ig_user_id, Lead.status.notin_(["won", "lost"]))
+        .order_by(Lead.created_at.desc())
+        .limit(1)
+    )).scalar_one_or_none()
+    if lead is None:
+        if not create:
+            return None
+        lead = Lead(source=source, ig_user_id=ig_user_id, ig_username=ig_username)
+        db.add(lead)
+        await db.flush()
+    elif ig_username and not lead.ig_username:
+        lead.ig_username = ig_username
+    return lead
+
+
+@ingest_router.post(
+    "/ingest/message",
+    response_model=LeadMessageResult,
+    status_code=201,
+    dependencies=[Depends(require_agent_key)],
+    summary="Agent bitta Instagram xabarini jurnalga yozadi (X-Agent-Key)",
+)
+async def ingest_message(payload: LeadMessageIn, db: Annotated[AsyncSession, Depends(get_db)]):
+    text = (payload.text or "").strip()
+    if not text:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Xabar matni bo'sh")
+
+    lead = await _lead_for_conversation(
+        db, source=payload.source, ig_user_id=payload.ig_user_id,
+        ig_username=payload.ig_username, create=payload.create_lead,
+    )
+    if lead is None:
+        return LeadMessageResult(logged=False)
+
+    # Dublikat — bir xil Instagram xabari ikki marta yozilmasin (import + webhook)
+    if payload.ig_message_id:
+        exists = (await db.execute(
+            select(LeadEvent.id)
+            .where(
+                LeadEvent.lead_id == lead.id,
+                LeadEvent.meta["ig_message_id"].astext == payload.ig_message_id,
+            )
+            .limit(1)
+        )).scalar_one_or_none()
+        if exists:
+            await db.commit()
+            return LeadMessageResult(logged=False, lead_id=lead.id, duplicate=True)
+
+    is_customer = payload.role == "user"
+    meta: dict = {"role": payload.role}
+    if payload.ig_message_id:
+        meta["ig_message_id"] = payload.ig_message_id
+    if payload.comment_id:
+        meta["comment_id"] = payload.comment_id
+
+    event = LeadEvent(
+        lead_id=lead.id,
+        kind="comment" if payload.kind == "comment" else "dm",
+        message_text=text if is_customer else None,
+        agent_reply=None if is_customer else text,
+        actor="user" if is_customer else payload.role,
+        meta=meta,
+    )
+    if payload.sent_at:
+        event.created_at = payload.sent_at
+    db.add(event)
+
+    # Mijoz xabaridan telefon raqami chiqsa — leadga yozib qo'yamiz (AI qayta so'ramasin)
+    if is_customer and not lead.contact:
+        phone = _extract_phone(text)
+        if phone:
+            lead.contact = phone
+    if payload.media_id and not lead.media_id:
+        lead.media_id = payload.media_id
+    if payload.comment_id and not lead.comment_id:
+        lead.comment_id = payload.comment_id
+
+    await db.commit()
+    return LeadMessageResult(logged=True, lead_id=lead.id, duplicate=False)
+
+
+@ingest_router.get(
+    "/ingest/context",
+    response_model=LeadContextOut,
+    dependencies=[Depends(require_agent_key)],
+    summary="Agent suhbat tarixini va ma'lum faktlarni oladi (X-Agent-Key)",
+)
+async def ingest_context(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    ig_user_id: str = Query(..., min_length=1),
+    limit: int = Query(40, ge=1, le=200),
+):
+    """Shu Instagram foydalanuvchisi bilan bo'lgan BUTUN yozishma (oxirgi `limit` ta).
+
+    Bir foydalanuvchida bir nechta lead bo'lishi mumkin (eskisi yopilgan bo'lsa) —
+    xotira uzilib qolmasligi uchun hammasi birga qaytariladi.
+    """
+    leads = (await db.execute(
+        select(Lead).where(Lead.ig_user_id == ig_user_id).order_by(Lead.created_at)
+    )).scalars().all()
+    if not leads:
+        return LeadContextOut()
+
+    lead_ids = [l.id for l in leads]
+    rows = (await db.execute(
+        select(LeadEvent)
+        .where(LeadEvent.lead_id.in_(lead_ids), LeadEvent.kind.in_(["dm", "comment"]))
+        .order_by(LeadEvent.created_at.desc())
+        .limit(limit)
+    )).scalars().all()
+
+    messages: list[LeadContextMessage] = []
+    for ev in reversed(rows):
+        if ev.message_text:
+            messages.append(LeadContextMessage(
+                role="user", content=ev.message_text, at=ev.created_at))
+        if ev.agent_reply:
+            role = "operator" if ev.actor == "operator" else "assistant"
+            messages.append(LeadContextMessage(
+                role=role, content=ev.agent_reply, at=ev.created_at))
+
+    # Faktlar — eng oxirgi to'ldirilgan qiymat ustun
+    def _last(field: str) -> Optional[str]:
+        for l in reversed(leads):
+            val = getattr(l, field, None)
+            if val:
+                return val
+        return None
+
+    current = leads[-1]
+    return LeadContextOut(
+        lead_id=current.id,
+        ig_username=_last("ig_username"),
+        name=_last("name"),
+        contact=_last("contact"),
+        product_interest=_last("product_interest"),
+        summary=_last("summary"),
+        status=current.status,
+        messages=messages,
+    )

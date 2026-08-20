@@ -31,4 +31,8 @@ export const systemSettingsApi = {
   get: () => api.get<SysSettingsResponse>('/system-settings').then((r) => r.data),
   update: (values: Record<string, string>) =>
     api.put<SysSettingsResponse>('/system-settings', { values }).then((r) => r.data),
+  /** Eski Instagram suhbatlarini Leadlarga ko'chirish (fon rejimida) */
+  importConversations: () =>
+    api.post<{ started: boolean }>('/system-settings/agent/import-conversations')
+      .then((r) => r.data),
 };

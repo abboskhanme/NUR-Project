@@ -235,7 +235,9 @@ export default function LeadDetailPage() {
                                 tag={chanTag} text={ev.message_text} at={ev.created_at} />
                       )}
                       {ev.agent_reply && (
-                        <Bubble side="right" name="AI agent" text={ev.agent_reply} at={ev.created_at} />
+                        <Bubble side="right"
+                                name={ev.actor === 'operator' ? 'Operator (qo\'lda)' : 'AI agent'}
+                                text={ev.agent_reply} at={ev.created_at} />
                       )}
                     </div>
                   );

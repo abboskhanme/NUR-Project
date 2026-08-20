@@ -72,6 +72,59 @@ class InstagramClient:
         logger.error("IG API 3 urinishdan keyin ham muvaffaqiyatsiz: {}", path)
         return {}
 
+    async def _get(self, path: str, *, params=None) -> dict:
+        """GET so'rov (throttle + backoff bilan). Xatoda bo'sh dict."""
+        params = {**(params or {}), "access_token": settings.IG_ACCESS_TOKEN}
+        url = path if path.startswith("http") else f"{self._base}/{path}"
+        delay = 1.0
+        for attempt in range(3):
+            await _throttle()
+            try:
+                async with httpx.AsyncClient(timeout=20.0) as client:
+                    resp = await client.get(url, params=params)
+                if resp.status_code == 200:
+                    return resp.json()
+                if resp.status_code in (429, 500, 503):
+                    logger.warning(
+                        "IG API GET {} ({}-urinish), backoff {}s: {}",
+                        resp.status_code, attempt + 1, delay, resp.text[:200],
+                    )
+                    await asyncio.sleep(delay)
+                    delay *= 2
+                    continue
+                logger.error("IG API GET xato {}: {}", resp.status_code, resp.text[:300])
+                return {}
+            except httpx.HTTPError as exc:
+                logger.warning("IG API GET ulanish xatosi ({}): {}", attempt + 1, exc)
+                await asyncio.sleep(delay)
+                delay *= 2
+        logger.error("IG API GET 3 urinishdan keyin ham muvaffaqiyatsiz: {}", path)
+        return {}
+
+    async def list_conversations(self, after: str | None = None) -> dict:
+        """Suhbatlar ro'yxati (Requests papkasidagilar ham, 30 kun ichida faol).
+
+        Nested `messages{...}` bilan bitta so'rovda xabar matnlarini ham
+        olishga urinamiz — bo'lmasa importer har xabarni alohida so'raydi.
+        """
+        params: dict[str, str] = {
+            "platform": "instagram",
+            "fields": (
+                "id,updated_time,participants,"
+                "messages.limit(50){id,created_time,from,to,message}"
+            ),
+            "limit": "50",
+        }
+        if after:
+            params["after"] = after
+        return await self._get("me/conversations", params=params)
+
+    async def get_message(self, message_id: str) -> dict:
+        """Bitta xabar tafsiloti (nested so'rov ishlamasa zaxira yo'l)."""
+        return await self._get(
+            message_id, params={"fields": "id,created_time,from,to,message"}
+        )
+
     async def reply_to_comment(self, comment_id: str, message: str) -> dict:
         """Ochiq kommentga ochiq javob yozadi."""
         return await self._post(f"{comment_id}/replies", params={"message": message})

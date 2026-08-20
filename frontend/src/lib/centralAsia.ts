@@ -55,6 +55,21 @@ export const CENTRAL_ASIA: CountryOpt[] = [
     flagCodes: '1f1f9-1f1f2',
     regions: ['Ashxobod shahri', 'Ahal', 'Balkan', "Dashog'uz", 'Lebap', 'Mari'],
   },
+  // Instagram orqali chet eldan ham yozishadi (ko'pincha Rossiyadan) — mijoz
+  // kartochkasida davlatni to'g'ri ko'rsata olishimiz uchun qo'shildi.
+  // Viloyatlar ro'yxati berilmagan: shahar/manzil qo'lda yoziladi.
+  {
+    value: 'Russia',
+    label: 'Rossiya',
+    flagCodes: '1f1f7-1f1fa',
+    regions: [],
+  },
+  {
+    value: 'Turkey',
+    label: 'Turkiya',
+    flagCodes: '1f1f9-1f1f7',
+    regions: [],
+  },
 ];
 
 export function regionsOf(country: string): string[] {

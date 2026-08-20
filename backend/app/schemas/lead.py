@@ -40,6 +40,56 @@ class LeadIngestResult(BaseModel):
     duplicate: bool = False  # mavjud lead'ga ulanган-yo'qligi
 
 
+class LeadMessageIn(BaseModel):
+    """Bitta Instagram xabari — suhbat tarixini TO'LIQ saqlash uchun.
+
+    Agent har bir kelgan/ketgan xabarni shu yerga yozadi (AI "qaynoq lead"
+    demasa ham). Shunda AI keyingi safar butun suhbatni eslay oladi va
+    xodim Leadlar bo'limida yozishmani boshidan ko'radi.
+    """
+
+    source: str = "instagram"
+    ig_user_id: str
+    ig_username: Optional[str] = None
+    # user — mijoz, assistant — AI agent, operator — xodim qo'lda yozgan
+    role: str = "user"
+    text: str
+    kind: str = "dm"                       # dm | comment
+    ig_message_id: Optional[str] = None    # dublikatni oldini olish uchun
+    comment_id: Optional[str] = None
+    media_id: Optional[str] = None
+    # Import qilinayotgan eski xabarning asl vaqti (bo'lmasa — hozir)
+    sent_at: Optional[datetime] = None
+    # False bo'lsa — lead mavjud bo'lmasa YANGI lead yaratilmaydi (izohlar uchun:
+    # har bir "🔥" izohi Leadlar ro'yxatini to'ldirib yubormasin)
+    create_lead: bool = True
+
+
+class LeadMessageResult(BaseModel):
+    logged: bool = False
+    lead_id: Optional[uuid.UUID] = None
+    duplicate: bool = False
+
+
+class LeadContextMessage(BaseModel):
+    role: str        # user | assistant | operator
+    content: str
+    at: Optional[datetime] = None
+
+
+class LeadContextOut(BaseModel):
+    """Agent uchun suhbat xotirasi — oxirgi xabarlar + ma'lum faktlar."""
+
+    lead_id: Optional[uuid.UUID] = None
+    ig_username: Optional[str] = None
+    name: Optional[str] = None
+    contact: Optional[str] = None
+    product_interest: Optional[str] = None
+    summary: Optional[str] = None
+    status: Optional[str] = None
+    messages: list[LeadContextMessage] = []
+
+
 # ---------------------------------------------------------------------------
 # Xodim uchun: yangilash (status/assign/note)
 # ---------------------------------------------------------------------------

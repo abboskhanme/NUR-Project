@@ -258,7 +258,15 @@ function LeadCard({
             <Instagram size={13} />
           </div>
           <div className="min-w-0">
-            <div className="font-medium text-sm truncate">{displayName}</div>
+            <div className="font-medium text-sm truncate flex items-center gap-1.5">
+              <span className="truncate">{displayName}</span>
+              {lead.source === 'instagram_import' && (
+                <span className="text-[10px] rounded px-1 py-px bg-black/[0.06] text-ink-soft shrink-0"
+                      title="Eski suhbatlardan import qilingan — AI javob bermagan">
+                  import
+                </span>
+              )}
+            </div>
             {lead.ig_username && (
               <div className="text-xs text-ink-soft truncate">@{lead.ig_username}</div>
             )}
