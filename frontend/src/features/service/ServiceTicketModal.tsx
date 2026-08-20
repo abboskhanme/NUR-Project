@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { X, Search, Check, Package } from 'lucide-react';
+import { X, Search, Check, Package, PackageX } from 'lucide-react';
 
 import { api } from '@/api/client';
 import { formatDate, formatPhone } from '@/lib/format';
@@ -17,6 +17,14 @@ interface Order {
   delivery_address?: string | null; product_summary?: string | null;
 }
 interface Category { id: string; name: string }
+// Mijozning oldingi arizalari — buyurtmasiz arizada mahsulot ma'lumotini
+// qayta yozdirmaslik uchun (oxirgi "0 dan" arizadan olinadi).
+interface PrevTicket {
+  id: string; is_external?: boolean; ext_product?: string | null;
+  purchase_date?: string | null; ext_seller?: string | null; serial_id?: string | null;
+}
+
+const MODELS_LIST_ID = 'svc-ticket-models';
 
 export default function ServiceTicketModal({
   onClose, onSaved,
@@ -31,6 +39,13 @@ export default function ServiceTicketModal({
   const [category, setCategory] = useState('');
   const [address, setAddress] = useState('');
   const [saving, setSaving] = useState(false);
+  // Buyurtmasiz ("0 dan") ariza — mijoz bizdan emas, dillerdan olgan bo'lsa
+  const [noOrder, setNoOrder] = useState(false);
+  const [extProduct, setExtProduct] = useState('');
+  const [extSerial, setExtSerial] = useState('');
+  const [extSeller, setExtSeller] = useState('');
+  const [purchaseDate, setPurchaseDate] = useState('');
+  const [warrantyOverride, setWarrantyOverride] = useState<boolean | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebounced(search.trim()), 300);
@@ -76,14 +91,64 @@ export default function ServiceTicketModal({
   });
   const categories = categoriesQ.data ?? [];
 
+  // Mijozning oldingi arizalari — oxirgi "0 dan" arizadagi mahsulot ma'lumoti
+  const prevQ = useQuery<{ items: PrevTicket[] }>({
+    queryKey: ['svc-cust-tickets', customer?.id],
+    queryFn: () => api.get('/service/tickets', {
+      params: { customer_id: customer!.id, page_size: 20 },
+    }).then((r) => r.data),
+    enabled: !!customer,
+  });
+  const prevExt = (prevQ.data?.items ?? []).find((t) => t.is_external) ?? null;
+
+  const modelsQ = useQuery<string[]>({
+    queryKey: ['service-product-models'],
+    queryFn: () => api.get('/service/product-models').then((r) => r.data),
+    enabled: noOrder,
+  });
+  const models = modelsQ.data ?? [];
+
   const orderHasAddress = !!(order?.delivery_address && order.delivery_address.trim());
-  const needAddress = !!order && !orderHasAddress;
+  const needAddress = noOrder || (!!order && !orderHasAddress);
+
+  // Buyurtmasiz arizada kafolat sotib olingan sanadan hisoblanadi
+  const extW = computeWarranty(purchaseDate || null);
+  const autoWarranty = extW.status === 'active_full' || extW.status === 'active_service_only';
+  const extInWarranty = warrantyOverride ?? autoWarranty;
+
+  function enterNoOrder() {
+    setOrder(null);
+    setNoOrder(true);
+    setPendingOrderId(null);
+    setExtProduct(prevExt?.ext_product ?? '');
+    setExtSerial(prevExt?.serial_id ?? '');
+    setExtSeller(prevExt?.ext_seller ?? '');
+    setPurchaseDate(prevExt?.purchase_date ?? '');
+    setWarrantyOverride(null);
+    setAddress(customer?.address ?? '');
+  }
+
+  function exitNoOrder() {
+    setNoOrder(false);
+    setAddress('');
+  }
+
+  // Oldingi ariza ma'lumoti kechroq yuklansa ham (sekin internet) — bo'sh
+  // maydonlarni to'ldiramiz. Operator yozgan qiymat ustidan yozilmaydi.
+  useEffect(() => {
+    if (!noOrder || !prevExt) return;
+    setExtProduct((v) => v || prevExt.ext_product || '');
+    setExtSerial((v) => v || prevExt.serial_id || '');
+    setExtSeller((v) => v || prevExt.ext_seller || '');
+    setPurchaseDate((v) => v || prevExt.purchase_date || '');
+  }, [noOrder, prevExt?.id]);
 
   function pickHit(h: SearchHit) {
     setCustomer({ id: h.customer_id, full_name: h.full_name, phone: h.phone, address: h.address ?? null });
     setSearch(h.full_name);
     setOrder(null);
     setAddress('');
+    setNoOrder(false);
     // Buyurtma ID bo'yicha topilgan bo'lsa — o'sha buyurtmani avtomatik tanlaymiz
     setPendingOrderId(h.order_id ?? null);
   }
@@ -105,14 +170,32 @@ export default function ServiceTicketModal({
 
   async function handleSave() {
     if (!customer) { toast.error('Mijozni tanlang'); return; }
-    if (!order) { toast.error('Buyurtmani tanlang'); return; }
+    if (!order && !noOrder) { toast.error('Buyurtmani tanlang'); return; }
     if (!problem.trim() && !category) { toast.error('Muammo yozing yoki toifani tanlang'); return; }
     if (needAddress && !address.trim()) { toast.error('Manzilni kiriting'); return; }
     setSaving(true);
     try {
+      if (noOrder) {
+        // Buyurtmasiz ariza — mavjud mijozga "0 dan" ariza
+        await api.post('/service/tickets/external', {
+          customer_id: customer.id,
+          address: address.trim(),
+          ext_product: extProduct.trim() || null,
+          serial_id: extSerial.trim() || null,
+          purchase_date: purchaseDate || null,
+          ext_seller: extSeller.trim() || null,
+          problem: problem.trim() || category,
+          category: category || null,
+          in_warranty: extInWarranty,
+        });
+        toast.success('Ariza yaratildi');
+        onSaved();
+        onClose();
+        return;
+      }
       await api.post('/service/tickets', {
         customer_id: customer.id,
-        order_id: order.id,
+        order_id: order!.id,
         problem: problem.trim() || category,
         category: category || null,
         address: needAddress ? address.trim() : null,
@@ -148,7 +231,7 @@ export default function ServiceTicketModal({
                 className="input pl-9"
                 placeholder="Ism, telefon yoki buyurtma ID bo'yicha qidiring…"
                 value={search}
-                onChange={(e) => { setSearch(e.target.value); setCustomer(null); setOrder(null); setPendingOrderId(null); }}
+                onChange={(e) => { setSearch(e.target.value); setCustomer(null); setOrder(null); setPendingOrderId(null); setNoOrder(false); }}
               />
             </div>
             {!customer && debounced.length >= 1 && hits.length > 0 && (
@@ -177,7 +260,7 @@ export default function ServiceTicketModal({
           </div>
 
           {/* 2. Order selection */}
-          {customer && (
+          {customer && !noOrder && (
             <div>
               <label className="label">
                 Buyurtmani tanlang *{' '}
@@ -188,8 +271,12 @@ export default function ServiceTicketModal({
                   {Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-12 rounded-button bg-black/5 animate-pulse" />)}
                 </div>
               ) : orders.length === 0 ? (
-                <div className="text-sm text-ink-soft bg-black/[0.03] rounded-button p-3">
-                  Bu mijozda buyurtma topilmadi.
+                <div className="text-sm bg-black/[0.03] rounded-button p-3 flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-ink-soft">Bu mijozda buyurtma topilmadi.</span>
+                  <button type="button" onClick={enterNoOrder}
+                          className="btn-action bg-primary/10 text-primary hover:bg-primary/20">
+                    <PackageX size={15} /> Buyurtmasiz ariza
+                  </button>
                 </div>
               ) : (
                 <div className="max-h-52 overflow-y-auto border border-black/10 rounded-button divide-y divide-black/5">
@@ -221,6 +308,79 @@ export default function ServiceTicketModal({
                   })}
                 </div>
               )}
+              {orders.length > 0 && (
+                <button type="button" onClick={enterNoOrder}
+                        className="mt-1.5 text-xs text-ink-soft hover:text-primary underline underline-offset-2">
+                  Mahsulot bizdan olinmagan — buyurtmasiz ariza
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* 2b. Buyurtmasiz ("0 dan") ariza — mahsulot ma'lumoti qo'lda */}
+          {customer && noOrder && (
+            <div className="rounded-button border border-primary/25 bg-primary/[0.06] p-3 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-sm font-medium inline-flex items-center gap-1.5">
+                  <PackageX size={15} /> Buyurtmasiz ariza
+                </div>
+                <button type="button" onClick={exitNoOrder}
+                        className="text-xs text-ink-soft hover:text-primary underline underline-offset-2">
+                  Buyurtma tanlashga qaytish
+                </button>
+              </div>
+              {prevExt && (
+                <div className="text-xs text-ink-soft">
+                  Mahsulot ma'lumoti oldingi arizadan olindi — kerak bo'lsa o'zgartiring.
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="label">Qanday model olgan</label>
+                  <input className="input" list={MODELS_LIST_ID} value={extProduct}
+                         placeholder="Masalan: OPTIMA 400 kvm"
+                         onChange={(e) => setExtProduct(e.target.value)} />
+                  <datalist id={MODELS_LIST_ID}>
+                    {models.map((m) => <option key={m} value={m} />)}
+                  </datalist>
+                </div>
+                <div>
+                  <label className="label">Seriya / ID raqami</label>
+                  <input className="input" value={extSerial} onChange={(e) => setExtSerial(e.target.value)} />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="label">Sotib olingan sana</label>
+                  <input type="date" className="input" value={purchaseDate}
+                         onChange={(e) => setPurchaseDate(e.target.value)} />
+                </div>
+                <div>
+                  <label className="label">Qayerdan olgan</label>
+                  <input className="input" placeholder="Diller yoki do'kon nomi"
+                         value={extSeller} onChange={(e) => setExtSeller(e.target.value)} />
+                </div>
+              </div>
+
+              {purchaseDate && (
+                <div className={`rounded-button p-2.5 text-sm ${WARRANTY_META[extW.status].cls}`}>
+                  {warrantyLong(extW.status)}
+                  {extW.status === 'active_full' && extW.daysYear1 > 0 && <> {`· ${extW.daysYear1} kun qoldi`}</>}
+                  {extW.status === 'active_service_only' && extW.daysYear3 > 0 && <> {`· ${extW.daysYear3} kun qoldi`}</>}
+                </div>
+              )}
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input type="checkbox" className="h-4 w-4 accent-primary" checked={extInWarranty}
+                       onChange={(e) => setWarrantyOverride(e.target.checked)} />
+                <span className="text-sm">
+                  Kafolatda
+                  <span className="text-ink-soft">
+                    {' '}— {purchaseDate ? 'sanadan avtomatik' : 'sana kiritilmagan'}, o'zgartirish mumkin
+                  </span>
+                </span>
+              </label>
             </div>
           )}
 
@@ -238,7 +398,7 @@ export default function ServiceTicketModal({
           )}
 
           {/* 3. Problem */}
-          {order && (
+          {(order || noOrder) && (
             <>
               <div>
                 <label className="label">
@@ -268,7 +428,9 @@ export default function ServiceTicketModal({
                 <div>
                   <label className="label">
                     Manzil *{' '}
-                    <span className="text-ink-soft font-normal">(buyurtmada manzil ko'rsatilmagan)</span>
+                    <span className="text-ink-soft font-normal">
+                      {noOrder ? '(servis boradigan manzil)' : "(buyurtmada manzil ko'rsatilmagan)"}
+                    </span>
                   </label>
                   <input className="input" placeholder="Borish manzili" value={address}
                          onChange={(e) => setAddress(e.target.value)} />
@@ -282,7 +444,7 @@ export default function ServiceTicketModal({
           <button onClick={onClose} className="px-3 py-1.5 text-sm rounded-button hover:bg-black/5">
             Bekor qilish
           </button>
-          <button onClick={handleSave} disabled={saving || !order} className="btn-primary disabled:opacity-50">
+          <button onClick={handleSave} disabled={saving || (!order && !noOrder)} className="btn-primary disabled:opacity-50">
             {saving ? 'Saqlanmoqda…' : 'Ariza yaratish'}
           </button>
         </div>

@@ -8,6 +8,7 @@ import {
 
 import { api } from '@/api/client';
 import { formatDate, formatDateTime, formatPhone, formatUZS } from '@/lib/format';
+import { computeWarranty } from './warranty';
 import { ServiceStatusBadge } from './status';
 
 interface Visit { id: string; planned_at?: string | null; note?: string | null; created_at: string }
@@ -16,6 +17,9 @@ interface Ticket {
   in_warranty: boolean; opened_at: string; closed_at?: string | null;
   resolution?: string | null; client_cost: string; address?: string | null; order_id?: string | null;
   parts_used?: string[];
+  // "0 dan" ariza — bazada buyurtmasi yo'q mijoz
+  is_external?: boolean; ext_product?: string | null;
+  purchase_date?: string | null; ext_seller?: string | null; serial_id?: string | null;
   customer?: { full_name: string; phone: string } | null;
   order?: { code: string; delivered_at?: string | null } | null;
   visits: Visit[];
@@ -130,8 +134,11 @@ export default function TicketDetailModal({
     }
   }
 
-  const W = tk?.order_id && warrantyQ.data ? WMETA_CLS[warrantyQ.data.current_status] : null;
-  const wStatus = warrantyQ.data?.current_status;
+  // Kafolat holati: buyurtma bo'lsa backenddan, "0 dan" arizada sotib olingan sanadan
+  const extStatus = tk?.is_external && tk.purchase_date
+    ? computeWarranty(tk.purchase_date).status : null;
+  const wStatus = tk?.order_id ? warrantyQ.data?.current_status : extStatus ?? undefined;
+  const W = wStatus ? WMETA_CLS[wStatus] : null;
   const isOpen = tk && !['completed', 'cancelled'].includes(tk.status);
 
   return (
@@ -142,6 +149,11 @@ export default function TicketDetailModal({
           <div className="flex items-center gap-2">
             <h3 className="font-semibold">{tk?.code ?? 'Ariza'}</h3>
             {tk && <ServiceStatusBadge status={tk.status} />}
+            {tk?.is_external && (
+              <span className="badge bg-black/5 text-ink-soft" title="Bazada buyurtmasi yo'q mijoz">
+                0 dan
+              </span>
+            )}
           </div>
           <button onClick={onClose} className="p-1 rounded hover:bg-black/5"><X size={18} /></button>
         </div>
@@ -164,6 +176,17 @@ export default function TicketDetailModal({
                 <div className="text-ink-soft inline-flex items-center gap-1">
                   <Package size={13} /> {tk.order.code}
                   {tk.order.delivered_at && ` — yetkazildi ${formatDate(tk.order.delivered_at)}`}
+                </div>
+              )}
+              {tk.is_external && (
+                <div className="text-ink-soft space-y-0.5">
+                  <div className="inline-flex items-center gap-1">
+                    <Package size={13} />
+                    {tk.ext_product || "Model ko'rsatilmagan"}
+                    {tk.serial_id && ` · ${tk.serial_id}`}
+                  </div>
+                  {tk.purchase_date && <div>Sotib olingan: {formatDate(tk.purchase_date)}</div>}
+                  {tk.ext_seller && <div>Qayerdan olgan: {tk.ext_seller}</div>}
                 </div>
               )}
               {tk.address && <div className="text-ink-soft">{tk.address}</div>}

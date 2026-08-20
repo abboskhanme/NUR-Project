@@ -15,6 +15,7 @@ from app.core.permissions import module_guard
 from app.db.session import get_db
 from app.models.customer import Customer
 from app.models.order import Order, OrderItem
+from app.models.product import Product
 from app.models.service import (
     ServiceCategory, ServicePart, ServiceTicket, ServiceTrip, ServiceVisit,
 )
@@ -22,17 +23,26 @@ from app.schemas.common import Page
 from app.schemas.service import (
     CustomerSearchHit, OrderMini, PartStat, ServiceCategoryIn, ServiceCategoryOut,
     ServiceCategoryReport, ServiceCategoryReportRow,
-    ServiceExpenseItem, ServicePartIn, ServicePartOut,
+    ServiceExpenseItem, ServiceExternalTicketCreate, ServicePartIn, ServicePartOut,
     ServiceSummary, ServiceTicketCreate, ServiceTicketOut, ServiceTicketUpdate,
     ServiceTripOut, ServiceTripUpdate, TripMoneyStat, ServiceVisitIn, ServiceVisitOut, WarrantyInfo,
 )
-from app.services.warranty_service import calculate_warranty
+from app.services.warranty_service import calculate_warranty, warranty_from_date
 
 router = APIRouter(dependencies=[Depends(module_guard("service"))])
 
 
 def _gen_code(year: int, n: int) -> str:
     return f"SRV-{year}-{n:05d}"
+
+
+async def _next_code(db: AsyncSession) -> str:
+    """Navbatdagi ariza kodi (yil bo'yicha tartib raqami)."""
+    year = datetime.now(timezone.utc).year
+    n = ((await db.execute(
+        select(func.count(ServiceTicket.id)).where(ServiceTicket.code.like(f"SRV-{year}-%"))
+    )).scalar() or 0) + 1
+    return _gen_code(year, n)
 
 
 async def _get_full(db: AsyncSession, ticket_id: uuid.UUID) -> Optional[ServiceTicket]:
@@ -387,7 +397,8 @@ async def list_tickets(db: Annotated[AsyncSession, Depends(get_db)], _: CurrentU
         q = q.where(ServiceTicket.customer_id == customer_id)
     if search:
         like = f"%{search}%"
-        q = q.where(or_(ServiceTicket.code.ilike(like), ServiceTicket.problem.ilike(like)))
+        q = q.where(or_(ServiceTicket.code.ilike(like), ServiceTicket.problem.ilike(like),
+                        ServiceTicket.ext_product.ilike(like)))
     total = (await db.execute(select(func.count()).select_from(q.subquery()))).scalar() or 0
     res = await db.execute(q.order_by(ServiceTicket.opened_at.desc())
                            .offset((page - 1) * page_size).limit(page_size))
@@ -423,12 +434,7 @@ async def create_ticket(payload: ServiceTicketCreate, user: CurrentUser,
             if not data.get("address") and order.delivery_address:
                 data["address"] = order.delivery_address
 
-    # Kod generatsiya (yil bo'yicha tartib raqami)
-    year = datetime.now(timezone.utc).year
-    n = ((await db.execute(
-        select(func.count(ServiceTicket.id)).where(ServiceTicket.code.like(f"SRV-{year}-%"))
-    )).scalar() or 0) + 1
-    code = _gen_code(year, n)
+    code = await _next_code(db)
 
     ticket = ServiceTicket(
         code=code,
@@ -440,6 +446,125 @@ async def create_ticket(payload: ServiceTicketCreate, user: CurrentUser,
     db.add(ticket)
     await db.commit()
     return await _get_full(db, ticket.id)
+
+
+@router.post("/tickets/external", response_model=ServiceTicketOut, status_code=201)
+async def create_external_ticket(payload: ServiceExternalTicketCreate, user: CurrentUser,
+                                 db: Annotated[AsyncSession, Depends(get_db)]):
+    """"0 dan" ariza — buyurtmasiz servis arizasi.
+
+    Mijoz ikki yo'l bilan aniqlanadi:
+      * `customer_id` berilsa — mavjud mijoz (oddiy modaldagi "buyurtmasiz
+        ariza" oqimi), ma'lumotlari o'zgartirilmaydi;
+      * aks holda telefon raqami (faqat raqamlar solishtiriladi) bo'yicha
+        qidiriladi — topilsa o'shanga bog'lanadi, topilmasa yangi mijoz
+        yaratiladi (source='dealer_client' — dillerdan olgan mijoz).
+    """
+    full_name = (payload.full_name or "").strip()
+    phone = (payload.phone or "").strip()
+    problem = (payload.problem or "").strip()
+    if not problem and not payload.category:
+        raise HTTPException(400, "Muammo yozing yoki toifani tanlang")
+
+    customer: Optional[Customer] = None
+
+    if payload.customer_id:
+        # 1a) Mavjud mijoz — buyurtmasiz ariza
+        customer = (await db.execute(
+            select(Customer).where(Customer.id == payload.customer_id)
+        )).scalar_one_or_none()
+        if customer is None:
+            raise HTTPException(404, "Mijoz topilmadi")
+    else:
+        # 1b) Yangi mijoz — telefon raqami bo'yicha mavjudini topamiz (dublikat bo'lmasin)
+        if not full_name:
+            raise HTTPException(400, "Ism-familiya majburiy")
+        if not phone:
+            raise HTTPException(400, "Telefon raqami majburiy")
+        digits = re.sub(r"\D", "", phone)
+        if digits:
+            customer = (await db.execute(
+                select(Customer).where(
+                    func.regexp_replace(Customer.phone, "[^0-9]", "", "g") == digits
+                ).order_by(Customer.created_at).limit(1)
+            )).scalars().first()
+
+    if customer is None:
+        customer = Customer(
+            full_name=full_name,
+            phone=phone,
+            phone2=(payload.phone2 or "").strip() or None,
+            country=(payload.country or "Uzbekistan").strip() or "Uzbekistan",
+            region=(payload.region or "").strip() or None,
+            city=(payload.city or "").strip() or None,
+            address=(payload.address or "").strip() or None,
+            source="dealer_client",
+            note=(payload.note or "").strip() or None,
+            created_by_id=user.id,
+        )
+        db.add(customer)
+        await db.flush()
+    elif not payload.customer_id:
+        # Telefon bo'yicha topilgan mijozning bo'sh maydonlarini to'ldiramiz
+        # (mavjud ma'lumot o'chmaydi). customer_id berilganda tegilmaydi.
+        if not customer.address and payload.address:
+            customer.address = payload.address.strip()
+        if not customer.region and payload.region:
+            customer.region = payload.region.strip()
+        if not customer.city and payload.city:
+            customer.city = payload.city.strip()
+        if not customer.phone2 and payload.phone2:
+            customer.phone2 = payload.phone2.strip()
+
+    # 2) Kafolat — sotib olingan sanadan avtomatik (qo'lda belgilangan bo'lsa — o'sha)
+    if payload.in_warranty is None:
+        info = warranty_from_date(payload.purchase_date)
+        in_warranty = info["current_status"] in ("active_full", "active_service_only")
+    else:
+        in_warranty = payload.in_warranty
+
+    ticket = ServiceTicket(
+        code=await _next_code(db),
+        customer_id=customer.id,
+        order_id=None,
+        serial_id=(payload.serial_id or "").strip() or None,
+        address=(payload.address or "").strip() or customer.address,
+        problem=problem or (payload.category or ""),
+        category=payload.category or None,
+        opened_at=datetime.now(timezone.utc),
+        status="new",
+        in_warranty=in_warranty,
+        is_external=True,
+        ext_product=(payload.ext_product or "").strip() or None,
+        purchase_date=payload.purchase_date,
+        ext_seller=(payload.ext_seller or "").strip() or None,
+        created_by_id=user.id,
+    )
+    db.add(ticket)
+    await db.commit()
+    return await _get_full(db, ticket.id)
+
+
+@router.get("/product-models", response_model=list[str])
+async def product_models(db: Annotated[AsyncSession, Depends(get_db)], _: CurrentUser):
+    """Katalogdagi asosiy mahsulot modellari — "0 dan" arizada tanlash uchun.
+
+    (/products endpointi alohida ruxsat talab qilgani uchun servis moduli
+    o'zining yengil ro'yxatini beradi.)
+    """
+    rows = (await db.execute(
+        select(Product.model, Product.kvm)
+        .where(Product.product_type == "main", Product.status == "active",
+               Product.model.is_not(None))
+        .distinct()
+        .order_by(Product.model, Product.kvm)
+    )).all()
+    names: list[str] = []
+    for model, kvm in rows:
+        name = f"{model} {kvm} kvm" if kvm else str(model)
+        if name not in names:
+            names.append(name)
+    return names
 
 
 @router.patch("/tickets/{ticket_id}", response_model=ServiceTicketOut)

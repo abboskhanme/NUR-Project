@@ -36,6 +36,14 @@ class ServiceTicket(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     status: Mapped[str] = mapped_column(String(20), default="new", index=True)
     in_warranty: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    # --- "0 dan" ariza: bizning bazada buyurtmasi yo'q mijoz (diller orqali olgan) ---
+    is_external: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false", nullable=False
+    )
+    ext_product: Mapped[Optional[str]] = mapped_column(String(120))   # qanday model olgan
+    purchase_date: Mapped[Optional[date]] = mapped_column(Date)       # kafolat shundan hisoblanadi
+    ext_seller: Mapped[Optional[str]] = mapped_column(String(120))    # qayerdan/kimdan olgan
     resolution: Mapped[Optional[str]] = mapped_column(Text)
     client_cost: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
 

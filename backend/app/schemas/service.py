@@ -23,6 +23,37 @@ class ServiceTicketCreate(ServiceTicketBase):
     pass
 
 
+class ServiceExternalTicketCreate(BaseModel):
+    """"0 dan" ariza — bizning bazada buyurtmasi yo'q mijoz (diller orqali olgan).
+
+    Ikki xil ishlatiladi:
+      1) Yangi mijoz — `full_name` + `phone` kiritiladi. Telefon raqami bazada
+         topilsa o'sha mijozga bog'lanadi, aks holda yangi mijoz yaratiladi.
+      2) Mavjud mijoz — `customer_id` beriladi (buyurtmasiz ariza), mijoz
+         ma'lumotlari o'zgartirilmaydi.
+    """
+    # Mijoz — yo customer_id, yo full_name + phone
+    customer_id: Optional[uuid.UUID] = None
+    full_name: Optional[str] = None
+    phone: Optional[str] = None
+    phone2: Optional[str] = None
+    country: str = "Uzbekistan"
+    region: Optional[str] = None
+    city: Optional[str] = None
+    address: Optional[str] = None
+    # Mahsulot
+    ext_product: Optional[str] = None      # qanday model olgan
+    serial_id: Optional[str] = None
+    purchase_date: Optional[date] = None   # kafolat shu sanadan hisoblanadi
+    ext_seller: Optional[str] = None       # qayerdan/kimdan olgan (diller nomi)
+    # Ariza
+    problem: str
+    category: Optional[str] = None
+    # Bo'sh bo'lsa — purchase_date bo'yicha avtomatik aniqlanadi
+    in_warranty: Optional[bool] = None
+    note: Optional[str] = None             # mijoz kartochkasiga izoh
+
+
 class ServiceTicketUpdate(BaseModel):
     status: Optional[str] = None
     resolution: Optional[str] = None
@@ -83,6 +114,11 @@ class ServiceTicketOut(ORMBase):
     resolution: Optional[str] = None
     client_cost: Decimal
     parts_used: list[str] = []
+    # "0 dan" ariza (bazada buyurtmasi yo'q mijoz)
+    is_external: bool = False
+    ext_product: Optional[str] = None
+    purchase_date: Optional[date] = None
+    ext_seller: Optional[str] = None
     visits: list[ServiceVisitOut] = []
     customer: Optional[CustomerMini] = None
     order: Optional[OrderMini] = None

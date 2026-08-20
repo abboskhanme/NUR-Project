@@ -5,13 +5,16 @@ from typing import Optional
 from app.models.order import Order
 
 
-def calculate_warranty(order: Order) -> dict:
-    """Return warranty info for an order.
+def warranty_from_date(start: Optional[date]) -> dict:
+    """Kafolat holati — boshlanish sanasi bo'yicha.
 
-    Year 1 (full): parts + service free.
-    Year 2-3 (service only): service free, parts at customer cost.
+    1-yil (to'liq): ish + ehtiyot qism bepul.
+    2-3-yil (faqat ish): ish bepul, ehtiyot qism mijoz hisobidan.
+
+    Sana bo'lmasa "not_delivered" (buyurtmada — yetkazilmagan, "0 dan"
+    arizada — sotib olingan sana ko'rsatilmagan).
     """
-    if not order.delivered_at:
+    if not start:
         return {
             "warranty_start": None,
             "year1_end": None,
@@ -21,7 +24,6 @@ def calculate_warranty(order: Order) -> dict:
             "current_status": "not_delivered",
         }
 
-    start: date = order.delivered_at
     year1_end = start + timedelta(days=365)
     year3_end = start + timedelta(days=365 * 3)
     today = date.today()
@@ -44,3 +46,8 @@ def calculate_warranty(order: Order) -> dict:
         "days_remaining_year3": max(0, days_y3),
         "current_status": status,
     }
+
+
+def calculate_warranty(order: Order) -> dict:
+    """Return warranty info for an order (yetkazilgan sanadan hisoblanadi)."""
+    return warranty_from_date(order.delivered_at)

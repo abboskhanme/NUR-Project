@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { Plus, Search, Wrench, CalendarClock, Tag, CheckCircle2 } from 'lucide-react';
+import { Plus, Search, Wrench, CalendarClock, Tag, CheckCircle2, UserPlus } from 'lucide-react';
 
 import { api } from '@/api/client';
 import Card from '@/components/ui/Card';
 import EmptyState from '@/components/ui/EmptyState';
 import { formatDate, formatPhone } from '@/lib/format';
 import ServiceTicketModal from '@/features/service/ServiceTicketModal';
+import ExternalTicketModal from '@/features/service/ExternalTicketModal';
 import TicketDetailModal from '@/features/service/TicketDetailModal';
 import ServiceCategoryModal from '@/features/service/ServiceCategoryModal';
 import ServicePartsModal from '@/features/service/ServicePartsModal';
@@ -20,7 +21,7 @@ import { ServiceStatusBadge } from '@/features/service/status';
 
 interface Ticket {
   id: string; code: string; problem: string; status: string;
-  in_warranty: boolean; opened_at: string;
+  in_warranty: boolean; opened_at: string; is_external?: boolean;
   customer?: { full_name: string; phone: string } | null;
   order?: { code: string } | null;
 }
@@ -50,6 +51,7 @@ export default function ServicePage() {
   const [status, setStatus] = useState('');
   const [search, setSearch] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
+  const [extOpen, setExtOpen] = useState(false);
   const [catOpen, setCatOpen] = useState(false);
   const [partsOpen, setPartsOpen] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
@@ -99,6 +101,10 @@ export default function ServicePage() {
           </button>
           <button className="btn-ghost" onClick={() => setPartsOpen(true)}>
             <Wrench size={16} /> Ehtiyot qismlar
+          </button>
+          <button className="btn-ghost" onClick={() => setExtOpen(true)}
+                  title="Bazada buyurtmasi yo'q mijoz uchun (masalan dillerdan olgan)">
+            <UserPlus size={16} /> 0 dan ariza
           </button>
           <button className="btn-primary" onClick={() => setCreateOpen(true)}>
             <Plus size={16} /> Yangi ariza
@@ -218,7 +224,14 @@ export default function ServicePage() {
                     <td className="py-2 pr-3">
                       {tk.customer ? (
                         <div>
-                          <div className="font-medium">{tk.customer.full_name}</div>
+                          <div className="font-medium flex items-center gap-1.5">
+                            {tk.customer.full_name}
+                            {tk.is_external && (
+                              <span className="badge bg-black/5 text-ink-soft" title="Bazada buyurtmasi yo'q mijoz">
+                                0 dan
+                              </span>
+                            )}
+                          </div>
                           <div className="text-xs text-ink-soft">{formatPhone(tk.customer.phone)}</div>
                         </div>
                       ) : <span className="text-ink-soft">—</span>}
@@ -244,6 +257,9 @@ export default function ServicePage() {
 
       {createOpen && (
         <ServiceTicketModal onClose={() => setCreateOpen(false)} onSaved={refetchAll} />
+      )}
+      {extOpen && (
+        <ExternalTicketModal onClose={() => setExtOpen(false)} onSaved={refetchAll} />
       )}
       {detailId && (
         <TicketDetailModal ticketId={detailId} onClose={() => setDetailId(null)} onChanged={refetchAll} />
