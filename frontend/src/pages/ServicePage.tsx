@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { Plus, Search, Wrench, CalendarClock, Tag, CheckCircle2, UserPlus } from 'lucide-react';
+import {
+  Plus, Search, Wrench, CalendarClock, Tag, CheckCircle2, UserPlus, MapPin,
+} from 'lucide-react';
 
 import { api } from '@/api/client';
 import Card from '@/components/ui/Card';
@@ -18,10 +20,12 @@ import ServicePartsStats from '@/features/service/ServicePartsStats';
 import ServiceMoneyStats from '@/features/service/ServiceMoneyStats';
 import ServiceCategoryReport from '@/features/service/ServiceCategoryReport';
 import { ServiceStatusBadge } from '@/features/service/status';
+import { mapLinks } from '@/features/service/location';
 
 interface Ticket {
   id: string; code: string; problem: string; status: string;
   in_warranty: boolean; opened_at: string; is_external?: boolean;
+  lat?: number | null; lon?: number | null; location_note?: string | null;
   customer?: { full_name: string; phone: string } | null;
   order?: { code: string } | null;
 }
@@ -50,6 +54,8 @@ function deadlineOf(openedAt: string): Date {
 export default function ServicePage() {
   const [status, setStatus] = useState('');
   const [search, setSearch] = useState('');
+  // Faqat lokatsiyasi yo'q arizalar — safarga chiqishdan oldin tozalab olish uchun
+  const [onlyNoLoc, setOnlyNoLoc] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [extOpen, setExtOpen] = useState(false);
   const [catOpen, setCatOpen] = useState(false);
@@ -63,9 +69,12 @@ export default function ServicePage() {
   });
 
   const ticketsQ = useQuery<{ items: Ticket[]; total: number }>({
-    queryKey: ['service-tickets', status, search],
+    queryKey: ['service-tickets', status, search, onlyNoLoc],
     queryFn: () => api.get('/service/tickets', {
-      params: { status: status || undefined, search: search.trim() || undefined, page_size: 100 },
+      params: {
+        status: status || undefined, search: search.trim() || undefined,
+        has_location: onlyNoLoc ? false : undefined, page_size: 100,
+      },
     }).then((r) => r.data),
   });
 
@@ -172,15 +181,30 @@ export default function ServicePage() {
             </button>
           ))}
         </div>
-        <div className="relative">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft" />
-          <input className="input pl-9 w-56" placeholder="Kod yoki muammo…"
-                 value={search} onChange={(e) => setSearch(e.target.value)} />
+        <div className="flex items-center gap-2">
+          <button onClick={() => setOnlyNoLoc((v) => !v)}
+            title="Lokatsiyasi biriktirilmagan arizalar"
+            className={`px-3 py-1.5 rounded-button text-sm font-medium transition inline-flex items-center gap-1.5 ${
+              onlyNoLoc ? 'bg-danger text-white' : 'bg-black/5 text-ink-soft hover:bg-black/10'}`}>
+            <MapPin size={15} /> Lokatsiyasiz
+          </button>
+          <div className="relative">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft" />
+            <input className="input pl-9 w-56" placeholder="Kod yoki muammo…"
+                   value={search} onChange={(e) => setSearch(e.target.value)} />
+          </div>
         </div>
       </div>
 
       {/* Servis safari — faqat "Rejalashtirilgan" filtrida */}
-      {status === 'scheduled' && <ServiceTripPanel onChanged={refetchAll} />}
+      {status === 'scheduled' && (
+        <ServiceTripPanel
+          onChanged={refetchAll}
+          points={tickets.filter((t) => t.lat != null && t.lon != null)
+            .map((t) => ({ lat: t.lat as number, lon: t.lon as number }))}
+          missingCount={tickets.filter((t) => t.lat == null).length}
+        />
+      )}
 
       <Card>
         {ticketsQ.isLoading ? (
@@ -198,6 +222,7 @@ export default function ServicePage() {
               <thead className="text-left text-ink-soft border-b border-black/5">
                 <tr>
                   <th className="py-2 pr-3 w-10"></th>
+                  <th className="py-2 pr-3 w-8"></th>
                   <th className="py-2 pr-3">Mijoz</th>
                   <th className="py-2 pr-3">Muammo</th>
                   <th className="py-2 pr-3">Tushgan sana</th>
@@ -220,6 +245,23 @@ export default function ServicePage() {
                           <CheckCircle2 size={22} strokeWidth={2.5} />
                         </button>
                       ) : null}
+                    </td>
+                    {/* Lokatsiya — bosilsa to'g'ridan-to'g'ri navigatorga o'tadi */}
+                    <td className="py-2 pr-3 text-center">
+                      {tk.lat != null && tk.lon != null ? (
+                        <a href={mapLinks(tk.lat, tk.lon).yandexRoute}
+                           target="_blank" rel="noreferrer"
+                           onClick={(e) => e.stopPropagation()}
+                           title={tk.location_note || 'Xaritada ochish'}
+                           className="inline-flex text-success hover:text-success/70">
+                          <MapPin size={18} />
+                        </a>
+                      ) : (
+                        <span title="Lokatsiya biriktirilmagan"
+                              className="inline-flex text-ink-soft/40">
+                          <MapPin size={18} />
+                        </span>
+                      )}
                     </td>
                     <td className="py-2 pr-3">
                       {tk.customer ? (

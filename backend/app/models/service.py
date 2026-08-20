@@ -4,7 +4,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Optional
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Numeric, String, Text
+from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -44,6 +44,20 @@ class ServiceTicket(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     ext_product: Mapped[Optional[str]] = mapped_column(String(120))   # qanday model olgan
     purchase_date: Mapped[Optional[date]] = mapped_column(Date)       # kafolat shundan hisoblanadi
     ext_seller: Mapped[Optional[str]] = mapped_column(String(120))    # qayerdan/kimdan olgan
+    # --- Borish lokatsiyasi (har arizaga alohida) ---
+    # Mijozga doimiy biriktirilmaydi: keyingi safar boshqa manzilga chaqirishi
+    # mumkin, shuning uchun lokatsiya aynan shu arizaga tegishli.
+    lat: Mapped[Optional[float]] = mapped_column(Float)
+    lon: Mapped[Optional[float]] = mapped_column(Float)
+    location_url: Mapped[Optional[str]] = mapped_column(Text)        # mijoz yuborgan asl havola
+    location_note: Mapped[Optional[str]] = mapped_column(String(255))  # mo'ljal
+    # telegram — botga forward qilingan pin; link — havoladan; manual — koordinata qo'lda
+    location_source: Mapped[Optional[str]] = mapped_column(String(20))
+    location_added_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    location_added_by_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+    )
+
     resolution: Mapped[Optional[str]] = mapped_column(Text)
     client_cost: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
 
@@ -64,6 +78,25 @@ class ServiceTicket(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     order: Mapped[Optional["Order"]] = relationship(  # noqa: F821
         "Order", lazy="selectin", viewonly=True
     )
+
+
+class ServiceLocationRequest(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    """"Lokatsiya kutilmoqda" oynasi — ERP va bot o'rtasidagi ko'prik.
+
+    Xodim ERP'da arizada "Lokatsiya biriktirish" ni bosadi va botga o'tadi;
+    shundan keyin `expires_at` gacha o'sha xodim botga yuborgan birinchi
+    lokatsiya AYNAN shu arizaga tushadi — ariza tanlash shart emas.
+    """
+    __tablename__ = "service_location_requests"
+
+    ticket_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("service_tickets.id", ondelete="CASCADE"), index=True
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    consumed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
 
 class ServiceVisit(UUIDPrimaryKeyMixin, TimestampMixin, Base):

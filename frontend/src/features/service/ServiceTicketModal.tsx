@@ -6,6 +6,7 @@ import { X, Search, Check, Package, PackageX } from 'lucide-react';
 import { api } from '@/api/client';
 import { formatDate, formatPhone } from '@/lib/format';
 import { computeWarranty, WARRANTY_META } from '@/features/service/warranty';
+import LocationInput from '@/features/service/LocationInput';
 
 interface Customer { id: string; full_name: string; phone: string; address?: string | null }
 interface SearchHit {
@@ -38,6 +39,9 @@ export default function ServiceTicketModal({
   const [problem, setProblem] = useState('');
   const [category, setCategory] = useState('');
   const [address, setAddress] = useState('');
+  // Borish lokatsiyasi (ixtiyoriy) — havola/koordinata
+  const [locRaw, setLocRaw] = useState('');
+  const [locNote, setLocNote] = useState('');
   const [saving, setSaving] = useState(false);
   // Buyurtmasiz ("0 dan") ariza — mijoz bizdan emas, dillerdan olgan bo'lsa
   const [noOrder, setNoOrder] = useState(false);
@@ -187,6 +191,8 @@ export default function ServiceTicketModal({
           problem: problem.trim() || category,
           category: category || null,
           in_warranty: extInWarranty,
+          location_raw: locRaw.trim() || null,
+          location_note: locNote.trim() || null,
         });
         toast.success('Ariza yaratildi');
         onSaved();
@@ -199,6 +205,8 @@ export default function ServiceTicketModal({
         problem: problem.trim() || category,
         category: category || null,
         address: needAddress ? address.trim() : null,
+        location_raw: locRaw.trim() || null,
+        location_note: locNote.trim() || null,
       });
       toast.success('Ariza yaratildi');
       onSaved();
@@ -436,6 +444,8 @@ export default function ServiceTicketModal({
                          onChange={(e) => setAddress(e.target.value)} />
                 </div>
               )}
+
+              <LocationInput raw={locRaw} note={locNote} onRaw={setLocRaw} onNote={setLocNote} />
             </>
           )}
         </div>

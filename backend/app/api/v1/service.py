@@ -10,6 +10,7 @@ from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.config import settings
 from app.core.dependencies import CurrentUser
 from app.core.permissions import module_guard
 from app.db.session import get_db
@@ -23,10 +24,12 @@ from app.schemas.common import Page
 from app.schemas.service import (
     CustomerSearchHit, OrderMini, PartStat, ServiceCategoryIn, ServiceCategoryOut,
     ServiceCategoryReport, ServiceCategoryReportRow,
-    ServiceExpenseItem, ServiceExternalTicketCreate, ServicePartIn, ServicePartOut,
+    ServiceExpenseItem, ServiceExternalTicketCreate, ServiceLocationIn,
+    ServiceLocationRequestOut, ServicePartIn, ServicePartOut,
     ServiceSummary, ServiceTicketCreate, ServiceTicketOut, ServiceTicketUpdate,
     ServiceTripOut, ServiceTripUpdate, TripMoneyStat, ServiceVisitIn, ServiceVisitOut, WarrantyInfo,
 )
+from app.services import geo, service_location as loc
 from app.services.warranty_service import calculate_warranty, warranty_from_date
 
 router = APIRouter(dependencies=[Depends(module_guard("service"))])
@@ -383,7 +386,8 @@ async def close_trip(trip_id: uuid.UUID, user: CurrentUser,
 async def list_tickets(db: Annotated[AsyncSession, Depends(get_db)], _: CurrentUser,
                        page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100),
                        status: Optional[str] = None, in_warranty: Optional[bool] = None,
-                       customer_id: Optional[uuid.UUID] = None, search: Optional[str] = None):
+                       customer_id: Optional[uuid.UUID] = None, search: Optional[str] = None,
+                       has_location: Optional[bool] = None):
     q = select(ServiceTicket).options(
         selectinload(ServiceTicket.visits),
         selectinload(ServiceTicket.customer),
@@ -395,6 +399,9 @@ async def list_tickets(db: Annotated[AsyncSession, Depends(get_db)], _: CurrentU
         q = q.where(ServiceTicket.in_warranty == in_warranty)
     if customer_id:
         q = q.where(ServiceTicket.customer_id == customer_id)
+    if has_location is not None:
+        q = q.where(ServiceTicket.lat.isnot(None) if has_location
+                    else ServiceTicket.lat.is_(None))
     if search:
         like = f"%{search}%"
         q = q.where(or_(ServiceTicket.code.ilike(like), ServiceTicket.problem.ilike(like),
@@ -417,10 +424,36 @@ async def get_ticket(ticket_id: uuid.UUID, _: CurrentUser,
     return t
 
 
+async def _apply_new_location(ticket: ServiceTicket, raw: str, note: str, user_id) -> None:
+    """Ariza ochilayotganda kiritilgan lokatsiya (ixtiyoriy).
+
+    Koordinata topilmasa ham ariza yaratilaveradi — kiritilgan matn/havola
+    `location_url` da saqlanadi va kartochkada qayta urinish mumkin. Ariza
+    yo'qolishidan ko'ra lokatsiyasiz ochilgani afzal.
+    """
+    raw = (raw or "").strip()
+    note = (note or "").strip()
+    if not raw and not note:
+        return
+    coords = await geo.resolve_coords(raw) if raw else None
+    if coords:
+        loc.set_location(
+            ticket, coords,
+            source=loc.SOURCE_LINK if raw.lower().startswith("http") else loc.SOURCE_MANUAL,
+            url=raw if raw.lower().startswith("http") else None,
+            note=note or None, user_id=user_id,
+        )
+    else:
+        ticket.location_url = raw or None
+        ticket.location_note = note or None
+
+
 @router.post("/tickets", response_model=ServiceTicketOut, status_code=201)
 async def create_ticket(payload: ServiceTicketCreate, user: CurrentUser,
                         db: Annotated[AsyncSession, Depends(get_db)]):
     data = payload.model_dump()
+    location_raw = data.pop("location_raw", None)
+    location_note = data.pop("location_note", None)
 
     # Buyurtma tanlangan bo'lsa — kafolatni yetkazib berilgan sanaga qarab
     # avtomatik aniqlaymiz (1-yil to'liq, 2-3 yil faqat ish tekin).
@@ -443,6 +476,7 @@ async def create_ticket(payload: ServiceTicketCreate, user: CurrentUser,
         created_by_id=user.id,
         **data,
     )
+    await _apply_new_location(ticket, location_raw, location_note, user.id)
     db.add(ticket)
     await db.commit()
     return await _get_full(db, ticket.id)
@@ -540,6 +574,7 @@ async def create_external_ticket(payload: ServiceExternalTicketCreate, user: Cur
         ext_seller=(payload.ext_seller or "").strip() or None,
         created_by_id=user.id,
     )
+    await _apply_new_location(ticket, payload.location_raw, payload.location_note, user.id)
     db.add(ticket)
     await db.commit()
     return await _get_full(db, ticket.id)
@@ -583,6 +618,94 @@ async def update_ticket(ticket_id: uuid.UUID, payload: ServiceTicketUpdate, _: C
         t.closed_at = None
     await db.commit()
     return await _get_full(db, ticket_id)
+
+
+# --------------------------------------------------------------------------- #
+# Borish lokatsiyasi — har arizaga alohida (mijozga doimiy biriktirilmaydi)
+# --------------------------------------------------------------------------- #
+@router.patch("/tickets/{ticket_id}/location", response_model=ServiceTicketOut)
+async def set_ticket_location(ticket_id: uuid.UUID, payload: ServiceLocationIn,
+                              user: CurrentUser,
+                              db: Annotated[AsyncSession, Depends(get_db)]):
+    """Lokatsiyani biriktirish/almashtirish.
+
+    Kiritish mumkin: xarita havolasi (Google/Yandex/2GIS/Apple, qisqartirilgani
+    ham), "41.311, 69.240" ko'rinishidagi koordinata yoki tayyor lat/lon.
+    """
+    t = await _get_full(db, ticket_id)
+    if not t:
+        raise HTTPException(404, "Ariza topilmadi")
+
+    coords = None
+    source = loc.SOURCE_MANUAL
+    url = None
+
+    if payload.lat is not None and payload.lon is not None:
+        if not geo.valid_coords(payload.lat, payload.lon):
+            raise HTTPException(400, "Koordinata noto'g'ri")
+        coords = geo.Coords(lat=round(payload.lat, 7), lon=round(payload.lon, 7))
+    elif payload.raw and payload.raw.strip():
+        raw = payload.raw.strip()
+        coords = await geo.resolve_coords(raw)
+        if not coords:
+            raise HTTPException(
+                400,
+                "Havoladan lokatsiya topilmadi. Havolani xaritada ochib, uzun "
+                "(to'liq) havolani nusxalang yoki koordinatani yozing: 41.311, 69.240",
+            )
+        if raw.lower().startswith("http"):
+            source, url = loc.SOURCE_LINK, raw
+    elif t.lat is None:
+        raise HTTPException(400, "Lokatsiya havolasi yoki koordinatani kiriting")
+
+    if coords:
+        loc.set_location(t, coords, source=source, url=url,
+                         note=payload.note, user_id=user.id)
+    elif payload.note is not None:
+        # Faqat mo'ljalni tahrirlash (lokatsiya allaqachon bor)
+        t.location_note = payload.note.strip() or None
+
+    await db.commit()
+    return await _get_full(db, ticket_id)
+
+
+@router.delete("/tickets/{ticket_id}/location", response_model=ServiceTicketOut)
+async def delete_ticket_location(ticket_id: uuid.UUID, _: CurrentUser,
+                                 db: Annotated[AsyncSession, Depends(get_db)]):
+    t = await _get_full(db, ticket_id)
+    if not t:
+        raise HTTPException(404, "Ariza topilmadi")
+    loc.clear_location(t)
+    await db.commit()
+    return await _get_full(db, ticket_id)
+
+
+@router.post("/tickets/{ticket_id}/location-request", response_model=ServiceLocationRequestOut)
+async def request_ticket_location(ticket_id: uuid.UUID, user: CurrentUser,
+                                  db: Annotated[AsyncSession, Depends(get_db)]):
+    """"Lokatsiya kutilmoqda" oynasini ochadi.
+
+    Shundan keyin xodim botga forward qilgan birinchi lokatsiya aynan shu
+    arizaga tushadi — botda ariza tanlash shart emas.
+    """
+    t = (await db.execute(
+        select(ServiceTicket).where(ServiceTicket.id == ticket_id)
+    )).scalar_one_or_none()
+    if not t:
+        raise HTTPException(404, "Ariza topilmadi")
+    if not user.telegram_chat_id:
+        raise HTTPException(
+            400,
+            "Telegram akkauntingiz profilingizga bog'lanmagan. Botga /id yozing "
+            "va chiqqan raqamni Foydalanuvchilar bo'limida profilingizga qo'shing.",
+        )
+    req = await loc.create_request(db, t.id, user.id)
+    username = (settings.TELEGRAM_BOT_USERNAME or "").strip().lstrip("@")
+    return ServiceLocationRequestOut(
+        ticket_id=t.id, ticket_code=t.code, expires_at=req.expires_at,
+        bot_username=username or None,
+        deep_link=f"https://t.me/{username}?start=loc" if username else None,
+    )
 
 
 @router.post("/tickets/{ticket_id}/visits", response_model=ServiceVisitOut, status_code=201)

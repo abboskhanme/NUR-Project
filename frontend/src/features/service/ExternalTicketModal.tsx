@@ -9,6 +9,7 @@ import Select from '@/components/ui/Select';
 import { CENTRAL_ASIA, regionsOf } from '@/lib/centralAsia';
 import { formatPhone } from '@/lib/format';
 import { computeWarranty, WARRANTY_META } from '@/features/service/warranty';
+import LocationInput from '@/features/service/LocationInput';
 
 const TWEMOJI_BASE = 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg';
 const flagIcon = (codes: string) => (
@@ -37,6 +38,9 @@ export default function ExternalTicketModal({
   const [region, setRegion] = useState('');
   const [city, setCity] = useState('');
   const [address, setAddress] = useState('');
+  // Borish lokatsiyasi (ixtiyoriy) — havola/koordinata; keyin kartochkadan ham qo'shsa bo'ladi
+  const [locRaw, setLocRaw] = useState('');
+  const [locNote, setLocNote] = useState('');
   // Mahsulot
   const [modelPick, setModelPick] = useState('');
   const [modelOther, setModelOther] = useState('');
@@ -116,6 +120,8 @@ export default function ExternalTicketModal({
         problem: problem.trim() || category,
         category: category || null,
         in_warranty: inWarranty,
+        location_raw: locRaw.trim() || null,
+        location_note: locNote.trim() || null,
       });
       toast.success('Ariza yaratildi');
       onSaved();
@@ -205,6 +211,8 @@ export default function ExternalTicketModal({
               <textarea className="input min-h-[56px]" value={address}
                         onChange={(e) => setAddress(e.target.value)} />
             </div>
+
+            <LocationInput raw={locRaw} note={locNote} onRaw={setLocRaw} onNote={setLocNote} />
           </div>
 
           {/* --- 2. Mahsulot --- */}

@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { X } from 'lucide-react';
+import { X, MapPin } from 'lucide-react';
 
 import { api } from '@/api/client';
 import Card from '@/components/ui/Card';
 import EmptyState from '@/components/ui/EmptyState';
 import { formatDate, formatPhone, formatUZS } from '@/lib/format';
 import { ServiceStatusBadge } from '@/features/service/status';
+import { mapLinks } from '@/features/service/location';
 
 interface Trip {
   id: string; name?: string | null; status: string;
@@ -76,6 +77,7 @@ export default function ServiceTripsList({ dateFrom, dateTo }: { dateFrom?: stri
 interface TripTicket {
   id: string; code: string; problem: string; status: string;
   address?: string | null; opened_at: string; parts_used?: string[];
+  lat?: number | null; lon?: number | null; location_note?: string | null;
   customer?: { full_name: string; phone: string } | null;
 }
 
@@ -109,7 +111,17 @@ function TripTicketsModal({ trip, onClose }: { trip: Trip; onClose: () => void }
             tickets.map((tk) => (
               <div key={tk.id} className="rounded-button border border-black/5 bg-black/[0.02] p-3 text-sm">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="font-medium">{tk.customer?.full_name ?? '—'}</span>
+                  <span className="font-medium inline-flex items-center gap-1.5">
+                    {tk.customer?.full_name ?? '—'}
+                    {tk.lat != null && tk.lon != null && (
+                      <a href={mapLinks(tk.lat, tk.lon).yandexRoute}
+                         target="_blank" rel="noreferrer"
+                         title={tk.location_note || 'Xaritada ochish'}
+                         className="text-success hover:text-success/70">
+                        <MapPin size={15} />
+                      </a>
+                    )}
+                  </span>
                   <ServiceStatusBadge status={tk.status} />
                 </div>
                 {tk.customer?.phone && <div className="text-xs text-ink-soft">{formatPhone(tk.customer.phone)}</div>}

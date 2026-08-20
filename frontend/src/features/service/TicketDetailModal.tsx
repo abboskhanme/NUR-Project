@@ -10,6 +10,7 @@ import { api } from '@/api/client';
 import { formatDate, formatDateTime, formatPhone, formatUZS } from '@/lib/format';
 import { computeWarranty } from './warranty';
 import { ServiceStatusBadge } from './status';
+import TicketLocation from './TicketLocation';
 
 interface Visit { id: string; planned_at?: string | null; note?: string | null; created_at: string }
 interface Ticket {
@@ -20,6 +21,10 @@ interface Ticket {
   // "0 dan" ariza — bazada buyurtmasi yo'q mijoz
   is_external?: boolean; ext_product?: string | null;
   purchase_date?: string | null; ext_seller?: string | null; serial_id?: string | null;
+  // Borish lokatsiyasi (shu arizaga tegishli)
+  lat?: number | null; lon?: number | null;
+  location_url?: string | null; location_note?: string | null;
+  location_source?: string | null; location_added_at?: string | null;
   customer?: { full_name: string; phone: string } | null;
   order?: { code: string; delivered_at?: string | null } | null;
   visits: Visit[];
@@ -191,6 +196,17 @@ export default function TicketDetailModal({
               )}
               {tk.address && <div className="text-ink-soft">{tk.address}</div>}
             </div>
+
+            {/* Borish lokatsiyasi — navigatorga bitta bosishda o'tadi */}
+            <TicketLocation
+              ticketId={tk.id}
+              loc={{
+                lat: tk.lat, lon: tk.lon, location_url: tk.location_url,
+                location_note: tk.location_note, location_source: tk.location_source,
+                location_added_at: tk.location_added_at,
+              }}
+              onChanged={onChanged}
+            />
 
             {/* Warranty */}
             {W && wStatus && (

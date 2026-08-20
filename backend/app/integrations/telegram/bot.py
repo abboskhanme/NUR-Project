@@ -15,7 +15,7 @@ from apscheduler.triggers.cron import CronTrigger
 
 from app.core.config import settings
 
-from . import admin_flow, customer_flow
+from . import admin_flow, customer_flow, service_flow
 from .common import tz
 from .digest import build_digest, format_digest
 
@@ -30,6 +30,8 @@ def build_dispatcher() -> Dispatcher:
     dp = Dispatcher(storage=MemoryStorage())
     # Admin router avval — /id, /report buyruqlari mijoz fallback'idan oldin.
     dp.include_router(admin_flow.router)
+    # Servis lokatsiyasi — xodim forward qilgan pin mijoz oqimiga tushmasin.
+    dp.include_router(service_flow.router)
     dp.include_router(customer_flow.router)
     return dp
 

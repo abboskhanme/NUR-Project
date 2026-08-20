@@ -20,7 +20,9 @@ class ServiceTicketBase(BaseModel):
 
 
 class ServiceTicketCreate(ServiceTicketBase):
-    pass
+    # Ariza ochilayotganda darhol lokatsiya (havola / koordinata) — ixtiyoriy
+    location_raw: Optional[str] = None
+    location_note: Optional[str] = None
 
 
 class ServiceExternalTicketCreate(BaseModel):
@@ -52,6 +54,9 @@ class ServiceExternalTicketCreate(BaseModel):
     # Bo'sh bo'lsa — purchase_date bo'yicha avtomatik aniqlanadi
     in_warranty: Optional[bool] = None
     note: Optional[str] = None             # mijoz kartochkasiga izoh
+    # Lokatsiya (ixtiyoriy) — havola yoki koordinata + mo'ljal
+    location_raw: Optional[str] = None
+    location_note: Optional[str] = None
 
 
 class ServiceTicketUpdate(BaseModel):
@@ -119,9 +124,38 @@ class ServiceTicketOut(ORMBase):
     ext_product: Optional[str] = None
     purchase_date: Optional[date] = None
     ext_seller: Optional[str] = None
+    # Borish lokatsiyasi (har arizaga alohida)
+    lat: Optional[float] = None
+    lon: Optional[float] = None
+    location_url: Optional[str] = None
+    location_note: Optional[str] = None
+    location_source: Optional[str] = None
+    location_added_at: Optional[datetime] = None
     visits: list[ServiceVisitOut] = []
     customer: Optional[CustomerMini] = None
     order: Optional[OrderMini] = None
+
+
+class ServiceLocationIn(BaseModel):
+    """Lokatsiyani biriktirish.
+
+    `raw` — mijoz yuborgan har qanday ko'rinish: Google/Yandex/2GIS havolasi,
+    qisqartirilgan havola yoki "41.311, 69.240". Koordinata to'g'ridan-to'g'ri
+    ma'lum bo'lsa `lat`/`lon` beriladi (bot shu yo'ldan yuradi).
+    """
+    raw: Optional[str] = None
+    lat: Optional[float] = None
+    lon: Optional[float] = None
+    note: Optional[str] = None      # mo'ljal
+
+
+class ServiceLocationRequestOut(BaseModel):
+    """"Lokatsiya kutilmoqda" oynasi — ERP botga o'tish havolasini ko'rsatadi."""
+    ticket_id: uuid.UUID
+    ticket_code: str
+    expires_at: datetime
+    bot_username: Optional[str] = None
+    deep_link: Optional[str] = None
 
 
 class WarrantyInfo(BaseModel):

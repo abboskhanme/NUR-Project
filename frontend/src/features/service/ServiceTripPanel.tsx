@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { Receipt, Check } from 'lucide-react';
+import { Receipt, Check, Route, MapPin } from 'lucide-react';
 
 import { api } from '@/api/client';
 import { formatUZS } from '@/lib/format';
+import { routeLink, type LatLon } from './location';
 
 interface Trip {
   id: string; name?: string | null; status: string;
@@ -20,8 +21,13 @@ const fmt = (v: string) => (Number(v) ? grp(String(Math.round(Number(v)))) : '')
  * Servis safari paneli — FAQAT "Rejalashtirilgan" filtrida.
  * Nom + olingan/sarflangan avtomatik saqlanadi (Saqlash tugmasi yo'q).
  * "Safarni yakunlash" — barcha rejalashtirilgan arizalarni "bajarildi" ga o'tkazadi.
+ *
+ * `points` — rejalashtirilgan arizalarning lokatsiyalari: bitta bosishda
+ * hammasini bitta marshrutga qo'yib navigatorda ochish uchun.
  */
-export default function ServiceTripPanel({ onChanged }: { onChanged: () => void }) {
+export default function ServiceTripPanel({ onChanged, points = [], missingCount = 0 }: {
+  onChanged: () => void; points?: LatLon[]; missingCount?: number;
+}) {
   const tripQ = useQuery<Trip>({
     queryKey: ['service-trip'],
     queryFn: () => api.get('/service/trips/current').then((r) => r.data),
@@ -81,6 +87,7 @@ export default function ServiceTripPanel({ onChanged }: { onChanged: () => void 
   }
 
   const net = toNum(collected) - toNum(spent);
+  const route = routeLink(points);
 
   return (
     <div className="rounded-card border border-primary/20 bg-primary/[0.04] p-4 space-y-3">
@@ -89,10 +96,26 @@ export default function ServiceTripPanel({ onChanged }: { onChanged: () => void 
           <Receipt size={16} className="text-primary" /> Servis safari
           {saved && <span className="text-xs font-normal text-success">✓ saqlandi</span>}
         </div>
-        <div className="text-xs text-ink-soft">
-          {`${trip?.scheduled_count ?? 0} ta rejalashtirilgan ariza`}
+        <div className="flex items-center gap-2">
+          {route && (
+            <a href={route} target="_blank" rel="noreferrer"
+               title="Barcha nuqtalar bitta marshrutda (Yandex xarita)"
+               className="btn-action bg-primary text-white hover:bg-primary-700">
+              <Route size={15} /> Marshrut ({points.length})
+            </a>
+          )}
+          <div className="text-xs text-ink-soft">
+            {`${trip?.scheduled_count ?? 0} ta rejalashtirilgan ariza`}
+          </div>
         </div>
       </div>
+
+      {missingCount > 0 && (
+        <div className="text-xs text-danger inline-flex items-center gap-1.5">
+          <MapPin size={14} /> {missingCount} ta arizada lokatsiya yo'q — safardan
+          oldin biriktiring ("Lokatsiyasiz" filtri).
+        </div>
+      )}
 
       <div>
         <label className="text-xs text-ink-soft">Safar nomi</label>

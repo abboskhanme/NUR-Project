@@ -41,6 +41,9 @@ class Settings(BaseSettings):
     # Telegram
     TELEGRAM_BOT_TOKEN: str = ""
     TELEGRAM_WEBHOOK_URL: str = ""
+    # Bot foydalanuvchi nomi (@ siz) — ERP'dagi "Botga o'tish" havolasi uchun.
+    # Masalan: nurtechno_bot  ->  https://t.me/nurtechno_bot?start=loc
+    TELEGRAM_BOT_USERNAME: str = ""
     # Kunlik hisobot oluvchi xo'jayin(lar) chat_id — vergul bilan: "12345,67890".
     # Chat_id ni bilish uchun bot'ga /id buyrug'ini yuboring.
     TELEGRAM_ADMIN_CHAT_IDS: str = ""
