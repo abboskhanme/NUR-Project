@@ -13,6 +13,8 @@ export interface User {
   is_superadmin: boolean;
   pin_enabled?: boolean;
   pin_timeout_minutes?: number;
+  // Servis lokatsiyasini botga forward qilish uchun bog'langan Telegram chat
+  telegram_chat_id?: string | null;
   roles: { id: string; name: string; description?: string | null; permissions: Record<string, any> }[];
 }
 

@@ -89,9 +89,8 @@ def _saved_text(ticket, lat: float, lon: float) -> str:
 async def _not_linked(m: Message) -> None:
     await m.answer(
         "📍 Lokatsiya keldi, lekin bu Telegram akkaunt ERP xodimiga bog'lanmagan.\n\n"
-        f"Agar siz xodim bo'lsangiz — <code>{m.chat.id}</code> raqamini "
-        "ERP'dagi <b>Foydalanuvchilar</b> bo'limida profilingizga (Telegram chat ID) "
-        "qo'shtiring.",
+        "Agar siz xodim bo'lsangiz — ERP'da <b>Sozlamalar → Telegram</b> "
+        f"bo'limiga shu raqamni qo'ying:\n<code>{m.chat.id}</code>",
         parse_mode="HTML",
     )
 

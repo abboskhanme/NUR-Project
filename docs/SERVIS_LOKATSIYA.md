@@ -42,10 +42,11 @@ bo'limida (faqat super-admin). `.env` ni tahrirlash shart emas.
 | **Kunlik hisobot vaqti** | HH:MM. |
 | **Yangi buyurtmada darhol xabar** | ha / yo'q. |
 
-So'ng har bir servis xodimi botga `/id` yozadi, chiqqan raqam ERP →
-**Foydalanuvchilar** → profilidagi *Telegram chat ID* maydoniga qo'yiladi.
-Bog'lanmagan akkauntdan kelgan lokatsiya qabul qilinmaydi (kim biriktirgani
-yozib boriladi).
+So'ng har bir servis xodimi o'z akkauntini bog'laydi: botga **`/id`** yozadi
+va chiqqan raqamni ERP → **Sozlamalar → Telegram** kartasiga qo'yib saqlaydi.
+Admin uni boshqa xodim uchun ham qo'ya oladi: **Foydalanuvchilar** → xodim →
+*Telegram chat ID*. Bog'lanmagan akkauntdan kelgan lokatsiya qabul qilinmaydi
+(kim biriktirgani yozib boriladi).
 
 Instagram agenti bilan **bir xil bot** ishlatilsa — o'sha tokenni ikkala
 bo'limga ham qo'ying («Telegram bildirishnoma» agentniki, «ERP Telegram boti»

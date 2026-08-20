@@ -12,6 +12,7 @@ export interface UserRow {
   phone: string;
   full_name: string;
   position?: string | null;
+  telegram_chat_id?: string | null;
   avatar_url?: string | null;
   is_active: boolean;
   is_superadmin: boolean;
@@ -43,6 +44,8 @@ export default function UserModal({
   const [fullName, setFullName] = useState(user?.full_name ?? '');
   const [phone, setPhone] = useState(user?.phone ?? '');
   const [position, setPosition] = useState(user?.position ?? '');
+  // Telegram chat ID — servis lokatsiyasini botga forward qilish uchun
+  const [tgChatId, setTgChatId] = useState(user?.telegram_chat_id ?? '');
   const [isActive, setIsActive] = useState(user?.is_active ?? true);
   const [selectedRoles, setSelectedRoles] = useState<string[]>(
     user?.roles?.map((r) => r.name) ?? [],
@@ -92,6 +95,7 @@ export default function UserModal({
         await api.patch(`/users/${user!.id}`, {
           phone, full_name: fullName,
           position: position || null,
+          telegram_chat_id: tgChatId.trim(),
           is_active: isActive,
           role_names: selectedRoles,
         });
@@ -204,6 +208,22 @@ export default function UserModal({
                     onChange={(e) => setPosition(e.target.value)}
                   />
                 </div>
+
+                {!isCreate && (
+                  <div>
+                    <label className="label">Telegram chat ID</label>
+                    <input
+                      className="input"
+                      placeholder="123456789"
+                      value={tgChatId}
+                      onChange={(e) => setTgChatId(e.target.value)}
+                    />
+                    <p className="mt-1 text-xs text-ink-soft">
+                      Servis lokatsiyasini botga forward qilish uchun. Xodim botga
+                      /id yozsa shu raqam chiqadi.
+                    </p>
+                  </div>
+                )}
 
                 {isCreate && (
                   <div>

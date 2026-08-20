@@ -21,10 +21,10 @@ async def cmd_id(m: Message):
     note = (
         "✅ Siz hisobot oluvchilar ro'yxatidasiz."
         if is_admin
-        else "ℹ️ Bu raqamni ERP'da «Tizim sozlamalari → ERP Telegram boti → "
+        else "ℹ️ Kunlik hisobot uchun bu raqamni «Tizim sozlamalari → ERP Telegram boti → "
              "Hisobot oluvchilar» ga qo'shing.\n"
-             "Servis lokatsiyasini biriktirish uchun esa — Foydalanuvchilar "
-             "bo'limida o'z profilingizdagi «Telegram chat ID» maydoniga."
+             "Servis lokatsiyasini biriktirish uchun esa — ERP'dagi "
+             "«Sozlamalar → Telegram» bo'limiga qo'ying."
     )
     await m.answer(f"Sizning chat_id: <code>{m.chat.id}</code>\n\n{note}", parse_mode="HTML")
 

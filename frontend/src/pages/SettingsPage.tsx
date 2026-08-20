@@ -6,6 +6,7 @@ import PhoneInput from '@/components/ui/PhoneInput';
 import { useAuthStore } from '@/stores/auth';
 import AvatarUploader from '@/features/users/AvatarUploader';
 import PinSettingsCard from '@/features/security/PinSettingsCard';
+import TelegramLinkCard from '@/features/security/TelegramLinkCard';
 
 export default function SettingsPage() {
   const user = useAuthStore((s) => s.user);
@@ -148,6 +149,8 @@ export default function SettingsPage() {
           </button>
         </div>
       </Card>
+
+      <TelegramLinkCard />
 
       <PinSettingsCard />
     </div>

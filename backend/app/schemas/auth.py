@@ -52,6 +52,8 @@ class UserOut(ORMBase):
     is_superadmin: bool = False
     pin_enabled: bool = False
     pin_timeout_minutes: int = 5
+    # Servis lokatsiyasi uchun: bot shu chat'dan kelgan lokatsiyani qabul qiladi
+    telegram_chat_id: Optional[str] = None
     roles: list[RoleOut] = []
 
 
