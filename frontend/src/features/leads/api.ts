@@ -86,6 +86,43 @@ export const INTENT_LABELS: Record<string, string> = {
 };
 
 // ---------------------------------------------------------------------------
+// Yozishmalar (Instagram inbox)
+// ---------------------------------------------------------------------------
+/** Instagram javob oynasi: erkin / faqat operator (7 kun) / yopiq */
+export type InboxWindow = 'open' | 'human_agent' | 'closed';
+
+export interface InboxItem {
+  lead_id: string;
+  ig_user_id?: string | null;
+  ig_username?: string | null;
+  name?: string | null;
+  contact?: string | null;
+  status: LeadStatus;
+  lead_score: number;
+  source: string;
+  assigned_to_name?: string | null;
+  last_message?: string | null;
+  last_message_at?: string | null;
+  last_message_role?: 'user' | 'assistant' | 'operator' | null;
+  last_customer_at?: string | null;
+  unread: number;
+  window: InboxWindow;
+}
+
+export interface ReplyResult {
+  sent: boolean;
+  tag?: string | null;
+  error?: string | null;
+  event?: LeadEvent | null;
+}
+
+export const WINDOW_LABELS: Record<InboxWindow, string> = {
+  open: 'Javob berish mumkin',
+  human_agent: "24 soat o'tgan — operator sifatida javob beriladi",
+  closed: "Javob oynasi yopilgan (7 kun o'tgan)",
+};
+
+// ---------------------------------------------------------------------------
 // API chaqiruvlari
 // ---------------------------------------------------------------------------
 export interface LeadListParams {
@@ -109,4 +146,15 @@ export const leadsApi = {
   remove: (id: string) => api.delete(`/leads/${id}`),
   convert: (id: string, body: { full_name?: string; phone?: string; region?: string; note?: string }) =>
     api.post<Lead>(`/leads/${id}/convert`, body).then((r) => r.data),
+
+  // --- Yozishmalar ---
+  inbox: (params: { search?: string; only_unread?: boolean } = {}) =>
+    api.get<InboxItem[]>('/leads/inbox', { params }).then((r) => r.data),
+  markRead: (id: string) => api.post(`/leads/${id}/read`),
+  reply: (id: string, text: string) =>
+    api.post<ReplyResult>(`/leads/${id}/reply`, { text }).then((r) => r.data),
+  botState: (id: string) =>
+    api.get<{ paused: boolean }>(`/leads/${id}/bot`).then((r) => r.data),
+  setBot: (id: string, enabled: boolean) =>
+    api.post<{ paused: boolean }>(`/leads/${id}/bot`, { enabled }).then((r) => r.data),
 };

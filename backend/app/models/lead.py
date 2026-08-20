@@ -10,9 +10,10 @@ kerak bo'lsa mijoz/buyurtmaga aylantiradi.
   - LeadEvent   — suhbat/hodisa jurnali (har xabar+javob yoki status o'zgarishi)
 """
 import uuid
+from datetime import datetime
 from typing import Any, Optional
 
-from sqlalchemy import ForeignKey, Integer, String, Text
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -59,6 +60,10 @@ class Lead(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     order_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("orders.id", ondelete="SET NULL")
     )
+
+    # "Yozishmalar" bo'limida xodim suhbatni oxirgi marta ochgan vaqt —
+    # shundan keyingi mijoz xabarlari o'qilmagan hisoblanadi.
+    last_read_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
     extra: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, server_default="{}")
 

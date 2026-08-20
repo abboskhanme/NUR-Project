@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import {
   Search, Sparkles, Flame, TrendingUp, CalendarPlus, Instagram, MessageCircle, Phone,
+  LayoutGrid, MessagesSquare,
 } from 'lucide-react';
 
 import EmptyState from '@/components/ui/EmptyState';
@@ -15,6 +16,7 @@ import {
   type Lead, type LeadStatus,
 } from '@/features/leads/api';
 import { ScoreBadge } from '@/features/leads/LeadBadges';
+import LeadsInbox from '@/features/leads/LeadsInbox';
 
 // Ustun rang mavzusi — har status sezilarli darajada ajralib tursin
 interface ColTheme { header: string; body: string; border: string; dot: string; count: string; ring: string; }
@@ -47,6 +49,7 @@ export default function LeadsPage() {
   const { can } = usePermissions();
   const canWrite = can('leads:write');
 
+  const [tab, setTab] = useState<'board' | 'inbox'>('board');
   const [search, setSearch] = useState('');
   const [overCol, setOverCol] = useState<LeadStatus | null>(null);
   const dragging = useRef<{ id: string; status: LeadStatus } | null>(null);
@@ -59,6 +62,7 @@ export default function LeadsPage() {
   const leadsQ = useQuery({
     queryKey: ['leads', 'board', search],
     queryFn: () => leadsApi.list({ status: 'all', search: search.trim() || undefined }),
+    enabled: tab === 'board',
   });
   const leads = leadsQ.data ?? [];
   const a = analyticsQ.data;
@@ -119,6 +123,21 @@ export default function LeadsPage() {
                  hint={`O'rtacha ball: ${a?.avg_score ?? 0}`} icon={<TrendingUp size={18} />} />
       </div>
 
+      {/* Ichki bo'limlar: Quvur / Yozishmalar */}
+      <div className="flex gap-1 border-b border-black/5">
+        {([['board', 'Quvur', LayoutGrid], ['inbox', 'Yozishmalar', MessagesSquare]] as const).map(
+          ([key, label, Icon]) => (
+            <button key={key} onClick={() => setTab(key)}
+              className={cn('px-4 py-2 text-sm font-medium -mb-px border-b-2 transition-colors inline-flex items-center gap-1.5',
+                tab === key ? 'border-primary text-primary'
+                            : 'border-transparent text-ink-soft hover:text-ink')}>
+              <Icon size={15} /> {label}
+            </button>
+          ))}
+      </div>
+
+      {tab === 'inbox' ? <LeadsInbox /> : (
+      <>
       {/* Qidiruv */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="relative">
@@ -169,6 +188,8 @@ export default function LeadsPage() {
             />
           ))}
         </div>
+      )}
+      </>
       )}
     </div>
   );

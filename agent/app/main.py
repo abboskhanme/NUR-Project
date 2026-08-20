@@ -17,6 +17,7 @@ from pydantic import BaseModel
 
 from app.agent import knowledge
 from app.config import settings
+from app.instagram.client import instagram
 from app.instagram.importer import import_and_notify
 from app.instagram.models import IncomingEvent
 from app.instagram.oauth import refresh_token_if_due
@@ -24,6 +25,7 @@ from app.instagram.oauth import router as oauth_router
 from app.instagram.webhook import router as webhook_router
 from app.processing.pipeline import process_event
 from app.remote_config import fetch_and_apply
+from app.state.store import store
 from app.telegram.notifier import send_daily_report
 
 # Logging
@@ -134,7 +136,74 @@ async def import_conversations_endpoint(
       curl -X POST https://<domen>/agent/admin/import-conversations \
            -H "X-Agent-Key: <AGENT_INGEST_KEY>"
     """
-    if not settings.AGENT_INGEST_KEY or x_agent_key != settings.AGENT_INGEST_KEY:
-        raise HTTPException(status_code=401, detail="Agent kaliti noto'g'ri")
+    _check_key(x_agent_key)
     background.add_task(import_and_notify)
     return {"started": True, "note": "Natija Telegram'ga yuboriladi"}
+
+
+# --- ERP "Yozishmalar" bo'limi uchun ------------------------------------- #
+def _check_key(key: Optional[str]) -> None:
+    if not settings.AGENT_INGEST_KEY or key != settings.AGENT_INGEST_KEY:
+        raise HTTPException(status_code=401, detail="Agent kaliti noto'g'ri")
+
+
+class SendDmIn(BaseModel):
+    ig_user_id: str
+    text: str
+    # 24 soatlik oyna yopilgan, lekin 7 kun ichida — jonli operator sifatida
+    human_agent: bool = False
+
+
+@app.post("/admin/send-dm")
+async def send_dm_endpoint(
+    payload: SendDmIn, x_agent_key: Optional[str] = Header(default=None)
+):
+    """ERP'dagi operator yozgan xabarni Instagram'ga yuboradi.
+
+    Yuborilgach o'sha suhbatda AI jim turadi (operator o'zi javob beryapti)
+    va xabar echo bo'lib qaytganda jurnalga ikkinchi marta yozilmaydi.
+    """
+    _check_key(x_agent_key)
+    text = (payload.text or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Xabar matni bo'sh")
+    if not settings.IG_ACCESS_TOKEN:
+        raise HTTPException(status_code=503, detail="Instagram ulanmagan")
+
+    result = await instagram.send_dm_result(
+        payload.ig_user_id, text, human_agent=payload.human_agent
+    )
+    if result.get("sent"):
+        try:
+            await store.mark_sent(payload.ig_user_id, text)
+            await store.pause(payload.ig_user_id, settings.BOT_PAUSE_HOURS)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Pauza/izni belgilashda xato: {}", exc)
+    return result
+
+
+class BotPauseIn(BaseModel):
+    ig_user_id: str
+    enabled: bool = True     # True — AI javob bersin, False — jim tursin
+
+
+@app.post("/admin/bot-pause")
+async def bot_pause_endpoint(
+    payload: BotPauseIn, x_agent_key: Optional[str] = Header(default=None)
+):
+    """Bitta suhbatda AI javobini yoqish/o'chirish (ERP tugmasi)."""
+    _check_key(x_agent_key)
+    if payload.enabled:
+        await store.unpause(payload.ig_user_id)
+    else:
+        await store.pause(payload.ig_user_id, settings.BOT_PAUSE_HOURS)
+    return {"enabled": payload.enabled, "paused": await store.is_paused(payload.ig_user_id)}
+
+
+@app.get("/admin/bot-state")
+async def bot_state_endpoint(
+    ig_user_id: str, x_agent_key: Optional[str] = Header(default=None)
+):
+    """AI shu suhbatda javob beryaptimi (pauzada emasmi)."""
+    _check_key(x_agent_key)
+    return {"paused": await store.is_paused(ig_user_id)}

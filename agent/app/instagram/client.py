@@ -36,6 +36,26 @@ async def _throttle() -> None:
         _last_call = time.monotonic()
 
 
+# Instagram javob oynasi yopilganini bildiruvchi xatolar (Meta kodlari)
+_WINDOW_ERROR_CODES = {10, 551, 200}
+_WINDOW_HINTS = ("outside of allowed window", "outside the allowed window",
+                 "24 hours", "messaging window")
+
+
+def _error_text(data: dict) -> str:
+    err = (data or {}).get("error") or {}
+    msg = err.get("error_user_msg") or err.get("message") or str(data)[:200]
+    return str(msg)
+
+
+def _is_window_error(data: dict) -> bool:
+    err = (data or {}).get("error") or {}
+    if err.get("code") in _WINDOW_ERROR_CODES:
+        return True
+    text = str(err.get("message") or "").lower()
+    return any(h in text for h in _WINDOW_HINTS)
+
+
 class InstagramClient:
     # Qiymatlarni HAR chaqiruvda settings'dan o'qiymiz — shunda remote config
     # (ERP'dan) token/versiya/ID ni yangilaganda darrov qo'llanadi (restartsiz).
@@ -142,6 +162,61 @@ class InstagramClient:
             "me/messages",
             json={"recipient": {"id": recipient_id}, "message": {"text": message}},
         )
+
+    async def send_dm_result(
+        self, recipient_id: str, message: str, *, human_agent: bool = False
+    ) -> dict:
+        """DM yuboradi va NATIJANI batafsil qaytaradi (ERP "Yozishmalar" uchun).
+
+        `send_dm` xatoni yutib yuboradi (bot uchun shu yetarli), bu yerda esa
+        operatorga sababni ko'rsatishimiz kerak.
+
+        human_agent=True — 24 soatlik oyna yopilgan, lekin 7 kun ichida:
+        Meta'ning HUMAN_AGENT tegi bilan JONLI operator javob bera oladi
+        (avtomatik xabarga bu teg TAQIQLANGAN — shuning uchun uni faqat
+        odam yozgan xabarga qo'yamiz).
+        """
+        payload: dict = {
+            "recipient": {"id": recipient_id},
+            "message": {"text": message},
+        }
+        if human_agent:
+            payload["messaging_type"] = "MESSAGE_TAG"
+            payload["tag"] = "HUMAN_AGENT"
+
+        status, data = await self._post_once("me/messages", payload)
+        if status == 200:
+            return {"sent": True, "tag": "HUMAN_AGENT" if human_agent else None}
+
+        error = _error_text(data)
+        # Oyna yopilgan bo'lsa — bir marta HUMAN_AGENT tegi bilan qayta urinamiz
+        if not human_agent and _is_window_error(data):
+            payload["messaging_type"] = "MESSAGE_TAG"
+            payload["tag"] = "HUMAN_AGENT"
+            status2, data2 = await self._post_once("me/messages", payload)
+            if status2 == 200:
+                return {"sent": True, "tag": "HUMAN_AGENT"}
+            error = _error_text(data2)
+
+        logger.warning("DM yuborilmadi ({}): {}", status, error)
+        return {"sent": False, "error": error}
+
+    async def _post_once(self, path: str, json: dict) -> tuple[int, dict]:
+        """Bitta POST — javob kodi va tanasi bilan (retry'siz, xato yutilmaydi)."""
+        url = f"{self._base}/{path}"
+        await _throttle()
+        try:
+            async with httpx.AsyncClient(timeout=20.0) as client:
+                resp = await client.post(
+                    url, params={"access_token": settings.IG_ACCESS_TOKEN}, json=json
+                )
+            try:
+                body = resp.json()
+            except ValueError:
+                body = {"raw": resp.text[:300]}
+            return resp.status_code, body
+        except httpx.HTTPError as exc:
+            return 0, {"error": {"message": f"Ulanish xatosi: {exc}"}}
 
     async def subscribe_webhooks(self) -> dict:
         """Akkauntni webhook maydonlariga obuna qiladi (/connect oqimida chaqiriladi).

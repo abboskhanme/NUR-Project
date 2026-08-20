@@ -158,6 +158,46 @@ class LeadDetailOut(LeadOut):
 
 
 # ---------------------------------------------------------------------------
+# "Yozishmalar" (Instagram inbox) — ERP ichidan jonli yozishish
+# ---------------------------------------------------------------------------
+class LeadInboxItem(BaseModel):
+    """Suhbatlar ro'yxatidagi bitta qator."""
+
+    lead_id: uuid.UUID
+    ig_user_id: Optional[str] = None
+    ig_username: Optional[str] = None
+    name: Optional[str] = None
+    contact: Optional[str] = None
+    status: str
+    lead_score: int = 0
+    source: str = "instagram"
+    assigned_to_name: Optional[str] = None
+    last_message: Optional[str] = None
+    last_message_at: Optional[datetime] = None
+    last_message_role: Optional[str] = None       # user | assistant | operator
+    last_customer_at: Optional[datetime] = None   # javob oynasi shundan hisoblanadi
+    unread: int = 0
+    # open — 24 soat ichida erkin javob; human_agent — 7 kungacha faqat operator;
+    # closed — Instagram javob berishga ruxsat bermaydi
+    window: str = "closed"
+
+
+class LeadReplyIn(BaseModel):
+    text: str
+
+
+class LeadReplyResult(BaseModel):
+    sent: bool
+    tag: Optional[str] = None        # HUMAN_AGENT ishlatilgan bo'lsa
+    error: Optional[str] = None
+    event: Optional[LeadEventOut] = None
+
+
+class LeadBotIn(BaseModel):
+    enabled: bool = True             # True — AI javob bersin
+
+
+# ---------------------------------------------------------------------------
 # Analitika
 # ---------------------------------------------------------------------------
 class LeadStatusCount(BaseModel):

@@ -9,24 +9,30 @@ Boshqa bo'limlarга (moliya, savdo, ombor) hech qanday ta'sir qilmaydi.
 import hmac
 import re
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Annotated, Optional
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
-from sqlalchemy import func, or_, select
+from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.agent_client import agent_request
 from app.core.config import settings
 from app.core.dependencies import CurrentUser
 from app.core.permissions import module_guard
 from app.db.session import get_db
 from app.models.customer import Customer
 from app.models.lead import LEAD_STATUSES, Lead, LeadEvent
+from app.models.system import SystemSetting
 from app.models.user import User
 from app.schemas.lead import (
     LeadAnalytics,
+    LeadBotIn,
+    LeadInboxItem,
+    LeadReplyIn,
+    LeadReplyResult,
     LeadContextMessage,
     LeadContextOut,
     LeadConvert,
@@ -191,6 +197,226 @@ async def list_leads(
         )
         counts = {row[0]: row[1] for row in cnt_res.all()}
     return [_to_out(l, names, counts.get(l.id, 0)) for l in leads]
+
+
+# ===========================================================================
+# YOZISHMALAR — Instagram bilan ERP ichidan jonli muloqot
+#
+# Kelayotgan xabarlar webhook orqali `lead_events` ga tushadi, javob esa agent
+# orqali yuboriladi (Instagram tokeni faqat agentда). Instagram qoidasi:
+# mijozning oxirgi xabaridan 24 soat ichida erkin, 7 kungacha faqat JONLI
+# operator (HUMAN_AGENT), keyin umuman yozib bo'lmaydi.
+# ===========================================================================
+_WINDOW_FREE = timedelta(hours=24)
+_WINDOW_HUMAN = timedelta(days=7)
+
+
+def _window_of(last_customer_at: Optional[datetime]) -> str:
+    if not last_customer_at:
+        return "closed"
+    age = datetime.now(timezone.utc) - last_customer_at
+    if age <= _WINDOW_FREE:
+        return "open"
+    if age <= _WINDOW_HUMAN:
+        return "human_agent"
+    return "closed"
+
+
+async def _agent_public_url(db: AsyncSession) -> Optional[str]:
+    """Agentning tashqi manzili (ichki tarmoq ishlamasa zaxira yo'l)."""
+    row = (await db.execute(
+        select(SystemSetting.value).where(SystemSetting.key == "AGENT_PUBLIC_URL")
+    )).scalar_one_or_none()
+    return row or None
+
+
+@router.get("/inbox", response_model=list[LeadInboxItem])
+async def inbox(
+    db: Annotated[AsyncSession, Depends(get_db)], _: CurrentUser,
+    search: Optional[str] = None,
+    only_unread: bool = False,
+    limit: int = Query(50, ge=1, le=200),
+):
+    """Instagram suhbatlari ro'yxati — oxirgi xabar, o'qilmaganlar, javob oynasi."""
+    # Har lead bo'yicha oxirgi xabar vaqti va oxirgi MIJOZ xabari vaqti
+    msg_kinds = ("dm", "comment")
+    agg = (
+        select(
+            LeadEvent.lead_id.label("lead_id"),
+            func.max(LeadEvent.created_at).label("last_at"),
+            func.max(
+                case((LeadEvent.message_text.is_not(None), LeadEvent.created_at))
+            ).label("last_customer_at"),
+            func.count(
+                case((
+                    and_(
+                        LeadEvent.message_text.is_not(None),
+                        or_(
+                            Lead.last_read_at.is_(None),
+                            LeadEvent.created_at > Lead.last_read_at,
+                        ),
+                    ), 1,
+                ))
+            ).label("unread"),
+        )
+        .join(Lead, Lead.id == LeadEvent.lead_id)
+        .where(LeadEvent.kind.in_(msg_kinds))
+        .group_by(LeadEvent.lead_id)
+        .subquery()
+    )
+
+    q = (
+        select(Lead, agg.c.last_at, agg.c.last_customer_at, agg.c.unread)
+        .join(agg, agg.c.lead_id == Lead.id)
+    )
+    if search:
+        like = f"%{search.strip()}%"
+        q = q.where(or_(
+            Lead.ig_username.ilike(like), Lead.name.ilike(like), Lead.contact.ilike(like),
+        ))
+    if only_unread:
+        q = q.where(agg.c.unread > 0)
+    q = q.order_by(agg.c.last_at.desc()).limit(limit)
+
+    rows = (await db.execute(q)).all()
+    if not rows:
+        return []
+
+    names = await _assignee_names(db, [r[0].assigned_to_id for r in rows])
+
+    # Har suhbatning oxirgi xabari matni
+    lead_ids = [r[0].id for r in rows]
+    last_events = (await db.execute(
+        select(LeadEvent)
+        .where(LeadEvent.lead_id.in_(lead_ids), LeadEvent.kind.in_(msg_kinds))
+        .order_by(LeadEvent.lead_id, LeadEvent.created_at.desc())
+    )).scalars().all()
+    last_by_lead: dict[uuid.UUID, LeadEvent] = {}
+    for ev in last_events:
+        last_by_lead.setdefault(ev.lead_id, ev)
+
+    items: list[LeadInboxItem] = []
+    for lead, last_at, last_customer_at, unread in rows:
+        ev = last_by_lead.get(lead.id)
+        text = (ev.message_text or ev.agent_reply) if ev else None
+        role = None
+        if ev:
+            role = "user" if ev.message_text else ("operator" if ev.actor == "operator" else "assistant")
+        items.append(LeadInboxItem(
+            lead_id=lead.id,
+            ig_user_id=lead.ig_user_id,
+            ig_username=lead.ig_username,
+            name=lead.name,
+            contact=lead.contact,
+            status=lead.status,
+            lead_score=lead.lead_score or 0,
+            source=lead.source,
+            assigned_to_name=names.get(lead.assigned_to_id),
+            last_message=text,
+            last_message_at=last_at,
+            last_message_role=role,
+            last_customer_at=last_customer_at,
+            unread=int(unread or 0),
+            window=_window_of(last_customer_at),
+        ))
+    return items
+
+
+@router.post("/{lead_id}/read", status_code=204)
+async def mark_read(lead_id: uuid.UUID, _: CurrentUser,
+                    db: Annotated[AsyncSession, Depends(get_db)]):
+    """Suhbatni o'qilgan deb belgilaydi."""
+    lead = await _get_lead(db, lead_id)
+    lead.last_read_at = datetime.now(timezone.utc)
+    await db.commit()
+
+
+@router.post("/{lead_id}/reply", response_model=LeadReplyResult)
+async def reply_to_lead(
+    lead_id: uuid.UUID, payload: LeadReplyIn, user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Operator yozgan xabarni Instagram'ga yuboradi va jurnalga yozadi.
+
+    Yuborilgach AI o'sha suhbatda jim turadi — javobni operator berayotgan
+    bo'lsa bot aralashmasligi kerak.
+    """
+    text = (payload.text or "").strip()
+    if not text:
+        raise HTTPException(400, "Xabar matni bo'sh")
+
+    lead = await _get_lead(db, lead_id)
+    if not lead.ig_user_id:
+        raise HTTPException(400, "Bu leadда Instagram foydalanuvchisi yo'q")
+
+    last_customer_at = (await db.execute(
+        select(func.max(LeadEvent.created_at)).where(
+            LeadEvent.lead_id == lead.id, LeadEvent.message_text.is_not(None)
+        )
+    )).scalar()
+    window = _window_of(last_customer_at)
+    if window == "closed":
+        raise HTTPException(
+            400,
+            "Instagram javob oynasi yopilgan (mijozning oxirgi xabaridan 7 kun "
+            "o'tgan). Instagram ilovasidan yoki telefon orqali bog'laning.",
+        )
+
+    result = await agent_request(
+        "POST", "/admin/send-dm",
+        json={
+            "ig_user_id": lead.ig_user_id,
+            "text": text,
+            "human_agent": window == "human_agent",
+        },
+        public_url=await _agent_public_url(db),
+    )
+    if not result.get("sent"):
+        return LeadReplyResult(sent=False, error=result.get("error") or "Yuborilmadi")
+
+    event = LeadEvent(
+        lead_id=lead.id, kind="dm", agent_reply=text, actor="operator",
+        meta={"role": "operator", "by": str(user.id), "by_name": user.full_name,
+              "tag": result.get("tag")},
+    )
+    db.add(event)
+    lead.last_read_at = datetime.now(timezone.utc)
+    # Operator javob bergan bo'lsa lead "bog'lanildi" holatiga o'tadi
+    if lead.status == "new":
+        lead.status = "contacted"
+    await db.commit()
+    await db.refresh(event)
+    return LeadReplyResult(sent=True, tag=result.get("tag"),
+                           event=LeadEventOut.model_validate(event))
+
+
+@router.get("/{lead_id}/bot")
+async def bot_state(lead_id: uuid.UUID, _: CurrentUser,
+                    db: Annotated[AsyncSession, Depends(get_db)]):
+    """AI shu suhbatda javob beryaptimi."""
+    lead = await _get_lead(db, lead_id)
+    if not lead.ig_user_id:
+        return {"paused": False}
+    data = await agent_request(
+        "GET", "/admin/bot-state", params={"ig_user_id": lead.ig_user_id},
+        public_url=await _agent_public_url(db),
+    )
+    return {"paused": bool(data.get("paused"))}
+
+
+@router.post("/{lead_id}/bot")
+async def set_bot_state(lead_id: uuid.UUID, payload: LeadBotIn, _: CurrentUser,
+                        db: Annotated[AsyncSession, Depends(get_db)]):
+    """Shu suhbatda AI javobini yoqish/o'chirish."""
+    lead = await _get_lead(db, lead_id)
+    if not lead.ig_user_id:
+        raise HTTPException(400, "Bu leadда Instagram foydalanuvchisi yo'q")
+    data = await agent_request(
+        "POST", "/admin/bot-pause",
+        json={"ig_user_id": lead.ig_user_id, "enabled": payload.enabled},
+        public_url=await _agent_public_url(db),
+    )
+    return {"paused": bool(data.get("paused"))}
 
 
 @router.get("/{lead_id}", response_model=LeadDetailOut)

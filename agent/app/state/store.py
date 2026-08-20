@@ -75,6 +75,9 @@ class _MemoryStore:
     async def pause(self, user_id: str, hours: int) -> None:
         self._paused[user_id] = time.time() + hours * 3600
 
+    async def unpause(self, user_id: str) -> None:
+        self._paused.pop(user_id, None)
+
     async def is_paused(self, user_id: str) -> bool:
         exp = self._paused.get(user_id)
         if not exp:
@@ -122,6 +125,9 @@ class _RedisStore:
 
     async def pause(self, user_id: str, hours: int) -> None:
         await self._r.set(f"pause:{user_id}", "1", ex=max(1, hours) * 3600)
+
+    async def unpause(self, user_id: str) -> None:
+        await self._r.delete(f"pause:{user_id}")
 
     async def is_paused(self, user_id: str) -> bool:
         return bool(await self._r.get(f"pause:{user_id}"))
