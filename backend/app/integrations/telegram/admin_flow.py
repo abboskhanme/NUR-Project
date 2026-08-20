@@ -7,8 +7,7 @@ from aiogram import Router
 from aiogram.filters import Command
 from aiogram.types import Message
 
-from app.core.config import settings
-
+from .config_store import admin_chat_ids
 from .digest import build_digest, format_digest
 
 log = logging.getLogger(__name__)
@@ -18,11 +17,14 @@ router = Router(name="admin")
 @router.message(Command("id"))
 async def cmd_id(m: Message):
     """Foydalanuvchiga o'z chat_id sini ko'rsatadi (admin ro'yxatiga qo'shish uchun)."""
-    is_admin = m.chat.id in settings.TELEGRAM_ADMIN_IDS
+    is_admin = m.chat.id in await admin_chat_ids()
     note = (
         "✅ Siz hisobot oluvchilar ro'yxatidasiz."
         if is_admin
-        else "ℹ️ Kunlik hisobot olish uchun bu raqamni TELEGRAM_ADMIN_CHAT_IDS ga qo'shing."
+        else "ℹ️ Bu raqamni ERP'da «Tizim sozlamalari → ERP Telegram boti → "
+             "Hisobot oluvchilar» ga qo'shing.\n"
+             "Servis lokatsiyasini biriktirish uchun esa — Foydalanuvchilar "
+             "bo'limida o'z profilingizdagi «Telegram chat ID» maydoniga."
     )
     await m.answer(f"Sizning chat_id: <code>{m.chat.id}</code>\n\n{note}", parse_mode="HTML")
 
@@ -30,7 +32,7 @@ async def cmd_id(m: Message):
 @router.message(Command("report"))
 async def cmd_report(m: Message):
     """Faqat adminlar uchun — bugungi hisobotni darhol yuboradi."""
-    if m.chat.id not in settings.TELEGRAM_ADMIN_IDS:
+    if m.chat.id not in await admin_chat_ids():
         return await m.answer(
             "⛔️ Bu buyruq faqat administratorlar uchun.\n"
             "Chat_id ingizni bilish uchun /id yuboring."

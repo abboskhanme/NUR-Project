@@ -18,6 +18,7 @@ from aiogram.types import (
 from app.core.config import settings
 
 from .common import MODELS, KVMS, DIRECTIONS, fmt_usd, fmt_uzs, to_decimal
+from .config_store import admin_chat_ids, notify_new_order_enabled
 from .repository import OrderDraft, create_order_from_draft
 
 log = logging.getLogger(__name__)
@@ -193,7 +194,7 @@ async def s_confirm(m: Message, state: FSMContext):
     )
 
     # Xo'jayin(lar)ga darhol xabar berish (sozlama yoqilgan bo'lsa).
-    if settings.TELEGRAM_NOTIFY_NEW_ORDER:
+    if await notify_new_order_enabled():
         text = (
             "🆕 <b>Telegram orqali yangi buyurtma</b>\n\n"
             f"№ <b>{created.code}</b>\n"
@@ -208,7 +209,7 @@ async def s_confirm(m: Message, state: FSMContext):
 
 async def _notify_admins(m: Message, text: str) -> None:
     """Buyurtma haqida barcha admin chat_id'larga xabar yuboradi."""
-    for chat_id in settings.TELEGRAM_ADMIN_IDS:
+    for chat_id in await admin_chat_ids():
         try:
             await m.bot.send_message(chat_id, text, parse_mode="HTML")
         except Exception:  # noqa: BLE001

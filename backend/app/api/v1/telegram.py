@@ -4,6 +4,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core import settings_store
 from app.core.config import settings
 from app.db.session import get_db
 from app.models.system import TelegramOrder
@@ -18,7 +19,7 @@ async def webhook(request: Request, db: Annotated[AsyncSession, Depends(get_db)]
     Bot conversation flow is implemented in app/integrations/telegram.py.
     Here we save raw update and dispatch to handler.
     """
-    if not settings.TELEGRAM_BOT_TOKEN:
+    if not await settings_store.get_value(db, "ERP_BOT_TOKEN"):
         raise HTTPException(503, "Telegram bot sozlanmagan")
     payload: dict[str, Any] = await request.json()
 
@@ -40,8 +41,10 @@ async def webhook(request: Request, db: Annotated[AsyncSession, Depends(get_db)]
 
 
 @router.get("/status")
-async def status():
+async def status(db: Annotated[AsyncSession, Depends(get_db)]):
+    values = await settings_store.get_values(db, "ERP_BOT_TOKEN", "ERP_BOT_USERNAME")
     return {
-        "bot_token_set": bool(settings.TELEGRAM_BOT_TOKEN),
+        "bot_token_set": bool(values["ERP_BOT_TOKEN"]),
+        "bot_username": values["ERP_BOT_USERNAME"] or None,
         "webhook_url": settings.TELEGRAM_WEBHOOK_URL or None,
     }

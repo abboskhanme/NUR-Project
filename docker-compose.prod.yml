@@ -58,12 +58,11 @@ services:
       "
 
   # Telegram bot — backend bilan bir image, alohida jarayon (polling).
-  # Mijozlar uchun sotuvchi + xo'jayinga kunlik hisobot.
-  # HOZIRCHA O'CHIRILGAN: "telegram" profili ortida — oddiy `up -d` da ishga
-  # tushmaydi (build ham qilinmaydi). Qayta yoqish uchun:
-  #   docker compose -f docker-compose.prod.yml --env-file .env.prod --profile telegram up -d
+  # Servis lokatsiyasi, mijoz buyurtmasi, xo'jayinga kunlik hisobot.
+  # Token va sozlamalari ERP'da: «Tizim sozlamalari → ERP Telegram boti».
+  # Token kiritilmagan bo'lsa jarayon yiqilmaydi — kutib turadi va kiritilgach
+  # ~30 soniyada o'zi ulanadi (o'zgartirilganda ham shunday).
   telegram-bot:
-    profiles: ["telegram"]
     build:
       context: ./backend
       dockerfile: Dockerfile

@@ -23,7 +23,10 @@ from app.core.agent_client import agent_request
 from app.core.dependencies import CurrentUser
 from app.core.permissions import is_superadmin
 from app.core.crypto import decrypt_secret, encrypt_secret
-from app.core.system_settings import ALLOWED_KEYS, CATALOG, CATALOG_BY_KEY, GROUPS
+from app.core.settings_store import env_value
+from app.core.system_settings import (
+    AGENT_KEYS, ALLOWED_KEYS, CATALOG, CATALOG_BY_KEY, GROUPS,
+)
 from app.db.session import get_db
 from app.models.system import SystemSetting
 
@@ -68,13 +71,14 @@ async def _upsert(db: AsyncSession, key: str, plain: str) -> None:
 
 
 def _resolve(key: str, db_values: dict[str, str]) -> str:
-    """Qiymat manbai — FAQAT DB.
+    """Qiymat manbai: DB, bo'sh bo'lsa — zaxira.
 
-    Bo'sh bo'lsa "" qaytadi va agent O'Z .env qiymatini ishlatadi (fallback
-    agent tomonda). ERP'ning o'z .env'iga (masalan ERP Telegram boti) qaytmaymiz
-    — bu kalitlar agentники, ERP'ники emas.
+    Agent kalitlarida zaxira yo'q: "" qaytadi va agent O'Z .env qiymatini
+    ishlatadi (fallback agent tomonda). ERP'ning o'z kalitlarida (ERP Telegram
+    boti) esa ERP .env'i zaxira bo'ladi — eski o'rnatmalar buzilmasin va
+    admin nima kuchda ekanini ko'rib tursin.
     """
-    return db_values.get(key) or ""
+    return db_values.get(key) or env_value(key)
 
 
 def _mask(value: str) -> str:
@@ -153,8 +157,10 @@ async def update_settings(
 # ===========================================================================
 @agent_router.get("/agent-config", dependencies=[Depends(require_agent_key)])
 async def agent_config(db: Annotated[AsyncSession, Depends(get_db)]):
+    # ERP'ning o'z sozlamalari (local=True, masalan ERP bot tokeni) agentga
+    # yuborilmaydi — ular agentга kerak emas.
     dbv = await _db_values(db)
-    return {item.key: _resolve(item.key, dbv) for item in CATALOG}
+    return {item.key: _resolve(item.key, dbv) for item in AGENT_KEYS}
 
 
 # Agent OAuth orqali olgan qiymatlarni ERP'ga qaytarib yozadi (Instagram ulash

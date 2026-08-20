@@ -10,7 +10,7 @@ from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.config import settings
+from app.core import settings_store
 from app.core.dependencies import CurrentUser
 from app.core.permissions import module_guard
 from app.db.session import get_db
@@ -700,7 +700,8 @@ async def request_ticket_location(ticket_id: uuid.UUID, user: CurrentUser,
             "va chiqqan raqamni Foydalanuvchilar bo'limida profilingizga qo'shing.",
         )
     req = await loc.create_request(db, t.id, user.id)
-    username = (settings.TELEGRAM_BOT_USERNAME or "").strip().lstrip("@")
+    # Bot nomi — Tizim sozlamalaridan (bo'sh bo'lsa .env zaxirasi)
+    username = (await settings_store.get_value(db, "ERP_BOT_USERNAME")).strip().lstrip("@")
     return ServiceLocationRequestOut(
         ticket_id=t.id, ticket_code=t.code, expires_at=req.expires_at,
         bot_username=username or None,

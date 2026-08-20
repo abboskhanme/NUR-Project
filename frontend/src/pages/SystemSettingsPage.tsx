@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import {
   ServerCog, ShieldCheck, RefreshCw, Save, Bot, Instagram, Send,
   SlidersHorizontal, Check, RotateCcw, BookOpen, ChevronDown, Sparkles,
-  type LucideIcon,
+  MapPin, type LucideIcon,
 } from 'lucide-react';
 
 import {
@@ -17,6 +17,11 @@ const GROUP_META: Record<string, { icon: LucideIcon; desc: string }> = {
   knowledge: { icon: BookOpen, desc: "Agent leadlarga shu ma'lumot asosida javob beradi." },
   instagram: { icon: Instagram, desc: 'Webhook va Graph API ulanishi (Meta).' },
   telegram: { icon: Send, desc: 'Xodimlarga qaynoq lead va kunlik hisobot boti.' },
+  erp_bot: {
+    icon: MapPin,
+    desc: 'Servis lokatsiyasi, mijoz buyurtmasi va kunlik hisobot boti. '
+      + "Saqlagach bot ~30 soniyada o'zi qayta ulanadi.",
+  },
   general: { icon: SlidersHorizontal, desc: 'Umumiy agent sozlamalari.' },
 };
 

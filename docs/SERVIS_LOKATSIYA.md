@@ -29,22 +29,33 @@ ishlatadi.
 - **Servis safari paneli** — «Marshrut (N)»: barcha rejalashtirilgan arizalar
   bitta Yandex marshrutida; lokatsiyasi yo'qlari soni alohida ogohlantiriladi.
 
-## Sozlash (bir martalik)
+## Sozlash — hammasi ERP ichidan
 
-1. **Botni yoqish** — hozir `telegram` profili ortida turibdi:
-   ```bash
-   docker compose -f docker-compose.prod.yml --env-file .env.prod \
-     --profile telegram up -d --build
-   ```
-2. **.env.prod** ga bot foydalanuvchi nomini qo'shish (ERP'dagi «Botga o'tish»
-   havolasi shundan yasaladi):
-   ```
-   TELEGRAM_BOT_USERNAME=nurtechno_bot
-   ```
-3. **Xodimlarni botga bog'lash** — har bir servis xodimi botga `/id` yozadi,
-   chiqqan raqam ERP → **Foydalanuvchilar** → profilidagi *Telegram chat ID*
-   maydoniga qo'yiladi. Bog'lanmagan akkauntdan kelgan lokatsiya qabul
-   qilinmaydi (kim biriktirgani yozib boriladi).
+Botning tokeni va sozlamalari **Tizim sozlamalari → «ERP Telegram boti»**
+bo'limida (faqat super-admin). `.env` ni tahrirlash shart emas.
+
+| Sozlama | Nima uchun |
+|---|---|
+| **Bot token** | BotFather'dan olinadi. Saqlagach bot ~30 soniyada o'zi qayta ulanadi — konteynerni qayta ishga tushirish kerak emas. |
+| **Bot foydalanuvchi nomi** | `@` siz. Arizadagi «Botga o'tish» havolasi shundan yasaladi. |
+| **Hisobot oluvchilar (chat ID)** | Kunlik hisobot va yangi buyurtma xabari shu chat'larga boradi. |
+| **Kunlik hisobot vaqti** | HH:MM. |
+| **Yangi buyurtmada darhol xabar** | ha / yo'q. |
+
+So'ng har bir servis xodimi botga `/id` yozadi, chiqqan raqam ERP →
+**Foydalanuvchilar** → profilidagi *Telegram chat ID* maydoniga qo'yiladi.
+Bog'lanmagan akkauntdan kelgan lokatsiya qabul qilinmaydi (kim biriktirgani
+yozib boriladi).
+
+Instagram agenti bilan **bir xil bot** ishlatilsa — o'sha tokenni ikkala
+bo'limga ham qo'ying («Telegram bildirishnoma» agentniki, «ERP Telegram boti»
+esa shu bot uchun). Ular to'qnashmaydi: agent faqat xabar yuboradi, ERP boti
+esa polling qiladi.
+
+`telegram-bot` konteyneri endi doim ishlaydi (profil ortida emas). Token
+kiritilmagan bo'lsa jarayon yiqilmaydi — kutib turadi va kiritilgach o'zi
+ulanadi. Eski `.env` qiymatlari (`TELEGRAM_BOT_TOKEN` va h.k.) zaxira sifatida
+saqlanib qoldi: sozlama bo'sh bo'lsa o'shalar ishlatiladi.
 
 ## Texnik eslatmalar
 
@@ -58,3 +69,7 @@ ishlatadi.
   (`maps.app.goo.gl`, `yandex.uz/maps/-/…`) ochib ko'riladi. Testlar:
   `tests/test_service_location.py`.
 - Xarita havolalari API kaliti yoki to'lov talab qilmaydi.
+- Sozlama o'qish tartibi: `system_settings` (DB) > `.env`. Kod:
+  `app/core/settings_store.py`, bot uchun
+  `app/integrations/telegram/config_store.py`. ERP kalitlari (`local=True`)
+  tashqi agentga (`/agent-config`) yuborilmaydi.

@@ -28,6 +28,9 @@ class SettingItem:
     # `/agent-config` orqali baribir oladi. Masalan «Ulash» tugmasi avtomatik
     # to'ldiradigan token/ID lar: ularni ekranda ko'rsatish faqat chalg'itadi.
     hidden: bool = False
+    # local=True — ERP'ning O'Z sozlamasi (tashqi agentga yuborilmaydi).
+    # Masalan ERP Telegram botining tokeni: uni agent bilmasligi kerak.
+    local: bool = False
 
 
 GROUPS: dict[str, str] = {
@@ -35,6 +38,7 @@ GROUPS: dict[str, str] = {
     "knowledge": "Bilim bazasi",
     "instagram": "Instagram (Meta)",
     "telegram": "Telegram bildirishnoma",
+    "erp_bot": "ERP Telegram boti",
     "general": "Umumiy",
 }
 
@@ -107,6 +111,34 @@ CATALOG: tuple[SettingItem, ...] = (
     SettingItem("TELEGRAM_CHAT_ID", "Chat ID (bildirishnoma oluvchi)", "telegram"),
     SettingItem("DAILY_REPORT_TIME", "Kunlik hisobot vaqti", "telegram", placeholder="20:00"),
 
+    # --- ERP Telegram boti (agentники EMAS: alohida jarayon, ERP bazasi bilan
+    # ishlaydi — servis lokatsiyasi, mijoz buyurtmasi, kunlik hisobot) ---
+    SettingItem(
+        "ERP_BOT_TOKEN", "Bot token", "erp_bot", secret=True, local=True,
+        help="BotFather'dan olingan token. Saqlagach bot ~30 soniyada o'zi "
+             "qayta ulanadi. Instagram agenti bilan bir xil bot bo'lsa — "
+             "o'sha tokenning aynan o'zini qo'ying.",
+    ),
+    SettingItem(
+        "ERP_BOT_USERNAME", "Bot foydalanuvchi nomi", "erp_bot", local=True,
+        placeholder="nurtechno_bot",
+        help="@ belgisisiz. Servis arizasidagi «Botga o'tish» havolasi shundan yasaladi.",
+    ),
+    SettingItem(
+        "ERP_BOT_ADMIN_CHAT_IDS", "Hisobot oluvchilar (chat ID)", "erp_bot", local=True,
+        placeholder="123456789, 987654321",
+        help="Kunlik hisobot va yangi buyurtma xabari shu chat'larga boradi. "
+             "Chat ID ni bilish uchun botga /id yuboring.",
+    ),
+    SettingItem(
+        "ERP_BOT_REPORT_TIME", "Kunlik hisobot vaqti", "erp_bot", local=True,
+        placeholder="20:00", help="HH:MM ko'rinishida, vaqt mintaqasi bo'yicha.",
+    ),
+    SettingItem(
+        "ERP_BOT_NOTIFY_NEW_ORDER", "Yangi buyurtmada darhol xabar", "erp_bot",
+        local=True, type="select", options=("ha", "yo'q"),
+    ),
+
     # --- Umumiy ---
     SettingItem("COMPANY_NAME", "Kompaniya nomi", "general"),
     SettingItem("BOT_PAUSE_HOURS", "Operator aralashgach bot pauzasi (soat)", "general",
@@ -119,3 +151,6 @@ CATALOG: tuple[SettingItem, ...] = (
 
 CATALOG_BY_KEY: dict[str, SettingItem] = {item.key: item for item in CATALOG}
 ALLOWED_KEYS: frozenset[str] = frozenset(CATALOG_BY_KEY)
+# Tashqi agentga (`/agent-config`) yuboriladigan kalitlar — ERP'ning o'z
+# sozlamalari (local=True) bundan tashqarida qoladi.
+AGENT_KEYS: tuple[SettingItem, ...] = tuple(i for i in CATALOG if not i.local)
