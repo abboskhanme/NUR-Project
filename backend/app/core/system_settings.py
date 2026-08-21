@@ -38,7 +38,9 @@ GROUPS: dict[str, str] = {
     "knowledge": "Bilim bazasi",
     "instagram": "Instagram (Meta)",
     "telegram": "Telegram bildirishnoma",
+    "tg_sales": "Telegram AI yordamchisi",
     "erp_bot": "ERP Telegram boti",
+    "wa_bridge": "Telegram → WhatsApp",
     "general": "Umumiy",
 }
 
@@ -111,6 +113,31 @@ CATALOG: tuple[SettingItem, ...] = (
     SettingItem("TELEGRAM_CHAT_ID", "Chat ID (bildirishnoma oluvchi)", "telegram"),
     SettingItem("DAILY_REPORT_TIME", "Kunlik hisobot vaqti", "telegram", placeholder="20:00"),
 
+    # --- Telegram AI yordamchisi (shaxsiy chatlarga javob beradi) ---
+    # Bu bot AGENT tomonida ishlaydi: ERP boti va bildirishnoma botidan
+    # ALOHIDA token bo'lishi shart, aks holda webhook/polling to'qnashadi.
+    SettingItem(
+        "TG_SALES_BOT_TOKEN", "Bot token (AI yordamchi)", "tg_sales", secret=True,
+        help="BotFather'dan YANGI bot oching. Telegram → Sozlamalar → Business → "
+             "Chatbots bo'limida shu botni ulasangiz, u shaxsiy chatlaringizga "
+             "siz nomingizdan javob beradi.",
+    ),
+    SettingItem(
+        "TG_SALES_ENABLED", "AI javob yoqilganmi", "tg_sales", type="select",
+        options=("ha", "yo'q"),
+        help="«yo'q» qilsangiz bot xabarlarni qabul qiladi-yu, javob bermaydi.",
+    ),
+    SettingItem(
+        "TG_WEBHOOK_SECRET", "Webhook maxfiy kaliti", "tg_sales", secret=True,
+        help="O'zingiz o'ylab topasiz (masalan 20 ta tasodifiy belgi). Telegram "
+             "har so'rovda shuni yuboradi — begona so'rovlar rad etiladi.",
+    ),
+    SettingItem(
+        "TG_API_BASE", "Telegram API manzili", "tg_sales", hidden=True,
+        placeholder="https://api.telegram.org",
+        help="Local Bot API server ishlatilsa o'zgartiriladi (katta fayllar uchun).",
+    ),
+
     # --- ERP Telegram boti (agentники EMAS: alohida jarayon, ERP bazasi bilan
     # ishlaydi — servis lokatsiyasi, mijoz buyurtmasi, kunlik hisobot) ---
     SettingItem(
@@ -137,6 +164,65 @@ CATALOG: tuple[SettingItem, ...] = (
     SettingItem(
         "ERP_BOT_NOTIFY_NEW_ORDER", "Yangi buyurtmada darhol xabar", "erp_bot",
         local=True, type="select", options=("ha", "yo'q"),
+    ),
+
+    # --- Telegram kanal postini WhatsApp'ga ko'chirish ---
+    # WhatsApp KANALIGA to'g'ridan-to'g'ri yozadigan rasmiy API yo'q, shuning
+    # uchun post kanal admini bo'lgan xodimning raqamiga yuboriladi — u bir
+    # marta "Forward" qilib kanalga qo'yadi.
+    SettingItem(
+        "WA_ENABLED", "Ko'prik yoqilganmi", "wa_bridge", local=True,
+        type="select", options=("ha", "yo'q"),
+        help="«ha» bo'lsa Telegram kanaldagi yangi postlar navbatga tushadi.",
+    ),
+    SettingItem(
+        "WA_BRIDGE_BOT_TOKEN", "Telegram bot token (kanalni o'qiydi)", "wa_bridge",
+        secret=True, local=True,
+        help="ALOHIDA bot oching va uni Telegram kanalingizga ADMIN qiling. "
+             "Boshqa botlarning tokenini qo'ymang — to'qnashadi.",
+    ),
+    SettingItem(
+        "WA_SOURCE_CHANNEL_ID", "Kanal ID (ixtiyoriy)", "wa_bridge", local=True,
+        placeholder="-1001234567890",
+        help="Bo'sh qoldirsangiz, bot admin bo'lgan barcha kanallardan oladi.",
+    ),
+    SettingItem(
+        "WA_DELAY_MINUTES", "Kechikish (daqiqa)", "wa_bridge", local=True,
+        type="number", placeholder="60",
+        help="Telegramga tashlangandan keyin shuncha vaqtdan so'ng WhatsApp'ga yuboriladi.",
+    ),
+    SettingItem(
+        "WA_PHONE_NUMBER_ID", "WhatsApp Phone Number ID", "wa_bridge", local=True,
+        help="Meta App → WhatsApp → API Setup sahifasidan olinadi.",
+    ),
+    SettingItem(
+        "WA_ACCESS_TOKEN", "WhatsApp access token", "wa_bridge", secret=True, local=True,
+        help="Doimiy (System User) token bo'lishi tavsiya etiladi — vaqtinchalisi 24 soatda tugaydi.",
+    ),
+    SettingItem(
+        "WA_TARGET_NUMBERS", "Qabul qiluvchi raqamlar", "wa_bridge", local=True,
+        placeholder="+998901112233, +998901112244",
+        help="Kanal admini bo'lgan xodim(lar) raqami. Post shularga boradi, "
+             "ular forward qilib kanalga qo'yadi.",
+    ),
+    SettingItem(
+        "WA_TEMPLATE_NAME", "Shablon nomi (oyna yopilganda)", "wa_bridge", local=True,
+        placeholder="nur_post_tayyor",
+        help="Meta'da tasdiqlangan utility shablon. Xodim 24 soatdan beri javob "
+             "yozmagan bo'lsa, avval shu shablon yuboriladi.",
+    ),
+    SettingItem(
+        "WA_TEMPLATE_LANG", "Shablon tili", "wa_bridge", local=True,
+        placeholder="uz", hidden=True,
+    ),
+    SettingItem(
+        "WA_GRAPH_VERSION", "Graph API versiyasi", "wa_bridge", local=True,
+        placeholder="v23.0", hidden=True,
+    ),
+    SettingItem(
+        "WA_TG_API_BASE", "Telegram API manzili", "wa_bridge", local=True,
+        placeholder="https://api.telegram.org", hidden=True,
+        help="Local Bot API server ishlatilsa (20 MB dan katta videolar uchun).",
     ),
 
     # --- Umumiy ---

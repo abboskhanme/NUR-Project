@@ -66,6 +66,27 @@ services:
         uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
       "
 
+  # Telegram kanal → WhatsApp ko'prigi: kanaldagi postni belgilangan vaqtdan
+  # keyin xodimning WhatsApp raqamiga yuboradi (u forward qilib kanalga qo'yadi).
+  # Sozlamalar «Tizim sozlamalari → Telegram → WhatsApp» da; o'chiq bo'lsa
+  # jarayon shunchaki kutib turadi.
+  wa-bridge:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: nur-wa-bridge
+    profiles: ["bot"]
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/nur_erp
+      SECRET_KEY: dev-secret-change-me-in-production
+    volumes:
+      - ./backend:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["python", "-m", "app.integrations.wa_bridge"]
+
   frontend:
     build:
       context: ./frontend

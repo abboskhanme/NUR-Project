@@ -15,6 +15,7 @@ import QueuePage from '@/pages/QueuePage';
 import CustomersPage from '@/pages/CustomersPage';
 import CustomerDetailPage from '@/pages/CustomerDetailPage';
 import LeadsPage from '@/pages/LeadsPage';
+import WaBridgePage from '@/pages/WaBridgePage';
 import LeadDetailPage from '@/pages/LeadDetailPage';
 import ProductsPage from '@/pages/ProductsPage';
 import CostingPage from '@/pages/CostingPage';
@@ -128,6 +129,7 @@ export default function App() {
         <Route path="customers" element={<RequireModule module="customers"><CustomersPage /></RequireModule>} />
         <Route path="customers/:customerId" element={<RequireModule module="customers"><CustomerDetailPage /></RequireModule>} />
         <Route path="leads" element={<RequireModule module="leads"><LeadsPage /></RequireModule>} />
+        <Route path="wa-bridge" element={<RequireModule module="telegram"><WaBridgePage /></RequireModule>} />
         <Route path="leads/:leadId" element={<RequireModule module="leads"><LeadDetailPage /></RequireModule>} />
         <Route path="products" element={<RequireModule module="products"><ProductsPage /></RequireModule>} />
         <Route path="costing" element={<RequireModule module="costing"><CostingPage /></RequireModule>} />

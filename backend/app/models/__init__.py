@@ -42,6 +42,7 @@ from app.models.costing import CostingMaterial, ProductRecipe, ProductRecipeItem
 from app.models.shipping import Shipment
 from app.models.production import ProductionRecord
 from app.models.lead import Lead, LeadEvent
+from app.models.wa_bridge import ChannelPost
 
 __all__ = [
     "Base",
@@ -94,6 +95,7 @@ __all__ = [
     "Shipment",
     "ProductionRecord",
     "Lead",
+    "ChannelPost",
     "LeadEvent",
     "SystemSetting",
 ]

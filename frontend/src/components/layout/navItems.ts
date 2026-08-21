@@ -2,6 +2,7 @@ import {
   LayoutDashboard, ShoppingCart, Users, Package, Wrench, Wallet,
   UserSquare2, Truck, BarChart3, Settings, ShieldCheck, ListOrdered, Warehouse,
   Coins, PackageOpen, Factory, Building2, Globe, Target, Sparkles, ServerCog, Calculator,
+  Send,
   type LucideIcon,
 } from 'lucide-react';
 import { usePermissions } from '@/lib/permissions';
@@ -44,6 +45,7 @@ export function useNavItems(): NavItem[] {
       { to: '/supply/ichki', label: 'Ichki taʼminot', icon: Building2, module: 'supply_ichki' },
       { to: '/supply/tashqi', label: 'Tashqi taʼminot', icon: Globe, module: 'supply_tashqi' },
     ] },
+    { to: '/wa-bridge', label: 'WhatsApp navbati', icon: Send, module: 'telegram' },
     { to: '/reports', label: 'Hisobotlar', icon: BarChart3, module: 'reports' },
     { to: '/users', label: 'Foydalanuvchilar', icon: ShieldCheck, module: 'users' },
     { to: '/settings', label: 'Sozlamalar', icon: Settings },
