@@ -18,6 +18,7 @@ export interface KpiData {
 }
 
 export interface ByModelRow { model: string; count: number; total_uzs: number }
+export interface BySizeRow { size: string; kvm: number | null; count: number; total_uzs: number }
 export interface ByRegionRow { region: string; count: number; total_uzs: number }
 export interface BySellerRow { seller: string; count: number; total_uzs: number }
 export interface ByCustomerRow { customer: string; phone: string | null; count: number; total_uzs: number }

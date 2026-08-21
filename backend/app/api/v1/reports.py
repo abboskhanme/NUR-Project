@@ -367,6 +367,43 @@ async def sales_by_model(
 
 
 # --------------------------------------------------------------------------- #
+# SALES — by size (kvm)
+# --------------------------------------------------------------------------- #
+@router.get("/sales/by-size")
+async def sales_by_size(
+    db: Annotated[AsyncSession, Depends(get_db)], _: CurrentUser,
+    date_from: Optional[date] = None, date_to: Optional[date] = None,
+):
+    """Asosiy mahsulot o'lchami (kvadratura) bo'yicha sotuv.
+
+    O'lcham mahsulot kartochkasidagi `kvm` maydonidan olinadi (150, 200, 300...).
+    Qo'shimcha mahsulotlarda o'lcham yo'q — ular "—" qatorida yig'iladi.
+    Tartib o'lcham bo'yicha o'sish tartibida (model hisobotidan farqi shu:
+    u yerda summa bo'yicha, bu yerda tabiiy ketma-ketlik o'qishga qulay).
+    """
+    date_from, date_to = _resolve_range(date_from, date_to, default_days=90)
+    res = await db.execute(
+        select(Product.kvm, func.count(OrderItem.id),
+               func.coalesce(func.sum(OrderItem.total_uzs), 0))
+        .join(OrderItem, OrderItem.product_id == Product.id)
+        .join(Order, Order.id == OrderItem.order_id)
+        .where(and_(Order.order_date >= date_from, Order.order_date <= date_to,
+                    NOT_REJECTED))
+        .group_by(Product.kvm)
+        .order_by(Product.kvm.asc().nulls_last())
+    )
+    return [
+        {
+            "size": f"{k} kvm" if k else "—",
+            "kvm": int(k) if k else None,
+            "count": int(c or 0),
+            "total_uzs": float(t or 0),
+        }
+        for k, c, t in res.all()
+    ]
+
+
+# --------------------------------------------------------------------------- #
 # SALES — by region
 # --------------------------------------------------------------------------- #
 @router.get("/sales/by-region")

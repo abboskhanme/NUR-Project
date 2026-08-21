@@ -14,7 +14,7 @@ import RevenueArea from '@/features/dashboard/RevenueArea';
 import ReportTable, { Column } from './ReportTable';
 import StatTile from './StatTile';
 import type {
-  DateRange, KpiData, ByModelRow, ByRegionRow, BySellerRow, ByCustomerRow,
+  DateRange, KpiData, ByModelRow, BySizeRow, ByRegionRow, BySellerRow, ByCustomerRow,
   StatusRow, TrendData, ReceivablesData, ReceivableRow,
 } from './types';
 
@@ -41,6 +41,10 @@ export default function SalesReport({ range }: { range: DateRange }) {
     queryKey: ['rep-by-model', range],
     queryFn: () => api.get('/reports/sales/by-model', { params }).then((r) => r.data),
   });
+  const bySize = useQuery<BySizeRow[]>({
+    queryKey: ['rep-by-size', range],
+    queryFn: () => api.get('/reports/sales/by-size', { params }).then((r) => r.data),
+  });
   const byRegion = useQuery<ByRegionRow[]>({
     queryKey: ['rep-by-region', range],
     queryFn: () => api.get('/reports/sales/by-region', { params }).then((r) => r.data),
@@ -65,6 +69,11 @@ export default function SalesReport({ range }: { range: DateRange }) {
 
   const modelCols: Column<ByModelRow>[] = [
     { key: 'model', label: 'Model', render: (r) => r.model },
+    { key: 'count', label: 'Soni', align: 'right' },
+    { key: 'total_uzs', label: 'Summa', align: 'right', render: (r) => formatUZS(r.total_uzs) },
+  ];
+  const sizeCols: Column<BySizeRow>[] = [
+    { key: 'size', label: "O'lcham", render: (r) => r.size },
     { key: 'count', label: 'Soni', align: 'right' },
     { key: 'total_uzs', label: 'Summa', align: 'right', render: (r) => formatUZS(r.total_uzs) },
   ];
@@ -179,6 +188,24 @@ export default function SalesReport({ range }: { range: DateRange }) {
           </div>
         </Card>
       </div>
+
+      <Card title="O'lcham bo'yicha sotuv (kvm)">
+        <ResponsiveContainer width="100%" height={240}>
+          <BarChart data={bySize.data ?? []}>
+            <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
+            <XAxis dataKey="size" fontSize={11} />
+            <YAxis fontSize={11} allowDecimals={false} />
+            <Tooltip formatter={(v: number, _n, p: any) => p?.dataKey === 'count' ? `${v} ta` : formatUZS(v)} />
+            <Bar dataKey="count" name="Soni" radius={[4, 4, 0, 0]}>
+              {(bySize.data ?? []).map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+        <div className="mt-3">
+          <ReportTable rows={bySize.data} columns={sizeCols} filename="sotuv-olcham"
+            emptyText="Tanlangan davrda sotuv yo'q" />
+        </div>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card title="Sotuvchi bo'yicha">
