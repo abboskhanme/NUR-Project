@@ -24,6 +24,7 @@ from app.schemas.common import Page
 from app.schemas.service import (
     CustomerSearchHit, OrderMini, PartStat, ServiceCategoryIn, ServiceCategoryOut,
     ServiceCategoryReport, ServiceCategoryReportRow,
+    ServiceRegionReport, ServiceRegionReportRow,
     ServiceExpenseItem, ServiceExternalTicketCreate, ServiceLocationIn,
     ServiceLocationRequestOut, ServicePartIn, ServicePartOut,
     ServiceSummary, ServiceTicketCreate, ServiceTicketOut, ServiceTicketUpdate,
@@ -199,12 +200,18 @@ async def service_expenses_list(
 # Hisobot — barcha toifalar bo'yicha
 # --------------------------------------------------------------------------- #
 UNCATEGORIZED = "Toifasiz"
+UNKNOWN_REGION = "Ko'rsatilmagan"
 
 
 def _ticket_date_ref():
     """Ish bajarilgan sana (closed_at, bo'lmasa opened_at) — barcha servis
     hisobotlarida bir xil mezon ishlatiladi."""
     return func.date(func.coalesce(ServiceTicket.closed_at, ServiceTicket.opened_at))
+
+
+def _region_expr():
+    """Mijoz viloyati; bo'sh/NULL bo'lsa "Ko'rsatilmagan"."""
+    return func.coalesce(func.nullif(func.btrim(Customer.region), ""), UNKNOWN_REGION)
 
 
 def _category_expr():
@@ -305,6 +312,100 @@ async def category_report(
         client_cost=sum((r.client_cost for r in ordered), Decimal(0)),
         parts_count=sum(r.parts_count for r in ordered),
         rows=ordered,
+    )
+
+
+@router.get("/report/regions", response_model=ServiceRegionReport)
+async def region_report(
+    db: Annotated[AsyncSession, Depends(get_db)], _: CurrentUser,
+    date_from: Optional[date] = None, date_to: Optional[date] = None,
+):
+    """Servis hisoboti — VILOYATLAR kesimida: qayerga ko'p chiqilyapti,
+    qancha xarajat va qism ketyapti, qaysi muammo ustun.
+
+    Viloyat mijoz kartochkasidan olinadi (ko'rsatilmagan bo'lsa alohida qator).
+    Vaqt filtri toifalar hisoboti bilan bir xil — ish bajarilgan sana bo'yicha,
+    shuning uchun ikkala hisobotdagi summalar mos keladi.
+    """
+    ref = _ticket_date_ref()
+    reg = _region_expr()
+    cat = _category_expr()
+    conds = []
+    if date_from:
+        conds.append(ref >= date_from)
+    if date_to:
+        conds.append(ref <= date_to)
+
+    parts_len = func.coalesce(func.jsonb_array_length(ServiceTicket.parts_used), 0)
+    q = (
+        select(
+            reg.label("region"),
+            func.count(ServiceTicket.id).label("total"),
+            func.count(ServiceTicket.id).filter(ServiceTicket.status == "new").label("new"),
+            func.count(ServiceTicket.id).filter(ServiceTicket.status == "scheduled").label("scheduled"),
+            func.count(ServiceTicket.id).filter(ServiceTicket.status == "completed").label("completed"),
+            func.count(ServiceTicket.id).filter(ServiceTicket.status == "cancelled").label("cancelled"),
+            func.count(ServiceTicket.id).filter(ServiceTicket.in_warranty.is_(True)).label("in_warranty"),
+            func.coalesce(func.sum(ServiceTicket.client_cost), 0).label("client_cost"),
+            func.coalesce(func.sum(parts_len), 0).label("parts_count"),
+            func.count(func.distinct(ServiceTicket.customer_id)).label("customers"),
+        )
+        .select_from(ServiceTicket)
+        .join(Customer, Customer.id == ServiceTicket.customer_id)
+        .group_by(reg)
+    )
+    if conds:
+        q = q.where(*conds)
+    agg_rows = (await db.execute(q)).all()
+
+    # Har viloyatda eng ko'p uchragan muammo turi
+    tq = (
+        select(reg.label("region"), cat.label("category"), func.count().label("cnt"))
+        .select_from(ServiceTicket)
+        .join(Customer, Customer.id == ServiceTicket.customer_id)
+        .group_by(reg, cat)
+        .order_by(func.count().desc())
+    )
+    if conds:
+        tq = tq.where(*conds)
+    top_by_region: dict[str, str] = {}
+    for region, category, _cnt in (await db.execute(tq)).all():
+        top_by_region.setdefault(region, category)
+
+    rows: list[ServiceRegionReportRow] = []
+    for r in agg_rows:
+        total = int(r.total)
+        in_w = int(r.in_warranty)
+        rows.append(ServiceRegionReportRow(
+            region=r.region, total=total,
+            new=int(r.new), scheduled=int(r.scheduled),
+            completed=int(r.completed), cancelled=int(r.cancelled),
+            in_warranty=in_w, out_warranty=total - in_w,
+            client_cost=r.client_cost, parts_count=int(r.parts_count),
+            customers=int(r.customers),
+            top_category=top_by_region.get(r.region),
+        ))
+
+    # Ko'p arizali viloyat yuqorida; "Ko'rsatilmagan" doim oxirida
+    rows.sort(key=lambda r: (r.region == UNKNOWN_REGION, -r.total, r.region.lower()))
+
+    # Mijozlar sonini viloyatlar bo'yicha qo'shib bo'lmaydi (bitta mijoz bitta
+    # viloyatda), lekin umumiy son alohida hisoblanadi — aniqroq bo'lsin.
+    cq = select(func.count(func.distinct(ServiceTicket.customer_id)))
+    if conds:
+        cq = cq.where(*conds)
+    total_customers = (await db.execute(cq)).scalar() or 0
+
+    return ServiceRegionReport(
+        date_from=date_from, date_to=date_to,
+        total=sum(r.total for r in rows),
+        completed=sum(r.completed for r in rows),
+        in_warranty=sum(r.in_warranty for r in rows),
+        out_warranty=sum(r.out_warranty for r in rows),
+        client_cost=sum((r.client_cost for r in rows), Decimal(0)),
+        parts_count=sum(r.parts_count for r in rows),
+        customers=int(total_customers),
+        rows=rows,
     )
 
 

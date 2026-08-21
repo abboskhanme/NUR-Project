@@ -224,6 +224,36 @@ class ServiceCategoryReport(BaseModel):
     rows: list[ServiceCategoryReportRow] = []
 
 
+class ServiceRegionReportRow(BaseModel):
+    """Bitta viloyat bo'yicha hisobot qatori."""
+    region: str
+    total: int = 0
+    new: int = 0
+    scheduled: int = 0
+    completed: int = 0
+    cancelled: int = 0
+    in_warranty: int = 0
+    out_warranty: int = 0
+    client_cost: Decimal = Decimal(0)   # shu viloyatdagi "Servis xarajati"
+    parts_count: int = 0                # ishlatilgan ehtiyot qismlar (dona)
+    customers: int = 0                  # nechta mijozga chiqilgan
+    top_category: Optional[str] = None  # eng ko'p uchragan muammo turi
+
+
+class ServiceRegionReport(BaseModel):
+    """Servis hisoboti — viloyatlar kesimida (qayerga ko'p chiqyapmiz)."""
+    date_from: Optional[date] = None
+    date_to: Optional[date] = None
+    total: int = 0
+    completed: int = 0
+    in_warranty: int = 0
+    out_warranty: int = 0
+    client_cost: Decimal = Decimal(0)
+    parts_count: int = 0
+    customers: int = 0
+    rows: list[ServiceRegionReportRow] = []
+
+
 class TripMoneyStat(BaseModel):
     collected: Decimal = Decimal(0)         # olingan
     spent: Decimal = Decimal(0)             # safar sarflangani (trip.spent yig'indisi)

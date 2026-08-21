@@ -11,6 +11,7 @@ import EmptyState from '@/components/ui/EmptyState';
 import StatTile from '@/features/reports/StatTile';
 import { formatUZS } from '@/lib/format';
 import { exportCSV } from '@/lib/export';
+import ServiceRegionReport from '@/features/service/ServiceRegionReport';
 
 interface PartStat { name: string; count: number }
 interface Row {
@@ -37,13 +38,20 @@ const SALES_MONTHS: Record<string, string> = {
 
 const CAT_COLORS = ['#1E3A5F', '#2980B9', '#27AE60', '#F39C12', '#E74C3C', '#8E44AD', '#16A085', '#7F8C8D'];
 
-/** Servis hisoboti — barcha toifalar kesimida (oy/yil filtri bilan). */
+const VIEWS = [
+  { key: 'category', label: "Toifalar bo'yicha" },
+  { key: 'region', label: "Viloyatlar bo'yicha" },
+] as const;
+type View = (typeof VIEWS)[number]['key'];
+
+/** Servis hisoboti — toifalar va viloyatlar kesimida (oy/yil filtri bilan). */
 export default function ServiceCategoryReport() {
   const now = new Date();
   const [month, setMonth] = useState<number>(now.getMonth() + 1); // 0 = butun yil
   const [year, setYear] = useState<number>(now.getFullYear());
   const [hideEmpty, setHideEmpty] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
+  const [view, setView] = useState<View>('category');
 
   const { dateFrom, dateTo } = useMemo(() => {
     if (month === 0) return { dateFrom: `${year}-01-01`, dateTo: `${year}-12-31` };
@@ -58,6 +66,7 @@ export default function ServiceCategoryReport() {
     queryFn: () => api.get('/service/report', {
       params: { date_from: dateFrom, date_to: dateTo },
     }).then((r) => r.data),
+    enabled: view === 'category',
   });
 
   const d = q.data;
@@ -102,7 +111,23 @@ export default function ServiceCategoryReport() {
           {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
         </select>
         <span className="text-xs text-ink-soft">Ish bajarilgan sana bo'yicha</span>
+
+        <div className="flex gap-1 ml-auto">
+          {VIEWS.map((v) => (
+            <button key={v.key} onClick={() => setView(v.key)}
+              className={'px-3 py-1.5 rounded-button text-sm font-medium transition ' +
+                (view === v.key ? 'bg-primary text-white'
+                                : 'bg-black/5 text-ink-soft hover:bg-black/10')}>
+              {v.label}
+            </button>
+          ))}
+        </div>
       </div>
+
+      {view === 'region' ? (
+        <ServiceRegionReport dateFrom={dateFrom} dateTo={dateTo} />
+      ) : (
+      <>
 
       {/* Umumiy ko'rsatkichlar */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
@@ -250,6 +275,8 @@ export default function ServiceCategoryReport() {
           </div>
         )}
       </Card>
+      </>
+      )}
     </div>
   );
 }
