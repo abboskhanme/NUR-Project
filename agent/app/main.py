@@ -26,6 +26,8 @@ from app.instagram.webhook import router as webhook_router
 from app.processing.pipeline import process_event
 from app.remote_config import fetch_and_apply
 from app.state.store import store
+from app.telegram_business.client import telegram
+from app.telegram_business.webhook import router as tg_webhook_router
 from app.telegram.notifier import send_daily_report
 
 # Logging
@@ -44,6 +46,9 @@ async def lifespan(app: FastAPI):
     # ko'tarilmagan bo'lsa keyingi sinxronlashda (5 daqiqada) qayta urinadi.
     await fetch_and_apply()
     logger.info("NUR Agent ishga tushdi (provider={})", settings.AI_PROVIDER)
+
+    # Telegram sotuv boti (shaxsiy chatlar) — webhookni o'zi o'rnatadi
+    await setup_telegram_webhook()
 
     _scheduler = AsyncIOScheduler(timezone=settings.TIMEZONE)
     try:
@@ -66,6 +71,12 @@ async def lifespan(app: FastAPI):
             IntervalTrigger(hours=24),
             id="ig_token_refresh",
         )
+        # Telegram tokeni/manzili ERP sozlamalarida o'zgarsa — webhook yangilanadi
+        _scheduler.add_job(
+            setup_telegram_webhook,
+            IntervalTrigger(minutes=30),
+            id="tg_webhook_sync",
+        )
         _scheduler.start()
         logger.info("Kunlik hisobot rejalashtirildi: {}", settings.DAILY_REPORT_TIME)
     except Exception as exc:  # noqa: BLE001
@@ -79,6 +90,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="NUR Agent", version="1.0.0", lifespan=lifespan)
 app.include_router(webhook_router)
+app.include_router(tg_webhook_router)
 app.include_router(oauth_router)
 
 
@@ -89,6 +101,7 @@ async def health():
         "status": "ok",
         "provider": settings.AI_PROVIDER,
         "instagram_connected": bool(settings.IG_ACCESS_TOKEN and settings.IG_USER_ID),
+        "telegram_connected": telegram.enabled,
         "knowledge_chars": len(knowledge.get_knowledge()),
     }
 
@@ -183,8 +196,15 @@ async def send_dm_endpoint(
 
 
 class BotPauseIn(BaseModel):
-    ig_user_id: str
+    # `user_key` — kanal kaliti ("tg:123" yoki Instagram ID). Eski `ig_user_id`
+    # ham qabul qilinadi (ERP'ning oldingi versiyasi bilan moslik).
+    user_key: Optional[str] = None
+    ig_user_id: Optional[str] = None
     enabled: bool = True     # True — AI javob bersin, False — jim tursin
+
+    @property
+    def key(self) -> str:
+        return (self.user_key or self.ig_user_id or "").strip()
 
 
 @app.post("/admin/bot-pause")
@@ -193,17 +213,78 @@ async def bot_pause_endpoint(
 ):
     """Bitta suhbatda AI javobini yoqish/o'chirish (ERP tugmasi)."""
     _check_key(x_agent_key)
+    key = payload.key
+    if not key:
+        raise HTTPException(status_code=400, detail="Suhbat kaliti yo'q")
     if payload.enabled:
-        await store.unpause(payload.ig_user_id)
+        await store.unpause(key)
     else:
-        await store.pause(payload.ig_user_id, settings.BOT_PAUSE_HOURS)
-    return {"enabled": payload.enabled, "paused": await store.is_paused(payload.ig_user_id)}
+        await store.pause(key, settings.BOT_PAUSE_HOURS)
+    return {"enabled": payload.enabled, "paused": await store.is_paused(key)}
 
 
 @app.get("/admin/bot-state")
 async def bot_state_endpoint(
-    ig_user_id: str, x_agent_key: Optional[str] = Header(default=None)
+    x_agent_key: Optional[str] = Header(default=None),
+    user_key: Optional[str] = None,
+    ig_user_id: Optional[str] = None,
 ):
     """AI shu suhbatda javob beryaptimi (pauzada emasmi)."""
     _check_key(x_agent_key)
-    return {"paused": await store.is_paused(ig_user_id)}
+    key = (user_key or ig_user_id or "").strip()
+    if not key:
+        raise HTTPException(status_code=400, detail="Suhbat kaliti yo'q")
+    return {"paused": await store.is_paused(key)}
+
+
+# --- Telegram sotuv boti (shaxsiy chatlar) ------------------------------- #
+_tg_webhook_state: dict[str, str] = {}
+
+
+async def setup_telegram_webhook() -> None:
+    """Webhookni Telegram'ga o'rnatadi (token yoki manzil o'zgarsa — qayta)."""
+    if not telegram.enabled or not settings.AGENT_PUBLIC_URL:
+        return
+    url = f"{settings.AGENT_PUBLIC_URL.rstrip('/')}/webhook/telegram"
+    fingerprint = f"{settings.TG_SALES_BOT_TOKEN[:12]}|{url}|{settings.TG_WEBHOOK_SECRET[:8]}"
+    if _tg_webhook_state.get("fp") == fingerprint:
+        return
+    if await telegram.set_webhook(url, settings.TG_WEBHOOK_SECRET):
+        _tg_webhook_state["fp"] = fingerprint
+
+
+class SendTelegramIn(BaseModel):
+    tg_user_id: str
+    text: str
+
+
+@app.post("/admin/send-telegram")
+async def send_telegram_endpoint(
+    payload: SendTelegramIn, x_agent_key: Optional[str] = Header(default=None)
+):
+    """ERP "Yozishmalar" bo'limidan Telegram chatiga operator javobi.
+
+    Instagramdagi kabi: yuborilgach AI o'sha suhbatda jim turadi va xabar
+    echo bo'lib qaytganda jurnalga ikkinchi marta yozilmaydi.
+    """
+    _check_key(x_agent_key)
+    text = (payload.text or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Xabar matni bo'sh")
+    if not telegram.enabled:
+        raise HTTPException(status_code=503, detail="Telegram boti sozlanmagan")
+
+    from app.telegram_business.webhook import connection_for_chat
+
+    conn_id = await connection_for_chat(payload.tg_user_id)
+    result = await telegram.send_message(
+        payload.tg_user_id, text, business_connection_id=conn_id
+    )
+    if result.get("sent"):
+        key = f"tg:{payload.tg_user_id}"
+        try:
+            await store.mark_sent(key, text)
+            await store.pause(key, settings.BOT_PAUSE_HOURS)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Pauza/izni belgilashda xato: {}", exc)
+    return result

@@ -8,6 +8,8 @@ export interface Lead {
   source: string;
   ig_user_id?: string | null;
   ig_username?: string | null;
+  tg_user_id?: string | null;
+  tg_username?: string | null;
   media_id?: string | null;
   comment_id?: string | null;
   name?: string | null;
@@ -91,8 +93,14 @@ export const INTENT_LABELS: Record<string, string> = {
 /** Instagram javob oynasi: erkin / faqat operator (7 kun) / yopiq */
 export type InboxWindow = 'open' | 'human_agent' | 'closed';
 
+/** Suhbat kanali */
+export type LeadChannel = 'instagram' | 'telegram';
+
 export interface InboxItem {
   lead_id: string;
+  channel: LeadChannel;
+  user_id?: string | null;
+  username?: string | null;
   ig_user_id?: string | null;
   ig_username?: string | null;
   name?: string | null;
@@ -148,7 +156,7 @@ export const leadsApi = {
     api.post<Lead>(`/leads/${id}/convert`, body).then((r) => r.data),
 
   // --- Yozishmalar ---
-  inbox: (params: { search?: string; only_unread?: boolean } = {}) =>
+  inbox: (params: { search?: string; only_unread?: boolean; channel?: string } = {}) =>
     api.get<InboxItem[]>('/leads/inbox', { params }).then((r) => r.data),
   markRead: (id: string) => api.post(`/leads/${id}/read`),
   reply: (id: string, text: string) =>

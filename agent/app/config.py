@@ -49,6 +49,16 @@ class Settings(BaseSettings):
     ERP_INGEST_URL: str = "http://backend:8000/api/v1/leads/ingest"
     AGENT_INGEST_KEY: str = ""
 
+    # Telegram — SHAXSIY CHATLARDA AI javob beruvchi bot (Business ulanishi
+    # yoki botning o'z chati). Bildirishnoma botidan ALOHIDA token bo'lishi
+    # kerak: bitta token ikki joyda ishlatilsa webhook/polling to'qnashadi.
+    TG_SALES_BOT_TOKEN: str = ""
+    TG_SALES_ENABLED: bool = True
+    # Webhook'ni Telegram chaqirganda yuboradigan maxfiy sarlavha
+    TG_WEBHOOK_SECRET: str = ""
+    # Local Bot API server ishlatilsa shu manzil o'zgartiriladi (2 GB fayllar)
+    TG_API_BASE: str = "https://api.telegram.org"
+
     # Telegram
     TELEGRAM_BOT_TOKEN: str = ""
     TELEGRAM_CHAT_ID: str = ""

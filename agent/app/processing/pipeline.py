@@ -11,6 +11,7 @@ from app.agent.core import SalesAgent
 from app.config import settings
 from app.instagram.client import instagram
 from app.instagram.models import IncomingEvent
+from app.telegram_business.client import telegram
 from app.leads import client as leads_client
 from app.models import AgentOutput, LeadPayload
 from app.state.store import store
@@ -54,7 +55,7 @@ async def process_event(event: IncomingEvent) -> None:
     # 1b. Operator aralashgan suhbatga bot aralashmaydi
     if event.kind == "dm":
         try:
-            if await store.is_paused(event.sender_id):
+            if await store.is_paused(event.store_key):
                 logger.info("Bot pauzada (operator javob bermoqda): {}", event.sender_id)
                 return
         except Exception as exc:  # noqa: BLE001
@@ -68,7 +69,7 @@ async def process_event(event: IncomingEvent) -> None:
     history: list[dict] = []
     known: dict = {}
     if event.sender_id:
-        ctx = await leads_client.fetch_context(event.sender_id)
+        ctx = await leads_client.fetch_context(event.sender_id, channel=event.channel)
         if ctx:
             history = ctx.get("messages") or []
             known = {
@@ -79,7 +80,7 @@ async def process_event(event: IncomingEvent) -> None:
             }
         elif event.kind == "dm":
             try:
-                history = await store.get_history(event.sender_id)
+                history = await store.get_history(event.store_key)
             except Exception as exc:  # noqa: BLE001
                 logger.warning("Tarixni olishда xato: {}", exc)
 
@@ -118,8 +119,8 @@ async def process_event(event: IncomingEvent) -> None:
     await _log(event, out.reply, role="assistant")
     if event.kind == "dm":
         try:
-            await store.append_turn(event.sender_id, "user", event.text)
-            await store.append_turn(event.sender_id, "assistant", out.reply)
+            await store.append_turn(event.store_key, "user", event.text)
+            await store.append_turn(event.store_key, "assistant", out.reply)
         except Exception as exc:  # noqa: BLE001
             logger.warning("Tarixni saqlashда xato: {}", exc)
 
@@ -148,8 +149,9 @@ async def _log(event: IncomingEvent, text: str, *, role: str) -> None:
         return
     try:
         await leads_client.log_message(
-            ig_user_id=event.sender_id,
-            ig_username=event.username,
+            user_id=event.sender_id,
+            username=event.username,
+            channel=event.channel,
             text=text,
             role=role,
             kind="comment" if event.kind == "comment" else "dm",
@@ -171,11 +173,11 @@ async def _handle_echo(event: IncomingEvent) -> None:
     if not event.sender_id:
         return
     try:
-        if await store.was_sent_by_bot(event.sender_id, event.text):
+        if await store.was_sent_by_bot(event.store_key, event.text):
             return  # bu botning o'z javobi, qaytib kelgan
         # Operator qo'lda yozgan javob ham suhbat tarixiga tushsin
         await _log(event, event.text, role="operator")
-        await store.pause(event.sender_id, settings.BOT_PAUSE_HOURS)
+        await store.pause(event.store_key, settings.BOT_PAUSE_HOURS)
         logger.info(
             "Operator qo'lda javob berdi — bot {} soat pauzada: {}",
             settings.BOT_PAUSE_HOURS, event.sender_id,
@@ -185,6 +187,9 @@ async def _handle_echo(event: IncomingEvent) -> None:
 
 
 async def _deliver(event: IncomingEvent, out: AgentOutput, *, is_first: bool = False) -> None:
+    if event.channel == "telegram":
+        await _deliver_telegram(event, out, is_first=is_first)
+        return
     if event.kind == "comment" and event.comment_id:
         # Ochiq kommentга ≤1 daqiqa javob
         await instagram.reply_to_comment(event.comment_id, out.reply)
@@ -202,7 +207,29 @@ async def _deliver(event: IncomingEvent, out: AgentOutput, *, is_first: bool = F
         if is_first:
             text = _with_disclosure(text)
         await instagram.send_dm(event.sender_id, text)
-        await store.mark_sent(event.sender_id, text)
+        await store.mark_sent(event.store_key, text)
+
+
+async def _deliver_telegram(
+    event: IncomingEvent, out: AgentOutput, *, is_first: bool = False
+) -> None:
+    """Telegram shaxsiy chatiga javob (Business ulanishi bo'lsa — siz nomingizdan).
+
+    Instagramdan farqi: javob oynasi cheklovi yo'q, izoh tushunchasi ham yo'q.
+    """
+    from app.telegram_business.webhook import connection_for_chat
+
+    text = out.reply
+    if is_first:
+        text = _with_disclosure(text)
+
+    chat_id = event.chat_id or event.sender_id
+    conn_id = event.business_connection_id or await connection_for_chat(str(chat_id))
+    result = await telegram.send_message(chat_id, text, business_connection_id=conn_id)
+    if result.get("sent"):
+        await store.mark_sent(event.store_key, text)
+    else:
+        logger.warning("Telegram javobi yuborilmadi: {}", result.get("error"))
 
 
 async def _within_comment_limits(event: IncomingEvent) -> bool:
@@ -240,9 +267,12 @@ def _with_disclosure(text: str) -> str:
 
 def _to_payload(event: IncomingEvent, out: AgentOutput) -> LeadPayload:
     return LeadPayload(
-        source="instagram",
-        ig_user_id=event.sender_id or None,
-        ig_username=event.username,
+        source=event.channel,
+        channel=event.channel,
+        user_id=event.sender_id or None,
+        username=event.username,
+        ig_user_id=event.sender_id if event.channel == "instagram" else None,
+        ig_username=event.username if event.channel == "instagram" else None,
         media_id=event.media_id,
         comment_id=event.comment_id,
         name=out.lead.name,

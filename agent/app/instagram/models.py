@@ -39,7 +39,13 @@ def _attachment_text(attachments: list[dict]) -> str:
 class IncomingEvent:
     kind: str  # "comment" | "dm" | "echo"
     text: str
-    sender_id: str  # Instagram user id (izoh/DM egasi; echo'da — mijoz)
+    sender_id: str  # kanaldagi foydalanuvchi id (izoh/DM egasi; echo'da — mijoz)
+    # Kanal: "instagram" | "telegram". Pipeline bitta — faqat yuborish va
+    # jurnalga yozish kanalga qarab farq qiladi.
+    channel: str = "instagram"
+    # Telegram: qaysi chatga yozamiz va Business ulanishi identifikatori
+    chat_id: str | None = None
+    business_connection_id: str | None = None
     username: str | None = None
     comment_id: str | None = None
     media_id: str | None = None
@@ -50,7 +56,16 @@ class IncomingEvent:
     has_attachment: bool = False
 
     @property
+    def store_key(self) -> str:
+        """Redis holatidagi kalit — kanallar ID'lari to'qnashmasligi uchun."""
+        if self.channel == "telegram":
+            return f"tg:{self.sender_id}"
+        return self.sender_id
+
+    @property
     def dedup_key(self) -> str:
+        if self.channel == "telegram" and self.message_id:
+            return f"tg:{self.sender_id}:{self.message_id}"
         if self.comment_id:
             return f"comment:{self.comment_id}"
         if self.message_id:

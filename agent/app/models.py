@@ -65,7 +65,10 @@ class LeadPayload(BaseModel):
     """ERP ingest JSON — `backend/app/schemas/lead.py::LeadIngest` bilan bir xil."""
 
     source: str = "instagram"
-    ig_user_id: Optional[str] = None
+    channel: str = "instagram"          # instagram | telegram
+    user_id: Optional[str] = None       # kanaldagi foydalanuvchi id
+    username: Optional[str] = None
+    ig_user_id: Optional[str] = None    # orqaga moslik uchun qoldirilgan
     ig_username: Optional[str] = None
     media_id: Optional[str] = None
     comment_id: Optional[str] = None

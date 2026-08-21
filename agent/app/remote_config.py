@@ -18,6 +18,9 @@ from app.config import settings
 
 # ERP satr sifatida qaytaradi — bularni int ga o'giramiz
 _INT_KEYS = {"AI_MAX_TOKENS", "DEDUP_TTL", "BOT_PAUSE_HOURS"}
+# ERP "ha"/"yo'q" ko'rinishida yuboradi — bool ga o'giramiz
+_BOOL_KEYS = {"TG_SALES_ENABLED"}
+_TRUE = {"ha", "true", "1", "yes", "on"}
 
 
 def _config_url() -> str:
@@ -32,7 +35,9 @@ def _apply(data: dict) -> None:
         if not hasattr(settings, key) or raw is None or raw == "":
             continue  # bo'sh qiymat .env fallbackни bekor qilmasin
         value: object = raw
-        if key in _INT_KEYS:
+        if key in _BOOL_KEYS:
+            value = str(raw).strip().lower() in _TRUE
+        elif key in _INT_KEYS:
             try:
                 value = int(raw)
             except (TypeError, ValueError):

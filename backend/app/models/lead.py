@@ -34,6 +34,9 @@ class Lead(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     # Instagram identifikatorlari (manba bilan bog'lash uchun)
     ig_user_id: Mapped[Optional[str]] = mapped_column(String(64), index=True)
     ig_username: Mapped[Optional[str]] = mapped_column(String(120), index=True)
+    # Telegram identifikatorlari — AI yordamchisi Telegram chatlarida ham ishlaydi
+    tg_user_id: Mapped[Optional[str]] = mapped_column(String(64), index=True)
+    tg_username: Mapped[Optional[str]] = mapped_column(String(120))
     media_id: Mapped[Optional[str]] = mapped_column(String(64))   # qaysi post/reels
     comment_id: Mapped[Optional[str]] = mapped_column(String(64))
 

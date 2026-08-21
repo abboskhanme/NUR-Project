@@ -20,6 +20,8 @@ from app.config import settings
 _HISTORY_MAX = 40  # DM suhbatда saqlanadigan oxirgi xabarlar soni
 _HISTORY_TTL = 60 * 60 * 24 * 30  # 30 kun
 _SENT_TTL = 60 * 10  # bot yuborgan xabar izi (echo shu oraliqda qaytadi)
+# Umumiy kalit-qiymat (masalan Telegram Business ulanishi) — uzoq saqlanadi
+_VALUE_TTL = 60 * 60 * 24 * 180
 
 
 def sent_key(user_id: str, text: str) -> str:
@@ -35,6 +37,7 @@ class _MemoryStore:
         self._history: dict[str, list[dict]] = {}
         self._paused: dict[str, float] = {}
         self._rate: dict[str, tuple[float, int]] = {}
+        self._values: dict[str, tuple[float, str]] = {}
 
     async def seen_once(self, key: str, ttl: int) -> bool:
         now = time.time()
@@ -77,6 +80,19 @@ class _MemoryStore:
 
     async def unpause(self, user_id: str) -> None:
         self._paused.pop(user_id, None)
+
+    async def set_value(self, key: str, value: str, ttl: int = _VALUE_TTL) -> None:
+        self._values[key] = (time.time() + ttl, value)
+
+    async def get_value(self, key: str) -> str | None:
+        item = self._values.get(key)
+        if not item:
+            return None
+        exp, value = item
+        if exp <= time.time():
+            self._values.pop(key, None)
+            return None
+        return value
 
     async def is_paused(self, user_id: str) -> bool:
         exp = self._paused.get(user_id)
@@ -128,6 +144,12 @@ class _RedisStore:
 
     async def unpause(self, user_id: str) -> None:
         await self._r.delete(f"pause:{user_id}")
+
+    async def set_value(self, key: str, value: str, ttl: int = _VALUE_TTL) -> None:
+        await self._r.set(f"kv:{key}", value, ex=ttl)
+
+    async def get_value(self, key: str) -> str | None:
+        return await self._r.get(f"kv:{key}")
 
     async def is_paused(self, user_id: str) -> bool:
         return bool(await self._r.get(f"pause:{user_id}"))

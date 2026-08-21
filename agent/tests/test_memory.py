@@ -82,7 +82,7 @@ def test_dm_logged_to_erp_and_facts_passed(monkeypatch):
         logged.append(kwargs)
         return True
 
-    async def fake_context(ig_user_id, limit=40):
+    async def fake_context(user_id, limit=40, *, channel="instagram"):
         return {
             "messages": [{"role": "user", "content": "Salom", "at": None}],
             "contact": "+998901112233",
@@ -112,6 +112,7 @@ def test_dm_logged_to_erp_and_facts_passed(monkeypatch):
     roles = [item["role"] for item in logged]
     assert roles == ["user", "assistant"], logged
     assert logged[0]["ig_message_id"] == "mid_m1"
+    assert logged[0]["channel"] == "instagram" and logged[0]["user_id"] == "cust_m1"
     assert logged[0]["create_lead"] is True
 
     # AI biz bilgan raqamni ko'rdi — qayta so'ramaydi
@@ -130,7 +131,7 @@ def test_comment_does_not_create_new_lead(monkeypatch):
         logged.append(kwargs)
         return True
 
-    async def fake_context(ig_user_id, limit=40):
+    async def fake_context(user_id, limit=40, *, channel="instagram"):
         return None
 
     async def fake_handle(text, **kwargs):

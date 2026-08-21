@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import {
   Search, Send, Instagram, Phone, Bot, BotOff, Lock, Clock, ExternalLink, Loader2,
+  MessageCircle,
 } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
@@ -10,7 +11,7 @@ import { formatDateTime, formatPhone } from '@/lib/format';
 import { usePermissions } from '@/lib/permissions';
 import {
   leadsApi, LEAD_STATUS_LABELS, WINDOW_LABELS,
-  type InboxItem, type InboxWindow, type LeadEvent,
+  type InboxItem, type InboxWindow, type LeadChannel, type LeadEvent,
 } from '@/features/leads/api';
 import { ScoreBadge } from '@/features/leads/LeadBadges';
 
@@ -41,6 +42,26 @@ function toMessages(events: LeadEvent[]) {
   return out;
 }
 
+/** Kanal ikonkasi — Instagram (kamera) yoki Telegram (xabar) */
+function ChannelIcon({ channel, size = 13 }: { channel: LeadChannel; size?: number }) {
+  return channel === 'telegram'
+    ? <MessageCircle size={size} className="text-sky-500" />
+    : <Instagram size={size} className="text-pink-500" />;
+}
+
+function profileUrl(item: InboxItem): string | null {
+  if (!item.username) return null;
+  return item.channel === 'telegram'
+    ? `https://t.me/${item.username}`
+    : `https://instagram.com/${item.username}`;
+}
+
+const CHANNEL_FILTERS: { key: '' | LeadChannel; label: string }[] = [
+  { key: '', label: 'Hammasi' },
+  { key: 'instagram', label: 'Instagram' },
+  { key: 'telegram', label: 'Telegram' },
+];
+
 const WINDOW_STYLE: Record<InboxWindow, string> = {
   open: 'bg-success/10 text-success',
   human_agent: 'bg-warning/10 text-warning',
@@ -59,6 +80,7 @@ export default function LeadsInbox() {
   const [search, setSearch] = useState('');
   const [debounced, setDebounced] = useState('');
   const [onlyUnread, setOnlyUnread] = useState(false);
+  const [channel, setChannel] = useState<'' | LeadChannel>('');
   const [activeId, setActiveId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -67,10 +89,11 @@ export default function LeadsInbox() {
   }, [search]);
 
   const inboxQ = useQuery({
-    queryKey: ['leads-inbox', debounced, onlyUnread],
+    queryKey: ['leads-inbox', debounced, onlyUnread, channel],
     queryFn: () => leadsApi.inbox({
       search: debounced || undefined,
       only_unread: onlyUnread || undefined,
+      channel: channel || undefined,
     }),
     refetchInterval: POLL_MS,
   });
@@ -96,6 +119,16 @@ export default function LeadsInbox() {
             <input className="input pl-9 h-9" placeholder="Ism, username, telefon…"
                    value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
+          <div className="flex gap-1">
+            {CHANNEL_FILTERS.map((f) => (
+              <button key={f.key || 'all'} type="button" onClick={() => setChannel(f.key)}
+                className={cn('px-2 py-1 rounded-button text-xs font-medium transition',
+                  channel === f.key ? 'bg-primary text-white'
+                                    : 'bg-black/5 text-ink-soft hover:bg-black/10')}>
+                {f.label}
+              </button>
+            ))}
+          </div>
           <label className="flex items-center gap-2 text-xs text-ink-soft cursor-pointer select-none">
             <input type="checkbox" className="h-3.5 w-3.5 accent-primary"
                    checked={onlyUnread} onChange={(e) => setOnlyUnread(e.target.checked)} />
@@ -110,7 +143,7 @@ export default function LeadsInbox() {
             ))
           ) : items.length === 0 ? (
             <div className="p-6 text-center text-sm text-ink-soft">
-              {debounced || onlyUnread ? 'Suhbat topilmadi' : "Hozircha yozishma yo'q"}
+              {debounced || onlyUnread || channel ? 'Suhbat topilmadi' : "Hozircha yozishma yo'q"}
             </div>
           ) : (
             items.map((it) => (
@@ -147,15 +180,15 @@ export default function LeadsInbox() {
 function ConversationRow({ item, active, onClick }: {
   item: InboxItem; active: boolean; onClick: () => void;
 }) {
-  const title = item.name || item.ig_username || "Noma'lum";
+  const title = item.name || item.username || item.ig_username || "Noma'lum";
   const preview = item.last_message || '';
   const prefix = item.last_message_role === 'user' ? '' : 'Siz: ';
   return (
     <button type="button" onClick={onClick}
       className={cn('w-full text-left px-3 py-2.5 transition flex gap-2.5',
                     active ? 'bg-primary/10' : 'hover:bg-black/[0.03]')}>
-      <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0">
-        <Instagram size={14} />
+      <div className="w-8 h-8 rounded-full bg-black/[0.05] flex items-center justify-center shrink-0">
+        <ChannelIcon channel={item.channel} size={15} />
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-2">
@@ -253,15 +286,19 @@ function ChatPanel({ item, canWrite, onChanged }: {
       <div className="px-4 py-2.5 border-b border-black/5 flex items-center justify-between gap-3 flex-wrap">
         <div className="min-w-0">
           <div className="font-semibold text-sm flex items-center gap-2">
-            <span className="truncate">{item.name || item.ig_username || "Noma'lum"}</span>
+            <span className="truncate">{item.name || item.username || "Noma'lum"}</span>
             <ScoreBadge score={item.lead_score} />
             <span className="badge bg-black/[0.05] text-ink-soft">{LEAD_STATUS_LABELS[item.status]}</span>
           </div>
           <div className="text-xs text-ink-soft flex items-center gap-2.5 mt-0.5">
-            {item.ig_username && (
-              <a href={`https://instagram.com/${item.ig_username}`} target="_blank" rel="noreferrer"
+            <span className="inline-flex items-center gap-1">
+              <ChannelIcon channel={item.channel} size={12} />
+              {item.channel === 'telegram' ? 'Telegram' : 'Instagram'}
+            </span>
+            {item.username && profileUrl(item) && (
+              <a href={profileUrl(item)!} target="_blank" rel="noreferrer"
                  className="inline-flex items-center gap-1 hover:text-primary">
-                @{item.ig_username} <ExternalLink size={11} />
+                @{item.username} <ExternalLink size={11} />
               </a>
             )}
             {item.contact && (

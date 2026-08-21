@@ -15,6 +15,11 @@ class LeadIngest(BaseModel):
     """Tashqi agent yuboradigan lead. Barcha maydonlar ixtiyoriy (AI to'ldiradi)."""
 
     source: str = "instagram"
+    # Kanal: instagram | telegram. `user_id`/`username` — kanaldan qat'i nazar
+    # umumiy maydonlar; eski `ig_*` nomlari orqaga moslik uchun qoldirilgan.
+    channel: str = "instagram"
+    user_id: Optional[str] = None
+    username: Optional[str] = None
     ig_user_id: Optional[str] = None
     ig_username: Optional[str] = None
     media_id: Optional[str] = None
@@ -49,7 +54,11 @@ class LeadMessageIn(BaseModel):
     """
 
     source: str = "instagram"
-    ig_user_id: str
+    channel: str = "instagram"          # instagram | telegram
+    # Umumiy identifikator (afzal) yoki eski `ig_user_id`
+    user_id: Optional[str] = None
+    username: Optional[str] = None
+    ig_user_id: Optional[str] = None
     ig_username: Optional[str] = None
     # user — mijoz, assistant — AI agent, operator — xodim qo'lda yozgan
     role: str = "user"
@@ -81,6 +90,8 @@ class LeadContextOut(BaseModel):
     """Agent uchun suhbat xotirasi — oxirgi xabarlar + ma'lum faktlar."""
 
     lead_id: Optional[uuid.UUID] = None
+    channel: str = "instagram"
+    username: Optional[str] = None
     ig_username: Optional[str] = None
     name: Optional[str] = None
     contact: Optional[str] = None
@@ -133,6 +144,8 @@ class LeadOut(ORMBase):
     source: str
     ig_user_id: Optional[str] = None
     ig_username: Optional[str] = None
+    tg_user_id: Optional[str] = None
+    tg_username: Optional[str] = None
     media_id: Optional[str] = None
     comment_id: Optional[str] = None
     name: Optional[str] = None
@@ -164,6 +177,9 @@ class LeadInboxItem(BaseModel):
     """Suhbatlar ro'yxatidagi bitta qator."""
 
     lead_id: uuid.UUID
+    channel: str = "instagram"          # instagram | telegram
+    user_id: Optional[str] = None       # kanaldagi identifikator
+    username: Optional[str] = None      # @username (kanaldan qat'i nazar)
     ig_user_id: Optional[str] = None
     ig_username: Optional[str] = None
     name: Optional[str] = None

@@ -67,10 +67,11 @@ async def push(payload: LeadPayload) -> bool:
 
 async def log_message(
     *,
-    ig_user_id: str,
+    user_id: str,
     text: str,
     role: str = "user",
-    ig_username: str | None = None,
+    username: str | None = None,
+    channel: str = "instagram",
     kind: str = "dm",
     ig_message_id: str | None = None,
     comment_id: str | None = None,
@@ -84,12 +85,16 @@ async def log_message(
     Bu "eng yaxshi harakat" (best effort) chaqiruv: xato bo'lsa ham javob
     berish to'xtamaydi, faqat log yoziladi.
     """
-    if not text or not ig_user_id:
+    if not text or not user_id:
         return False
     payload = {
-        "source": source,
-        "ig_user_id": ig_user_id,
-        "ig_username": ig_username,
+        "source": source if source != "instagram" else channel,
+        "channel": channel,
+        "user_id": user_id,
+        "username": username,
+        # Eski maydonlar — ERP'ning oldingi versiyasi bilan moslik uchun
+        "ig_user_id": user_id if channel == "instagram" else None,
+        "ig_username": username if channel == "instagram" else None,
         "role": role,
         "text": text,
         "kind": kind,
@@ -110,15 +115,17 @@ async def log_message(
     return False
 
 
-async def fetch_context(ig_user_id: str, limit: int = 40) -> dict | None:
+async def fetch_context(
+    user_id: str, limit: int = 40, *, channel: str = "instagram"
+) -> dict | None:
     """Suhbat tarixi + ma'lum faktlar (raqam, qiziqish). Xato bo'lsa None."""
-    if not ig_user_id:
+    if not user_id:
         return None
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.get(
                 _url("/context"),
-                params={"ig_user_id": ig_user_id, "limit": limit},
+                params={"user_id": user_id, "channel": channel, "limit": limit},
                 headers=_headers(),
             )
         if resp.status_code == 200:
