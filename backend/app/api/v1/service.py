@@ -364,7 +364,8 @@ async def region_report(
         .select_from(ServiceTicket)
         .join(Customer, Customer.id == ServiceTicket.customer_id)
         .group_by(reg, cat)
-        .order_by(func.count().desc())
+        # Teng bo'lsa alifbo bo'yicha — har so'rovda bir xil natija chiqsin
+        .order_by(func.count().desc(), cat)
     )
     if conds:
         tq = tq.where(*conds)
