@@ -13,6 +13,15 @@ docker compose -f docker-compose.prod.yml --env-file .env.prod --profile agent \
 
 Migratsiyalar startda avtomatik qo'llanadi (`20260821_01`, `20260821_02`).
 
+> **Muhim:** hech qanday token `.env` ga yozilmaydi — hammasi **Tizim
+> sozlamalari** menyusidan (super-admin) kiritiladi va bazada **shifrlangan**
+> holda saqlanadi. `.env` da faqat infratuzilma qoladi: `DATABASE_URL`,
+> `SECRET_KEY`, `AGENT_INGEST_KEY`.
+>
+> Qiymatni saqlagach: **WhatsApp ko'prigi** ~1 daqiqada, **Telegram AI
+> yordamchisi** ~5 daqiqada o'zi qo'llaydi (webhook ham o'zi o'rnatiladi).
+> Konteynerni qayta ishga tushirish shart emas.
+
 ---
 
 # A. Telegram shaxsiy chatlarida AI javob

@@ -60,7 +60,7 @@ async def lifespan(app: FastAPI):
         )
         # Har 5 daqiqada ERP'dan config'ni yangilab olamiz (avtomatik yangilanish)
         _scheduler.add_job(
-            fetch_and_apply,
+            sync_config,
             IntervalTrigger(minutes=5),
             id="remote_config",
         )
@@ -70,12 +70,6 @@ async def lifespan(app: FastAPI):
             refresh_token_if_due,
             IntervalTrigger(hours=24),
             id="ig_token_refresh",
-        )
-        # Telegram tokeni/manzili ERP sozlamalarida o'zgarsa — webhook yangilanadi
-        _scheduler.add_job(
-            setup_telegram_webhook,
-            IntervalTrigger(minutes=30),
-            id="tg_webhook_sync",
         )
         _scheduler.start()
         logger.info("Kunlik hisobot rejalashtirildi: {}", settings.DAILY_REPORT_TIME)
@@ -239,6 +233,17 @@ async def bot_state_endpoint(
 
 # --- Telegram sotuv boti (shaxsiy chatlar) ------------------------------- #
 _tg_webhook_state: dict[str, str] = {}
+
+
+async def sync_config() -> None:
+    """ERP sozlamalarini tortib olish + Telegram webhookni moslash.
+
+    Ikkalasi birga bo'lishi muhim: super-admin UI'da bot tokenini kiritsa,
+    keyingi sinxronlashda (≤5 daqiqa) webhook ham o'zi o'rnatiladi — serverga
+    kirish yoki restart shart emas.
+    """
+    await fetch_and_apply()
+    await setup_telegram_webhook()
 
 
 async def setup_telegram_webhook() -> None:
