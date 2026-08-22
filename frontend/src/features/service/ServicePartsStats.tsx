@@ -42,12 +42,12 @@ export default function ServicePartsStats() {
   return (
     <Card title="Sarflangan ehtiyot qismlar">
       {/* Oy / yil filtri */}
-      <div className="flex items-center gap-2 flex-wrap mb-4">
-        <select className="input w-40" value={month} onChange={(e) => setMonth(Number(e.target.value))}>
+      <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 sm:flex-wrap mb-4">
+        <select className="input w-full sm:w-40" value={month} onChange={(e) => setMonth(Number(e.target.value))}>
           <option value={0}>Butun yil</option>
           {MONTH_NUMS.map((m) => <option key={m} value={m}>{SALES_MONTHS[String(m)]}</option>)}
         </select>
-        <select className="input w-28" value={year} onChange={(e) => setYear(Number(e.target.value))}>
+        <select className="input w-full sm:w-28" value={year} onChange={(e) => setYear(Number(e.target.value))}>
           {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
         </select>
       </div>
@@ -63,7 +63,7 @@ export default function ServicePartsStats() {
           <div className="text-xs text-ink-soft">{`Jami: ${total} dona`}</div>
           {stats.map((s) => (
             <div key={s.name} className="flex items-center gap-3">
-              <div className="w-32 shrink-0 text-sm font-medium truncate" title={s.name}>{s.name}</div>
+              <div className="w-20 sm:w-32 shrink-0 text-sm font-medium truncate" title={s.name}>{s.name}</div>
               <div className="flex-1 h-5 rounded-full bg-black/5 overflow-hidden">
                 <div className="h-full bg-primary/70 rounded-full transition-all"
                      style={{ width: `${Math.max(6, (s.count / max) * 100)}%` }} />

@@ -9,7 +9,6 @@ import Select from '@/components/ui/Select';
 import { CENTRAL_ASIA, regionsOf } from '@/lib/centralAsia';
 import { formatPhone } from '@/lib/format';
 import { computeWarranty, WARRANTY_META } from '@/features/service/warranty';
-import LocationInput from '@/features/service/LocationInput';
 
 const TWEMOJI_BASE = 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg';
 const flagIcon = (codes: string) => (
@@ -38,9 +37,6 @@ export default function ExternalTicketModal({
   const [region, setRegion] = useState('');
   const [city, setCity] = useState('');
   const [address, setAddress] = useState('');
-  // Borish lokatsiyasi (ixtiyoriy) — havola/koordinata; keyin kartochkadan ham qo'shsa bo'ladi
-  const [locRaw, setLocRaw] = useState('');
-  const [locNote, setLocNote] = useState('');
   // Mahsulot
   const [modelPick, setModelPick] = useState('');
   const [modelOther, setModelOther] = useState('');
@@ -120,8 +116,6 @@ export default function ExternalTicketModal({
         problem: problem.trim() || category,
         category: category || null,
         in_warranty: inWarranty,
-        location_raw: locRaw.trim() || null,
-        location_note: locNote.trim() || null,
       });
       toast.success('Ariza yaratildi');
       onSaved();
@@ -134,8 +128,8 @@ export default function ExternalTicketModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="bg-card rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col"
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-0 sm:p-4" onClick={onClose}>
+      <div className="bg-card rounded-t-2xl sm:rounded-lg shadow-xl w-full max-w-2xl max-h-[92vh] sm:max-h-[90vh] flex flex-col"
            onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3 border-b border-black/5 shrink-0">
           <div>
@@ -210,9 +204,12 @@ export default function ExternalTicketModal({
               <label className="label">Manzil * <span className="text-ink-soft font-normal">(servis boradigan manzil)</span></label>
               <textarea className="input min-h-[56px]" value={address}
                         onChange={(e) => setAddress(e.target.value)} />
+              <p className="text-xs text-ink-soft mt-1">
+                Xarita lokatsiyasi shu yerda kiritilmaydi — mijozning Telegramga
+                tashlagan pinini ariza kartochkasidan botga forward qilib biriktirasiz.
+              </p>
             </div>
 
-            <LocationInput raw={locRaw} note={locNote} onRaw={setLocRaw} onNote={setLocNote} />
           </div>
 
           {/* --- 2. Mahsulot --- */}

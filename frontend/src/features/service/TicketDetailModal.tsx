@@ -147,8 +147,8 @@ export default function TicketDetailModal({
   const isOpen = tk && !['completed', 'cancelled'].includes(tk.status);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="bg-card rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto flex flex-col"
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-0 sm:p-4" onClick={onClose}>
+      <div className="bg-card rounded-t-2xl sm:rounded-lg shadow-xl w-full max-w-lg max-h-[92vh] sm:max-h-[90vh] overflow-y-auto flex flex-col"
            onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3 border-b border-black/5 sticky top-0 bg-card z-10">
           <div className="flex items-center gap-2">
@@ -225,22 +225,22 @@ export default function TicketDetailModal({
 
             {/* Status actions */}
             {isOpen && (
-              <div className="flex flex-wrap gap-2">
+              <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
                 {tk.status === 'new' && (
                   <button disabled={busy}
                     onClick={() => patch({ status: 'scheduled' }, 'Rejalashtirildi')}
-                    className="btn-action bg-amber-100 text-amber-700 hover:bg-amber-200">
+                    className="btn-action justify-center bg-amber-100 text-amber-700 hover:bg-amber-200">
                     <CalendarClock size={15} /> Rejalashtirish
                   </button>
                 )}
                 <button disabled={busy}
                   onClick={() => patch({ status: 'completed' }, 'Bajarildi deb belgilandi')}
-                  className="btn-action bg-emerald-100 text-emerald-700 hover:bg-emerald-200">
+                  className="btn-action justify-center bg-emerald-100 text-emerald-700 hover:bg-emerald-200">
                   <Check size={15} /> Bajarildi
                 </button>
                 <button disabled={busy}
                   onClick={() => patch({ status: 'cancelled' }, 'Bekor qilindi')}
-                  className="btn-action bg-gray-100 text-gray-600 hover:bg-gray-200">
+                  className="btn-action justify-center bg-gray-100 text-gray-600 hover:bg-gray-200">
                   <Ban size={15} /> Bekor qilish
                 </button>
               </div>

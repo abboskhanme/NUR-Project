@@ -65,7 +65,7 @@ export default function ServiceExpensesList({ dateFrom, dateTo }: { dateFrom?: s
         />
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm min-w-[560px] sm:min-w-0">
             <thead className="text-left text-ink-soft border-b border-black/5">
               <tr>
                 <th className="py-2 pr-3 whitespace-nowrap">Sana</th>
@@ -94,7 +94,7 @@ export default function ServiceExpensesList({ dateFrom, dateTo }: { dateFrom?: s
                       <span className="ml-1.5 badge bg-success/10 text-success">Kafolat</span>
                     )}
                   </td>
-                  <td className="py-2 pr-3 max-w-[260px] truncate">
+                  <td className="py-2 pr-3 max-w-[160px] sm:max-w-[260px] truncate">
                     {e.category || e.problem || '—'}
                   </td>
                   <td className="py-2 pr-3 text-right font-semibold text-danger tabular-nums whitespace-nowrap">

@@ -36,7 +36,7 @@ export default function ServiceTripsList({ dateFrom, dateTo }: { dateFrom?: stri
         <EmptyState title="Yakunlangan safarlar yo'q" description="Safarni yakunlaganingizda shu yerda ko'rinadi" />
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm min-w-[560px] sm:min-w-0">
             <thead className="text-left text-ink-soft border-b border-black/5">
               <tr>
                 <th className="py-2 pr-3">Safar nomi</th>
@@ -89,8 +89,8 @@ function TripTicketsModal({ trip, onClose }: { trip: Trip; onClose: () => void }
   const tickets = q.data ?? [];
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="bg-card rounded-lg shadow-xl w-full max-w-lg max-h-[88vh] overflow-hidden flex flex-col"
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/40 p-0 sm:p-4" onClick={onClose}>
+      <div className="bg-card rounded-t-2xl sm:rounded-lg shadow-xl w-full max-w-lg max-h-[92vh] sm:max-h-[88vh] overflow-hidden flex flex-col"
            onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3 border-b border-black/5">
           <div>

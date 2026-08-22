@@ -45,12 +45,12 @@ export default function ServiceMoneyStats() {
   return (
     <div className="space-y-4">
       {/* Oy / yil filtri */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <select className="input w-40" value={month} onChange={(e) => setMonth(Number(e.target.value))}>
+      <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 sm:flex-wrap">
+        <select className="input w-full sm:w-40" value={month} onChange={(e) => setMonth(Number(e.target.value))}>
           <option value={0}>Butun yil</option>
           {MONTH_NUMS.map((mo) => <option key={mo} value={mo}>{SALES_MONTHS[String(mo)]}</option>)}
         </select>
-        <select className="input w-28" value={year} onChange={(e) => setYear(Number(e.target.value))}>
+        <select className="input w-full sm:w-28" value={year} onChange={(e) => setYear(Number(e.target.value))}>
           {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
         </select>
       </div>

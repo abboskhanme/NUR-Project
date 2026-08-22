@@ -104,28 +104,28 @@ export default function ServicePage() {
           <h1 className="text-2xl font-bold">Servis xizmati</h1>
           <p className="text-sm text-ink-soft">Sotilgan mahsulotlarga kafolat va texnik xizmat</p>
         </div>
-        <div className="flex items-center gap-2">
-          <button className="btn-ghost" onClick={() => setCatOpen(true)}>
+        <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
+          <button className="btn-ghost justify-center" onClick={() => setCatOpen(true)}>
             <Tag size={16} /> Toifalar
           </button>
-          <button className="btn-ghost" onClick={() => setPartsOpen(true)}>
+          <button className="btn-ghost justify-center" onClick={() => setPartsOpen(true)}>
             <Wrench size={16} /> Ehtiyot qismlar
           </button>
-          <button className="btn-ghost" onClick={() => setExtOpen(true)}
+          <button className="btn-ghost justify-center" onClick={() => setExtOpen(true)}
                   title="Bazada buyurtmasi yo'q mijoz uchun (masalan dillerdan olgan)">
             <UserPlus size={16} /> 0 dan ariza
           </button>
-          <button className="btn-primary" onClick={() => setCreateOpen(true)}>
+          <button className="btn-primary justify-center" onClick={() => setCreateOpen(true)}>
             <Plus size={16} /> Yangi ariza
           </button>
         </div>
       </div>
 
       {/* Ichki bo'limlar: Arizalar / Servis safarlari */}
-      <div className="flex gap-1 border-b border-black/5">
+      <div className="flex gap-1 border-b border-black/5 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
         {([['tickets', 'Arizalar'], ['trips', 'Servis safarlari'], ['partsStats', 'Sarflangan qismlar'], ['money', 'Sarflangan mablag'], ['report', 'Hisobot']] as const).map(([key, label]) => (
           <button key={key} onClick={() => setTab(key)}
-            className={'px-4 py-2 text-sm font-medium -mb-px border-b-2 transition-colors ' +
+            className={'px-3 sm:px-4 py-2 text-sm font-medium -mb-px border-b-2 transition-colors whitespace-nowrap shrink-0 ' +
               (tab === key ? 'border-primary text-primary' : 'border-transparent text-ink-soft hover:text-ink')}>
             {label}
           </button>
@@ -143,54 +143,54 @@ export default function ServicePage() {
       ) : (
       <>
       {/* KPI — 3 ta karta */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
         {/* Servis muammolari (ochiq) — qizil */}
-        <div className="rounded-card border border-danger/25 bg-danger/10 p-4 flex items-start justify-between">
+        <div className="rounded-card border border-danger/25 bg-danger/10 p-3 sm:p-4 flex items-start justify-between gap-2">
           <div>
-            <div className="text-sm font-medium text-danger/90">Servis muammolari</div>
-            <div className="text-2xl font-bold mt-2 text-danger">{(s?.new ?? 0) + (s?.scheduled ?? 0)}</div>
+            <div className="text-xs sm:text-sm font-medium text-danger/90 leading-tight">Servis muammolari</div>
+            <div className="text-xl sm:text-2xl font-bold mt-1 sm:mt-2 text-danger">{(s?.new ?? 0) + (s?.scheduled ?? 0)}</div>
           </div>
-          <div className="w-10 h-10 rounded-button bg-danger/20 text-danger flex items-center justify-center shrink-0"><Wrench size={18} /></div>
+          <div className="w-10 h-10 rounded-button bg-danger/20 text-danger hidden sm:flex items-center justify-center shrink-0"><Wrench size={18} /></div>
         </div>
         {/* Bartaraf etilgan — yashil */}
-        <div className="rounded-card border border-success/25 bg-success/10 p-4 flex items-start justify-between">
+        <div className="rounded-card border border-success/25 bg-success/10 p-3 sm:p-4 flex items-start justify-between gap-2">
           <div>
-            <div className="text-sm font-medium text-success/90">Bartaraf etilgan</div>
-            <div className="text-2xl font-bold mt-2 text-success">{s?.completed ?? 0}</div>
+            <div className="text-xs sm:text-sm font-medium text-success/90 leading-tight">Bartaraf etilgan</div>
+            <div className="text-xl sm:text-2xl font-bold mt-1 sm:mt-2 text-success">{s?.completed ?? 0}</div>
           </div>
-          <div className="w-10 h-10 rounded-button bg-success/20 text-success flex items-center justify-center shrink-0"><CheckCircle2 size={18} /></div>
+          <div className="w-10 h-10 rounded-button bg-success/20 text-success hidden sm:flex items-center justify-center shrink-0"><CheckCircle2 size={18} /></div>
         </div>
         {/* Rejalashtirilgan (✅ znachok soni) — primary */}
-        <div className="rounded-card border border-primary/25 bg-primary/10 p-4 flex items-start justify-between">
+        <div className="rounded-card border border-primary/25 bg-primary/10 p-3 sm:p-4 flex items-start justify-between gap-2">
           <div>
-            <div className="text-sm font-medium text-primary/90">Rejalashtirilgan</div>
-            <div className="text-2xl font-bold mt-2 text-primary">{s?.with_visit ?? 0}</div>
+            <div className="text-xs sm:text-sm font-medium text-primary/90 leading-tight">Rejalashtirilgan</div>
+            <div className="text-xl sm:text-2xl font-bold mt-1 sm:mt-2 text-primary">{s?.with_visit ?? 0}</div>
           </div>
-          <div className="w-10 h-10 rounded-button bg-primary/20 text-primary flex items-center justify-center shrink-0"><CalendarClock size={18} /></div>
+          <div className="w-10 h-10 rounded-button bg-primary/20 text-primary hidden sm:flex items-center justify-center shrink-0"><CalendarClock size={18} /></div>
         </div>
       </div>
 
       {/* Filtrlar + qidiruv */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex flex-wrap gap-1.5">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
+        <div className="flex gap-1.5 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 sm:flex-wrap">
           {FILTER_KEYS.map((key) => (
             <button key={key} onClick={() => setStatus(key)}
-              className={`px-3 py-1.5 rounded-button text-sm font-medium transition ${
+              className={`px-3 py-1.5 rounded-button text-sm font-medium transition whitespace-nowrap shrink-0 ${
                 status === key ? 'bg-primary text-white' : 'bg-black/5 text-ink-soft hover:bg-black/10'}`}>
               {key === '' ? 'Hammasi' : SERVICE_FILTER_LABELS[key]}
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           <button onClick={() => setOnlyNoLoc((v) => !v)}
             title="Lokatsiyasi biriktirilmagan arizalar"
             className={`px-3 py-1.5 rounded-button text-sm font-medium transition inline-flex items-center gap-1.5 ${
               onlyNoLoc ? 'bg-danger text-white' : 'bg-black/5 text-ink-soft hover:bg-black/10'}`}>
             <MapPin size={15} /> Lokatsiyasiz
           </button>
-          <div className="relative">
+          <div className="relative flex-1 sm:flex-none">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft" />
-            <input className="input pl-9 w-56" placeholder="Kod yoki muammo…"
+            <input className="input pl-9 w-full sm:w-56" placeholder="Kod yoki muammo…"
                    value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
         </div>
@@ -217,7 +217,65 @@ export default function ServicePage() {
           <EmptyState title="Servis arizalari yo'q"
                       description={`"Yangi ariza" tugmasi orqali birinchi arizani qo'shing`} />
         ) : (
-          <div className="overflow-x-auto">
+          <>
+          {/* Telefon: kartochkalar ro'yxati — jadval siqilib ketmasin */}
+          <div className="md:hidden divide-y divide-black/5">
+            {tickets.map((tk) => (
+              <div key={tk.id} onClick={() => setDetailId(tk.id)}
+                   className="py-3 flex gap-3 cursor-pointer active:bg-black/[0.03]">
+                <div className="flex flex-col items-center gap-2 pt-0.5 shrink-0"
+                     onClick={(e) => e.stopPropagation()}>
+                  {tk.status === 'new' || tk.status === 'scheduled' ? (
+                    <span onClick={() => toggleScheduled(tk)} title="Rejalashtirilgan"
+                          className={'inline-flex cursor-pointer ' + (tk.status === 'scheduled'
+                            ? 'text-success' : 'text-danger/70')}>
+                      <CheckCircle2 size={22} strokeWidth={2.5} />
+                    </span>
+                  ) : <span className="w-[22px]" />}
+                  {tk.lat != null && tk.lon != null ? (
+                    <a href={mapLinks(tk.lat, tk.lon).yandexRoute} target="_blank" rel="noreferrer"
+                       title={tk.location_note || 'Xaritada ochish'}
+                       className="inline-flex text-success">
+                      <MapPin size={17} />
+                    </a>
+                  ) : (
+                    <span title="Lokatsiya biriktirilmagan" className="inline-flex text-ink-soft/40">
+                      <MapPin size={17} />
+                    </span>
+                  )}
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="font-medium truncate flex items-center gap-1.5">
+                        {tk.customer?.full_name ?? '—'}
+                        {tk.is_external && (
+                          <span className="badge bg-black/5 text-ink-soft shrink-0">0 dan</span>
+                        )}
+                      </div>
+                      {tk.customer && (
+                        <div className="text-xs text-ink-soft">{formatPhone(tk.customer.phone)}</div>
+                      )}
+                    </div>
+                    <div className="shrink-0"><ServiceStatusBadge status={tk.status} /></div>
+                  </div>
+
+                  <div className="text-sm mt-1 line-clamp-2">{tk.problem}</div>
+
+                  <div className="mt-1.5 flex items-center gap-x-2 gap-y-1 flex-wrap text-xs text-ink-soft">
+                    <span>{formatDate(tk.opened_at)}</span>
+                    <span>· Muddat: {formatDate(deadlineOf(tk.opened_at))}</span>
+                    {tk.in_warranty
+                      ? <span className="badge bg-success/10 text-success">Kafolatda</span>
+                      : <span className="badge bg-gray-100 text-gray-600">Kafolatsiz</span>}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="text-left text-ink-soft border-b border-black/5">
                 <tr>
@@ -278,7 +336,7 @@ export default function ServicePage() {
                         </div>
                       ) : <span className="text-ink-soft">—</span>}
                     </td>
-                    <td className="py-2 pr-3 max-w-[260px] truncate">{tk.problem}</td>
+                    <td className="py-2 pr-3 max-w-[200px] lg:max-w-[320px] truncate">{tk.problem}</td>
                     <td className="py-2 pr-3 whitespace-nowrap">{formatDate(tk.opened_at)}</td>
                     <td className="py-2 pr-3 whitespace-nowrap">{formatDate(deadlineOf(tk.opened_at))}</td>
                     <td className="py-2 pr-3">
@@ -292,6 +350,7 @@ export default function ServicePage() {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </Card>
       </>

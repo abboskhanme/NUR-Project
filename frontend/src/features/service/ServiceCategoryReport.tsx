@@ -102,20 +102,20 @@ export default function ServiceCategoryReport() {
   return (
     <div className="space-y-4">
       {/* Oy / yil filtri */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <select className="input w-40" value={month} onChange={(e) => setMonth(Number(e.target.value))}>
+      <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 sm:flex-wrap">
+        <select className="input w-full sm:w-40" value={month} onChange={(e) => setMonth(Number(e.target.value))}>
           <option value={0}>Butun yil</option>
           {MONTH_NUMS.map((mo) => <option key={mo} value={mo}>{SALES_MONTHS[String(mo)]}</option>)}
         </select>
-        <select className="input w-28" value={year} onChange={(e) => setYear(Number(e.target.value))}>
+        <select className="input w-full sm:w-28" value={year} onChange={(e) => setYear(Number(e.target.value))}>
           {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
         </select>
         <span className="text-xs text-ink-soft">Ish bajarilgan sana bo'yicha</span>
 
-        <div className="flex gap-1 ml-auto">
+        <div className="col-span-2 flex gap-1 sm:ml-auto">
           {VIEWS.map((v) => (
             <button key={v.key} onClick={() => setView(v.key)}
-              className={'px-3 py-1.5 rounded-button text-sm font-medium transition ' +
+              className={'flex-1 sm:flex-none px-3 py-1.5 rounded-button text-sm font-medium transition ' +
                 (view === v.key ? 'bg-primary text-white'
                                 : 'bg-black/5 text-ink-soft hover:bg-black/10')}>
               {v.label}
@@ -191,7 +191,7 @@ export default function ServiceCategoryReport() {
                       description="Toifalar «Toifalar» tugmasi orqali qo'shiladi" />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[560px] sm:min-w-0">
               <thead className="text-left text-ink-soft border-b border-black/10">
                 <tr>
                   <th className="py-2 pr-2 font-medium">Toifa</th>

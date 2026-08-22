@@ -96,7 +96,7 @@ export default function ServiceTripPanel({ onChanged, points = [], missingCount 
           <Receipt size={16} className="text-primary" /> Servis safari
           {saved && <span className="text-xs font-normal text-success">✓ saqlandi</span>}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {route && (
             <a href={route} target="_blank" rel="noreferrer"
                title="Barcha nuqtalar bitta marshrutda (Yandex xarita)"

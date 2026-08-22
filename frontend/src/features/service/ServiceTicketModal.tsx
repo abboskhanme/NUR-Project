@@ -221,8 +221,8 @@ export default function ServiceTicketModal({
   const selW = order ? computeWarranty(order.delivered_at) : null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="bg-card rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto flex flex-col"
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-0 sm:p-4" onClick={onClose}>
+      <div className="bg-card rounded-t-2xl sm:rounded-lg shadow-xl w-full max-w-lg max-h-[92vh] sm:max-h-[90vh] overflow-y-auto flex flex-col"
            onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3 border-b border-black/5 sticky top-0 bg-card z-10">
           <h3 className="font-semibold">Yangi servis arizasi</h3>

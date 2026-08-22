@@ -127,7 +127,7 @@ export default function ServiceRegionReport({ dateFrom, dateTo }: {
                       description="Tanlangan davrda ariza topilmadi" />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[560px] sm:min-w-0">
               <thead className="text-left text-ink-soft border-b border-black/5">
                 <tr>
                   <th className="py-2 pr-3">Viloyat</th>
