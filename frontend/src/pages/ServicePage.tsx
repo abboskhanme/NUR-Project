@@ -218,61 +218,78 @@ export default function ServicePage() {
                       description={`"Yangi ariza" tugmasi orqali birinchi arizani qo'shing`} />
         ) : (
           <>
-          {/* Telefon: kartochkalar ro'yxati — jadval siqilib ketmasin */}
+          {/* --- TELEFON KO'RINISHI ---------------------------------------
+              Servis xodimi uchun eng sodda ro'yxat: chapda ikkita katta tugma
+              (safar navbati va lokatsiya), o'ngda mijoz ismi, uning ostida
+              muammo. Yon tomonga siljish YO'Q — hamma narsa ekranga sig'adi. */}
           <div className="md:hidden divide-y divide-black/5">
-            {tickets.map((tk) => (
-              <div key={tk.id} onClick={() => setDetailId(tk.id)}
-                   className="py-3 flex gap-3 cursor-pointer active:bg-black/[0.03]">
-                <div className="flex flex-col items-center gap-2 pt-0.5 shrink-0"
-                     onClick={(e) => e.stopPropagation()}>
-                  {tk.status === 'new' || tk.status === 'scheduled' ? (
-                    <span onClick={() => toggleScheduled(tk)} title="Rejalashtirilgan"
-                          className={'inline-flex cursor-pointer ' + (tk.status === 'scheduled'
-                            ? 'text-success' : 'text-danger/70')}>
-                      <CheckCircle2 size={22} strokeWidth={2.5} />
-                    </span>
-                  ) : <span className="w-[22px]" />}
-                  {tk.lat != null && tk.lon != null ? (
-                    <a href={mapLinks(tk.lat, tk.lon).yandexRoute} target="_blank" rel="noreferrer"
-                       title={tk.location_note || 'Xaritada ochish'}
-                       className="inline-flex text-success">
-                      <MapPin size={17} />
-                    </a>
-                  ) : (
-                    <span title="Lokatsiya biriktirilmagan" className="inline-flex text-ink-soft/40">
-                      <MapPin size={17} />
-                    </span>
-                  )}
-                </div>
+            {tickets.map((tk) => {
+              const scheduled = tk.status === 'scheduled';
+              const open = tk.status === 'new' || scheduled;
+              const hasLoc = tk.lat != null && tk.lon != null;
+              return (
+                <div key={tk.id} onClick={() => setDetailId(tk.id)}
+                     className="py-3 flex items-start gap-3 cursor-pointer active:bg-black/[0.03]">
+                  {/* Ikkita katta tugma — barmoq bilan bosishga qulay (36px) */}
+                  <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+                    {open ? (
+                      <button onClick={() => toggleScheduled(tk)}
+                              aria-label={scheduled ? 'Safar navbatidan olish' : 'Safar navbatiga olish'}
+                              title={scheduled ? 'Safar navbatida' : 'Safar navbatiga olish'}
+                              className={'w-9 h-9 rounded-full flex items-center justify-center transition ' +
+                                (scheduled ? 'bg-success/15 text-success' : 'bg-danger/10 text-danger')}>
+                        <CheckCircle2 size={20} strokeWidth={2.5} />
+                      </button>
+                    ) : (
+                      <span className="w-9 h-9 rounded-full bg-black/[0.04] text-ink-soft/40 flex items-center justify-center">
+                        <CheckCircle2 size={20} />
+                      </span>
+                    )}
 
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="font-medium truncate flex items-center gap-1.5">
+                    {hasLoc ? (
+                      <a href={mapLinks(tk.lat as number, tk.lon as number).yandexRoute}
+                         target="_blank" rel="noreferrer"
+                         aria-label="Xaritada ochish"
+                         title={tk.location_note || 'Xaritada ochish'}
+                         className="w-9 h-9 rounded-full bg-success/15 text-success flex items-center justify-center">
+                        <MapPin size={19} />
+                      </a>
+                    ) : (
+                      <span title="Lokatsiya biriktirilmagan"
+                            className="w-9 h-9 rounded-full bg-black/[0.04] text-ink-soft/40 flex items-center justify-center">
+                        <MapPin size={19} />
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Mijoz ismi + muammo */}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-semibold truncate">
                         {tk.customer?.full_name ?? '—'}
-                        {tk.is_external && (
-                          <span className="badge bg-black/5 text-ink-soft shrink-0">0 dan</span>
-                        )}
-                      </div>
-                      {tk.customer && (
-                        <div className="text-xs text-ink-soft">{formatPhone(tk.customer.phone)}</div>
+                      </span>
+                      {tk.is_external && (
+                        <span className="badge bg-black/5 text-ink-soft shrink-0">0 dan</span>
                       )}
                     </div>
-                    <div className="shrink-0"><ServiceStatusBadge status={tk.status} /></div>
-                  </div>
 
-                  <div className="text-sm mt-1 line-clamp-2">{tk.problem}</div>
+                    {tk.problem && (
+                      <p className="text-sm text-ink-soft line-clamp-2 mt-0.5 break-words">
+                        {tk.problem}
+                      </p>
+                    )}
 
-                  <div className="mt-1.5 flex items-center gap-x-2 gap-y-1 flex-wrap text-xs text-ink-soft">
-                    <span>{formatDate(tk.opened_at)}</span>
-                    <span>· Muddat: {formatDate(deadlineOf(tk.opened_at))}</span>
-                    {tk.in_warranty
-                      ? <span className="badge bg-success/10 text-success">Kafolatda</span>
-                      : <span className="badge bg-gray-100 text-gray-600">Kafolatsiz</span>}
+                    <div className="mt-1.5 flex items-center gap-1.5 text-xs text-ink-soft">
+                      <ServiceStatusBadge status={tk.status} />
+                      {tk.in_warranty && (
+                        <span className="badge bg-success/10 text-success">Kafolat</span>
+                      )}
+                      <span className="ml-auto whitespace-nowrap">{formatDate(tk.opened_at)}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           <div className="hidden md:block overflow-x-auto">

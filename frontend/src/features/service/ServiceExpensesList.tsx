@@ -65,13 +65,13 @@ export default function ServiceExpensesList({ dateFrom, dateTo }: { dateFrom?: s
         />
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[560px] sm:min-w-0">
+          <table className="w-full text-sm">
             <thead className="text-left text-ink-soft border-b border-black/5">
               <tr>
                 <th className="py-2 pr-3 whitespace-nowrap">Sana</th>
                 <th className="py-2 pr-3">Mijoz</th>
-                <th className="py-2 pr-3">Ariza</th>
-                <th className="py-2 pr-3">Muammo / Toifa</th>
+                <th className="py-2 pr-3 hidden sm:table-cell">Ariza</th>
+                <th className="py-2 pr-3 hidden sm:table-cell">Muammo / Toifa</th>
                 <th className="py-2 pr-3 text-right whitespace-nowrap">Xarajat</th>
               </tr>
             </thead>
@@ -88,13 +88,13 @@ export default function ServiceExpensesList({ dateFrom, dateTo }: { dateFrom?: s
                       <div className="text-xs text-ink-soft">{formatPhone(e.customer_phone)}</div>
                     )}
                   </td>
-                  <td className="py-2 pr-3 whitespace-nowrap">
+                  <td className="py-2 pr-3 whitespace-nowrap hidden sm:table-cell">
                     <span className="font-mono text-xs text-ink-soft">{e.code}</span>
                     {e.in_warranty && (
                       <span className="ml-1.5 badge bg-success/10 text-success">Kafolat</span>
                     )}
                   </td>
-                  <td className="py-2 pr-3 max-w-[160px] sm:max-w-[260px] truncate">
+                  <td className="py-2 pr-3 max-w-[260px] truncate hidden sm:table-cell">
                     {e.category || e.problem || '—'}
                   </td>
                   <td className="py-2 pr-3 text-right font-semibold text-danger tabular-nums whitespace-nowrap">
@@ -105,7 +105,8 @@ export default function ServiceExpensesList({ dateFrom, dateTo }: { dateFrom?: s
             </tbody>
             <tfoot>
               <tr className="border-t border-black/10">
-                <td className="py-2 pr-3 font-semibold" colSpan={4}>Jami</td>
+                <td className="py-2 pr-3 font-semibold sm:hidden" colSpan={2}>Jami</td>
+                <td className="py-2 pr-3 font-semibold hidden sm:table-cell" colSpan={4}>Jami</td>
                 <td className="py-2 pr-3 text-right font-bold text-danger tabular-nums whitespace-nowrap">
                   {formatUZS(total)}
                 </td>

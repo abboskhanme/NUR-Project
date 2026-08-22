@@ -191,18 +191,18 @@ export default function ServiceCategoryReport() {
                       description="Toifalar «Toifalar» tugmasi orqali qo'shiladi" />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[560px] sm:min-w-0">
+            <table className="w-full text-sm">
               <thead className="text-left text-ink-soft border-b border-black/10">
                 <tr>
                   <th className="py-2 pr-2 font-medium">Toifa</th>
                   <th className="py-2 px-2 font-medium text-right">Jami</th>
-                  <th className="py-2 px-2 font-medium text-right">Yangi</th>
-                  <th className="py-2 px-2 font-medium text-right">Reja</th>
-                  <th className="py-2 px-2 font-medium text-right">Bajarilgan</th>
-                  <th className="py-2 px-2 font-medium text-right">Bekor</th>
-                  <th className="py-2 px-2 font-medium text-right">Kafolatda</th>
-                  <th className="py-2 px-2 font-medium text-right">Kafolatsiz</th>
-                  <th className="py-2 px-2 font-medium text-right">Qismlar</th>
+                  <th className="py-2 px-2 font-medium text-right hidden sm:table-cell">Yangi</th>
+                  <th className="py-2 px-2 font-medium text-right hidden sm:table-cell">Reja</th>
+                  <th className="py-2 px-2 font-medium text-right hidden sm:table-cell">Bajarilgan</th>
+                  <th className="py-2 px-2 font-medium text-right hidden sm:table-cell">Bekor</th>
+                  <th className="py-2 px-2 font-medium text-right hidden sm:table-cell">Kafolatda</th>
+                  <th className="py-2 px-2 font-medium text-right hidden sm:table-cell">Kafolatsiz</th>
+                  <th className="py-2 px-2 font-medium text-right hidden sm:table-cell">Qismlar</th>
                   <th className="py-2 pl-2 font-medium text-right">Servis xarajati</th>
                 </tr>
               </thead>
@@ -226,13 +226,13 @@ export default function ServiceCategoryReport() {
                           </span>
                         </td>
                         <td className="py-2 px-2 text-right font-bold tabular-nums">{r.total}</td>
-                        <td className="py-2 px-2 text-right tabular-nums">{r.new || '—'}</td>
-                        <td className="py-2 px-2 text-right tabular-nums">{r.scheduled || '—'}</td>
-                        <td className="py-2 px-2 text-right tabular-nums text-success">{r.completed || '—'}</td>
-                        <td className="py-2 px-2 text-right tabular-nums">{r.cancelled || '—'}</td>
-                        <td className="py-2 px-2 text-right tabular-nums">{r.in_warranty || '—'}</td>
-                        <td className="py-2 px-2 text-right tabular-nums">{r.out_warranty || '—'}</td>
-                        <td className="py-2 px-2 text-right tabular-nums">{r.parts_count || '—'}</td>
+                        <td className="py-2 px-2 text-right tabular-nums hidden sm:table-cell">{r.new || '—'}</td>
+                        <td className="py-2 px-2 text-right tabular-nums hidden sm:table-cell">{r.scheduled || '—'}</td>
+                        <td className="py-2 px-2 text-right tabular-nums text-success hidden sm:table-cell">{r.completed || '—'}</td>
+                        <td className="py-2 px-2 text-right tabular-nums hidden sm:table-cell">{r.cancelled || '—'}</td>
+                        <td className="py-2 px-2 text-right tabular-nums hidden sm:table-cell">{r.in_warranty || '—'}</td>
+                        <td className="py-2 px-2 text-right tabular-nums hidden sm:table-cell">{r.out_warranty || '—'}</td>
+                        <td className="py-2 px-2 text-right tabular-nums hidden sm:table-cell">{r.parts_count || '—'}</td>
                         <td className="py-2 pl-2 text-right tabular-nums font-medium">
                           {Number(r.client_cost) > 0 ? formatUZS(r.client_cost) : '—'}
                         </td>
@@ -260,13 +260,13 @@ export default function ServiceCategoryReport() {
                   <tr className="border-t-2 border-black/10 font-semibold">
                     <td className="py-2 pr-2">Jami</td>
                     <td className="py-2 px-2 text-right tabular-nums">{d.total}</td>
-                    <td className="py-2 px-2 text-right tabular-nums">{d.new}</td>
-                    <td className="py-2 px-2 text-right tabular-nums">{d.scheduled}</td>
-                    <td className="py-2 px-2 text-right tabular-nums">{d.completed}</td>
-                    <td className="py-2 px-2 text-right tabular-nums">{d.cancelled}</td>
-                    <td className="py-2 px-2 text-right tabular-nums">{d.in_warranty}</td>
-                    <td className="py-2 px-2 text-right tabular-nums">{d.out_warranty}</td>
-                    <td className="py-2 px-2 text-right tabular-nums">{d.parts_count}</td>
+                    <td className="py-2 px-2 text-right tabular-nums hidden sm:table-cell">{d.new}</td>
+                    <td className="py-2 px-2 text-right tabular-nums hidden sm:table-cell">{d.scheduled}</td>
+                    <td className="py-2 px-2 text-right tabular-nums hidden sm:table-cell">{d.completed}</td>
+                    <td className="py-2 px-2 text-right tabular-nums hidden sm:table-cell">{d.cancelled}</td>
+                    <td className="py-2 px-2 text-right tabular-nums hidden sm:table-cell">{d.in_warranty}</td>
+                    <td className="py-2 px-2 text-right tabular-nums hidden sm:table-cell">{d.out_warranty}</td>
+                    <td className="py-2 px-2 text-right tabular-nums hidden sm:table-cell">{d.parts_count}</td>
                     <td className="py-2 pl-2 text-right tabular-nums">{formatUZS(d.client_cost)}</td>
                   </tr>
                 </tfoot>

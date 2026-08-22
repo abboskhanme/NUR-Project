@@ -36,14 +36,14 @@ export default function ServiceTripsList({ dateFrom, dateTo }: { dateFrom?: stri
         <EmptyState title="Yakunlangan safarlar yo'q" description="Safarni yakunlaganingizda shu yerda ko'rinadi" />
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[560px] sm:min-w-0">
+          <table className="w-full text-sm">
             <thead className="text-left text-ink-soft border-b border-black/5">
               <tr>
                 <th className="py-2 pr-3">Safar nomi</th>
-                <th className="py-2 pr-3">Sana</th>
+                <th className="py-2 pr-3 hidden sm:table-cell">Sana</th>
                 <th className="py-2 pr-3 text-right">Arizalar</th>
-                <th className="py-2 pr-3 text-right">Olingan</th>
-                <th className="py-2 pr-3 text-right">Sarflangan</th>
+                <th className="py-2 pr-3 text-right hidden sm:table-cell">Olingan</th>
+                <th className="py-2 pr-3 text-right hidden sm:table-cell">Sarflangan</th>
                 <th className="py-2 pr-3 text-right">Sof</th>
               </tr>
             </thead>
@@ -54,10 +54,10 @@ export default function ServiceTripsList({ dateFrom, dateTo }: { dateFrom?: stri
                   <tr key={tr.id} onClick={() => setOpenTrip(tr)}
                       className="border-b border-black/5 hover:bg-black/5 cursor-pointer">
                     <td className="py-2 pr-3 font-medium">{tr.name || '—'}</td>
-                    <td className="py-2 pr-3 whitespace-nowrap">{formatDate(tr.closed_at || tr.opened_at)}</td>
+                    <td className="py-2 pr-3 whitespace-nowrap hidden sm:table-cell">{formatDate(tr.closed_at || tr.opened_at)}</td>
                     <td className="py-2 pr-3 text-right">{tr.ticket_count}</td>
-                    <td className="py-2 pr-3 text-right text-success">{formatUZS(tr.collected)}</td>
-                    <td className="py-2 pr-3 text-right text-danger">{formatUZS(tr.spent)}</td>
+                    <td className="py-2 pr-3 text-right text-success hidden sm:table-cell">{formatUZS(tr.collected)}</td>
+                    <td className="py-2 pr-3 text-right text-danger hidden sm:table-cell">{formatUZS(tr.spent)}</td>
                     <td className={'py-2 pr-3 text-right font-semibold ' + (net >= 0 ? 'text-success' : 'text-danger')}>
                       {formatUZS(net)}
                     </td>

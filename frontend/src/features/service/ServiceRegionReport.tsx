@@ -127,18 +127,18 @@ export default function ServiceRegionReport({ dateFrom, dateTo }: {
                       description="Tanlangan davrda ariza topilmadi" />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[560px] sm:min-w-0">
+            <table className="w-full text-sm">
               <thead className="text-left text-ink-soft border-b border-black/5">
                 <tr>
                   <th className="py-2 pr-3">Viloyat</th>
                   <th className="py-2 pr-3 text-right">Arizalar</th>
-                  <th className="py-2 pr-3 text-right">Mijozlar</th>
-                  <th className="py-2 pr-3 text-right">Bajarilgan</th>
-                  <th className="py-2 pr-3 text-right">Ochiq</th>
-                  <th className="py-2 pr-3 text-right">Kafolatda</th>
-                  <th className="py-2 pr-3 text-right">Qismlar</th>
+                  <th className="py-2 pr-3 text-right hidden sm:table-cell">Mijozlar</th>
+                  <th className="py-2 pr-3 text-right hidden sm:table-cell">Bajarilgan</th>
+                  <th className="py-2 pr-3 text-right hidden sm:table-cell">Ochiq</th>
+                  <th className="py-2 pr-3 text-right hidden sm:table-cell">Kafolatda</th>
+                  <th className="py-2 pr-3 text-right hidden sm:table-cell">Qismlar</th>
                   <th className="py-2 pr-3 text-right">Xarajat</th>
-                  <th className="py-2 pr-3">Ko'p uchragan muammo</th>
+                  <th className="py-2 pr-3 hidden sm:table-cell">Ko'p uchragan muammo</th>
                 </tr>
               </thead>
               <tbody>
@@ -150,16 +150,16 @@ export default function ServiceRegionReport({ dateFrom, dateTo }: {
                       </span>
                     </td>
                     <td className="py-2 pr-3 text-right font-semibold tabular-nums">{r.total}</td>
-                    <td className="py-2 pr-3 text-right tabular-nums">{r.customers}</td>
-                    <td className="py-2 pr-3 text-right tabular-nums text-success">{r.completed}</td>
-                    <td className="py-2 pr-3 text-right tabular-nums">{r.new + r.scheduled}</td>
-                    <td className="py-2 pr-3 text-right tabular-nums">
+                    <td className="py-2 pr-3 text-right tabular-nums hidden sm:table-cell">{r.customers}</td>
+                    <td className="py-2 pr-3 text-right tabular-nums text-success hidden sm:table-cell">{r.completed}</td>
+                    <td className="py-2 pr-3 text-right tabular-nums hidden sm:table-cell">{r.new + r.scheduled}</td>
+                    <td className="py-2 pr-3 text-right tabular-nums hidden sm:table-cell">
                       {r.in_warranty}
                       <span className="text-ink-soft"> / {r.total}</span>
                     </td>
-                    <td className="py-2 pr-3 text-right tabular-nums">{r.parts_count}</td>
+                    <td className="py-2 pr-3 text-right tabular-nums hidden sm:table-cell">{r.parts_count}</td>
                     <td className="py-2 pr-3 text-right tabular-nums">{formatUZS(r.client_cost)}</td>
-                    <td className="py-2 pr-3 text-ink-soft">{r.top_category || '—'}</td>
+                    <td className="py-2 pr-3 text-ink-soft hidden sm:table-cell">{r.top_category || '—'}</td>
                   </tr>
                 ))}
               </tbody>
