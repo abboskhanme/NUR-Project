@@ -48,7 +48,7 @@ class Settings(BaseSettings):
     # Chat_id ni bilish uchun bot'ga /id buyrug'ini yuboring.
     TELEGRAM_ADMIN_CHAT_IDS: str = ""
     # Kunlik hisobot yuborish vaqti, HH:MM (TIMEZONE bo'yicha).
-    TELEGRAM_REPORT_TIME: str = "20:00"
+    TELEGRAM_REPORT_TIME: str = "23:50"
     # Yangi buyurtma kelganda xo'jayinga darhol xabar berilsinmi.
     TELEGRAM_NOTIFY_NEW_ORDER: bool = True
 

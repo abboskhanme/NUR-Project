@@ -13,6 +13,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+from datetime import date, datetime, timedelta
 
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
@@ -48,8 +49,8 @@ def build_dispatcher() -> Dispatcher:
 
 
 def _parse_report_time(raw: str) -> tuple[int, int]:
-    """'HH:MM' -> (hour, minute). Xato bo'lsa 20:00."""
-    raw = (raw or "20:00").strip()
+    """'HH:MM' -> (hour, minute). Xato bo'lsa 23:50 (kun yakuni)."""
+    raw = (raw or "23:50").strip()
     try:
         hh, mm = raw.split(":")
         h, m = int(hh), int(mm)
@@ -57,8 +58,19 @@ def _parse_report_time(raw: str) -> tuple[int, int]:
             return h, m
     except Exception:  # noqa: BLE001
         pass
-    log.warning("TELEGRAM_REPORT_TIME noto'g'ri (%r) — 20:00 ishlatiladi", raw)
-    return 20, 0
+    log.warning("TELEGRAM_REPORT_TIME noto'g'ri (%r) — 23:50 ishlatiladi", raw)
+    return 23, 50
+
+
+def _report_day() -> date:
+    """Hisobot qaysi kun uchun yig'ilsin.
+
+    Vaqt yarim tundan keyinga (00:00–04:59) qo'yilgan bo'lsa, yangi kun hali
+    boshlanmagan — hisobot NOL bo'lib chiqadi. Shu sabab bunday holatda
+    endigina tugagan kun (kecha) bo'yicha yig'amiz.
+    """
+    now = datetime.now(tz())
+    return now.date() - timedelta(days=1) if now.hour < 5 else now.date()
 
 
 async def _send_daily_report(bot: Bot) -> None:
@@ -68,7 +80,7 @@ async def _send_daily_report(bot: Bot) -> None:
         log.info("Kunlik hisobot: admin chat_id yo'q — o'tkazib yuborildi.")
         return
     try:
-        text = format_digest(await build_digest())
+        text = format_digest(await build_digest(_report_day()))
     except Exception:  # noqa: BLE001
         log.exception("Kunlik hisobotni yig'ishda xato")
         return

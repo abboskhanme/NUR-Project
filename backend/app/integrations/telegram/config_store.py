@@ -24,7 +24,7 @@ class BotConfig:
     token: str = ""
     username: str = ""
     admin_ids: list[int] = field(default_factory=list)
-    report_time: str = "20:00"
+    report_time: str = "23:50"
     notify_new_order: bool = True
 
     @property
