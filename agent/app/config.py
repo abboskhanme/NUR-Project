@@ -79,6 +79,10 @@ class Settings(BaseSettings):
     DEDUP_TTL: int = 86400
     # Operator telefondan qo'lda javob yozsa, bot shu suhbatda necha soat jim tursin.
     BOT_PAUSE_HOURS: int = 12
+    # Izohlarga javob tezligi (halqadan himoya). Chegaradan oshgan izoh
+    # TASHLANMAYDI — 10 daqiqalik oyna bo'shagach avtomatik javob beriladi.
+    CMT_LIMIT_PER_POST: int = 30     # bitta post ostida 10 daqiqada
+    CMT_LIMIT_TOTAL: int = 100       # butun akkaunt bo'yicha 10 daqiqada
     LOG_LEVEL: str = "INFO"
     COMPANY_NAME: str = "NUR"
 

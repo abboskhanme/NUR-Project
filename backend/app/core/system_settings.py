@@ -159,7 +159,10 @@ CATALOG: tuple[SettingItem, ...] = (
     ),
     SettingItem(
         "ERP_BOT_REPORT_TIME", "Kunlik hisobot vaqti", "erp_bot", local=True,
-        placeholder="20:00", help="HH:MM ko'rinishida, vaqt mintaqasi bo'yicha.",
+        placeholder="23:50",
+        help="HH:MM ko'rinishida, vaqt mintaqasi bo'yicha. Kun yakunidagi vaqt "
+             "(masalan 23:50) tavsiya etiladi. Yarim tundan keyin qo'ysangiz, "
+             "hisobot avtomatik ravishda endigina tugagan kun bo'yicha yig'iladi.",
     ),
     SettingItem(
         "ERP_BOT_NOTIFY_NEW_ORDER", "Yangi buyurtmada darhol xabar", "erp_bot",
@@ -230,6 +233,16 @@ CATALOG: tuple[SettingItem, ...] = (
     SettingItem("BOT_PAUSE_HOURS", "Operator aralashgach bot pauzasi (soat)", "general",
                 type="number",
                 help="Siz telefondan qo'lda javob yozsangiz, bot shu suhbatda shuncha soat jim turadi."),
+    SettingItem(
+        "CMT_LIMIT_PER_POST", "Izoh javobi chegarasi (bitta post, 10 daqiqada)",
+        "general", type="number", placeholder="30",
+        help="Halqadan himoya. Chegaradan oshgan izoh TASHLANMAYDI — oyna "
+             "bo'shagach avtomatik javob beriladi va Telegramga xabar keladi.",
+    ),
+    SettingItem(
+        "CMT_LIMIT_TOTAL", "Izoh javobi chegarasi (jami, 10 daqiqada)",
+        "general", type="number", placeholder="100",
+    ),
     SettingItem("DEDUP_TTL", "Takror xabar bloki (soniya)", "general",
                 type="number", hidden=True),
     SettingItem("TIMEZONE", "Vaqt mintaqasi", "general", placeholder="Asia/Tashkent"),

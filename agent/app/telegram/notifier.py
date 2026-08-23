@@ -71,6 +71,15 @@ async def notify_ingest_failed(payload: LeadPayload) -> None:
     )
 
 
+async def notify_comments_throttled(media: str, count: int, minutes: int) -> None:
+    """Izohlar juda ko'p kelganda — javoblar navbatga qo'yilgani haqida xabar."""
+    where = "post ostida" if media != "all" else "umuman akkauntda"
+    await _send(
+        f"⏳ <b>Izohlar ko'p</b>\n{where} {minutes} daqiqada {count} ta izoh keldi.\n"
+        f"Javoblar navbatga qo'yildi — oyna bo'shagach avtomatik yuboriladi."
+    )
+
+
 async def notify_token_problem(detail: str) -> None:
     """Instagram tokenini yangilab bo'lmadi — akkauntni qayta ulash kerak."""
     await _send(

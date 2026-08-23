@@ -17,7 +17,8 @@ from app.ai.factory import get_provider
 from app.config import settings
 
 # ERP satr sifatida qaytaradi — bularni int ga o'giramiz
-_INT_KEYS = {"AI_MAX_TOKENS", "DEDUP_TTL", "BOT_PAUSE_HOURS"}
+_INT_KEYS = {"AI_MAX_TOKENS", "DEDUP_TTL", "BOT_PAUSE_HOURS",
+             "CMT_LIMIT_PER_POST", "CMT_LIMIT_TOTAL"}
 # ERP "ha"/"yo'q" ko'rinishida yuboradi — bool ga o'giramiz
 _BOOL_KEYS = {"TG_SALES_ENABLED"}
 _TRUE = {"ha", "true", "1", "yes", "on"}

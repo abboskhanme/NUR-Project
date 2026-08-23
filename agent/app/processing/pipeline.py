@@ -5,6 +5,8 @@ Har bosqich alohida try/except: biri yiqilsa boshqalari ishlashda davom etadi
 """
 from __future__ import annotations
 
+import asyncio
+
 from loguru import logger
 
 from app.agent.core import SalesAgent
@@ -24,13 +26,31 @@ _agent = SalesAgent()
 # Shuning uchun bir post ostida qisqa vaqtda beriladigan javoblar soni qat'iy
 # cheklangan: normal muloqotda bunga hech qachon yetilmaydi, halqada esa
 # darhol to'xtaydi.
-_COMMENT_LIMIT = 8          # bitta post ostida
-_COMMENT_WINDOW = 600       # 10 daqiqada
-_GLOBAL_LIMIT = 30          # butun akkaunt bo'yicha
+_COMMENT_WINDOW = 600       # 10 daqiqalik oyna
 _GLOBAL_WINDOW = 600
+# Cheklovga urilgan izoh TASHLANMAYDI — oyna bo'shagach qayta urinamiz.
+_RETRY_DELAY = _COMMENT_WINDOW + 15
+_MAX_RETRIES = 3            # shundan keyin qo'lda javob berish kerak
+_MAX_PENDING = 300          # xotira to'lib ketmasligi uchun navbat chegarasi
+_pending_retries = 0
 
 
-async def process_event(event: IncomingEvent) -> None:
+def _comment_limit() -> int:
+    """Bitta post ostida oynadagi javoblar chegarasi (sozlamadan)."""
+    return max(1, int(settings.CMT_LIMIT_PER_POST or 30))
+
+
+def _global_limit() -> int:
+    return max(1, int(settings.CMT_LIMIT_TOTAL or 100))
+
+
+async def process_event(event: IncomingEvent, *, skip_dedup: bool = False,
+                        attempt: int = 0) -> None:
+    """Bitta hodisani to'liq qayta ishlaydi.
+
+    `skip_dedup` — cheklov sababli kechiktirilgan izohni qayta ishlashda
+    (dedup allaqachon birinchi urinishda belgilangan).
+    """
     # 0. Echo — akkauntimizdan chiqqan xabar. Agar uni bot yubormagan bo'lsa,
     #    demak operator telefondan qo'lda javob yozdi → bot o'sha suhbatda jim turadi.
     if event.kind == "echo":
@@ -39,7 +59,7 @@ async def process_event(event: IncomingEvent) -> None:
 
     # 1. Dedup — bir xil komment/xabarni takror ishlamaymiz
     try:
-        if await store.seen_once(event.dedup_key, settings.DEDUP_TTL):
+        if not skip_dedup and await store.seen_once(event.dedup_key, settings.DEDUP_TTL):
             logger.info("Dublikat o'tkazib yuborildi: {}", event.dedup_key)
             return
     except Exception as exc:  # noqa: BLE001
@@ -50,6 +70,8 @@ async def process_event(event: IncomingEvent) -> None:
     #     ajratiladi. Bu esa o'sha tekshiruv qandaydir sabab ishlamay qolsa
     #     spamning oldini oladi.
     if event.kind == "comment" and not await _within_comment_limits(event):
+        # Tashlab yubormaymiz — oyna bo'shagach qayta urinamiz
+        await _queue_comment_retry(event, attempt)
         return
 
     # 1b. Operator aralashgan suhbatga bot aralashmaydi
@@ -241,23 +263,68 @@ async def _within_comment_limits(event: IncomingEvent) -> bool:
     try:
         media = event.media_id or "unknown"
         per_media = await store.bump_rate(f"cmt:{media}", _COMMENT_WINDOW)
-        if per_media > _COMMENT_LIMIT:
-            logger.error(
-                "CHEKLOV: {} post ostida {} daqiqada {} ta javob — TO'XTATILDI. "
-                "Sabab halqa bo'lishi mumkin (bot o'z izohiga javob beryapti).",
-                media, _COMMENT_WINDOW // 60, per_media,
+        if per_media > _comment_limit():
+            logger.warning(
+                "CHEKLOV: {} post ostida {} daqiqada {} ta izoh — javob navbatga "
+                "qo'yildi (chegara {}).",
+                media, _COMMENT_WINDOW // 60, per_media, _comment_limit(),
             )
+            await _alert_throttled(media, per_media)
             return False
         total = await store.bump_rate("cmt:all", _GLOBAL_WINDOW)
-        if total > _GLOBAL_LIMIT:
-            logger.error(
-                "CHEKLOV: {} daqiqada jami {} ta izoh javobi — TO'XTATILDI.",
-                _GLOBAL_WINDOW // 60, total,
+        if total > _global_limit():
+            logger.warning(
+                "CHEKLOV: {} daqiqada jami {} ta izoh — javob navbatga qo'yildi "
+                "(chegara {}).",
+                _GLOBAL_WINDOW // 60, total, _global_limit(),
             )
+            await _alert_throttled("all", total)
             return False
     except Exception as exc:  # noqa: BLE001
         logger.warning("Cheklov tekshiruvida xato (davom etamiz): {}", exc)
     return True
+
+
+async def _queue_comment_retry(event: IncomingEvent, attempt: int) -> None:
+    """Cheklovga urilgan izohni oyna bo'shagach qayta ishlash uchun navbatga qo'yadi."""
+    global _pending_retries
+
+    if attempt >= _MAX_RETRIES:
+        logger.error(
+            "Izohga javob berilmadi ({} urinish, cheklov bo'shamadi): {}",
+            attempt, event.comment_id,
+        )
+        return
+    if _pending_retries >= _MAX_PENDING:
+        logger.error("Izoh navbati to'lgan ({}) — o'tkazib yuborildi: {}",
+                     _MAX_PENDING, event.comment_id)
+        return
+
+    _pending_retries += 1
+
+    async def _later() -> None:
+        global _pending_retries
+        try:
+            await asyncio.sleep(_RETRY_DELAY)
+            logger.info("Kechiktirilgan izohga qaytamiz ({}-urinish): {}",
+                        attempt + 1, event.comment_id)
+            await process_event(event, skip_dedup=True, attempt=attempt + 1)
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Kechiktirilgan izohda xato: {}", exc)
+        finally:
+            _pending_retries -= 1
+
+    asyncio.create_task(_later())
+
+
+async def _alert_throttled(media: str, count: int) -> None:
+    """Cheklovga urilganda Telegram'ga bir marta xabar beradi (oynaga bir)."""
+    try:
+        if await store.seen_once(f"cmt-alert:{media}", _COMMENT_WINDOW):
+            return          # shu oynada allaqachon xabar berilgan
+        await notifier.notify_comments_throttled(media, count, _COMMENT_WINDOW // 60)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Cheklov ogohlantirishida xato: {}", exc)
 
 
 def _with_disclosure(text: str) -> str:
