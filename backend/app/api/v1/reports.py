@@ -14,6 +14,7 @@ Endpointlar:
   GET /reports/sales/status-breakdown  — status bo'yicha buyurtmalar
   GET /reports/finance/pnl             — oylik P&L
   GET /reports/service/summary         — servis bo'limi summary
+  GET /reports/production/summary      — ishlab chiqarish (kotyol + tana) summary
   GET /reports/supply/summary          — ta'minot bo'limi summary
 """
 from calendar import monthrange
@@ -33,7 +34,8 @@ from app.models.customer import Customer
 from app.models.finance import FinanceCategory, FinanceTransaction
 from app.models.order import Order, OrderItem, Payment
 from app.models.product import Product
-from app.models.service import ServiceTicket
+from app.models.production import ProductionRecord
+from app.models.service import ServiceTicket, ServiceTrip
 from app.models.supply import GoodsReceipt, Item, Vendor
 from app.models.user import User
 
@@ -625,14 +627,57 @@ async def finance_pnl(
 # --------------------------------------------------------------------------- #
 # SERVICE — summary
 # --------------------------------------------------------------------------- #
+SERVICE_UNCATEGORIZED = "Toifasiz"
+SERVICE_UNKNOWN_REGION = "Ko'rsatilmagan"
+
+
+async def _service_trend(db: AsyncSession, date_from: date, date_to: date,
+                         granularity: str) -> list[dict]:
+    """Arizalar dinamikasi — ochilgan sana bo'yicha (jami / bajarilgan)."""
+    opened = func.date(ServiceTicket.opened_at)
+    cond = and_(opened >= date_from, opened <= date_to)
+    completed = func.count(ServiceTicket.id).filter(ServiceTicket.status == "completed")
+
+    if granularity == "month":
+        month_col = func.date_trunc("month", ServiceTicket.opened_at)
+        rows = (await db.execute(
+            select(month_col.label("m"), func.count(ServiceTicket.id), completed)
+            .where(cond).group_by("m").order_by("m")
+        )).all()
+        return [
+            {"date": (m.date() if hasattr(m, "date") else m),
+             "total": int(t or 0), "completed": int(c or 0)}
+            for m, t, c in rows
+        ]
+
+    rows = (await db.execute(
+        select(opened.label("d"), func.count(ServiceTicket.id), completed)
+        .where(cond).group_by("d")
+    )).all()
+    by_day = {d: (int(t or 0), int(c or 0)) for d, t, c in rows}
+    out: list[dict] = []
+    cur = date_from
+    while cur <= date_to:
+        t, c = by_day.get(cur, (0, 0))
+        out.append({"date": cur, "total": t, "completed": c})
+        cur += timedelta(days=1)
+    return out
+
+
 @router.get("/service/summary")
 async def service_summary(
     db: Annotated[AsyncSession, Depends(get_db)], _: CurrentUser,
     date_from: Optional[date] = None, date_to: Optional[date] = None,
 ):
+    """Servis bo'limi hisoboti (umumiy).
+
+    Arizalar davr ichida OCHILGAN sana (opened_at) bo'yicha filtrlanadi.
+    Yagona istisno — servis safarlari puli: safar YAKUNLANGAN sana (closed_at)
+    bo'yicha, chunki safar summalari safar yopilganda kiritiladi.
+    """
     date_from, date_to = _resolve_range(date_from, date_to, default_days=90)
-    cond = and_(func.date(ServiceTicket.opened_at) >= date_from,
-                func.date(ServiceTicket.opened_at) <= date_to)
+    opened = func.date(ServiceTicket.opened_at)
+    cond = and_(opened >= date_from, opened <= date_to)
 
     by_status_rows = (await db.execute(
         select(ServiceTicket.status, func.count(ServiceTicket.id))
@@ -643,15 +688,77 @@ async def service_summary(
     total = sum(by_status.values())
     in_warranty = int(await _scalar(db, select(func.count(ServiceTicket.id))
                                     .where(and_(cond, ServiceTicket.in_warranty.is_(True)))))
+    external = int(await _scalar(db, select(func.count(ServiceTicket.id))
+                                 .where(and_(cond, ServiceTicket.is_external.is_(True)))))
     client_revenue = float(await _scalar(db, select(func.coalesce(func.sum(ServiceTicket.client_cost), 0))
                                          .where(cond)))
 
+    cat_expr = func.coalesce(func.nullif(func.btrim(ServiceTicket.category), ""), SERVICE_UNCATEGORIZED)
     by_cat_rows = (await db.execute(
-        select(func.coalesce(ServiceTicket.category, "—"), func.count(ServiceTicket.id))
-        .where(cond).group_by(ServiceTicket.category)
-        .order_by(func.count(ServiceTicket.id).desc()).limit(8)
+        select(cat_expr, func.count(ServiceTicket.id))
+        .where(cond).group_by(cat_expr)
+        .order_by(func.count(ServiceTicket.id).desc()).limit(12)
     )).all()
     by_category = [{"category": c, "count": int(n)} for c, n in by_cat_rows]
+
+    # --- O'rtacha yopish muddati (kunlarda) ---
+    avg_close = (await db.execute(
+        select(func.avg(func.date(ServiceTicket.closed_at) - func.date(ServiceTicket.opened_at)))
+        .where(and_(cond, ServiceTicket.closed_at.is_not(None)))
+    )).scalar()
+
+    # --- Viloyat kesimi ---
+    region_expr = func.coalesce(func.nullif(func.btrim(Customer.region), ""), SERVICE_UNKNOWN_REGION)
+    region_rows = (await db.execute(
+        select(region_expr,
+               func.count(ServiceTicket.id),
+               func.count(ServiceTicket.id).filter(ServiceTicket.status == "completed"),
+               func.coalesce(func.sum(ServiceTicket.client_cost), 0),
+               func.count(func.distinct(ServiceTicket.customer_id)))
+        .select_from(ServiceTicket)
+        .join(Customer, Customer.id == ServiceTicket.customer_id)
+        .where(cond).group_by(region_expr)
+        .order_by(func.count(ServiceTicket.id).desc())
+    )).all()
+    by_region = [
+        {"region": r, "count": int(c), "completed": int(done),
+         "client_cost_uzs": float(cost or 0), "customers": int(cust)}
+        for r, c, done, cost, cust in region_rows
+    ]
+
+    # --- Ishlatilgan ehtiyot qismlar ---
+    parts_sub = (
+        select(func.jsonb_array_elements_text(ServiceTicket.parts_used).label("name"))
+        .where(cond).subquery()
+    )
+    part_rows = (await db.execute(
+        select(parts_sub.c.name, func.count().label("cnt"))
+        .group_by(parts_sub.c.name)
+        .order_by(func.count().desc(), parts_sub.c.name).limit(15)
+    )).all()
+    parts = [{"name": n, "count": int(c)} for n, c in part_rows]
+    parts_total = int(await _scalar(db, select(func.coalesce(
+        func.sum(func.coalesce(func.jsonb_array_length(ServiceTicket.parts_used), 0)), 0)).where(cond)))
+
+    # --- Servis safarlari puli (yakunlangan safarlar, closed_at bo'yicha) ---
+    trip_ref = func.date(ServiceTrip.closed_at)
+    collected, spent, trip_count = (await db.execute(
+        select(func.coalesce(func.sum(ServiceTrip.collected), 0),
+               func.coalesce(func.sum(ServiceTrip.spent), 0),
+               func.count(ServiceTrip.id))
+        .where(and_(ServiceTrip.status == "closed",
+                    trip_ref >= date_from, trip_ref <= date_to))
+    )).one()
+    trips = {
+        "collected_uzs": float(collected or 0),
+        "spent_uzs": float(spent or 0),
+        "net_uzs": float((collected or 0) - (spent or 0)),
+        "trip_count": int(trip_count or 0),
+    }
+
+    # --- Kunlik / oylik dinamika ---
+    granularity = "day" if (date_to - date_from).days <= 62 else "month"
+    trend = await _service_trend(db, date_from, date_to, granularity)
 
     return {
         "date_from": date_from, "date_to": date_to,
@@ -662,8 +769,16 @@ async def service_summary(
         "cancelled": by_status.get("cancelled", 0),
         "in_warranty": in_warranty,
         "out_warranty": total - in_warranty,
+        "external": external,
         "client_revenue_uzs": client_revenue,
+        "avg_close_days": round(float(avg_close), 1) if avg_close is not None else None,
         "by_category": by_category,
+        "by_region": by_region,
+        "parts": parts,
+        "parts_total": parts_total,
+        "trips": trips,
+        "granularity": granularity,
+        "trend": trend,
     }
 
 
@@ -712,4 +827,169 @@ async def supply_summary(
         "low_stock_count": len(low_stock),
         "low_stock": low_stock,
         "top_debts": top_debts,
+    }
+
+
+# --------------------------------------------------------------------------- #
+# PRODUCTION — summary (faqat KOTYOL va OLIB KELINGAN KOTYOL)
+# --------------------------------------------------------------------------- #
+PRODUCTION_CATEGORIES = ("kotyol", "tana")
+PRODUCTION_NO_SIZE = "Ko'rsatilmagan"
+PRODUCTION_NO_DIRECTION = "Ko'rsatilmagan"
+
+
+def _direction_label(value: Optional[str]) -> str:
+    return {"right": "O'ngga", "left": "Chapga"}.get(value or "", PRODUCTION_NO_DIRECTION)
+
+
+async def _production_trend(db: AsyncSession, date_from: date, date_to: date,
+                            granularity: str) -> list[dict]:
+    """Kotyol va tana ishlab chiqarish dinamikasi (production_date bo'yicha)."""
+    qty = func.coalesce(func.sum(ProductionRecord.quantity), 0)
+    base_cond = and_(ProductionRecord.production_date >= date_from,
+                     ProductionRecord.production_date <= date_to,
+                     ProductionRecord.category.in_(PRODUCTION_CATEGORIES))
+
+    if granularity == "month":
+        month_col = func.date_trunc("month", ProductionRecord.production_date)
+        rows = (await db.execute(
+            select(month_col.label("m"), ProductionRecord.category, qty)
+            .where(base_cond).group_by("m", ProductionRecord.category).order_by("m")
+        )).all()
+        by_key: dict = {}
+        for m, cat, n in rows:
+            key = m.date() if hasattr(m, "date") else m
+            point = by_key.setdefault(key, {"date": key, "kotyol": 0, "tana": 0})
+            point[cat] = int(n or 0)
+        return [by_key[k] for k in sorted(by_key)]
+
+    rows = (await db.execute(
+        select(ProductionRecord.production_date, ProductionRecord.category, qty)
+        .where(base_cond)
+        .group_by(ProductionRecord.production_date, ProductionRecord.category)
+    )).all()
+    by_day: dict = {}
+    for d, cat, n in rows:
+        point = by_day.setdefault(d, {"kotyol": 0, "tana": 0})
+        point[cat] = int(n or 0)
+    out: list[dict] = []
+    cur = date_from
+    while cur <= date_to:
+        point = by_day.get(cur, {"kotyol": 0, "tana": 0})
+        out.append({"date": cur, "kotyol": point["kotyol"], "tana": point["tana"]})
+        cur += timedelta(days=1)
+    return out
+
+
+@router.get("/production/summary")
+async def production_report_summary(
+    db: Annotated[AsyncSession, Depends(get_db)], _: CurrentUser,
+    date_from: Optional[date] = None, date_to: Optional[date] = None,
+):
+    """Ishlab chiqarish hisoboti — FAQAT kotyol va olib kelingan kotyol (tana).
+
+    Bunker/garelka bu hisobotga kirmaydi (Ishlab chiqarish bo'limining o'zida
+    ko'rinadi). Filtr — ishlab chiqarilgan sana (production_date) bo'yicha.
+    """
+    date_from, date_to = _resolve_range(date_from, date_to, default_days=90)
+    qty = func.coalesce(func.sum(ProductionRecord.quantity), 0)
+    cond = and_(ProductionRecord.production_date >= date_from,
+                ProductionRecord.production_date <= date_to,
+                ProductionRecord.category.in_(PRODUCTION_CATEGORIES))
+    kotyol_cond = and_(cond, ProductionRecord.category == "kotyol")
+    tana_cond = and_(cond, ProductionRecord.category == "tana")
+
+    total_rows = (await db.execute(
+        select(ProductionRecord.category, qty, func.count(ProductionRecord.id))
+        .where(cond).group_by(ProductionRecord.category)
+    )).all()
+    totals = {cat: (int(n or 0), int(c or 0)) for cat, n, c in total_rows}
+    kotyol_total = totals.get("kotyol", (0, 0))[0]
+    tana_total = totals.get("tana", (0, 0))[0]
+
+    # Omborga o'tkazilgan holati — faqat kotyolga tegishli
+    transferred = int(await _scalar(db, select(func.count(ProductionRecord.id))
+                                    .where(and_(kotyol_cond,
+                                                ProductionRecord.transferred_at.is_not(None)))))
+
+    # Ish kunlari — yozuv bo'lgan kunlar soni (o'rtacha hisoblash uchun)
+    work_days = int(await _scalar(db, select(
+        func.count(func.distinct(ProductionRecord.production_date))).where(cond)))
+
+    # --- Kotyol: model + o'lcham kesimi ---
+    model_expr = func.coalesce(func.nullif(func.btrim(Product.model), ""), "—")
+    model_rows = (await db.execute(
+        select(model_expr, Product.kvm, qty)
+        .select_from(ProductionRecord)
+        .outerjoin(Product, Product.id == ProductionRecord.product_id)
+        .where(kotyol_cond)
+        .group_by(model_expr, Product.kvm)
+        .order_by(qty.desc())
+    )).all()
+    kotyol_by_model = [
+        {"model": m, "kvm": (int(k) if k is not None else None), "count": int(n or 0)}
+        for m, k, n in model_rows
+    ]
+
+    # --- Kotyol: faqat o'lcham (kvm) kesimi ---
+    size_rows = (await db.execute(
+        select(Product.kvm, qty)
+        .select_from(ProductionRecord)
+        .outerjoin(Product, Product.id == ProductionRecord.product_id)
+        .where(kotyol_cond).group_by(Product.kvm).order_by(qty.desc())
+    )).all()
+    kotyol_by_size = [
+        {"size": (f"{int(k)} kvm" if k is not None else PRODUCTION_NO_SIZE),
+         "kvm": (int(k) if k is not None else None), "count": int(n or 0)}
+        for k, n in size_rows
+    ]
+
+    # --- Tana (olib kelingan kotyol): o'lcham kesimi ---
+    # SELECT va GROUP BY da AYNAN bir xil ifoda obyekti ishlatiladi — aks holda
+    # bind parametrlar boshqacha bo'lib, Postgres ularni bir xil deb bilmaydi.
+    body_expr = func.coalesce(
+        func.nullif(func.btrim(ProductionRecord.body_size), ""), PRODUCTION_NO_SIZE)
+    body_rows = (await db.execute(
+        select(body_expr, qty)
+        .where(tana_cond).group_by(body_expr).order_by(qty.desc())
+    )).all()
+    tana_by_size = [{"size": s, "count": int(n or 0)} for s, n in body_rows]
+
+    # --- Yo'nalish (o'ng / chap) ---
+    dir_rows = (await db.execute(
+        select(ProductionRecord.category, ProductionRecord.bunker_direction, qty)
+        .where(cond).group_by(ProductionRecord.category, ProductionRecord.bunker_direction)
+    )).all()
+    kotyol_dirs: dict[str, int] = {}
+    tana_dirs: dict[str, int] = {}
+    for cat, direction, n in dir_rows:
+        target = kotyol_dirs if cat == "kotyol" else tana_dirs
+        label = _direction_label(direction)
+        target[label] = target.get(label, 0) + int(n or 0)
+
+    def _dir_list(d: dict[str, int]) -> list[dict]:
+        return sorted(
+            ({"direction": k, "count": v} for k, v in d.items()),
+            key=lambda r: (r["direction"] == PRODUCTION_NO_DIRECTION, -r["count"]),
+        )
+
+    granularity = "day" if (date_to - date_from).days <= 62 else "month"
+    trend = await _production_trend(db, date_from, date_to, granularity)
+
+    return {
+        "date_from": date_from, "date_to": date_to,
+        "granularity": granularity,
+        "kotyol_total": kotyol_total,
+        "tana_total": tana_total,
+        "kotyol_transferred": transferred,
+        "kotyol_pending": max(kotyol_total - transferred, 0),
+        "work_days": work_days,
+        "kotyol_avg_per_day": round(kotyol_total / work_days, 1) if work_days else 0,
+        "tana_avg_per_day": round(tana_total / work_days, 1) if work_days else 0,
+        "trend": trend,
+        "kotyol_by_model": kotyol_by_model,
+        "kotyol_by_size": kotyol_by_size,
+        "tana_by_size": tana_by_size,
+        "kotyol_by_direction": _dir_list(kotyol_dirs),
+        "tana_by_direction": _dir_list(tana_dirs),
     }

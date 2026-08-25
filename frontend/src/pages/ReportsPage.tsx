@@ -1,17 +1,18 @@
 import { useState } from 'react';
-import { ShoppingCart, Wallet, Wrench, Truck, Calculator } from 'lucide-react';
+import { ShoppingCart, Wallet, Wrench, Truck, Calculator, Factory } from 'lucide-react';
 
 import DateRangeFilter, { presetRange } from '@/features/reports/DateRangeFilter';
 import SalesReport from '@/features/reports/SalesReport';
 import FinanceReport from '@/features/reports/FinanceReport';
 import ServiceReport from '@/features/reports/ServiceReport';
+import ProductionReport from '@/features/reports/ProductionReport';
 import SupplyReport from '@/features/reports/SupplyReport';
 import CostingReport from '@/features/reports/CostingReport';
 import { formatDate } from '@/lib/format';
 import { usePermissions } from '@/lib/permissions';
 import type { DateRange } from '@/features/reports/types';
 
-type Tab = 'sales' | 'finance' | 'costing' | 'service' | 'supply';
+type Tab = 'sales' | 'finance' | 'costing' | 'service' | 'production' | 'supply';
 type Preset = 'this_month' | 'last_month' | 'last_30' | 'last_90' | 'this_year';
 
 const TAB_KEYS: Array<{ key: Tab; icon: typeof ShoppingCart }> = [
@@ -19,6 +20,7 @@ const TAB_KEYS: Array<{ key: Tab; icon: typeof ShoppingCart }> = [
   { key: 'finance', icon: Wallet },
   { key: 'costing', icon: Calculator },
   { key: 'service', icon: Wrench },
+  { key: 'production', icon: Factory },
   { key: 'supply', icon: Truck },
 ];
 
@@ -27,6 +29,7 @@ const REPORTS_TABS: Record<string, string> = {
   finance: 'Moliya',
   costing: 'Tannarx / Foyda',
   service: 'Servis',
+  production: 'Ishlab chiqarish',
   supply: "Ta'minot",
 };
 
@@ -92,6 +95,7 @@ export default function ReportsPage() {
       {tab === 'finance' && <FinanceReport range={range} />}
       {tab === 'costing' && <CostingReport range={range} />}
       {tab === 'service' && <ServiceReport range={range} />}
+      {tab === 'production' && <ProductionReport range={range} />}
       {tab === 'supply' && <SupplyReport range={range} />}
     </div>
   );
