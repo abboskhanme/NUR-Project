@@ -1,7 +1,7 @@
 import { Fragment, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { Plus, Pencil, Trash2, Search, Flame, Boxes, Cylinder, Warehouse, CheckCircle2, Container, CalendarDays, CalendarRange, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Flame, Boxes, Cylinder, Warehouse, CheckCircle2, Container, CalendarDays, CalendarRange, ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 
 import { api } from '@/api/client';
 import Card from '@/components/ui/Card';
@@ -47,6 +47,12 @@ const REPORT_MONTHS: Record<number, string> = {
 };
 const rpad2 = (n: number) => String(n).padStart(2, '0');
 
+// Kategoriya → jamlanmadagi maydon (o'tgan oy bilan solishtirish uchun)
+const CAT_TOTAL: Record<Category, 'total_kotyol' | 'total_bunker' | 'total_garelka' | 'total_tana'> = {
+  kotyol: 'total_kotyol', bunker: 'total_bunker', garelka: 'total_garelka', tana: 'total_tana',
+};
+const totalOf = (s: Summary | undefined, c: Category) => (s ? s[CAT_TOTAL[c]] : 0);
+
 export default function ProductionPage() {
   const qc = useQueryClient();
   const { can } = usePermissions();
@@ -80,21 +86,49 @@ export default function ProductionPage() {
     ? `${repYear}-yil`
     : `${REPORT_MONTHS[repMonth]} ${repYear}`;
 
+  // --- Solishtirish davri: bir oldingi oy ("Butun yil"da — o'tgan yil) --------
+  const { prevFrom, prevTo, prevLabel } = useMemo(() => {
+    if (repMonth === 0) {
+      const y = repYear - 1;
+      return { prevFrom: `${y}-01-01`, prevTo: `${y}-12-31`, prevLabel: `${y}-yil` };
+    }
+    const pm = repMonth === 1 ? 12 : repMonth - 1;
+    const py = repMonth === 1 ? repYear - 1 : repYear;
+    const last = new Date(py, pm, 0).getDate();
+    return {
+      prevFrom: `${py}-${rpad2(pm)}-01`,
+      prevTo: `${py}-${rpad2(pm)}-${rpad2(last)}`,
+      prevLabel: `${REPORT_MONTHS[pm]} ${py}`,
+    };
+  }, [repYear, repMonth]);
+  const prevWord = repMonth === 0 ? "o'tgan yil" : "o'tgan oy";
+
   // KPI kartalar uchun — butun davr (filtrsiz) jami
   const summaryQ = useQuery<Summary>({
     queryKey: ['prod-summary'],
     queryFn: () => api.get('/production/summary').then((r) => r.data),
   });
 
-  // Hisobot jadvali uchun — tanlangan davr bo'yicha
+  // Hisobot jadvali uchun — tanlangan davr bo'yicha.
+  // Ichki bo'limlarda ham kerak: o'tgan oy bilan solishtirish shu jamlanmadan.
   const reportQ = useQuery<Summary>({
     queryKey: ['prod-summary', dateFrom, dateTo],
     queryFn: () => api.get('/production/summary', {
       params: { date_from: dateFrom, date_to: dateTo },
     }).then((r) => r.data),
-    enabled: tab === 'summary',
   });
   const rs = reportQ.data;
+
+  // O'tgan davr jamlanmasi — faqat solishtirish uchun (jadvalga ta'sir qilmaydi)
+  const prevQ = useQuery<Summary>({
+    queryKey: ['prod-summary', prevFrom, prevTo],
+    queryFn: () => api.get('/production/summary', {
+      params: { date_from: prevFrom, date_to: prevTo },
+    }).then((r) => r.data),
+  });
+  const ps = prevQ.data;
+  // Solishtirish faqat ikkala davr ham yuklangach ko'rsatiladi (0 lipillamasin)
+  const cmpReady = !!rs && !!ps;
 
   // Ichki bo'limlar (kotyol/bunker/garelka/tana) ham xuddi hisobot kabi
   // tanlangan davr bo'yicha filtrlanadi — kunlik ko'rish uchun.
@@ -243,10 +277,14 @@ export default function ProductionPage() {
 
           {/* Tanlangan davr jamlanmasi */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
-            <PeriodStat label="Kotyol" value={rs?.total_kotyol ?? 0} tone="primary" />
-            <PeriodStat label="Bunker" value={rs?.total_bunker ?? 0} tone="success" />
-            <PeriodStat label="Garelka" value={rs?.total_garelka ?? 0} tone="warning" />
-            <PeriodStat label="Tana" value={rs?.total_tana ?? 0} tone="accent" />
+            <PeriodStat label="Kotyol" value={rs?.total_kotyol ?? 0} tone="primary"
+                        prev={cmpReady ? ps!.total_kotyol : undefined} prevWord={prevWord} prevLabel={prevLabel} />
+            <PeriodStat label="Bunker" value={rs?.total_bunker ?? 0} tone="success"
+                        prev={cmpReady ? ps!.total_bunker : undefined} prevWord={prevWord} prevLabel={prevLabel} />
+            <PeriodStat label="Garelka" value={rs?.total_garelka ?? 0} tone="warning"
+                        prev={cmpReady ? ps!.total_garelka : undefined} prevWord={prevWord} prevLabel={prevLabel} />
+            <PeriodStat label="Tana" value={rs?.total_tana ?? 0} tone="accent"
+                        prev={cmpReady ? ps!.total_tana : undefined} prevWord={prevWord} prevLabel={prevLabel} />
           </div>
 
           {reportQ.isLoading ? (
@@ -309,6 +347,17 @@ export default function ProductionPage() {
                   </span>
                   <span className="text-sm font-medium text-ink-soft">dona</span>
                 </div>
+                {/* O'tgan oyga nisbatan — qidiruv paytida ko'rsatilmaydi
+                    (u paytda yuqoridagi son faqat topilganlarni sanaydi) */}
+                {category && !searching && cmpReady && (
+                  <MonthDelta
+                    current={totalOf(rs, category)}
+                    prev={totalOf(ps, category)}
+                    prevLabel={prevLabel}
+                    unit="dona"
+                    className="mt-1"
+                  />
+                )}
               </div>
             </div>
             <div className="flex items-center gap-5 pr-1">
@@ -548,13 +597,53 @@ const PERIOD_TONES: Record<string, string> = {
   accent: 'border-accent/25 bg-accent/10 text-accent',
 };
 
-function PeriodStat({ label, value, tone }: {
+function PeriodStat({ label, value, tone, prev, prevWord, prevLabel }: {
   label: string; value: number; tone: 'primary' | 'success' | 'warning' | 'accent';
+  prev?: number; prevWord?: string; prevLabel?: string;
 }) {
   return (
     <div className={`rounded-button border p-2.5 ${PERIOD_TONES[tone]}`}>
       <div className="text-xs font-medium opacity-80">{label}</div>
       <div className="text-xl font-bold tabular-nums">{value}</div>
+      {prev !== undefined && (
+        <MonthDelta current={value} prev={prev} prevLabel={prevLabel ?? ''}
+                    prevWord={prevWord} compact className="mt-0.5" />
+      )}
+    </div>
+  );
+}
+
+/** O'tgan davr bilan solishtirish: farq, foiz va o'tgan davr soni. */
+function MonthDelta({ current, prev, prevLabel, prevWord, unit, compact, className = '' }: {
+  current: number; prev: number; prevLabel: string;
+  prevWord?: string; unit?: string; compact?: boolean; className?: string;
+}) {
+  const diff = current - prev;
+  const pct = prev > 0 ? Math.round((diff / prev) * 100) : null;
+  const Icon = diff > 0 ? TrendingUp : diff < 0 ? TrendingDown : Minus;
+  const cls = diff > 0 ? 'text-success' : diff < 0 ? 'text-danger' : 'text-ink-soft';
+  const sign = diff > 0 ? '+' : diff < 0 ? '−' : '';
+  // Ixcham ko'rinishda (kichik kartalar) — ikki qator, "o'tgan oy: 33";
+  // keng kartada — bitta qator, oy nomi bilan: "Iyul 2026: 33 dona".
+  const base = compact
+    ? `${prevWord ?? "o'tgan oy"}: ${prev}`
+    : `${prevLabel}: ${prev}${unit ? ` ${unit}` : ''}`;
+  const delta = (
+    <span className={`inline-flex items-center gap-0.5 font-semibold ${cls}`}>
+      <Icon size={12} />
+      {diff === 0 ? "o'zgarishsiz" : `${sign}${Math.abs(diff)}`}
+      {pct !== null && diff !== 0 && ` (${sign}${Math.abs(pct)}%)`}
+    </span>
+  );
+  return (
+    <div className={`text-[11px] leading-tight ${compact ? '' : 'flex items-center gap-1 whitespace-nowrap'} ${className}`}
+         title={`${prevLabel}: ${prev}${unit ? ` ${unit}` : ''}`}>
+      {delta}
+      {compact ? (
+        <div className="text-ink-soft">{base}</div>
+      ) : (
+        <span className="text-ink-soft">· {base}</span>
+      )}
     </div>
   );
 }
