@@ -20,14 +20,16 @@ import ServicePartsStats from '@/features/service/ServicePartsStats';
 import ServiceMoneyStats from '@/features/service/ServiceMoneyStats';
 import ServiceCategoryReport from '@/features/service/ServiceCategoryReport';
 import { ServiceStatusBadge } from '@/features/service/status';
+import WarrantyTerm, { warrantyStart } from '@/features/service/WarrantyTerm';
 import { mapLinks } from '@/features/service/location';
 
 interface Ticket {
   id: string; code: string; problem: string; status: string;
   in_warranty: boolean; opened_at: string; is_external?: boolean;
   lat?: number | null; lon?: number | null; location_note?: string | null;
+  purchase_date?: string | null;
   customer?: { full_name: string; phone: string } | null;
-  order?: { code: string } | null;
+  order?: { code: string; delivered_at?: string | null } | null;
 }
 interface Summary {
   total: number; new: number; scheduled: number;
@@ -303,6 +305,7 @@ export default function ServicePage() {
                   <th className="py-2 pr-3">Tushgan sana</th>
                   <th className="py-2 pr-3">Muddat</th>
                   <th className="py-2 pr-3">Kafolat</th>
+                  <th className="py-2 pr-3">Kafolat muddati</th>
                   <th className="py-2 pr-3">Status</th>
                 </tr>
               </thead>
@@ -361,6 +364,8 @@ export default function ServicePage() {
                         ? <span className="badge bg-success/10 text-success">Kafolatda</span>
                         : <span className="badge bg-gray-100 text-gray-600">Yo'q</span>}
                     </td>
+                    {/* Kafolat muddati — faqat ko'rsatiladi, tahrirlanmaydi */}
+                    <td className="py-2 pr-3"><WarrantyTerm start={warrantyStart(tk)} /></td>
                     <td className="py-2 pr-3"><ServiceStatusBadge status={tk.status} /></td>
                   </tr>
                 ))}

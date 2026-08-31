@@ -143,6 +143,9 @@ export default function TicketDetailModal({
   const extStatus = tk?.is_external && tk.purchase_date
     ? computeWarranty(tk.purchase_date).status : null;
   const wStatus = tk?.order_id ? warrantyQ.data?.current_status : extStatus ?? undefined;
+  // Kafolat muddatlari — yetkazilgan (yoki "0 dan"da sotib olingan) sanadan
+  const wStart = tk?.order?.delivered_at ?? tk?.purchase_date ?? null;
+  const wTerm = computeWarranty(wStart);
   const W = wStatus ? WMETA_CLS[wStatus] : null;
   const isOpen = tk && !['completed', 'cancelled'].includes(tk.status);
 
@@ -208,11 +211,20 @@ export default function TicketDetailModal({
               onChanged={onChanged}
             />
 
-            {/* Warranty */}
+            {/* Warranty — holat va aniq muddatlar (faqat ko'rsatiladi) */}
             {W && wStatus && (
-              <div className={`rounded-button p-3 text-sm flex gap-2 ${W.cls}`}>
-                <W.Icon size={18} className="shrink-0 mt-0.5" />
-                <span className="font-medium">{warrantyLabel(wStatus)}</span>
+              <div className={`rounded-button p-3 text-sm ${W.cls}`}>
+                <div className="flex gap-2">
+                  <W.Icon size={18} className="shrink-0 mt-0.5" />
+                  <span className="font-medium">{warrantyLabel(wStatus)}</span>
+                </div>
+                {wTerm.year1End && wTerm.year3End && (
+                  <div className="mt-2 pt-2 border-t border-black/10 text-xs space-y-0.5">
+                    <div>Kafolat boshlangan: {formatDate(wStart)}</div>
+                    <div>1-yil (ish + ehtiyot qism): {formatDate(wTerm.year1End)} gacha</div>
+                    <div>2–3-yil (faqat ish): {formatDate(wTerm.year3End)} gacha</div>
+                  </div>
+                )}
               </div>
             )}
 
