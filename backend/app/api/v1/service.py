@@ -24,7 +24,7 @@ from app.schemas.common import Page
 from app.schemas.service import (
     CustomerSearchHit, OrderMini, PartStat, ServiceCategoryIn, ServiceCategoryOut,
     ServiceCategoryReport, ServiceCategoryReportRow,
-    ServiceRegionReport, ServiceRegionReportRow,
+    ServiceRegionOption, ServiceRegionReport, ServiceRegionReportRow,
     ServiceExpenseItem, ServiceExternalTicketCreate, ServiceLocationIn,
     ServiceLocationRequestOut, ServicePartIn, ServicePartOut,
     ServiceSummary, ServiceTicketCreate, ServiceTicketOut, ServiceTicketUpdate,
@@ -484,12 +484,27 @@ async def close_trip(trip_id: uuid.UUID, user: CurrentUser,
     return _trip_out(new_trip, await _scheduled_count(db))
 
 
+@router.get("/regions", response_model=list[ServiceRegionOption])
+async def ticket_regions(db: Annotated[AsyncSession, Depends(get_db)], _: CurrentUser):
+    """Arizalar uchraydigan viloyatlar — ro'yxatdagi filtr dropdown'i uchun."""
+    reg = _region_expr()
+    rows = (await db.execute(
+        select(reg.label("region"), func.count().label("count"))
+        .select_from(ServiceTicket)
+        .join(Customer, Customer.id == ServiceTicket.customer_id)
+        .group_by(reg)
+    )).all()
+    out = [ServiceRegionOption(region=r.region, count=r.count) for r in rows]
+    out.sort(key=lambda r: (r.region == UNKNOWN_REGION, -r.count, r.region.lower()))
+    return out
+
+
 @router.get("/tickets", response_model=Page[ServiceTicketOut])
 async def list_tickets(db: Annotated[AsyncSession, Depends(get_db)], _: CurrentUser,
                        page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100),
                        status: Optional[str] = None, in_warranty: Optional[bool] = None,
                        customer_id: Optional[uuid.UUID] = None, search: Optional[str] = None,
-                       has_location: Optional[bool] = None):
+                       has_location: Optional[bool] = None, region: Optional[str] = None):
     q = select(ServiceTicket).options(
         selectinload(ServiceTicket.visits),
         selectinload(ServiceTicket.customer),
@@ -497,6 +512,10 @@ async def list_tickets(db: Annotated[AsyncSession, Depends(get_db)], _: CurrentU
     )
     if status:
         q = q.where(ServiceTicket.status == status)
+    if region:
+        # Viloyat mijoz kartochkasidan olinadi (hisobotlardagi mezon bilan bir xil)
+        q = (q.join(Customer, Customer.id == ServiceTicket.customer_id)
+              .where(_region_expr() == region.strip()))
     if in_warranty is not None:
         q = q.where(ServiceTicket.in_warranty == in_warranty)
     if customer_id:

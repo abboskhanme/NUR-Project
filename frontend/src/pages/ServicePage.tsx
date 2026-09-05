@@ -7,6 +7,7 @@ import {
 
 import { api } from '@/api/client';
 import Card from '@/components/ui/Card';
+import Select from '@/components/ui/Select';
 import EmptyState from '@/components/ui/EmptyState';
 import { formatDate, formatPhone } from '@/lib/format';
 import ServiceTicketModal from '@/features/service/ServiceTicketModal';
@@ -37,6 +38,8 @@ interface Summary {
   with_visit: number;
 }
 
+interface RegionOption { region: string; count: number }
+
 const FILTER_KEYS = ['', 'new', 'scheduled', 'completed', 'cancelled'] as const;
 
 const SERVICE_FILTER_LABELS: Record<string, string> = {
@@ -53,11 +56,19 @@ function deadlineOf(openedAt: string): Date {
   return d;
 }
 
+/** Qator foni: bajarilmagan ariza — qizil-pushti, bajarilgani — yashil. */
+function rowTone(status: string): string {
+  if (status === 'completed') return 'bg-success/10 hover:bg-success/20';
+  if (status === 'new' || status === 'scheduled') return 'bg-danger/[0.08] hover:bg-danger/[0.16]';
+  return 'hover:bg-black/5';
+}
+
 export default function ServicePage() {
   const [status, setStatus] = useState('');
   const [search, setSearch] = useState('');
   // Faqat lokatsiyasi yo'q arizalar — safarga chiqishdan oldin tozalab olish uchun
   const [onlyNoLoc, setOnlyNoLoc] = useState(false);
+  const [region, setRegion] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
   const [extOpen, setExtOpen] = useState(false);
   const [catOpen, setCatOpen] = useState(false);
@@ -70,12 +81,19 @@ export default function ServicePage() {
     queryFn: () => api.get('/service/summary').then((r) => r.data),
   });
 
+  // Viloyat filtri variantlari — arizalarda haqiqatan uchraydiganlari
+  const regionsQ = useQuery<RegionOption[]>({
+    queryKey: ['service-regions'],
+    queryFn: () => api.get('/service/regions').then((r) => r.data),
+  });
+
   const ticketsQ = useQuery<{ items: Ticket[]; total: number }>({
-    queryKey: ['service-tickets', status, search, onlyNoLoc],
+    queryKey: ['service-tickets', status, search, onlyNoLoc, region],
     queryFn: () => api.get('/service/tickets', {
       params: {
         status: status || undefined, search: search.trim() || undefined,
-        has_location: onlyNoLoc ? false : undefined, page_size: 100,
+        has_location: onlyNoLoc ? false : undefined,
+        region: region || undefined, page_size: 100,
       },
     }).then((r) => r.data),
   });
@@ -184,6 +202,18 @@ export default function ServicePage() {
           ))}
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto">
+          {/* Viloyat bo'yicha filtr */}
+          <Select
+            value={region}
+            onChange={setRegion}
+            allowEmpty
+            emptyLabel="Barcha viloyatlar"
+            placeholder="Barcha viloyatlar"
+            className="w-full sm:w-48"
+            options={(regionsQ.data ?? []).map((r) => ({
+              value: r.region, label: `${r.region} (${r.count})`,
+            }))}
+          />
           <button onClick={() => setOnlyNoLoc((v) => !v)}
             title="Lokatsiyasi biriktirilmagan arizalar"
             className={`px-3 py-1.5 rounded-button text-sm font-medium transition inline-flex items-center gap-1.5 ${
@@ -231,7 +261,8 @@ export default function ServicePage() {
               const hasLoc = tk.lat != null && tk.lon != null;
               return (
                 <div key={tk.id} onClick={() => setDetailId(tk.id)}
-                     className="py-3 flex items-start gap-3 cursor-pointer active:bg-black/[0.03]">
+                     className={'py-3 px-2 -mx-2 flex items-start gap-3 cursor-pointer transition-colors '
+                       + rowTone(tk.status)}>
                   {/* Ikkita katta tugma — barmoq bilan bosishga qulay (36px) */}
                   <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
                     {open ? (
@@ -312,7 +343,8 @@ export default function ServicePage() {
               <tbody>
                 {tickets.map((tk) => (
                   <tr key={tk.id} onClick={() => setDetailId(tk.id)}
-                      className="border-b border-black/5 hover:bg-black/5 cursor-pointer">
+                      className={'border-b border-black/5 cursor-pointer transition-colors '
+                        + rowTone(tk.status)}>
                     <td className="py-2 pr-3 text-center" onClick={(e) => e.stopPropagation()}>
                       {tk.status === 'new' || tk.status === 'scheduled' ? (
                         <button onClick={() => toggleScheduled(tk)}

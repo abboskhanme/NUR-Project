@@ -254,6 +254,12 @@ class ServiceRegionReport(BaseModel):
     rows: list[ServiceRegionReportRow] = []
 
 
+class ServiceRegionOption(BaseModel):
+    """Arizalar ro'yxatidagi viloyat filtri uchun bitta variant."""
+    region: str
+    count: int = 0
+
+
 class TripMoneyStat(BaseModel):
     collected: Decimal = Decimal(0)         # olingan
     spent: Decimal = Decimal(0)             # safar sarflangani (trip.spent yig'indisi)
