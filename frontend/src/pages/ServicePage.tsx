@@ -207,6 +207,7 @@ export default function ServicePage() {
             value={region}
             onChange={setRegion}
             allowEmpty
+            searchable={false}
             emptyLabel="Barcha viloyatlar"
             placeholder="Barcha viloyatlar"
             className="w-full sm:w-48"

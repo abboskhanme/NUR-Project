@@ -8,6 +8,12 @@ export interface SelectOption {
   icon?: ReactNode;
 }
 
+/** Sensorli qurilma — mobil klaviatura chiqmasligi uchun autofocus berilmaydi. */
+function isTouch() {
+  return typeof window !== 'undefined'
+    && window.matchMedia?.('(hover: none) and (pointer: coarse)').matches;
+}
+
 /**
  * Chiroyli custom dropdown — native <select> o'rniga.
  * Ochilgan ro'yxat PORTAL + `position: fixed` bilan chiqadi, shuning uchun
@@ -24,6 +30,7 @@ export default function Select({
   disabled = false,
   invalid = false,
   className = '',
+  searchable,
 }: {
   value: string;
   onChange: (val: string) => void;
@@ -34,6 +41,8 @@ export default function Select({
   disabled?: boolean;
   invalid?: boolean;
   className?: string;
+  /** Qidiruv maydoni. Berilmasa — 8 tadan ko'p variant bo'lsa o'zi yoqiladi. */
+  searchable?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -42,7 +51,7 @@ export default function Select({
   const [style, setStyle] = useState<React.CSSProperties | null>(null);
 
   const selected = options.find((o) => o.value === value);
-  const searchable = options.length > 8;
+  const withSearch = searchable ?? options.length > 8;
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -89,11 +98,12 @@ export default function Select({
       if (popRef.current && e.target instanceof Node && popRef.current.contains(e.target)) return;
       close();
     };
+    // Mobil klaviatura chiqqanda ham resize bo'ladi — yopmaymiz, qayta joylashtiramiz.
     window.addEventListener('scroll', onScroll, true);
-    window.addEventListener('resize', close);
+    window.addEventListener('resize', place);
     return () => {
       window.removeEventListener('scroll', onScroll, true);
-      window.removeEventListener('resize', close);
+      window.removeEventListener('resize', place);
     };
   }, [open]);
 
@@ -122,11 +132,11 @@ export default function Select({
           <div className="fixed inset-0 z-[55]" onClick={close} />
           <div ref={popRef} style={style}
                className="bg-card border border-black/10 rounded-xl shadow-xl overflow-hidden flex flex-col">
-            {searchable && (
+            {withSearch && (
               <div className="flex items-center gap-2 px-3 py-2 border-b border-black/5 shrink-0">
                 <Search size={14} className="text-ink/40 shrink-0" />
                 <input
-                  autoFocus
+                  autoFocus={!isTouch()}
                   className="w-full bg-transparent outline-none text-sm"
                   placeholder="Qidirish..."
                   value={query}
