@@ -40,6 +40,7 @@ export const SPECIAL_PERMISSIONS = [
   { key: 'system:finance_override', label: 'Oylikdan ortiq avans berish',           danger: true },
   { key: 'system:order_override',   label: 'Buyurtma ID/sotuvchisini tahrirlash',   danger: false },
   { key: 'system:goals_manage',     label: 'Oylik maqsadlarni (sotuv/tushum) belgilash', danger: false },
+  { key: 'system:service_reopen',   label: 'Yopilgan servis arizasini qayta ochish', danger: false },
 ] as const;
 
 export const SYSTEM_WILDCARD = 'system:*';

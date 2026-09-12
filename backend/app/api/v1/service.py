@@ -12,7 +12,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core import settings_store
 from app.core.dependencies import CurrentUser
-from app.core.permissions import module_guard
+from app.core.permissions import has_special, module_guard
 from app.db.session import get_db
 from app.models.customer import Customer
 from app.models.order import Order, OrderItem
@@ -723,19 +723,40 @@ async def product_models(db: Annotated[AsyncSession, Depends(get_db)], _: Curren
     return names
 
 
+# Yopilgan (bajarilgan/bekor qilingan) ariza holatlari
+CLOSED_STATUSES = ("completed", "cancelled")
+OPEN_STATUSES = ("new", "scheduled")
+
+
 @router.patch("/tickets/{ticket_id}", response_model=ServiceTicketOut)
-async def update_ticket(ticket_id: uuid.UUID, payload: ServiceTicketUpdate, _: CurrentUser,
+async def update_ticket(ticket_id: uuid.UUID, payload: ServiceTicketUpdate, user: CurrentUser,
                         db: Annotated[AsyncSession, Depends(get_db)]):
+    """Arizani tahrirlash.
+
+    Yopilgan arizani QAYTA OCHISH (bajarildi/bekor → yangi/rejalashtirilgan)
+    faqat `system:service_reopen` ruxsati bilan — hisobot raqamlariga ta'sir
+    qiladi, shuning uchun oddiy xodim qaytara olmaydi.
+    """
     t = await _get_full(db, ticket_id)
     if not t:
         raise HTTPException(404, "Ariza topilmadi")
     changes = payload.model_dump(exclude_unset=True)
+
+    new_status = changes.get("status")
+    if (t.status in CLOSED_STATUSES and new_status in OPEN_STATUSES
+            and not has_special(user, "system:service_reopen")):
+        raise HTTPException(
+            403,
+            "Yopilgan arizani qayta ochish uchun ruxsat yo'q "
+            "(«Yopilgan servis arizasini qayta ochish»).",
+        )
+
     for k, v in changes.items():
         setattr(t, k, v)
     # Bajarildi / Bekor qilindi — yopilgan sanani avtomatik belgilaymiz
-    if changes.get("status") in ("completed", "cancelled") and not t.closed_at:
+    if new_status in CLOSED_STATUSES and not t.closed_at:
         t.closed_at = datetime.now(timezone.utc)
-    if changes.get("status") in ("new", "scheduled"):
+    if new_status in OPEN_STATUSES:
         t.closed_at = None
     await db.commit()
     return await _get_full(db, ticket_id)

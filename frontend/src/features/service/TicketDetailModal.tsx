@@ -3,11 +3,12 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import {
   X, Phone, Package, ShieldCheck, ShieldAlert, ShieldX, Truck,
-  CalendarClock, Check, Ban, Plus,
+  CalendarClock, Check, Ban, Plus, RotateCcw,
 } from 'lucide-react';
 
 import { api } from '@/api/client';
 import { formatDate, formatDateTime, formatPhone, formatUZS } from '@/lib/format';
+import { usePermissions } from '@/lib/permissions';
 import { computeWarranty } from './warranty';
 import { ServiceStatusBadge } from './status';
 import TicketLocation from './TicketLocation';
@@ -49,6 +50,10 @@ export default function TicketDetailModal({
   ticketId, onClose, onChanged,
 }: { ticketId: string; onClose: () => void; onChanged: () => void }) {
   const qc = useQueryClient();
+  // Yopilgan arizani qayta ochish — hisobotga ta'sir qiladi, shuning uchun
+  // faqat maxsus ruxsat bilan (super-admin va rolga aniq berilganlar).
+  const { canSpecial } = usePermissions();
+  const canReopen = canSpecial('system:service_reopen');
   const ticketQ = useQuery<Ticket>({
     queryKey: ['service-ticket', ticketId],
     queryFn: () => api.get(`/service/tickets/${ticketId}`).then((r) => r.data),
@@ -255,6 +260,42 @@ export default function TicketDetailModal({
                   className="btn-action justify-center bg-gray-100 text-gray-600 hover:bg-gray-200">
                   <Ban size={15} /> Bekor qilish
                 </button>
+              </div>
+            )}
+
+            {/* Yopilgan ariza — statusni qaytarish (faqat ruxsat bo'lsa) */}
+            {!isOpen && canReopen && (
+              <div className="rounded-button bg-black/[0.03] p-3 space-y-2">
+                <div className="text-xs text-ink-soft">
+                  Ariza {tk.status === 'completed' ? 'bajarilgan' : 'bekor qilingan'}
+                  {tk.closed_at && ` — ${formatDateTime(tk.closed_at)}`}.
+                  Statusni qaytarsangiz hisobot raqamlari ham o'zgaradi.
+                </div>
+                <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
+                  <button disabled={busy}
+                    onClick={() => patch({ status: 'new' }, 'Ariza yangiga qaytarildi')}
+                    className="btn-action justify-center bg-blue-100 text-blue-700 hover:bg-blue-200">
+                    <RotateCcw size={15} /> Yangiga qaytarish
+                  </button>
+                  <button disabled={busy}
+                    onClick={() => patch({ status: 'scheduled' }, 'Rejalashtirilganga qaytarildi')}
+                    className="btn-action justify-center bg-amber-100 text-amber-700 hover:bg-amber-200">
+                    <CalendarClock size={15} /> Rejalashtirilgan
+                  </button>
+                  {tk.status === 'completed' ? (
+                    <button disabled={busy}
+                      onClick={() => patch({ status: 'cancelled' }, 'Bekor qilindi')}
+                      className="btn-action justify-center bg-gray-100 text-gray-600 hover:bg-gray-200">
+                      <Ban size={15} /> Bekor qilish
+                    </button>
+                  ) : (
+                    <button disabled={busy}
+                      onClick={() => patch({ status: 'completed' }, 'Bajarildi deb belgilandi')}
+                      className="btn-action justify-center bg-emerald-100 text-emerald-700 hover:bg-emerald-200">
+                      <Check size={15} /> Bajarildi
+                    </button>
+                  )}
+                </div>
               </div>
             )}
 
