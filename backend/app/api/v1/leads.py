@@ -76,7 +76,8 @@ def _to_out(lead: Lead, names: dict[uuid.UUID, str], event_count: int = 0) -> Le
             k: getattr(lead, k)
             for k in (
                 "id", "source", "ig_user_id", "ig_username",
-                "tg_user_id", "tg_username", "media_id", "comment_id",
+                "tg_user_id", "tg_username", "wa_user_id", "wa_username",
+                "media_id", "comment_id",
                 "name", "contact", "product_interest", "language", "intent",
                 "lead_score", "summary", "status", "assigned_to_id", "note",
                 "customer_id", "order_id", "created_at", "updated_at",
@@ -275,14 +276,15 @@ async def inbox(
         like = f"%{search.strip()}%"
         q = q.where(or_(
             Lead.ig_username.ilike(like), Lead.tg_username.ilike(like),
+            Lead.wa_username.ilike(like), Lead.wa_user_id.ilike(like),
             Lead.name.ilike(like), Lead.contact.ilike(like),
         ))
     if only_unread:
         q = q.where(agg.c.unread > 0)
-    if channel == "telegram":
-        q = q.where(Lead.tg_user_id.is_not(None))
+    if channel in ("telegram", "whatsapp"):
+        q = q.where(_id_col(channel).is_not(None))
     elif channel == "instagram":
-        q = q.where(Lead.tg_user_id.is_(None))
+        q = q.where(Lead.tg_user_id.is_(None), Lead.wa_user_id.is_(None))
     q = q.order_by(agg.c.last_at.desc()).limit(limit)
 
     rows = (await db.execute(q)).all()
@@ -313,7 +315,7 @@ async def inbox(
         items.append(LeadInboxItem(
             lead_id=lead.id,
             channel=chan,
-            user_id=lead.tg_user_id if chan == "telegram" else lead.ig_user_id,
+            user_id=getattr(lead, _columns_for(chan)[0]),
             username=_channel_username(lead),
             ig_user_id=lead.ig_user_id,
             ig_username=lead.ig_username,
@@ -328,8 +330,7 @@ async def inbox(
             last_message_role=role,
             last_customer_at=last_customer_at,
             unread=int(unread or 0),
-            # Telegramda javob oynasi cheklovi yo'q — har doim yozish mumkin
-            window="open" if chan == "telegram" else _window_of(last_customer_at),
+            window=_window_for(chan, last_customer_at),
         ))
     return items
 
@@ -363,17 +364,21 @@ async def reply_to_lead(
         raise HTTPException(400, "Bu leadда Instagram foydalanuvchisi yo'q")
 
     window = "open"
-    if channel == "instagram":
-        # Instagram: 24 soat erkin, 7 kungacha HUMAN_AGENT, keyin yopiq
+    if channel in ("instagram", "whatsapp"):
+        # Instagram: 24 soat erkin, 7 kungacha HUMAN_AGENT, keyin yopiq.
+        # WhatsApp: 24 soat erkin, keyin faqat shablon (ERP'dan yozib bo'lmaydi).
         last_customer_at = (await db.execute(
             select(func.max(LeadEvent.created_at)).where(
                 LeadEvent.lead_id == lead.id, LeadEvent.message_text.is_not(None)
             )
         )).scalar()
-        window = _window_of(last_customer_at)
+        window = _window_for(channel, last_customer_at)
         if window == "closed":
             raise HTTPException(
                 400,
+                "WhatsApp javob oynasi yopilgan (mijozning oxirgi xabaridan 24 "
+                "soat o'tgan). Telefon orqali bog'laning."
+                if channel == "whatsapp" else
                 "Instagram javob oynasi yopilgan (mijozning oxirgi xabaridan 7 kun "
                 "o'tgan). Instagram ilovasidan yoki telefon orqali bog'laning.",
             )
@@ -383,6 +388,12 @@ async def reply_to_lead(
         result = await agent_request(
             "POST", "/admin/send-telegram",
             json={"tg_user_id": lead.tg_user_id, "text": text},
+            public_url=public_url,
+        )
+    elif channel == "whatsapp":
+        result = await agent_request(
+            "POST", "/admin/send-whatsapp",
+            json={"wa_user_id": lead.wa_user_id, "text": text},
             public_url=public_url,
         )
     else:
@@ -601,7 +612,7 @@ async def ingest_lead(payload: LeadIngest, db: Annotated[AsyncSession, Depends(g
     channel = payload.channel if payload.channel in CHANNELS else "instagram"
     user_id = (payload.user_id or payload.ig_user_id or "").strip()
     username = payload.username or payload.ig_username
-    id_col = Lead.tg_user_id if channel == "telegram" else Lead.ig_user_id
+    id_col = _id_col(channel)
 
     existing: Optional[Lead] = None
     if user_id:
@@ -627,18 +638,13 @@ async def ingest_lead(payload: LeadIngest, db: Annotated[AsyncSession, Depends(g
             if val:
                 setattr(lead, field, val)
         if username:
-            if channel == "telegram":
-                lead.tg_username = username
-            else:
-                lead.ig_username = username
+            setattr(lead, _columns_for(channel)[1], username)
         lead.lead_score = max(lead.lead_score or 0, payload.lead_score or 0)
     else:
+        id_field, username_field = _columns_for(channel)
         lead = Lead(
             source=_source_for(payload.source, channel),
-            ig_user_id=user_id if channel != "telegram" else None,
-            ig_username=username if channel != "telegram" else None,
-            tg_user_id=user_id if channel == "telegram" else None,
-            tg_username=username if channel == "telegram" else None,
+            **{id_field: user_id or None, username_field: username},
             media_id=payload.media_id,
             comment_id=payload.comment_id,
             name=payload.name,
@@ -749,21 +755,64 @@ def _country_of(phone: str) -> str:
     return "Uzbekistan"
 
 
-CHANNELS = ("instagram", "telegram")
+CHANNELS = ("instagram", "telegram", "whatsapp")
+
+# Kanal → lead ustunlari (ID, username). Yangi kanal qo'shilganda faqat shu
+# jadval kengayadi — qolgan kod o'zgarmaydi.
+CHANNEL_COLUMNS: dict[str, tuple[str, str]] = {
+    "instagram": ("ig_user_id", "ig_username"),
+    "telegram": ("tg_user_id", "tg_username"),
+    "whatsapp": ("wa_user_id", "wa_username"),
+}
+# Agent holatidagi kalit prefiksi (kanallar ID'lari to'qnashmasligi uchun).
+# Instagram — tarixiy sabablarga ko'ra prefikssiz.
+CHANNEL_KEY_PREFIX: dict[str, str] = {"telegram": "tg:", "whatsapp": "wa:"}
+
+
+def _columns_for(channel: str) -> tuple[str, str]:
+    return CHANNEL_COLUMNS.get(channel, CHANNEL_COLUMNS["instagram"])
+
+
+def _id_col(channel: str):
+    """Kanalning ID ustuni (SQLAlchemy ustun obyekti)."""
+    return getattr(Lead, _columns_for(channel)[0])
 
 
 def _channel_of(lead: Lead) -> str:
-    """Lead qaysi kanaldan kelgan (Telegram identifikatori bo'lsa — telegram)."""
-    return "telegram" if lead.tg_user_id else "instagram"
+    """Lead qaysi kanaldan kelgan (qaysi ID ustuni to'ldirilganiga qarab)."""
+    if lead.tg_user_id:
+        return "telegram"
+    if lead.wa_user_id:
+        return "whatsapp"
+    return "instagram"
 
 
 def _user_key(lead: Lead) -> str:
-    """Agent holatidagi kalit — Instagram va Telegram ID'lari to'qnashmasin."""
-    return f"tg:{lead.tg_user_id}" if lead.tg_user_id else (lead.ig_user_id or "")
+    """Agent holatidagi kalit — kanallar ID'lari to'qnashmasin."""
+    channel = _channel_of(lead)
+    user_id = getattr(lead, _columns_for(channel)[0]) or ""
+    return f"{CHANNEL_KEY_PREFIX.get(channel, '')}{user_id}" if user_id else ""
 
 
 def _channel_username(lead: Lead) -> Optional[str]:
-    return lead.tg_username if lead.tg_user_id else lead.ig_username
+    return getattr(lead, _columns_for(_channel_of(lead))[1])
+
+
+def _window_for(channel: str, last_customer_at: Optional[datetime]) -> str:
+    """Javob oynasi kanalga qarab.
+
+    Telegram — cheklovsiz. WhatsApp — mijozning oxirgi xabaridan 24 soat
+    (keyin faqat tasdiqlangan shablon, ya'ni ERP'dan erkin matn yozib
+    bo'lmaydi). Instagram — 24 soat erkin + 7 kungacha jonli operator.
+    """
+    if channel == "telegram":
+        return "open"
+    if channel == "whatsapp":
+        if not last_customer_at:
+            return "closed"
+        age = datetime.now(timezone.utc) - last_customer_at
+        return "open" if age <= _WINDOW_FREE else "closed"
+    return _window_of(last_customer_at)
 
 
 def _source_for(source: str, channel: str) -> str:
@@ -782,10 +831,10 @@ async def _lead_for_conversation(
     `create=False` bo'lsa va lead topilmasa — None (izohlardan har kim uchun
     lead ochilib ketmasligi uchun).
     """
-    id_col = Lead.tg_user_id if channel == "telegram" else Lead.ig_user_id
+    id_field, username_field = _columns_for(channel)
     lead = (await db.execute(
         select(Lead)
-        .where(id_col == user_id, Lead.status.notin_(["won", "lost"]))
+        .where(_id_col(channel) == user_id, Lead.status.notin_(["won", "lost"]))
         .order_by(Lead.created_at.desc())
         .limit(1)
     )).scalar_one_or_none()
@@ -793,17 +842,12 @@ async def _lead_for_conversation(
         if not create:
             return None
         lead = Lead(source=source)
-        if channel == "telegram":
-            lead.tg_user_id, lead.tg_username = user_id, username
-        else:
-            lead.ig_user_id, lead.ig_username = user_id, username
+        setattr(lead, id_field, user_id)
+        setattr(lead, username_field, username)
         db.add(lead)
         await db.flush()
-    elif username:
-        if channel == "telegram" and not lead.tg_username:
-            lead.tg_username = username
-        elif channel != "telegram" and not lead.ig_username:
-            lead.ig_username = username
+    elif username and not getattr(lead, username_field):
+        setattr(lead, username_field, username)
     return lead
 
 
@@ -901,10 +945,8 @@ async def ingest_context(
     uid = (user_id or ig_user_id or "").strip()
     if not uid:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Foydalanuvchi ID yo'q")
-    id_col = Lead.tg_user_id if channel == "telegram" else Lead.ig_user_id
-
     leads = (await db.execute(
-        select(Lead).where(id_col == uid).order_by(Lead.created_at)
+        select(Lead).where(_id_col(channel) == uid).order_by(Lead.created_at)
     )).scalars().all()
     if not leads:
         return LeadContextOut(channel=channel)
@@ -939,7 +981,7 @@ async def ingest_context(
     return LeadContextOut(
         lead_id=current.id,
         channel=channel,
-        username=_last("tg_username" if channel == "telegram" else "ig_username"),
+        username=_last(_columns_for(channel)[1]),
         ig_username=_last("ig_username"),
         name=_last("name"),
         contact=_last("contact"),

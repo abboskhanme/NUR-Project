@@ -10,6 +10,8 @@ export interface Lead {
   ig_username?: string | null;
   tg_user_id?: string | null;
   tg_username?: string | null;
+  wa_user_id?: string | null;
+  wa_username?: string | null;
   media_id?: string | null;
   comment_id?: string | null;
   name?: string | null;
@@ -94,7 +96,7 @@ export const INTENT_LABELS: Record<string, string> = {
 export type InboxWindow = 'open' | 'human_agent' | 'closed';
 
 /** Suhbat kanali */
-export type LeadChannel = 'instagram' | 'telegram';
+export type LeadChannel = 'instagram' | 'telegram' | 'whatsapp';
 
 export interface InboxItem {
   lead_id: string;
@@ -129,6 +131,54 @@ export const WINDOW_LABELS: Record<InboxWindow, string> = {
   human_agent: "24 soat o'tgan — operator sifatida javob beriladi",
   closed: "Javob oynasi yopilgan (7 kun o'tgan)",
 };
+
+/** WhatsAppda oyna 24 soat — 7 kunlik «operator» bosqichi yo'q */
+export const WA_WINDOW_LABELS: Record<InboxWindow, string> = {
+  ...WINDOW_LABELS,
+  closed: "Javob oynasi yopilgan (24 soat o'tgan)",
+};
+
+export function windowLabel(channel: LeadChannel, window: InboxWindow): string {
+  return (channel === 'whatsapp' ? WA_WINDOW_LABELS : WINDOW_LABELS)[window];
+}
+
+export const CHANNEL_LABELS: Record<LeadChannel, string> = {
+  instagram: 'Instagram',
+  telegram: 'Telegram',
+  whatsapp: 'WhatsApp',
+};
+
+/** Lead qaysi kanaldan kelgan — backenddagi `_channel_of` bilan bir xil mantiq */
+export function leadChannel(lead: Pick<Lead, 'tg_user_id' | 'wa_user_id'>): LeadChannel {
+  if (lead.tg_user_id) return 'telegram';
+  if (lead.wa_user_id) return 'whatsapp';
+  return 'instagram';
+}
+
+/** Kanaldan qat'i nazar: ko'rsatiladigan nom va profil havolasi */
+export function leadHandle(lead: Lead): { channel: LeadChannel; username: string | null; url: string | null } {
+  const channel = leadChannel(lead);
+  if (channel === 'telegram') {
+    return {
+      channel,
+      username: lead.tg_username || null,
+      url: lead.tg_username ? `https://t.me/${lead.tg_username}` : null,
+    };
+  }
+  if (channel === 'whatsapp') {
+    return {
+      channel,
+      // WhatsAppda «username» yo'q — profil nomi yoki raqamning o'zi
+      username: lead.wa_username || lead.wa_user_id || null,
+      url: lead.wa_user_id ? `https://wa.me/${lead.wa_user_id}` : null,
+    };
+  }
+  return {
+    channel,
+    username: lead.ig_username || null,
+    url: lead.ig_username ? `https://instagram.com/${lead.ig_username}` : null,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // API chaqiruvlari

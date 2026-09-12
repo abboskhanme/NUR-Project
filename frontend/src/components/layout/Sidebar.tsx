@@ -21,11 +21,19 @@ export default function Sidebar() {
 
   const renderLink = (it: NavItem) => {
     const Icon: LucideIcon = it.icon;
-    return (
+    const link = (
       <NavLink key={it.to} to={it.to} end={it.exact} className={linkClass}>
         <Icon size={18} />
         {!collapsed && <span>{it.label}</span>}
       </NavLink>
+    );
+    // Pastdagi alohida guruh — ustidan ajratuvchi chiziq
+    if (!it.divider) return link;
+    return (
+      <div key={it.to}>
+        <div className="mx-4 my-2 border-t border-black/5" />
+        {link}
+      </div>
     );
   };
 

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import {
-  Search, Sparkles, Flame, TrendingUp, CalendarPlus, Instagram, MessageCircle, Phone,
+  Search, Sparkles, Flame, TrendingUp, CalendarPlus, MessageCircle, Phone,
   LayoutGrid, MessagesSquare,
 } from 'lucide-react';
 
@@ -12,10 +12,10 @@ import { cn } from '@/lib/cn';
 import { formatDate, formatPhone } from '@/lib/format';
 import { usePermissions } from '@/lib/permissions';
 import {
-  leadsApi, LEAD_STATUS_LABELS, LEAD_STATUS_ORDER,
+  leadsApi, leadHandle, LEAD_STATUS_LABELS, LEAD_STATUS_ORDER,
   type Lead, type LeadStatus,
 } from '@/features/leads/api';
-import { ScoreBadge } from '@/features/leads/LeadBadges';
+import { ChannelIcon, ScoreBadge } from '@/features/leads/LeadBadges';
 import LeadsInbox from '@/features/leads/LeadsInbox';
 
 // Ustun rang mavzusi — har status sezilarli darajada ajralib tursin
@@ -108,7 +108,9 @@ export default function LeadsPage() {
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <Sparkles size={22} className="text-primary" /> Leadlar
         </h1>
-        <p className="text-sm text-ink-soft">Instagram AI agenti topgan potentsial mijozlar</p>
+        <p className="text-sm text-ink-soft">
+          AI agent topgan potentsial mijozlar — Instagram, Telegram va WhatsApp
+        </p>
       </div>
 
       {/* KPI kartalari */}
@@ -169,7 +171,7 @@ export default function LeadsPage() {
           title={search ? 'Lead topilmadi' : "Hali lead yo'q"}
           description={search
             ? "Qidiruvni o'zgartirib ko'ring"
-            : "Instagram agenti ishga tushgach, leadlar shu yerda paydo bo'ladi"}
+            : "AI agent ishga tushgach, leadlar shu yerda paydo bo'ladi"}
         />
       ) : (
         <div className="flex gap-3 overflow-x-auto pb-2">
@@ -262,7 +264,8 @@ function LeadCard({
   onClick: () => void;
   onDragStart: () => void;
 }) {
-  const displayName = lead.name || lead.ig_username || "Noma'lum";
+  const handle = leadHandle(lead);
+  const displayName = lead.name || handle.username || "Noma'lum";
   return (
     <div
       draggable={canWrite}
@@ -275,8 +278,8 @@ function LeadCard({
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
-          <div className="w-7 h-7 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0">
-            <Instagram size={13} />
+          <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+            <ChannelIcon channel={handle.channel} size={13} />
           </div>
           <div className="min-w-0">
             <div className="font-medium text-sm truncate flex items-center gap-1.5">
@@ -288,8 +291,10 @@ function LeadCard({
                 </span>
               )}
             </div>
-            {lead.ig_username && (
-              <div className="text-xs text-ink-soft truncate">@{lead.ig_username}</div>
+            {handle.username && (
+              <div className="text-xs text-ink-soft truncate">
+                {handle.channel === 'whatsapp' ? '' : '@'}{handle.username}
+              </div>
             )}
           </div>
         </div>

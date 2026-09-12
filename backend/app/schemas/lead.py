@@ -15,8 +15,8 @@ class LeadIngest(BaseModel):
     """Tashqi agent yuboradigan lead. Barcha maydonlar ixtiyoriy (AI to'ldiradi)."""
 
     source: str = "instagram"
-    # Kanal: instagram | telegram. `user_id`/`username` — kanaldan qat'i nazar
-    # umumiy maydonlar; eski `ig_*` nomlari orqaga moslik uchun qoldirilgan.
+    # Kanal: instagram | telegram | whatsapp. `user_id`/`username` — kanaldan
+    # qat'i nazar umumiy maydonlar; eski `ig_*` nomlari orqaga moslik uchun.
     channel: str = "instagram"
     user_id: Optional[str] = None
     username: Optional[str] = None
@@ -54,7 +54,7 @@ class LeadMessageIn(BaseModel):
     """
 
     source: str = "instagram"
-    channel: str = "instagram"          # instagram | telegram
+    channel: str = "instagram"          # instagram | telegram | whatsapp
     # Umumiy identifikator (afzal) yoki eski `ig_user_id`
     user_id: Optional[str] = None
     username: Optional[str] = None
@@ -146,6 +146,8 @@ class LeadOut(ORMBase):
     ig_username: Optional[str] = None
     tg_user_id: Optional[str] = None
     tg_username: Optional[str] = None
+    wa_user_id: Optional[str] = None
+    wa_username: Optional[str] = None
     media_id: Optional[str] = None
     comment_id: Optional[str] = None
     name: Optional[str] = None
@@ -177,7 +179,7 @@ class LeadInboxItem(BaseModel):
     """Suhbatlar ro'yxatidagi bitta qator."""
 
     lead_id: uuid.UUID
-    channel: str = "instagram"          # instagram | telegram
+    channel: str = "instagram"          # instagram | telegram | whatsapp
     user_id: Optional[str] = None       # kanaldagi identifikator
     username: Optional[str] = None      # @username (kanaldan qat'i nazar)
     ig_user_id: Optional[str] = None
@@ -193,8 +195,8 @@ class LeadInboxItem(BaseModel):
     last_message_role: Optional[str] = None       # user | assistant | operator
     last_customer_at: Optional[datetime] = None   # javob oynasi shundan hisoblanadi
     unread: int = 0
-    # open — 24 soat ichida erkin javob; human_agent — 7 kungacha faqat operator;
-    # closed — Instagram javob berishga ruxsat bermaydi
+    # open — erkin javob; human_agent — Instagramda 7 kungacha faqat operator;
+    # closed — kanal javob berishga ruxsat bermaydi (WhatsAppda 24 soatdan keyin)
     window: str = "closed"
 
 

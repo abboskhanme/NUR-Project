@@ -20,7 +20,7 @@ from app.config import settings
 _INT_KEYS = {"AI_MAX_TOKENS", "DEDUP_TTL", "BOT_PAUSE_HOURS",
              "CMT_LIMIT_PER_POST", "CMT_LIMIT_TOTAL"}
 # ERP "ha"/"yo'q" ko'rinishida yuboradi — bool ga o'giramiz
-_BOOL_KEYS = {"TG_SALES_ENABLED"}
+_BOOL_KEYS = {"TG_SALES_ENABLED", "WA_AI_ENABLED"}
 _TRUE = {"ha", "true", "1", "yes", "on"}
 
 

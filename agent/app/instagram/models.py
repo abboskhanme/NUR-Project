@@ -40,8 +40,8 @@ class IncomingEvent:
     kind: str  # "comment" | "dm" | "echo"
     text: str
     sender_id: str  # kanaldagi foydalanuvchi id (izoh/DM egasi; echo'da — mijoz)
-    # Kanal: "instagram" | "telegram". Pipeline bitta — faqat yuborish va
-    # jurnalga yozish kanalga qarab farq qiladi.
+    # Kanal: "instagram" | "telegram" | "whatsapp". Pipeline bitta — faqat
+    # yuborish va jurnalga yozish kanalga qarab farq qiladi.
     channel: str = "instagram"
     # Telegram: qaysi chatga yozamiz va Business ulanishi identifikatori
     chat_id: str | None = None
@@ -55,17 +55,19 @@ class IncomingEvent:
     # Matnsiz xabar (ovoz/rasm/...) — AI javobida hisobga olinadi
     has_attachment: bool = False
 
+    # Kanal -> holat kaliti prefiksi (Instagram tarixiy sabablarga ko'ra prefikssiz)
+    KEY_PREFIX = {"telegram": "tg:", "whatsapp": "wa:"}
+
     @property
     def store_key(self) -> str:
         """Redis holatidagi kalit — kanallar ID'lari to'qnashmasligi uchun."""
-        if self.channel == "telegram":
-            return f"tg:{self.sender_id}"
-        return self.sender_id
+        return f"{self.KEY_PREFIX.get(self.channel, '')}{self.sender_id}"
 
     @property
     def dedup_key(self) -> str:
-        if self.channel == "telegram" and self.message_id:
-            return f"tg:{self.sender_id}:{self.message_id}"
+        prefix = self.KEY_PREFIX.get(self.channel, "")
+        if prefix and self.message_id:
+            return f"{prefix}{self.sender_id}:{self.message_id}"
         if self.comment_id:
             return f"comment:{self.comment_id}"
         if self.message_id:

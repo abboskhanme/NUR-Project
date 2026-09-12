@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import {
-  ArrowLeft, Instagram, Phone, Languages, Trash2, UserPlus,
+  ArrowLeft, Phone, Languages, Trash2, UserPlus,
   ExternalLink, Bot, MessageSquare, CheckCircle2, Flame,
   XCircle, MessageCircle, Check, StickyNote, Plus, User,
 } from 'lucide-react';
@@ -14,9 +14,10 @@ import { cn } from '@/lib/cn';
 import { formatDateTime, formatPhone } from '@/lib/format';
 import { usePermissions } from '@/lib/permissions';
 import {
-  leadsApi, LEAD_STATUS_LABELS, LANG_LABELS,
-  type LeadDetail, type LeadStatus,
+  leadsApi, leadHandle, CHANNEL_LABELS, LEAD_STATUS_LABELS, LANG_LABELS,
+  type LeadChannel, type LeadDetail, type LeadStatus,
 } from '@/features/leads/api';
+import { ChannelIcon } from '@/features/leads/LeadBadges';
 import ConvertModal from '@/features/leads/ConvertModal';
 
 // Quvur bosqichlari (yakuniy "lost" alohida ishlanadi)
@@ -103,8 +104,9 @@ export default function LeadDetailPage() {
     );
   }
 
-  const displayName = lead.name || lead.ig_username || "Noma'lum lead";
-  const igLink = lead.ig_username ? `https://instagram.com/${lead.ig_username}` : null;
+  const handle = leadHandle(lead);
+  const displayName = lead.name || handle.username || "Noma'lum lead";
+  const handlePrefix = handle.channel === 'whatsapp' ? '' : '@';
   const digits = (lead.contact || '').replace(/\D/g, '');
   const phone = digits.length >= 7 ? lead.contact! : null;
 
@@ -128,8 +130,8 @@ export default function LeadDetailPage() {
           <Card className="overflow-hidden !p-0">
             <div className="p-5">
               <div className="flex items-start gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-fuchsia-500 to-orange-400 text-white flex items-center justify-center shrink-0 shadow-sm">
-                  <Instagram size={26} />
+                <div className="w-14 h-14 rounded-2xl bg-black/[0.04] flex items-center justify-center shrink-0 shadow-sm">
+                  <ChannelIcon channel={handle.channel} size={26} />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -141,14 +143,14 @@ export default function LeadDetailPage() {
                     )}
                   </div>
                   <div className="text-sm text-ink-soft mt-1 flex items-center gap-2 flex-wrap">
-                    {igLink ? (
-                      <a href={igLink} target="_blank" rel="noreferrer"
+                    {handle.url ? (
+                      <a href={handle.url} target="_blank" rel="noreferrer"
                          className="inline-flex items-center gap-1 text-primary hover:underline font-medium">
-                        @{lead.ig_username} <ExternalLink size={12} />
+                        {handlePrefix}{handle.username} <ExternalLink size={12} />
                       </a>
-                    ) : <span>@—</span>}
+                    ) : <span>{handle.username ? `${handlePrefix}${handle.username}` : '—'}</span>}
                     <span className="inline-flex items-center gap-1 text-xs rounded-full px-2 py-0.5 bg-black/[0.05]">
-                      <Instagram size={11} /> Instagram
+                      <ChannelIcon channel={handle.channel} size={11} /> {CHANNEL_LABELS[handle.channel]}
                     </span>
                     <span>·</span>
                     <span>{formatDateTime(lead.created_at)}</span>
@@ -173,10 +175,12 @@ export default function LeadDetailPage() {
                                label="WhatsApp" tone="success" external />
                   </>
                 )}
-                {igLink && (
-                  <ActionBtn href={igLink} icon={<Instagram size={15} />} label="Instagram" external />
+                {handle.url && (
+                  <ActionBtn href={handle.url}
+                             icon={<ChannelIcon channel={handle.channel} size={15} />}
+                             label={CHANNEL_LABELS[handle.channel]} external />
                 )}
-                {!phone && !igLink && (
+                {!phone && !handle.url && (
                   <span className="text-xs text-ink-soft">Aloqa ma'lumoti yo'q</span>
                 )}
               </div>
@@ -231,7 +235,8 @@ export default function LeadDetailPage() {
                   return (
                     <div key={ev.id} className="space-y-2">
                       {ev.message_text && (
-                        <Bubble side="left" name={lead.ig_username ? `@${lead.ig_username}` : 'Mijoz'}
+                        <Bubble side="left" channel={handle.channel}
+                                name={handle.username ? `${handlePrefix}${handle.username}` : 'Mijoz'}
                                 tag={chanTag} text={ev.message_text} at={ev.created_at} />
                       )}
                       {ev.agent_reply && (
@@ -466,15 +471,16 @@ function Fact({ icon, label, value }: { icon: React.ReactNode; label: string; va
 // ===========================================================================
 // Suhbat "pufakchasi"
 // ===========================================================================
-function Bubble({ side, name, tag, text, at }: {
+function Bubble({ side, name, tag, text, at, channel = 'instagram' }: {
   side: 'left' | 'right'; name: string; tag?: string; text: string; at: string;
+  channel?: LeadChannel;
 }) {
   const right = side === 'right';
   return (
     <div className={cn('flex gap-2', right ? 'justify-end' : 'justify-start')}>
       {!right && (
-        <div className="w-7 h-7 rounded-full bg-black/[0.06] text-ink-soft flex items-center justify-center shrink-0 mt-0.5">
-          <Instagram size={13} />
+        <div className="w-7 h-7 rounded-full bg-black/[0.06] flex items-center justify-center shrink-0 mt-0.5">
+          <ChannelIcon channel={channel} size={13} />
         </div>
       )}
       <div className={cn(

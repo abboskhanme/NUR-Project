@@ -23,6 +23,7 @@ class SalesAgent:
         history: list[dict] | None = None,
         known: dict | None = None,
         has_attachment: bool = False,
+        channel: str = "instagram",
     ) -> AgentOutput:
         """Mijoz xabariga javob ishlab chiqadi.
 
@@ -33,12 +34,13 @@ class SalesAgent:
         history       — oldingi DM suhbati [{"role","content"}, ...]
         known         — biz allaqachon bilgan faktlar (raqam, qiziqish, ism)
         has_attachment— mijoz matnsiz (ovoz/rasm) xabar yubordimi
+        channel       — instagram | telegram | whatsapp (javob uslubi uchun)
         """
         system = build_system_prompt(kb.get_knowledge(), settings.COMPANY_NAME)
 
-        ctx_lines = [
-            f"Kanal: {'ochiq IZOH' if is_comment else 'shaxsiy xabar (DM)'}",
-        ]
+        platform = _CHANNEL_LABELS.get(channel, channel or "Instagram")
+        place = "ochiq IZOH" if is_comment else "shaxsiy xabar"
+        ctx_lines = [f"Kanal: {platform} — {place}"]
         if username:
             ctx_lines.append(f"Mijoz username: @{username}")
         if media_caption:
@@ -70,6 +72,12 @@ class SalesAgent:
         result = await get_provider().generate(system, messages, AgentOutput)
         return result.clamp()
 
+
+_CHANNEL_LABELS = {
+    "instagram": "Instagram",
+    "telegram": "Telegram",
+    "whatsapp": "WhatsApp",
+}
 
 _FACT_LABELS = {
     "name": "Ismi",

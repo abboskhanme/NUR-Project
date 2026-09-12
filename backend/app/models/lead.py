@@ -37,6 +37,9 @@ class Lead(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     # Telegram identifikatorlari — AI yordamchisi Telegram chatlarida ham ishlaydi
     tg_user_id: Mapped[Optional[str]] = mapped_column(String(64), index=True)
     tg_username: Mapped[Optional[str]] = mapped_column(String(120))
+    # WhatsApp identifikatorlari — raqam (wa_id) va WhatsApp profil nomi
+    wa_user_id: Mapped[Optional[str]] = mapped_column(String(64), index=True)
+    wa_username: Mapped[Optional[str]] = mapped_column(String(120))
     media_id: Mapped[Optional[str]] = mapped_column(String(64))   # qaysi post/reels
     comment_id: Mapped[Optional[str]] = mapped_column(String(64))
 

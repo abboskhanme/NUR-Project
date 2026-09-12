@@ -1,4 +1,4 @@
-# Telegram AI yordamchisi + WhatsApp ko'prigi — sozlash qo'llanmasi
+# Telegram / WhatsApp AI yordamchisi + WhatsApp ko'prigi — sozlash qo'llanmasi
 
 > Kod tayyor va sinovdan o'tgan. Bu hujjat — **sizning tomoningizda** bajariladigan
 > qadamlar. Reja va texnik tafsilotlar: `docs/TELEGRAM_WHATSAPP_REJA.md`.
@@ -11,7 +11,7 @@ docker compose -f docker-compose.prod.yml --env-file .env.prod --profile agent \
   up -d --build backend frontend agent wa-bridge
 ```
 
-Migratsiyalar startda avtomatik qo'llanadi (`20260821_01`, `20260821_02`).
+Migratsiyalar startda avtomatik qo'llanadi (`20260821_01`, `20260821_02`, `20260912_01`).
 
 > **Muhim:** hech qanday token `.env` ga yozilmaydi — hammasi **Tizim
 > sozlamalari** menyusidan (super-admin) kiritiladi va bazada **shifrlangan**
@@ -147,11 +147,76 @@ o'sha serverning manzilini yozib qo'yish yetadi, kod o'zgarmaydi.
 
 ---
 
+# C. WhatsApp'ga yozganlarga AI javob berishi
+
+Instagram va Telegramdagi bilan **aynan bir xil** AI: bir xil bilim bazasi, bir
+xil suhbat xotirasi (ERP'da), bir xil "AI o'chiq/yoniq" tugmasi va operator
+aralashsa bot jim turishi. Farqi faqat kanalda.
+
+> Hisob ma'lumotlari (**Phone Number ID** va **access token**) yuqoridagi
+> **B2** bo'limida kiritilgani bilan bir xil — qayta kiritish shart emas.
+> Bitta WhatsApp raqami ikkala vazifani ham bajaradi: kanal posti chiqishi
+> **va** mijozga javob berish.
+
+## C1. ERP sozlamalari (1 daqiqa)
+
+**Tizim sozlamalari → WhatsApp AI yordamchisi:**
+
+| Maydon | Nima yoziladi |
+|---|---|
+| AI javob yoqilganmi | `ha` |
+| Webhook verify token | O'zingiz o'ylab topgan 20+ belgili satr (C2 da kerak bo'ladi) |
+| App Secret | Meta App → Settings → Basic → App Secret. Bo'sh qoldirsangiz Instagram App Secret ishlatiladi |
+
+Agar **B2** hali bajarilmagan bo'lsa, **Tizim sozlamalari → Telegram → WhatsApp**
+dagi `WhatsApp Phone Number ID` va `WhatsApp access token` ni ham to'ldiring —
+javob yuborish shular orqali ketadi.
+
+## C2. Meta webhook (2 daqiqa)
+
+**Meta for Developers → App → WhatsApp → Configuration → Webhook → Edit:**
+
+| Maydon | Qiymat |
+|---|---|
+| Callback URL | `https://<domeningiz>/agent/webhook/whatsapp` |
+| Verify token | C1 da yozgan qiymat |
+
+**Verify and save** → keyin **Manage** tugmasi orqali `messages` maydoniga
+obuna bo'ling (**Subscribe**).
+
+> Xohlasangiz `message_echoes` ga ham obuna bo'ling: u holda siz WhatsApp
+> ilovasidan qo'lda javob yozsangiz, bot o'sha suhbatda avtomatik jim turadi.
+
+Agent sozlamani ~5 daqiqada oladi. Tekshirish: `https://<domen>/agent/health`
+→ `"whatsapp_connected": true`.
+
+## C3. Tekshirish
+
+1. Boshqa telefondan **biznes raqamingizga** "Salom, narxi qancha?" deb yozing.
+2. AI bir necha soniyada javob beradi; birinchi xabarga bot ekanligi haqidagi
+   eslatma avtomatik qo'shiladi.
+3. ERP → **Leadlar → Yozishmalar → WhatsApp** — suhbat paydo bo'ladi va u
+   yerdan operator o'zi ham javob yozishi mumkin.
+
+## C4. Bilib qo'yish kerak
+
+| Holat | Nima bo'ladi |
+|---|---|
+| Mijozning oxirgi xabaridan 24 soat o'tdi | ERP'dan erkin matn yozib bo'lmaydi (Meta qoidasi) — telefon qilinadi |
+| Operator ERP'dan javob yozdi | AI o'sha suhbatda 12 soat jim turadi |
+| «AI javob yoqilganmi» = `yo'q` | Xabarlar baribir **Leadlar** bo'limiga tushadi, faqat AI javob bermaydi |
+| Mijoz ovozli xabar / rasm yubordi | Tarixga "[Mijoz ovozli xabar yubordi]" deb yoziladi, AI matn bilan yozishni so'raydi |
+| Mijoz "operator kerak" dedi | AI menejerga o'tkazadi va Telegramga bildirishnoma keladi |
+
+---
+
 ## Xavfsizlik va cheklovlar
 
 - Ikkala qism ham **rasmiy API**larda ishlaydi — raqam yoki akkaunt bloklanish
   xavfi yo'q.
 - WhatsApp tokeni faqat ERP bazasida, **shifrlangan** holda saqlanadi.
 - Telegram AI yordamchisining tokeni agent sozlamalarida (shifrlangan).
+- WhatsApp webhook'i **imzo bilan** tekshiriladi (`X-Hub-Signature-256`) — begona
+  so'rov qabul qilinmaydi.
 - Ko'prik alohida konteynerda (`nur-wa-bridge`) ishlaydi: u to'xtasa ERP ishlashda
   davom etadi, postlar esa navbatda saqlanib qoladi.

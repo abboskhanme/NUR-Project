@@ -1,6 +1,19 @@
-import { Flame } from 'lucide-react';
+import { Flame, Instagram, MessageCircle, MessageSquare } from 'lucide-react';
 import { cn } from '@/lib/cn';
-import { LEAD_STATUS_LABELS, type LeadStatus } from '@/features/leads/api';
+import { LEAD_STATUS_LABELS, type LeadChannel, type LeadStatus } from '@/features/leads/api';
+
+/** Kanal ikonkasi — Instagram / Telegram / WhatsApp (barcha ekranlarda bir xil) */
+export function ChannelIcon({ channel, size = 13, className }: {
+  channel: LeadChannel; size?: number; className?: string;
+}) {
+  if (channel === 'telegram') {
+    return <MessageCircle size={size} className={cn('text-sky-500', className)} />;
+  }
+  if (channel === 'whatsapp') {
+    return <MessageSquare size={size} className={cn('text-emerald-500', className)} />;
+  }
+  return <Instagram size={size} className={cn('text-pink-500', className)} />;
+}
 
 const STATUS_STYLES: Record<LeadStatus, string> = {
   new: 'bg-blue-100 text-blue-700',

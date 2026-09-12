@@ -15,6 +15,8 @@ export interface NavItem {
   superadmin?: boolean;  // faqat super-admin ko'radi
   exact?: boolean;
   children?: NavItem[];  // quyi-menyu (masalan: Ta'minot → Ichki / Tashqi)
+  // true — shu bo'limdan OLDIN ajratuvchi chiziq chiziladi (pastdagi alohida guruh)
+  divider?: boolean;
 }
 
 /**
@@ -32,7 +34,6 @@ export function useNavItems(): NavItem[] {
     { to: '/queue', label: 'Navbat', icon: ListOrdered, module: 'orders' },
     { to: '/shipping', label: 'Yuk chiqarish', icon: PackageOpen, module: 'shipping' },
     { to: '/customers', label: 'Mijozlar', icon: Users, module: 'customers' },
-    { to: '/leads', label: 'Leadlar', icon: Sparkles, module: 'leads' },
     { to: '/products', label: 'Mahsulotlar', icon: Package, module: 'products' },
     { to: '/costing', label: 'Tannarx', icon: Calculator, module: 'costing' },
     { to: '/warehouse', label: 'Ombor', icon: Warehouse, module: 'inventory' },
@@ -45,16 +46,29 @@ export function useNavItems(): NavItem[] {
       { to: '/supply/ichki', label: 'Ichki taʼminot', icon: Building2, module: 'supply_ichki' },
       { to: '/supply/tashqi', label: 'Tashqi taʼminot', icon: Globe, module: 'supply_tashqi' },
     ] },
-    { to: '/wa-bridge', label: 'WhatsApp navbati', icon: Send, module: 'telegram' },
     { to: '/reports', label: 'Hisobotlar', icon: BarChart3, module: 'reports' },
     { to: '/users', label: 'Foydalanuvchilar', icon: ShieldCheck, module: 'users' },
     { to: '/settings', label: 'Sozlamalar', icon: Settings },
     { to: '/system-settings', label: 'Tizim sozlamalari', icon: ServerCog, superadmin: true },
   ];
+
+  // Eng pastdagi ALOHIDA guruh — AI kanallari. Kundalik ish oqimiga kirmaydi,
+  // shuning uchun ro'yxat oxirida, ajratuvchi chiziqdan keyin turadi.
+  const bottom: NavItem[] = [
+    { to: '/leads', label: 'Leadlar', icon: Sparkles, module: 'leads' },
+    { to: '/wa-bridge', label: 'WhatsApp navbati', icon: Send, module: 'telegram' },
+  ];
+
   const visible = (it: NavItem) =>
     (!it.module || canModule(it.module)) && (!it.superadmin || isSuperadmin);
-  return items
+  const keep = (list: NavItem[]) => list
     .map((it) => (it.children ? { ...it, children: it.children.filter(visible) } : it))
     // Quyi-menyu: kamida bitta ko'rinadigan bola bo'lsa otani ko'rsatamiz
     .filter((it) => (it.children ? it.children.length > 0 : visible(it)));
+
+  const tail = keep(bottom);
+  // Chiziq faqat guruhning BIRINCHI ko'rinadigan bo'limi oldiga chiziladi
+  // (ruxsat yo'qligi sababli biri yashirilsa ham chiziq joyida qoladi).
+  if (tail.length) tail[0] = { ...tail[0], divider: true };
+  return [...keep(items), ...tail];
 }

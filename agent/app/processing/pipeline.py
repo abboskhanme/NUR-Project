@@ -14,6 +14,7 @@ from app.config import settings
 from app.instagram.client import instagram
 from app.instagram.models import IncomingEvent
 from app.telegram_business.client import telegram
+from app.whatsapp.client import whatsapp
 from app.leads import client as leads_client
 from app.models import AgentOutput, LeadPayload
 from app.state.store import store
@@ -45,11 +46,14 @@ def _global_limit() -> int:
 
 
 async def process_event(event: IncomingEvent, *, skip_dedup: bool = False,
-                        attempt: int = 0) -> None:
+                        attempt: int = 0, reply: bool = True) -> None:
     """Bitta hodisani to'liq qayta ishlaydi.
 
     `skip_dedup` — cheklov sababli kechiktirilgan izohni qayta ishlashda
     (dedup allaqachon birinchi urinishda belgilangan).
+    `reply=False` — AI javob bermaydi, xabar faqat ERP jurnaliga yoziladi
+    (kanalda «AI javob» o'chirilgan bo'lsa: xodim Leadlar bo'limida ko'radi
+    va o'zi javob beradi).
     """
     # 0. Echo — akkauntimizdan chiqqan xabar. Agar uni bot yubormagan bo'lsa,
     #    demak operator telefondan qo'lda javob yozdi → bot o'sha suhbatda jim turadi.
@@ -110,6 +114,12 @@ async def process_event(event: IncomingEvent, *, skip_dedup: bool = False,
     #     yozishma yo'qolmaydi (keyingi safar xotira sifatida ishlatiladi).
     await _log(event, event.text, role="user")
 
+    # 2b. AI javobi o'chirilgan kanal — xabar yozildi, shu yerda to'xtaymiz
+    if not reply:
+        logger.info("AI javobi o'chirilgan ({}) — xabar faqat jurnalga yozildi",
+                    event.channel)
+        return
+
     # 3. AI javobi
     try:
         out = await _agent.handle(
@@ -120,6 +130,7 @@ async def process_event(event: IncomingEvent, *, skip_dedup: bool = False,
             history=history,
             known=known,
             has_attachment=event.has_attachment,
+            channel=event.channel,
         )
     except Exception as exc:  # noqa: BLE001
         logger.exception("Agent javob berolmadi: {}", exc)
@@ -212,6 +223,9 @@ async def _deliver(event: IncomingEvent, out: AgentOutput, *, is_first: bool = F
     if event.channel == "telegram":
         await _deliver_telegram(event, out, is_first=is_first)
         return
+    if event.channel == "whatsapp":
+        await _deliver_whatsapp(event, out, is_first=is_first)
+        return
     if event.kind == "comment" and event.comment_id:
         # Ochiq kommentга ≤1 daqiqa javob
         await instagram.reply_to_comment(event.comment_id, out.reply)
@@ -252,6 +266,29 @@ async def _deliver_telegram(
         await store.mark_sent(event.store_key, text)
     else:
         logger.warning("Telegram javobi yuborilmadi: {}", result.get("error"))
+
+
+async def _deliver_whatsapp(
+    event: IncomingEvent, out: AgentOutput, *, is_first: bool = False
+) -> None:
+    """WhatsApp'ga javob (Cloud API).
+
+    Mijoz endigina yozgani uchun 24 soatlik oyna ochiq — erkin matn ketaveradi.
+    Izoh tushunchasi yo'q, faqat shaxsiy suhbat.
+    """
+    text = out.reply
+    if is_first:
+        text = _with_disclosure(text)
+
+    # Mijoz javob kutayotganini bilsin — xabarni «o'qildi» qilib belgilaymiz
+    if event.message_id:
+        await whatsapp.mark_read(event.message_id)
+
+    result = await whatsapp.send_message(event.sender_id, text)
+    if result.get("sent"):
+        await store.mark_sent(event.store_key, text)
+    else:
+        logger.warning("WhatsApp javobi yuborilmadi: {}", result.get("error"))
 
 
 async def _within_comment_limits(event: IncomingEvent) -> bool:

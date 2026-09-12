@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { Fragment, useEffect, useRef } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/cn';
 import { useNavItems } from './navItems';
@@ -40,9 +40,11 @@ export default function MobileNav() {
       >
         {/* w-max + mx-auto: kam menyu bo'lsa markazga, ko'p bo'lsa boshidan suriladi */}
         <div className="flex items-stretch gap-1 h-16 px-2 w-max mx-auto">
-          {items.map(({ to, label, icon: Icon, exact }) => (
+          {items.map(({ to, label, icon: Icon, exact, divider }) => (
+            <Fragment key={to}>
+            {/* Pastdagi alohida guruh — oldidan vertikal ajratuvchi chiziq */}
+            {divider && <div className="self-center h-8 w-px bg-black/10 mx-1 flex-shrink-0" />}
             <NavLink
-              key={to}
               to={to}
               end={exact}
               data-active={isActive(to, exact) || undefined}
@@ -59,6 +61,7 @@ export default function MobileNav() {
               <Icon size={20} />
               <span className="truncate max-w-full leading-tight">{label}</span>
             </NavLink>
+            </Fragment>
           ))}
         </div>
       </div>

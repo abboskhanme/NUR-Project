@@ -59,6 +59,19 @@ class Settings(BaseSettings):
     # Local Bot API server ishlatilsa shu manzil o'zgartiriladi (2 GB fayllar)
     TG_API_BASE: str = "https://api.telegram.org"
 
+    # WhatsApp Cloud API — mijoz yozganda AI javob beradi (Instagram/Telegram
+    # bilan bir xil pipeline). Raqam va token ERP'dagi «Telegram → WhatsApp»
+    # sozlamalaridan keladi — bitta hisob ma'lumoti ikkala vazifaga ishlaydi.
+    WA_AI_ENABLED: bool = False
+    WA_PHONE_NUMBER_ID: str = ""
+    WA_ACCESS_TOKEN: str = ""
+    WA_GRAPH_VERSION: str = "v23.0"
+    # Meta webhook tasdiqlash tokeni (GET hub.verify_token)
+    WA_VERIFY_TOKEN: str = ""
+    # Webhook imzosi uchun App Secret. Bo'sh bo'lsa IG_APP_SECRET ishlatiladi
+    # (odatda bitta Meta ilovasi — Instagram ham, WhatsApp ham o'shanda).
+    WA_APP_SECRET: str = ""
+
     # Telegram
     TELEGRAM_BOT_TOKEN: str = ""
     TELEGRAM_CHAT_ID: str = ""

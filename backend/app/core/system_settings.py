@@ -41,6 +41,7 @@ GROUPS: dict[str, str] = {
     "tg_sales": "Telegram AI yordamchisi",
     "erp_bot": "ERP Telegram boti",
     "wa_bridge": "Telegram → WhatsApp",
+    "wa_ai": "WhatsApp AI yordamchisi",
     "general": "Umumiy",
 }
 
@@ -194,12 +195,14 @@ CATALOG: tuple[SettingItem, ...] = (
         type="number", placeholder="60",
         help="Telegramga tashlangandan keyin shuncha vaqtdan so'ng WhatsApp'ga yuboriladi.",
     ),
+    # Bu uchtasi AI yordamchisiga ham kerak (mijozga javob yuborish) — shuning
+    # uchun `local` EMAS: agent ularni `/agent-config` orqali oladi.
     SettingItem(
-        "WA_PHONE_NUMBER_ID", "WhatsApp Phone Number ID", "wa_bridge", local=True,
+        "WA_PHONE_NUMBER_ID", "WhatsApp Phone Number ID", "wa_bridge",
         help="Meta App → WhatsApp → API Setup sahifasidan olinadi.",
     ),
     SettingItem(
-        "WA_ACCESS_TOKEN", "WhatsApp access token", "wa_bridge", secret=True, local=True,
+        "WA_ACCESS_TOKEN", "WhatsApp access token", "wa_bridge", secret=True,
         help="Doimiy (System User) token bo'lishi tavsiya etiladi — vaqtinchalisi 24 soatda tugaydi.",
     ),
     SettingItem(
@@ -219,13 +222,36 @@ CATALOG: tuple[SettingItem, ...] = (
         placeholder="uz", hidden=True,
     ),
     SettingItem(
-        "WA_GRAPH_VERSION", "Graph API versiyasi", "wa_bridge", local=True,
+        "WA_GRAPH_VERSION", "Graph API versiyasi", "wa_bridge",
         placeholder="v23.0", hidden=True,
     ),
     SettingItem(
         "WA_TG_API_BASE", "Telegram API manzili", "wa_bridge", local=True,
         placeholder="https://api.telegram.org", hidden=True,
         help="Local Bot API server ishlatilsa (20 MB dan katta videolar uchun).",
+    ),
+
+    # --- WhatsApp AI yordamchisi (mijoz yozganda AI o'zi javob beradi) ---
+    # Instagram/Telegram bilan BIR XIL AI, bir xil bilim bazasi va bir xil
+    # suhbat xotirasi. Raqam va token yuqoridagi «Telegram → WhatsApp»
+    # guruhidan olinadi (WA_PHONE_NUMBER_ID / WA_ACCESS_TOKEN).
+    SettingItem(
+        "WA_AI_ENABLED", "AI javob yoqilganmi", "wa_ai", type="select",
+        options=("ha", "yo'q"),
+        help="«ha» bo'lsa WhatsApp raqamingizga yozgan mijozga AI o'zi javob "
+             "beradi. «yo'q» — xabarlar faqat Leadlar bo'limiga tushadi.",
+    ),
+    SettingItem(
+        "WA_VERIFY_TOKEN", "Webhook verify token", "wa_ai", secret=True,
+        help="O'zingiz o'ylab topasiz. Meta App → WhatsApp → Configuration → "
+             "Webhook sozlashda aynan shuni kiritasiz. Callback URL: "
+             "https://<domeningiz>/agent/webhook/whatsapp — «messages» "
+             "maydoniga obuna bo'ling.",
+    ),
+    SettingItem(
+        "WA_APP_SECRET", "App Secret (imzo tekshiruvi)", "wa_ai", secret=True,
+        help="Meta App → Settings → Basic. Bo'sh qoldirsangiz Instagram App "
+             "Secret ishlatiladi (bitta ilova bo'lsa shunday bo'ladi).",
     ),
 
     # --- Umumiy ---

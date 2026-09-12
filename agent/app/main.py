@@ -29,6 +29,8 @@ from app.state.store import store
 from app.telegram_business.client import telegram
 from app.telegram_business.webhook import router as tg_webhook_router
 from app.telegram.notifier import send_daily_report
+from app.whatsapp.client import whatsapp
+from app.whatsapp.webhook import router as wa_webhook_router
 
 # Logging
 logger.remove()
@@ -85,6 +87,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="NUR Agent", version="1.0.0", lifespan=lifespan)
 app.include_router(webhook_router)
 app.include_router(tg_webhook_router)
+app.include_router(wa_webhook_router)
 app.include_router(oauth_router)
 
 
@@ -96,6 +99,7 @@ async def health():
         "provider": settings.AI_PROVIDER,
         "instagram_connected": bool(settings.IG_ACCESS_TOKEN and settings.IG_USER_ID),
         "telegram_connected": telegram.enabled,
+        "whatsapp_connected": whatsapp.enabled and settings.WA_AI_ENABLED,
         "knowledge_chars": len(knowledge.get_knowledge()),
     }
 
@@ -256,6 +260,37 @@ async def setup_telegram_webhook() -> None:
         return
     if await telegram.set_webhook(url, settings.TG_WEBHOOK_SECRET):
         _tg_webhook_state["fp"] = fingerprint
+
+
+class SendWhatsAppIn(BaseModel):
+    wa_user_id: str          # mijoz raqami (wa_id, faqat raqamlar)
+    text: str
+
+
+@app.post("/admin/send-whatsapp")
+async def send_whatsapp_endpoint(
+    payload: SendWhatsAppIn, x_agent_key: Optional[str] = Header(default=None)
+):
+    """ERP "Yozishmalar" bo'limidan WhatsApp'ga operator javobi.
+
+    Instagram/Telegramdagi kabi: yuborilgach AI o'sha suhbatda jim turadi.
+    """
+    _check_key(x_agent_key)
+    text = (payload.text or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Xabar matni bo'sh")
+    if not whatsapp.enabled:
+        raise HTTPException(status_code=503, detail="WhatsApp sozlanmagan")
+
+    result = await whatsapp.send_message(payload.wa_user_id, text)
+    if result.get("sent"):
+        key = f"wa:{payload.wa_user_id}"
+        try:
+            await store.mark_sent(key, text)
+            await store.pause(key, settings.BOT_PAUSE_HOURS)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Pauza/izni belgilashda xato: {}", exc)
+    return result
 
 
 class SendTelegramIn(BaseModel):

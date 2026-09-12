@@ -2,18 +2,17 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import {
-  Search, Send, Instagram, Phone, Bot, BotOff, Lock, Clock, ExternalLink, Loader2,
-  MessageCircle,
+  Search, Send, Phone, Bot, BotOff, Lock, Clock, ExternalLink, Loader2,
 } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
 import { formatDateTime, formatPhone } from '@/lib/format';
 import { usePermissions } from '@/lib/permissions';
 import {
-  leadsApi, LEAD_STATUS_LABELS, WINDOW_LABELS,
+  leadsApi, LEAD_STATUS_LABELS, CHANNEL_LABELS, windowLabel,
   type InboxItem, type InboxWindow, type LeadChannel, type LeadEvent,
 } from '@/features/leads/api';
-import { ScoreBadge } from '@/features/leads/LeadBadges';
+import { ChannelIcon, ScoreBadge } from '@/features/leads/LeadBadges';
 
 const POLL_MS = 10_000;   // yangi xabarlar shuncha vaqtda o'zi chiqadi
 
@@ -42,14 +41,11 @@ function toMessages(events: LeadEvent[]) {
   return out;
 }
 
-/** Kanal ikonkasi — Instagram (kamera) yoki Telegram (xabar) */
-function ChannelIcon({ channel, size = 13 }: { channel: LeadChannel; size?: number }) {
-  return channel === 'telegram'
-    ? <MessageCircle size={size} className="text-sky-500" />
-    : <Instagram size={size} className="text-pink-500" />;
-}
-
 function profileUrl(item: InboxItem): string | null {
+  // WhatsAppda «username» — profil nomi, havola esa raqamdan yasaladi
+  if (item.channel === 'whatsapp') {
+    return item.user_id ? `https://wa.me/${item.user_id}` : null;
+  }
   if (!item.username) return null;
   return item.channel === 'telegram'
     ? `https://t.me/${item.username}`
@@ -60,6 +56,7 @@ const CHANNEL_FILTERS: { key: '' | LeadChannel; label: string }[] = [
   { key: '', label: 'Hammasi' },
   { key: 'instagram', label: 'Instagram' },
   { key: 'telegram', label: 'Telegram' },
+  { key: 'whatsapp', label: 'WhatsApp' },
 ];
 
 const WINDOW_STYLE: Record<InboxWindow, string> = {
@@ -293,7 +290,7 @@ function ChatPanel({ item, canWrite, onChanged }: {
           <div className="text-xs text-ink-soft flex items-center gap-2.5 mt-0.5">
             <span className="inline-flex items-center gap-1">
               <ChannelIcon channel={item.channel} size={12} />
-              {item.channel === 'telegram' ? 'Telegram' : 'Instagram'}
+              {CHANNEL_LABELS[item.channel]}
             </span>
             {item.username && profileUrl(item) && (
               <a href={profileUrl(item)!} target="_blank" rel="noreferrer"
@@ -324,7 +321,7 @@ function ChatPanel({ item, canWrite, onChanged }: {
       {/* Javob oynasi holati */}
       <div className={cn('px-4 py-1.5 text-xs flex items-center gap-1.5', WINDOW_STYLE[item.window])}>
         {item.window === 'closed' ? <Lock size={12} /> : <Clock size={12} />}
-        {WINDOW_LABELS[item.window]}
+        {windowLabel(item.channel, item.window)}
       </div>
 
       {/* Xabarlar */}
@@ -347,7 +344,7 @@ function ChatPanel({ item, canWrite, onChanged }: {
           <div className="text-xs text-ink-soft text-center py-2">
             {!canWrite
               ? "Yozish uchun ruxsat yo'q"
-              : "Instagram bu suhbatga javob yozishga ruxsat bermaydi — ilovadan yoki telefon orqali bog'laning"}
+              : `${CHANNEL_LABELS[item.channel]} bu suhbatga javob yozishga ruxsat bermaydi — ilovadan yoki telefon orqali bog'laning`}
           </div>
         ) : (
           <div className="flex items-end gap-2">

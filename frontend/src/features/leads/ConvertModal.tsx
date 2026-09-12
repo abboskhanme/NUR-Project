@@ -3,16 +3,21 @@ import toast from 'react-hot-toast';
 import { X, UserPlus } from 'lucide-react';
 
 import PhoneInput from '@/components/ui/PhoneInput';
-import { leadsApi, type Lead } from '@/features/leads/api';
+import { leadsApi, leadChannel, type Lead } from '@/features/leads/api';
 
 /** Leaddan mijoz yaratish modali. Telefon raqami majburiy. */
 export default function ConvertModal({
   lead, onClose, onDone,
 }: { lead: Lead; onClose: () => void; onDone: (updated: Lead) => void }) {
-  const [fullName, setFullName] = useState(lead.name || lead.ig_username || '');
-  // Lead kontakti raqamga o'xshasa — oldindan to'ldiramiz
+  const [fullName, setFullName] = useState(
+    lead.name || lead.wa_username || lead.ig_username || lead.tg_username || '',
+  );
+  // Lead kontakti raqamga o'xshasa — oldindan to'ldiramiz.
+  // WhatsAppda raqamning o'zi ham ma'lum (mijoz shu raqamdan yozgan).
   const [phone, setPhone] = useState(
-    lead.contact && /\d/.test(lead.contact) ? lead.contact : '',
+    lead.contact && /\d/.test(lead.contact)
+      ? lead.contact
+      : (leadChannel(lead) === 'whatsapp' ? `+${lead.wa_user_id}` : ''),
   );
   const [region, setRegion] = useState('');
   const [saving, setSaving] = useState(false);
