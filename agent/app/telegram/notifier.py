@@ -20,26 +20,42 @@ def bump(key: str) -> None:
     _stats[key] = _stats.get(key, 0) + 1
 
 
+def chat_ids(value: str) -> list[str]:
+    """"123, 456; -100789" -> ["123", "456", "-100789"] (bo'sh bo'laklar tashlanadi)."""
+    parts = (value or "").replace(";", ",").replace("\n", ",").split(",")
+    out: list[str] = []
+    for part in parts:
+        part = part.strip()
+        if part and part not in out:
+            out.append(part)
+    return out
+
+
 async def _send(text: str) -> None:
-    if not settings.TELEGRAM_BOT_TOKEN or not settings.TELEGRAM_CHAT_ID:
+    targets = chat_ids(settings.TELEGRAM_CHAT_ID)
+    if not settings.TELEGRAM_BOT_TOKEN or not targets:
         logger.debug("Telegram sozlanmagan — xabar yuborilmadi")
         return
     url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage"
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.post(
-                url,
-                json={
-                    "chat_id": settings.TELEGRAM_CHAT_ID,
-                    "text": text,
-                    "parse_mode": "HTML",
-                    "disable_web_page_preview": True,
-                },
-            )
-        if resp.status_code != 200:
-            logger.warning("Telegram {}: {}", resp.status_code, resp.text[:200])
-    except httpx.HTTPError as exc:
-        logger.warning("Telegram ulanish xatosi: {}", exc)
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        # Har bir oluvchiga alohida — bittasida xato bo'lsa qolganlariga baribir boradi
+        for chat_id in targets:
+            try:
+                resp = await client.post(
+                    url,
+                    json={
+                        "chat_id": chat_id,
+                        "text": text,
+                        "parse_mode": "HTML",
+                        "disable_web_page_preview": True,
+                    },
+                )
+                if resp.status_code != 200:
+                    logger.warning(
+                        "Telegram {} (chat {}): {}", resp.status_code, chat_id, resp.text[:200]
+                    )
+            except httpx.HTTPError as exc:
+                logger.warning("Telegram ulanish xatosi (chat {}): {}", chat_id, exc)
 
 
 async def notify_hot_lead(username: str | None, out: AgentOutput) -> None:

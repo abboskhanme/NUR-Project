@@ -111,7 +111,10 @@ CATALOG: tuple[SettingItem, ...] = (
 
     # --- Telegram ---
     SettingItem("TELEGRAM_BOT_TOKEN", "Bot token (agent boti)", "telegram", secret=True),
-    SettingItem("TELEGRAM_CHAT_ID", "Chat ID (bildirishnoma oluvchi)", "telegram"),
+    SettingItem("TELEGRAM_CHAT_ID", "Chat ID (bildirishnoma oluvchi)", "telegram",
+                placeholder="123456789, 987654321",
+                help="Bir nechta oluvchi bo'lsa vergul bilan ajrating. Har bir oluvchi "
+                     "avval agent botiga /start bosgan bo'lishi shart."),
     SettingItem("DAILY_REPORT_TIME", "Kunlik hisobot vaqti", "telegram", placeholder="20:00"),
 
     # --- Telegram AI yordamchisi (shaxsiy chatlarga javob beradi) ---
