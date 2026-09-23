@@ -14,7 +14,9 @@ export default defineConfig({
         // Windows + Docker'da fayl o'zgarishlarini sezish uchun polling
         watch: {
             usePolling: true,
-            interval: 500,
+            interval: 1000,
+            binaryInterval: 3000,
+            ignored: ['**/node_modules/**', '**/dist/**', '**/.git/**'],
         },
         proxy: {
             '/api': {
