@@ -67,6 +67,14 @@ class DebtTransaction(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     # Valyuta — yaratilganda mahsulotdan nusxalanadi (keyin mahsulot o'zgarsa ham o'zgarmaydi)
     currency: Mapped[str] = mapped_column(String(3), default="UZS")
 
+    # Konvertatsiyali to'lov: qarz o'z valyutasida (amount/currency) yopiladi,
+    # lekin haqiqatda boshqa valyutada to'langan bo'lishi mumkin. Shunda to'langan
+    # summa, valyuta va o'sha paytdagi USD->UZS kursi shu yerda saqlanadi.
+    # Oddiy (bir valyutadagi) to'lovda uchalasi ham NULL.
+    paid_amount: Mapped[Optional[Decimal]] = mapped_column(Numeric(16, 2))
+    paid_currency: Mapped[Optional[str]] = mapped_column(String(3))
+    exchange_rate: Mapped[Optional[Decimal]] = mapped_column(Numeric(14, 2))
+
     note: Mapped[Optional[str]] = mapped_column(Text)
     created_by_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")

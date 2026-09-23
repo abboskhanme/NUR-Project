@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { X, PackagePlus, Wallet } from 'lucide-react';
+import { X, PackagePlus, Wallet, RefreshCw } from 'lucide-react';
 
 import { api } from '@/api/client';
 import { formatMoney } from '@/lib/format';
@@ -32,12 +32,41 @@ export default function DebtActionModal({
   const [amount, setAmount] = useState<number>(0);
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
+  // To'lov valyutasi — qarz valyutasidan farq qilsa, kurs bo'yicha konvertatsiya
+  const debtCur = String(product.currency || 'UZS').toUpperCase();
+  const [payCur, setPayCur] = useState<string>(debtCur);
+  const [rate, setRate] = useState('');
+  const [rateSource, setRateSource] = useState('');
 
   useEffect(() => {
     const esc = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', esc);
     return () => window.removeEventListener('keydown', esc);
   }, [onClose]);
+
+  async function fetchRate(silent = false) {
+    try {
+      const r = await api.get('/finance/exchange-rates/latest');
+      if (r.data?.usd_to_uzs) {
+        setRate(String(Number(r.data.usd_to_uzs)));
+        setRateSource(r.data.source === 'cbu' ? 'CBU' : 'Joriy');
+        if (!silent) toast.success(r.data.source === 'cbu' ? 'CBU joriy kursi olindi' : 'Joriy kurs olindi');
+      } else if (!silent) toast.error('Kurs topilmadi');
+    } catch {
+      if (!silent) toast.error('Kursni olishda xatolik');
+    }
+  }
+
+  const isConverted = kind === 'payment' && payCur !== debtCur;
+  useEffect(() => {
+    if (isConverted && !rate) fetchRate(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isConverted]);
+
+  const rateNum = parseFloat(rate) || 0;
+  // Qarzdan yopiladigan summa (qarz valyutasida)
+  const convertedAmount = !isConverted || !rateNum ? 0
+    : debtCur === 'USD' ? amount / rateNum : amount * rateNum;
 
   const isPurchase = kind === 'purchase';
   const isProduct = product.debt_type === 'product';
@@ -64,7 +93,13 @@ export default function DebtActionModal({
         toast.success('Kirim qo\'shildi');
       } else {
         if (!amount || amount <= 0) { toast.error("To'lov summasi"); setSaving(false); return; }
-        await api.post(`/debts/products/${product.id}/payment`, {
+        if (isConverted && !rateNum) { toast.error('Valyuta kursi'); setSaving(false); return; }
+        await api.post(`/debts/products/${product.id}/payment`, isConverted ? {
+          paid_amount: amount,
+          paid_currency: payCur,
+          exchange_rate: rateNum,
+          note: note.trim() || null,
+        } : {
           amount,
           note: note.trim() || null,
         });
@@ -130,10 +165,45 @@ export default function DebtActionModal({
                 <span className="text-lg font-bold text-danger">{formatMoney(product.balance, product.currency)}</span>
               </div>
               <div>
+                <label className="label">To'lov valyutasi</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {['UZS', 'USD'].map((c) => (
+                    <button key={c} type="button" onClick={() => setPayCur(c)}
+                            className={`px-3 py-1.5 text-sm rounded-button border transition ${
+                              payCur === c
+                                ? 'bg-primary text-white border-primary'
+                                : 'border-black/10 hover:bg-black/5'}`}>
+                      {DEBTS_CURRENCY[c]}{c === debtCur ? ' (qarz valyutasi)' : ''}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
                 <label className="label">To'lov summasi *</label>
                 <MoneyInput value={amount} onChange={setAmount} autoFocus
-                            suffix={(DEBTS_CURRENCY[String(product.currency)] ?? product.currency)} />
+                            suffix={DEBTS_CURRENCY[payCur] ?? payCur} />
               </div>
+              {isConverted && (
+                <>
+                  <div>
+                    <label className="label">
+                      Kurs (1 $ = so'm){rateSource ? ` · ${rateSource}` : ''}
+                    </label>
+                    <div className="flex gap-2">
+                      <input className="input" inputMode="decimal" value={rate}
+                             onChange={(e) => { setRate(e.target.value.replace(/[^\d.]/g, '')); setRateSource('Qo\'lda'); }} />
+                      <button type="button" onClick={() => fetchRate()} title="Joriy kursni olish"
+                              className="px-2.5 rounded-button border border-black/10 hover:bg-black/5">
+                        <RefreshCw size={15} />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="rounded-button bg-success/10 border border-success/20 px-4 py-3 flex items-center justify-between">
+                    <span className="text-sm font-medium text-success/90">Qarzdan yopiladi</span>
+                    <span className="text-lg font-bold text-success">{formatMoney(convertedAmount, debtCur)}</span>
+                  </div>
+                </>
+              )}
             </>
           )}
 

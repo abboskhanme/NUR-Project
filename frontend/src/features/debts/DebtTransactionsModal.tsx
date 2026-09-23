@@ -15,6 +15,9 @@ interface Tx {
   unit_price: number;
   amount: number;
   currency: string;
+  paid_amount?: number | null;
+  paid_currency?: string | null;
+  exchange_rate?: number | null;
   note?: string | null;
   created_at: string;
 }
@@ -114,7 +117,11 @@ export default function DebtTransactionsModal({
                         )}
                       </div>
                       <div className="text-xs text-ink-soft">
-                        {formatDateTime(tx.created_at)}{tx.note ? ` · ${tx.note}` : ''}
+                        {formatDateTime(tx.created_at)}
+                        {tx.paid_currency && tx.paid_amount != null && (
+                          <> · {formatMoney(tx.paid_amount, tx.paid_currency)} to'landi (kurs {formatMoney(tx.exchange_rate ?? 0, 'UZS')})</>
+                        )}
+                        {tx.note ? ` · ${tx.note}` : ''}
                       </div>
                     </div>
                     <div className={`text-sm font-bold shrink-0 ${purchase ? 'text-danger' : 'text-success'}`}>

@@ -25,6 +25,7 @@ from app.schemas.debt import (
     PurchaseCreate,
 )
 from app.schemas.taminot import SupplierCurrencyTotal, TaminotDebtView
+from app.services.finance_service import ensure_today_rate
 
 router = APIRouter(dependencies=[Depends(module_guard("debts"))])
 
@@ -268,13 +269,43 @@ async def add_payment(
     p = (await db.execute(select(DebtProduct).where(DebtProduct.id == product_id))).scalar_one_or_none()
     if not p:
         raise HTTPException(404, "Mahsulot topilmadi")
+    debt_cur = (p.currency or "UZS").upper()
+    paid_cur = (payload.paid_currency or debt_cur).upper()
+    paid_amount: Optional[Decimal] = None
+    rate: Optional[Decimal] = None
+    if paid_cur != debt_cur:
+        # Konvertatsiya: qarz o'z valyutasida yopiladi, to'lov boshqa valyutada
+        if {paid_cur, debt_cur} != {"UZS", "USD"}:
+            raise HTTPException(400, "Faqat so'm ↔ dollar konvertatsiyasi qo'llab-quvvatlanadi")
+        if not payload.paid_amount:
+            raise HTTPException(400, "To'langan summa kiritilmagan")
+        paid_amount = Decimal(str(payload.paid_amount)).quantize(Decimal("0.01"))
+        if payload.exchange_rate:
+            rate = Decimal(str(payload.exchange_rate))
+        else:
+            today = await ensure_today_rate(db)
+            rate = today.usd_to_uzs if today else None
+        if not rate or rate <= 0:
+            raise HTTPException(400, "Valyuta kursi topilmadi — kursni qo'lda kiriting")
+        rate = rate.quantize(Decimal("0.01"))
+        amount = paid_amount / rate if debt_cur == "USD" else paid_amount * rate
+    else:
+        if not payload.amount:
+            raise HTTPException(400, "To'lov summasi kiritilmagan")
+        amount = Decimal(str(payload.amount))
+    amount = amount.quantize(Decimal("0.01"))
+    if amount <= 0:
+        raise HTTPException(400, "To'lov summasi juda kichik")
     tx = DebtTransaction(
         product_id=product_id,
         kind="payment",
         qty=Decimal("0"),
         unit_price=Decimal("0"),
-        amount=Decimal(str(payload.amount)).quantize(Decimal("0.01")),
+        amount=amount,
         currency=p.currency,
+        paid_amount=paid_amount,
+        paid_currency=paid_cur if paid_amount is not None else None,
+        exchange_rate=rate,
         note=payload.note,
         created_by_id=user.id,
     )

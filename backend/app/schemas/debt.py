@@ -65,8 +65,17 @@ class PurchaseCreate(BaseModel):
 
 
 class PaymentCreate(BaseModel):
-    """Qarz to'lash — qarzni kamaytiradi."""
-    amount: float = Field(gt=0)
+    """Qarz to'lash — qarzni kamaytiradi.
+
+    Oddiy to'lov: `amount` (qarz valyutasida).
+    Konvertatsiyali to'lov: `paid_currency` qarz valyutasidan farq qilsa —
+    `paid_amount` + `exchange_rate` (USD->UZS) beriladi, qarzdan yopiladigan
+    summa (`amount`) serverda hisoblanadi.
+    """
+    amount: Optional[float] = Field(default=None, gt=0)
+    paid_amount: Optional[float] = Field(default=None, gt=0)
+    paid_currency: Optional[str] = None
+    exchange_rate: Optional[float] = Field(default=None, gt=0)
     note: Optional[str] = None
 
 
@@ -78,6 +87,9 @@ class DebtTransactionOut(ORMBase):
     unit_price: float
     amount: float
     currency: str = "UZS"
+    paid_amount: Optional[float] = None
+    paid_currency: Optional[str] = None
+    exchange_rate: Optional[float] = None
     note: Optional[str] = None
     created_at: datetime
 
