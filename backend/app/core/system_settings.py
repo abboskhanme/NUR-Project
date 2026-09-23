@@ -136,6 +136,12 @@ CATALOG: tuple[SettingItem, ...] = (
         help="O'zingiz o'ylab topasiz (masalan 20 ta tasodifiy belgi). Telegram "
              "har so'rovda shuni yuboradi — begona so'rovlar rad etiladi.",
     ),
+    # Bot menyusidagi salomlashish matni — «Bot menyusi» sahifasidan tahrirlanadi
+    # (`telegram` ruxsati bilan), agent uni `/bot-menu/agent` orqali oladi.
+    SettingItem(
+        "TG_MENU_GREETING", "Menyu salomlashish matni", "tg_sales",
+        type="textarea", hidden=True, local=True,
+    ),
     SettingItem(
         "TG_API_BASE", "Telegram API manzili", "tg_sales", hidden=True,
         placeholder="https://api.telegram.org",

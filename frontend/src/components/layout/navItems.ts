@@ -2,7 +2,7 @@ import {
   LayoutDashboard, ShoppingCart, Users, Package, Wrench, Wallet,
   UserSquare2, Truck, BarChart3, Settings, ShieldCheck, ListOrdered, Warehouse,
   Coins, PackageOpen, Factory, Building2, Globe, Target, Sparkles, ServerCog, Calculator,
-  Send,
+  Send, Bot,
   type LucideIcon,
 } from 'lucide-react';
 import { usePermissions } from '@/lib/permissions';
@@ -57,6 +57,7 @@ export function useNavItems(): NavItem[] {
   const bottom: NavItem[] = [
     { to: '/leads', label: 'Leadlar', icon: Sparkles, module: 'leads' },
     { to: '/wa-bridge', label: 'WhatsApp navbati', icon: Send, module: 'telegram' },
+    { to: '/bot-menu', label: 'Bot menyusi', icon: Bot, module: 'telegram' },
   ];
 
   const visible = (it: NavItem) =>

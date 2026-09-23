@@ -74,6 +74,32 @@ ko'rinmaydi).
 **Instagramdan farqi:** Telegramda 24 soatlik javob oynasi **yo'q** — istalgan
 vaqtda javob yozish mumkin.
 
+## A5. Bot menyusi (narxlar, manzil va h.k. — AI'siz tayyor javob)
+
+ERP → **Bot menyusi** (`telegram` ruxsati) → **Bo'lim qo'shish**:
+tugma nomi (`💰 Narxlar`), buyruq (`narxlar`), matn va 10 tagacha rasm.
+
+Mijoz bo'limni tanlasa bot AI'ga murojaat qilmay, **darhol** shu matn va
+rasmlarni yuboradi (2+ rasm — albom). Boshqa har qanday savolga AI javob beradi.
+
+| Qayerda | Mijoz qanday tanlaydi |
+|---|---|
+| Botning o'z chati | Pastdagi tugmalar (`/start` da chiqadi) yoki «Menu» → `/narxlar` |
+| Business ulanishi | Salomlashish ostidagi tugmalar (mijoz `/start` yoki «menyu» yozsa), yoki `/narxlar` |
+| Havola | `t.me/<bot_nomi>?start=narxlar` — to'g'ri shu bo'limni ochadi |
+
+Bilib qo'yish kerak:
+- Business chatida pastki klaviatura **Telegram tomonidan taqiqlangan** — shu
+  sabab u yerda inline tugmalar ishlatiladi.
+- Matn 1024 belgidan uzun bo'lsa rasm ostiga sig'maydi — rasmlardan keyin
+  alohida xabar bo'lib ketadi.
+- Operator suhbatni o'z qo'liga olgan (AI pauzada) bo'lsa ham mijoz tugma
+  bossa menyu javobi yuboriladi — bu AI javobi emas, mijozning aniq so'rovi.
+- Yuborilgan menyu javobi Leadlar yozishmasiga ham tushadi, shuning uchun AI
+  keyingi savolda («50 litrlisi qancha edi?») nima yuborilganini biladi.
+- O'zgarish botda bir necha soniyada paydo bo'ladi (agent o'chiq bo'lsa —
+  ishga tushgach, ko'pi bilan 5 daqiqada).
+
 ---
 
 # B. Telegram kanal posti → WhatsApp kanali

@@ -11,6 +11,7 @@ from app.api.v1 import (
     orders,
     service,
     wa_bridge,
+    bot_menu,
     finance,
     hr,
     supply,
@@ -55,5 +56,7 @@ api_router.include_router(goals.router, prefix="/goals", tags=["Goals / Oylik ma
 api_router.include_router(leads.router, prefix="/leads", tags=["Leads / Marketing"])
 api_router.include_router(leads.ingest_router, prefix="/leads", tags=["Leads / Marketing"])
 api_router.include_router(wa_bridge.router, prefix="/wa-bridge", tags=["Telegram → WhatsApp"])
+api_router.include_router(bot_menu.router, prefix="/bot-menu", tags=["Telegram bot menyusi"])
+api_router.include_router(bot_menu.agent_router, prefix="/bot-menu", tags=["Telegram bot menyusi"])
 api_router.include_router(system_settings.router, prefix="/system-settings", tags=["System Settings"])
 api_router.include_router(system_settings.agent_router, prefix="/system-settings", tags=["System Settings"])

@@ -26,6 +26,7 @@ from app.instagram.webhook import router as webhook_router
 from app.processing.pipeline import process_event
 from app.remote_config import fetch_and_apply
 from app.state.store import store
+from app.telegram_business import menu as tg_menu
 from app.telegram_business.client import telegram
 from app.telegram_business.webhook import router as tg_webhook_router
 from app.telegram.notifier import send_daily_report
@@ -51,6 +52,8 @@ async def lifespan(app: FastAPI):
 
     # Telegram sotuv boti (shaxsiy chatlar) — webhookni o'zi o'rnatadi
     await setup_telegram_webhook()
+    # Bot menyusi (ERP «Bot menyusi» sahifasi) + «Menu» tugmasidagi buyruqlar
+    await tg_menu.refresh()
 
     _scheduler = AsyncIOScheduler(timezone=settings.TIMEZONE)
     try:
@@ -248,6 +251,15 @@ async def sync_config() -> None:
     """
     await fetch_and_apply()
     await setup_telegram_webhook()
+    await tg_menu.refresh()
+
+
+@app.post("/admin/menu/refresh")
+async def menu_refresh_endpoint(x_agent_key: Optional[str] = Header(default=None)):
+    """ERP'da bot menyusi o'zgardi — darhol qayta olamiz (5 daqiqa kutmasdan)."""
+    _check_key(x_agent_key)
+    current = await tg_menu.refresh()
+    return {"items": len(current.items)}
 
 
 async def setup_telegram_webhook() -> None:

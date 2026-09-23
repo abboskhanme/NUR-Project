@@ -43,6 +43,7 @@ from app.models.shipping import Shipment
 from app.models.production import ProductionRecord
 from app.models.lead import Lead, LeadEvent
 from app.models.wa_bridge import ChannelPost
+from app.models.bot_menu import BotMenuImage, BotMenuItem
 
 __all__ = [
     "Base",
@@ -96,6 +97,8 @@ __all__ = [
     "ProductionRecord",
     "Lead",
     "ChannelPost",
+    "BotMenuItem",
+    "BotMenuImage",
     "LeadEvent",
     "SystemSetting",
 ]

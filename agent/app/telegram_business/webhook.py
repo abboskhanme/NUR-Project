@@ -26,6 +26,7 @@ from loguru import logger
 from app.config import settings
 from app.processing.pipeline import process_event
 from app.state.store import store
+from app.telegram_business import menu
 from app.telegram_business.models import parse_update
 
 router = APIRouter(prefix="/webhook", tags=["Telegram webhook"])
@@ -92,17 +93,33 @@ async def receive(
     if isinstance(conn, dict):
         await remember_connection(conn)
 
-    # 2) Xabarlar
+    # 2) Menyudagi inline tugma bosildi (Business chatidagi salomlashish ostida)
+    callback = update.get("callback_query")
+    if isinstance(callback, dict):
+        background.add_task(menu.handle_callback, callback)
+        return Response(content="OK", media_type="text/plain")
+
+    # 3) Xabarlar
     msg = update.get("business_message") or {}
     conn_id = msg.get("business_connection_id") if isinstance(msg, dict) else None
     owner_id = await owner_of(conn_id)
 
-    for event in parse_update(update, owner_id=owner_id):
+    events = parse_update(update, owner_id=owner_id)
+    if events:
+        # Boshqa worker menyuni yangilagan bo'lishi mumkin (prod'da bir nechta jarayon)
+        await menu.ensure_fresh()
+    for event in events:
         if event.business_connection_id and event.chat_id:
             # Javob yozishda kerak bo'ladi
             await store.set_value(
                 CHAT_KEY.format(event.chat_id), event.business_connection_id
             )
+        # Menyu tanlovi (`/narxlar`, «💰 Narxlar» tugmasi) — AI'siz tayyor javob
+        if event.kind == "dm" and not event.has_attachment:
+            action = menu.match(event.text, menu.current())
+            if action:
+                background.add_task(menu.handle_action, event, action)
+                continue
         background.add_task(process_event, event)
 
     return Response(content="OK", media_type="text/plain")
