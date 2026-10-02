@@ -80,7 +80,7 @@ SPECIAL_PERMISSIONS: list[dict] = [
     {"key": "system:user_password",    "label": "Foydalanuvchi parolini almashtirish",    "danger": False},
     {"key": "system:user_avatar",      "label": "Foydalanuvchi rasmini boshqarish",       "danger": False},
     {"key": "system:finance_override", "label": "Oylikdan ortiq avans berish",            "danger": True},
-    {"key": "system:order_override",   "label": "Buyurtma ID/sotuvchisini tahrirlash",    "danger": False},
+    {"key": "system:order_override",   "label": "Buyurtma ID/sotuvchisi, statusni qaytarish", "danger": False},
     {"key": "system:goals_manage",     "label": "Oylik maqsadlarni (sotuv/tushum) belgilash", "danger": False},
     {"key": "system:service_reopen",   "label": "Yopilgan servis arizasini qayta ochish", "danger": False},
 ]

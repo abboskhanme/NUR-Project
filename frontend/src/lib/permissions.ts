@@ -38,7 +38,7 @@ export const SPECIAL_PERMISSIONS = [
   { key: 'system:user_password',    label: 'Foydalanuvchi parolini almashtirish',   danger: false },
   { key: 'system:user_avatar',      label: 'Foydalanuvchi rasmini boshqarish',      danger: false },
   { key: 'system:finance_override', label: 'Oylikdan ortiq avans berish',           danger: true },
-  { key: 'system:order_override',   label: 'Buyurtma ID/sotuvchisini tahrirlash',   danger: false },
+  { key: 'system:order_override',   label: 'Buyurtma ID/sotuvchisi, statusni qaytarish', danger: false },
   { key: 'system:goals_manage',     label: 'Oylik maqsadlarni (sotuv/tushum) belgilash', danger: false },
   { key: 'system:service_reopen',   label: 'Yopilgan servis arizasini qayta ochish', danger: false },
 ] as const;

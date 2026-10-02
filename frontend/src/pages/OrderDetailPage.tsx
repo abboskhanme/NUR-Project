@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import {
   ArrowLeft, Pencil, Phone, MapPin, User, Package, Plus, Trash2, ExternalLink, ShieldCheck,
-  FileText, Receipt,
+  FileText, Receipt, Undo2,
 } from 'lucide-react';
 
 import { api } from '@/api/client';
@@ -80,7 +80,7 @@ export default function OrderDetailPage() {
   const { orderId } = useParams<{ orderId: string }>();
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const { can } = usePermissions();
+  const { can, canSpecial } = usePermissions();
   const [editing, setEditing] = useState(false);
   const [addingPayment, setAddingPayment] = useState(false);
   const [confirm, setConfirm] = useState<{
@@ -122,6 +122,21 @@ export default function OrderDetailPage() {
       action: async () => {
         await api.post(`/orders/${orderId}/status`, { status });
         toast.success("Status yangilandi");
+        refresh();
+      },
+    });
+  }
+
+  // Super-admin (order_override): adashib yopilgan buyurtmani «Navbatda»ga qaytarish
+  function askRevertToQueue() {
+    setConfirm({
+      title: "Navbatdaga qaytarish",
+      message: "Buyurtma qayta «Navbatda» holatiga o'tadi, yetkazilgan sana o'chiriladi. Adashib o'zgartirilgan statusni tuzatish uchun.",
+      confirmText: "Qaytarish",
+      variant: 'primary',
+      action: async () => {
+        await api.post(`/orders/${orderId}/status`, { status: 'new' });
+        toast.success("Navbatga qaytarildi");
         refresh();
       },
     });
@@ -269,6 +284,16 @@ export default function OrderDetailPage() {
                 {`"Yetkazildi" uchun qoldiq to'liq to'lanishi kerak (${formatUZS(o.balance_uzs)})`}
               </span>
             )}
+          </div>
+        )}
+
+        {/* Yopilgan buyurtmani qaytarish — faqat super-admin (order_override) */}
+        {(o.status === 'delivered' || o.status === 'rejected') && canSpecial('system:order_override') && (
+          <div className="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-black/5">
+            <button onClick={askRevertToQueue} className="btn-ghost text-sm py-1.5">
+              <Undo2 size={15} /> Navbatdaga qaytarish
+            </button>
+            <span className="text-xs text-ink-soft">Adashib o'zgartirilgan statusni tuzatish uchun</span>
           </div>
         )}
       </Card>

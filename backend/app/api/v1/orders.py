@@ -145,6 +145,35 @@ async def _delete_linked_unit(db: AsyncSession, order: Order) -> None:
     order.inventory_id = None
 
 
+async def _revert_to_queue(db: AsyncSession, order: Order, note: Optional[str] = None) -> None:
+    """Yetkazilgan/rad etilgan buyurtmani «Navbatda» (new) holatiga qaytaradi.
+
+    ID raqami bo'lsa: boshqa aktiv buyurtma uni band qilgan bo'lsa — rad etiladi;
+    ombor birligi hali mavjud bo'lsa (rad etilganda bo'shagan) — qayta band qilinadi;
+    yetkazilganda o'chirilgan bo'lsa — faqat ID snapshot qoladi.
+    """
+    if order.unit_uid:
+        other = (await db.execute(
+            select(Order.code).where(
+                Order.unit_uid == order.unit_uid, Order.id != order.id,
+                Order.status.notin_(("delivered", "rejected"))).limit(1)
+        )).scalar_one_or_none()
+        if other:
+            raise HTTPException(
+                400, f"«{order.unit_uid}» ID boshqa buyurtmada band ({other}) — avval ID ni o'zgartiring")
+        inv = await _find_unit_by_uid(db, order.unit_uid)
+        if inv is not None:
+            inv.status = "reserved"
+            order.inventory_id = inv.id
+    prev = order.status
+    order.status = "new"
+    order.delivered_at = None
+    line = f"[status revert] {prev} -> new"
+    if note:
+        line += f": {note}"
+    order.note = (order.note + "\n" if order.note else "") + line
+
+
 def _order_query():
     return select(Order).options(
         selectinload(Order.items).selectinload(OrderItem.product),
@@ -796,11 +825,20 @@ async def override_order_amounts(order_id: uuid.UUID, payload: OverrideAmounts, 
 
 @router.post("/{order_id}/status", response_model=OrderOut)
 async def change_status(order_id: uuid.UUID, payload: OrderStatusChange,
-                        _: CurrentUser, db: Annotated[AsyncSession, Depends(get_db)]):
+                        user: CurrentUser, db: Annotated[AsyncSession, Depends(get_db)]):
     res = await db.execute(_order_query().where(Order.id == order_id))
     o = res.scalar_one_or_none()
     if not o:
         raise HTTPException(404, "Buyurtma topilmadi")
+    # Yopilgan (yetkazilgan/rad etilgan) buyurtmani «Navbatda»ga qaytarish —
+    # adashib bosilgan statusni tuzatish uchun; FAQAT system:order_override.
+    if o.status in ("delivered", "rejected") and payload.status == "new":
+        if not has_special(user, "system:order_override"):
+            raise HTTPException(403, "Statusni qaytarish uchun ruxsat yo'q (super-admin darajasidagi).")
+        await _revert_to_queue(db, o, payload.note)
+        await db.commit()
+        res = await db.execute(_order_query().where(Order.id == order_id))
+        return res.scalar_one()
     if not is_valid_transition(o.status, payload.status):
         raise HTTPException(400, f"O'tish ruxsat etilmaydi: {o.status} -> {payload.status}")
     # To'liq to'lanmagan buyurtmani "Yetkazildi"ga o'tkazib bo'lmaydi (diller bundan mustasno)
