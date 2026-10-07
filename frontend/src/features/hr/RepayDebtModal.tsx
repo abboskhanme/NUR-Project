@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useEffect, useMemo, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { X, HandCoins, Wallet, Coins } from 'lucide-react';
+import { X, HandCoins, Wallet, Coins, AlertTriangle } from 'lucide-react';
 
 import { api } from '@/api/client';
 import { formatUZS } from '@/lib/format';
@@ -10,6 +10,20 @@ import { formatUZS } from '@/lib/format';
 const onlyDigits = (s: string) => s.replace(/[^\d]/g, '').replace(/^0+(?=\d)/, '');
 const groupDigits = (s: string) => s.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 const toNum = (s: string) => parseFloat(s.replace(/[^\d.]/g, '')) || 0;
+
+const HR_MONTHS = [
+  'Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun',
+  'Iyul', 'Avgust', 'Sentyabr', 'Oktyabr', 'Noyabr', 'Dekabr',
+];
+const pad = (n: number) => String(n).padStart(2, '0');
+
+interface MonthAdvance {
+  id: string;
+  advance_date: string;
+  amount: string;
+  note?: string | null;
+  status?: string;
+}
 
 function errText(e: any, fallback: string): string {
   const d = e?.response?.data?.detail;
@@ -25,23 +39,71 @@ function errText(e: any, fallback: string): string {
 /**
  * Xodim qarzini uning oyligidan so'ndirish modali.
  * Kiritilgan summa: (1) xodim qarzidan so'ndiriladi (Xodim qarzlari bo'limidagi
- * so'ndirilgan qarzlar ro'yxatiga yoziladi); (2) o'sha summa avans sifatida
- * qo'shiladi ("Qarzga to'landi") va qolgan oyligidan ayiriladi.
+ * so'ndirilgan qarzlar ro'yxatiga yoziladi); (2) o'sha summa tanlangan oy avansiga
+ * qo'shiladi ("Qarzga to'landi") va o'sha oyning qolgan oyligidan ayiriladi.
+ * "Oylikdan allaqachon ushlangan" belgilansa — (2) qilinmaydi (ikki marta ushlanmasin).
  * Moliya bo'limiga umuman aralashmaydi (naqd pul harakati yo'q).
  */
 export default function RepayDebtModal({
-  employeeId, fullName, debt, remainingSalary, onClose,
+  employeeId, fullName, debt, remainingSalary, year, month, onClose,
 }: {
   employeeId: string;
   fullName: string;
   debt: number;
   remainingSalary?: number;
+  year?: number;    // HR sahifasida ko'rilayotgan oy — default tanlov
+  month?: number;
   onClose: () => void;
 }) {
   const qc = useQueryClient();
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
+  const [alreadyDeducted, setAlreadyDeducted] = useState(false);
+
+  // Qaysi oy oyligidan: joriy oy va oldingi 2 oy (+ sahifada ko'rilayotgan oy)
+  const now = new Date();
+  const curKey = `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
+  const monthOptions = useMemo(() => {
+    const keys: string[] = [];
+    for (let i = 0; i < 3; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      keys.push(`${d.getFullYear()}-${pad(d.getMonth() + 1)}`);
+    }
+    const viewed = year && month ? `${year}-${pad(month)}` : null;
+    if (viewed && viewed < curKey && !keys.includes(viewed)) keys.push(viewed);
+    return keys;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [year, month]);
+  const viewedKey = year && month ? `${year}-${pad(month)}` : curKey;
+  const [ym, setYm] = useState(monthOptions.includes(viewedKey) ? viewedKey : curKey);
+  const [selY, selM] = ym.split('-').map(Number);
+  const isCurrent = ym === curKey;
+  const monthLabel = `${HR_MONTHS[selM - 1]} ${selY}`;
+  const lastDay = new Date(selY, selM, 0).getDate();
+  // Joriy oyda — bugungi sana, o'tgan oyda — o'sha oyning oxirgi kuni
+  const payDate = isCurrent
+    ? `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
+    : `${ym}-${pad(lastDay)}`;
+
+  // Tanlangan oyning qolgan oyligi
+  const summaryQ = useQuery<{ net: string }>({
+    queryKey: ['hr', 'summary', employeeId, selY, selM],
+    queryFn: () => api.get(`/hr/employees/${employeeId}/summary`, { params: { year: selY, month: selM } })
+      .then((r) => r.data),
+  });
+  const monthNet = summaryQ.data ? parseFloat(summaryQ.data.net) || 0 : remainingSalary;
+
+  // Tanlangan oyda qo'lda kiritilgan qarz ushlanmalari — ikki marta ushlamaslik uchun ogohlantirish
+  const advQ = useQuery<MonthAdvance[]>({
+    queryKey: ['hr', 'advances', employeeId, selY, selM],
+    queryFn: () => api.get('/hr/advances', {
+      params: { employee_id: employeeId, date_from: `${ym}-01`, date_to: `${ym}-${pad(lastDay)}` },
+    }).then((r) => r.data),
+  });
+  const loanDeductions = (advQ.data ?? []).filter(
+    (a) => a.status !== 'void' && /qarz/i.test(a.note ?? ''),
+  );
 
   useEffect(() => {
     const esc = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -61,6 +123,8 @@ export default function RepayDebtModal({
       const r = await api.post(`/hr/employees/${employeeId}/repay-loan-from-salary`, {
         amount: amt,
         note: note || null,
+        pay_date: payDate,
+        deduct_from_salary: !alreadyDeducted,
       });
       const remaining = parseFloat(r.data?.remaining_debt ?? '0') || 0;
       toast.success(
@@ -72,6 +136,9 @@ export default function RepayDebtModal({
       qc.invalidateQueries({ queryKey: ['employee-loans'] });
       qc.invalidateQueries({ queryKey: ['salary-debts'] });
       qc.invalidateQueries({ queryKey: ['hr', 'advances'] });
+      qc.invalidateQueries({ queryKey: ['hr', 'employee-loans'] });
+      qc.invalidateQueries({ queryKey: ['hr', 'salary-history'] });
+      qc.invalidateQueries({ queryKey: ['hr', 'summary'] });
       onClose();
     } catch (e: any) {
       toast.error(errText(e, 'So\'ndirib bo\'lmadi'));
@@ -119,11 +186,38 @@ export default function RepayDebtModal({
             </div>
             <div className="rounded-xl border border-black/5 bg-black/[0.02] p-3">
               <div className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-ink-soft">
-                <Wallet size={13} /> Qolgan oylik
+                <Wallet size={13} /> Qolgan oylik · {HR_MONTHS[selM - 1]}
               </div>
               <div className="text-base font-bold tabular-nums mt-1">
-                {remainingSalary != null ? formatUZS(remainingSalary) : '—'}
+                {monthNet != null ? formatUZS(monthNet) : '—'}
               </div>
+            </div>
+          </div>
+
+          {/* Qaysi oy oyligidan */}
+          <div>
+            <label className="text-[11px] font-medium uppercase tracking-wide text-ink-soft">
+              Qaysi oy oyligidan
+            </label>
+            <div className="mt-1 flex gap-1.5 flex-wrap">
+              {monthOptions.map((k) => {
+                const [y, m] = k.split('-').map(Number);
+                return (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => setYm(k)}
+                    className={
+                      'px-3 py-1.5 rounded-button text-sm border transition-colors ' +
+                      (ym === k
+                        ? 'border-amber-600 bg-amber-500/10 text-amber-700 font-medium'
+                        : 'border-black/10 text-ink-soft hover:bg-black/5')
+                    }
+                  >
+                    {HR_MONTHS[m - 1]} {y}{k === curKey ? ' (joriy)' : ''}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -178,9 +272,48 @@ export default function RepayDebtModal({
             />
           </div>
 
+          {/* Shu oyda qarz uchun qo'lda ushlanma bor — ikki marta ushlanmasin */}
+          {loanDeductions.length > 0 && !alreadyDeducted && (
+            <div className="rounded-xl border border-amber-500/30 bg-amber-500/[0.08] p-3 text-xs text-amber-800 leading-relaxed">
+              <div className="flex items-center gap-1.5 font-semibold">
+                <AlertTriangle size={14} /> {monthLabel} oyligidan qarz uchun ushlanma allaqachon bor:
+              </div>
+              <ul className="mt-1 space-y-0.5 tabular-nums">
+                {loanDeductions.map((a) => (
+                  <li key={a.id}>
+                    {a.advance_date.split('-').reverse().join('.')} — {formatUZS(a.amount)} «{a.note}»
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-1">
+                Agar shu summani qarzga yozmoqchi bo'lsangiz — pastdagi «Oylikdan allaqachon ushlangan»
+                belgisini qo'ying, aks holda oylikdan ikki marta ushlanadi.
+              </div>
+            </div>
+          )}
+
+          <label className="flex items-start gap-2 text-sm cursor-pointer">
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              checked={alreadyDeducted}
+              onChange={(e) => setAlreadyDeducted(e.target.checked)}
+            />
+            <span>
+              Oylikdan allaqachon ushlangan
+              <span className="block text-xs text-ink-soft">Faqat qarz yopiladi, oylikdan qayta ushlanmaydi</span>
+            </span>
+          </label>
+
           <div className="rounded-xl bg-black/[0.03] p-3 text-xs text-ink-soft leading-relaxed">
-            Bu summa xodim qarzidan so'ndiriladi va <span className="font-medium text-ink">avansiga</span> qo'shilib,
-            qolgan oyligidan ayiriladi. Moliya bo'limiga ta'sir qilmaydi (naqd pul harakati yo'q).
+            {alreadyDeducted ? (
+              <>Bu summa faqat xodim qarzidan so'ndiriladi — <span className="font-medium text-ink">avans qo'shilmaydi</span>,
+              oylik o'zgarmaydi.</>
+            ) : (
+              <>Bu summa xodim qarzidan so'ndiriladi va <span className="font-medium text-ink">{monthLabel}</span> avansiga
+              qo'shilib, o'sha oyning qolgan oyligidan ayiriladi.</>
+            )}{' '}
+            Moliya bo'limiga ta'sir qilmaydi (naqd pul harakati yo'q).
           </div>
 
           <button

@@ -1491,7 +1491,9 @@ async def repay_loan_from_salary(employee_id: uuid.UUID, payload: LoanRepayFromS
     1) xodimning faol qarzlaridan eng eskisidan boshlab taqsimlab so'ndiriladi — har biri
        uchun qarz to'lovi (EmployeeLoanPayment) yoziladi, to'liq yopilsa qarz "closed" bo'ladi;
     2) o'sha summa xodim avansi sifatida qo'shiladi ("Qarzga to'landi" izohi bilan) — shunda
-       joriy oyning qolgan oyligidan ayiriladi va avans ro'yxatida ko'rinadi.
+       `pay_date` oyining (default — joriy oy) qolgan oyligidan ayiriladi va avans ro'yxatida ko'rinadi.
+       `deduct_from_salary=False` bo'lsa bu qadam o'tkazib yuboriladi — summa oylikdan
+       allaqachon (qo'lda) ushlangan, faqat qarzni yopish kerak. Aks holda ikki marta ushlanardi.
     Moliya balansiga umuman ta'sir qilmaydi (avans tx_id'siz yoziladi).
     """
     amount = payload.amount or Decimal(0)
@@ -1530,6 +1532,11 @@ async def repay_loan_from_salary(employee_id: uuid.UUID, payload: LoanRepayFromS
             400, f"Summa jami qarzdan oshib ketdi. Qoldiq: {total_balance:,.0f}".replace(",", " "))
 
     pay_date = payload.pay_date or date.today()
+    # Oylikdan avvalroq ushlangan bo'lsa — foydalanuvchi izohi qarz to'loviga yoziladi
+    # (avans yozilmaydi, izoh boshqa joyda saqlanmaydi)
+    pay_note = "Oylikdan so'ndirildi"
+    if not payload.deduct_from_salary and payload.note:
+        pay_note = f"{pay_note} — {payload.note}"
     remaining = amount
     count = 0
     for loan in loans:
@@ -1539,7 +1546,7 @@ async def repay_loan_from_salary(employee_id: uuid.UUID, payload: LoanRepayFromS
         pay_amt = min(bal, remaining)
         db.add(EmployeeLoanPayment(
             loan_id=loan.id, amount=pay_amt, pay_date=pay_date,
-            note="Oylikdan so'ndirildi", created_by_id=user.id,
+            note=pay_note, created_by_id=user.id,
         ))
         count += 1
         if pay_amt >= bal:  # to'liq so'ndirildi — qarz yopiladi
@@ -1549,14 +1556,16 @@ async def repay_loan_from_salary(employee_id: uuid.UUID, payload: LoanRepayFromS
             break
 
     # Oylikdan ayirish uchun avans yozuvi — moliyaga tegmaydi (tx_id yo'q)
-    adv = SalaryAdvance(
-        employee_id=employee_id, advance_date=pay_date, amount=amount,
-        currency=emp.currency or "UZS", note=payload.note or "Qarzga to'landi",
-        status="active", tx_id=None, created_by_id=user.id,
-    )
-    db.add(adv)
-    await db.flush()
-    advance_id = adv.id
+    advance_id = None
+    if payload.deduct_from_salary:
+        adv = SalaryAdvance(
+            employee_id=employee_id, advance_date=pay_date, amount=amount,
+            currency=emp.currency or "UZS", note=payload.note or "Qarzga to'landi",
+            status="active", tx_id=None, created_by_id=user.id,
+        )
+        db.add(adv)
+        await db.flush()
+        advance_id = adv.id
     await db.commit()
     return LoanRepayFromSalaryOut(
         paid=amount, remaining_debt=total_balance - amount,

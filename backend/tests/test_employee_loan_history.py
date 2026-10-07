@@ -220,3 +220,52 @@ async def test_edit_rejects_unknown_status(client, db_engine):
     loan = await _loan(c, emp, 1_000_000)
     r = await c.patch(f"{API}/employee-loans/{loan['id']}", json={"status": "deleted"})
     assert r.status_code == 422, r.text
+
+
+# --------------------------------------------------------------------------- #
+# Oylikdan so'ndirish: oy tanlash va "allaqachon ushlangan"
+# --------------------------------------------------------------------------- #
+async def _advances(db_engine, emp):
+    from sqlalchemy import select
+
+    from app.models.hr import SalaryAdvance
+
+    async with _session(db_engine)() as db:
+        return (await db.execute(
+            select(SalaryAdvance).where(SalaryAdvance.employee_id == emp.id)
+        )).scalars().all()
+
+
+async def test_repay_already_deducted_closes_loan_without_new_advance(client, db_engine):
+    emp = await _employee(db_engine)
+    c = _auth(client, await _user(db_engine, ["hr:*"]))
+    loan = await _loan(c, emp, 2_100_000)
+
+    r = await c.post(f"{API}/employees/{emp.id}/repay-loan-from-salary", json={
+        "amount": 2_100_000, "pay_date": "2026-09-30", "note": "sentabrdan",
+        "deduct_from_salary": False,
+    })
+    assert r.status_code == 201, r.text
+    assert r.json()["advance_id"] is None
+    assert float(r.json()["remaining_debt"]) == 0
+
+    assert await _advances(db_engine, emp) == []          # oylikdan qayta ushlanmadi
+    h = (await _history_of(c, emp))["items"][0]
+    assert h["id"] == loan["id"] and h["status"] == "closed"
+    assert h["payments"][0]["pay_date"] == "2026-09-30"
+    assert h["payments"][0]["note"] == "Oylikdan so'ndirildi — sentabrdan"
+
+
+async def test_repay_from_chosen_month_lands_in_that_month(client, db_engine):
+    emp = await _employee(db_engine)
+    c = _auth(client, await _user(db_engine, ["hr:*"]))
+    await _loan(c, emp, 1_000_000)
+
+    r = await c.post(f"{API}/employees/{emp.id}/repay-loan-from-salary",
+                     json={"amount": 400_000, "pay_date": "2026-09-30"})
+    assert r.status_code == 201, r.text
+    advs = await _advances(db_engine, emp)
+    assert len(advs) == 1 and advs[0].id is not None
+    assert str(advs[0].advance_date) == "2026-09-30"     # sentyabr oyligidan ushlandi
+    assert float(advs[0].amount) == 400_000
+    assert str(advs[0].id) == r.json()["advance_id"]

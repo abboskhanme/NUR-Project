@@ -185,13 +185,16 @@ class LoanRepayFromSalaryIn(BaseModel):
     """Xodim qarzini oyligidan so'ndirish (naqd pul harakati yo'q)."""
     amount: Decimal
     note: Optional[str] = None        # avans izohi; default "Qarzga to'landi"
-    pay_date: Optional[date] = None
+    pay_date: Optional[date] = None   # shu sananing oyi oyligidan ushlanadi
+    # False — summa oylikdan ALLAQACHON ushlangan (qo'lda avans sifatida kiritilgan):
+    # faqat qarz so'ndiriladi, oylikdan qayta ushlanmaydi (avans yozilmaydi)
+    deduct_from_salary: bool = True
 
 
 class LoanRepayFromSalaryOut(BaseModel):
     paid: Decimal                     # so'ndirilgan summa
     remaining_debt: Decimal           # so'ndirishdan keyingi qoldiq qarz
-    advance_id: uuid.UUID             # yaratilgan avans yozuvi (oylikdan ayirish)
+    advance_id: Optional[uuid.UUID] = None  # yaratilgan avans (deduct_from_salary=False da yo'q)
     payments_count: int               # nechta qarzga taqsimlab yozildi
 
 

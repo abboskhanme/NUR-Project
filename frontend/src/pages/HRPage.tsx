@@ -438,6 +438,8 @@ export default function HRPage() {
           fullName={repay.emp.full_name}
           debt={repay.debt}
           remainingSalary={parseFloat(repay.emp.month_summary?.net ?? '0') || 0}
+          year={curYear}
+          month={curMonth}
           onClose={() => setRepay(null)}
         />
       )}
