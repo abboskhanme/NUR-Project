@@ -408,3 +408,92 @@ class MonthHistoryItem(BaseModel):
     net: Decimal
     bonus: Decimal = Decimal(0)
     penalty: Decimal = Decimal(0)
+
+
+# ---- Oylik tarixi: xodimning barcha oylari, to'lovlari va hisob tafsilotlari ----
+class SalaryHistoryPayment(BaseModel):
+    """Bitta avans/oylik to'lovi (bekor qilinganlari ham)."""
+    id: uuid.UUID
+    advance_date: date                # hisob sanasi — qaysi oy uchun ekanini belgilaydi
+    amount: Decimal
+    currency: str
+    note: Optional[str] = None
+    status: str                       # active / void
+    kind: str                         # "salary" (oylik to'lovi) | "advance" (avans)
+    method: Optional[str] = None      # "naqd" | "karta" | None (moliyaga yozilmagan)
+    in_finance: bool = False          # moliyadan chiqim sifatida yozilganmi
+    counted: bool = True              # shu oy hisobiga kirdimi (bekor/ishga kirishdan oldin — yo'q)
+    created_at: datetime              # tizimga kiritilgan vaqt — "qachon"
+    created_by_name: Optional[str] = None
+    voided_at: Optional[datetime] = None
+
+
+class SalaryHistoryAdjustment(BaseModel):
+    id: uuid.UUID
+    kind: str                         # bonus / penalty
+    amount: Decimal
+    note: Optional[str] = None
+    status: str
+    created_at: datetime
+    created_by_name: Optional[str] = None
+    voided_at: Optional[datetime] = None
+
+
+class SalaryHistoryOverride(BaseModel):
+    id: uuid.UUID
+    amount: Decimal
+    note: Optional[str] = None
+    status: str
+    created_at: datetime
+    created_by_name: Optional[str] = None
+    voided_at: Optional[datetime] = None
+
+
+class SalaryHistoryMonth(BaseModel):
+    year: int
+    month: int
+    salary_type: str                  # shu oyda amal qilgan tip
+    rate_amount: Decimal              # oylik summa (fixed) yoki soatlik stavka
+    present_days: int
+    total_hours: Decimal
+    attendance_pay: Decimal           # davomat bo'yicha hisoblangan haq (soatbay)
+    override: Optional[Decimal] = None
+    bonus: Decimal = Decimal(0)
+    penalty: Decimal = Decimal(0)
+    gross: Decimal                    # hisoblangan oylik (bonus/jarima bilan)
+    paid: Decimal                     # berilgan (faol to'lovlar)
+    balance: Decimal                  # gross − paid (musbat — qarzimiz, manfiy — ortiqcha berilgan)
+    before_hire: bool = False         # oy butunlay ishga kirishdan oldin
+    payments: list[SalaryHistoryPayment] = []
+    adjustments: list[SalaryHistoryAdjustment] = []
+    overrides: list[SalaryHistoryOverride] = []
+
+
+class SalaryHistoryRate(BaseModel):
+    effective_from: date
+    salary_type: str
+    amount: Decimal
+    note: Optional[str] = None
+    created_at: datetime
+    created_by_name: Optional[str] = None
+
+
+class SalaryHistoryEmployee(BaseModel):
+    """Xodim bo'yicha butun davr jamilari (ro'yxat uchun)."""
+    employee_id: uuid.UUID
+    full_name: str
+    department_type: str
+    status: str
+    hire_date: Optional[date] = None
+    salary_type: str
+    salary_amount: Decimal
+    months_count: int
+    total_gross: Decimal
+    total_paid: Decimal
+    balance: Decimal
+    last_payment_date: Optional[date] = None
+
+
+class SalaryHistoryDetail(SalaryHistoryEmployee):
+    rates: list[SalaryHistoryRate] = []
+    months: list[SalaryHistoryMonth] = []   # yangi oydan eskisiga

@@ -6,7 +6,7 @@ from decimal import Decimal
 from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import and_, case, delete, select, func
+from sqlalchemy import and_, case, delete, or_, select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import CurrentUser
@@ -17,6 +17,7 @@ from app.models.hr import (
     PayrollItem, PayrollRun, Position, SalaryAdjustment, SalaryAdvance,
     SalaryOverride, SalaryRate,
 )
+from app.models.finance import FinanceCategory, FinanceTransaction
 from app.models.system import AuditLog
 from app.models.user import User
 from app.schemas.common import Page
@@ -33,6 +34,8 @@ from app.schemas.hr import (
     PositionCreate, PositionOut, PositionUpdate,
     SalaryAdjustmentIn, SalaryAdjustmentOut,
     SalaryAdvanceIn, SalaryAdvanceOut,
+    SalaryHistoryAdjustment, SalaryHistoryDetail, SalaryHistoryEmployee,
+    SalaryHistoryMonth, SalaryHistoryOverride, SalaryHistoryPayment, SalaryHistoryRate,
     SalaryOverrideIn, SalaryOverrideOut,
     SalaryRateOut,
 )
@@ -600,6 +603,237 @@ async def employee_history(
             m = 12
             y -= 1
     return out
+
+
+# ---- Oylik tarixi (barcha oylar, to'lovlar va hisob tafsilotlari) ----
+def _month_iter(start: tuple[int, int], end: tuple[int, int]):
+    y, m = start
+    while (y, m) <= end:
+        yield y, m
+        m += 1
+        if m == 13:
+            y, m = y + 1, 1
+
+
+async def _salary_ledger(db: AsyncSession, employee_ids: Optional[list[uuid.UUID]] = None
+                         ) -> list[SalaryHistoryDetail]:
+    """Xodimlarning butun oylik tarixi — har oy uchun hisob va har bir to'lov.
+
+    Oy hisobi `_month_aggregate` bilan AYNAN bir xil (ishga kirish sanasi, o'sha
+    oydagi stavka, override, bonus/jarima, faol avanslar), lekin hamma xodim va
+    hamma oy uchun bir necha guruh so'rovida olinadi. To'lov qaysi oyga tegishli —
+    uning `advance_date`'i bo'yicha (HR/moliya to'lovni o'sha oy ichiga yozadi).
+
+    Oylar: ishga kirgan oydan (yoki birinchi yozuvdan) joriy oygacha. Ishlamayotgan
+    (status != active) xodimda — oxirgi yozuvi bor oygacha, aks holda fixed oylik
+    ketgandan keyin ham "hisoblanib" boraverardi.
+    """
+    q = select(Employee).order_by(Employee.full_name)
+    if employee_ids is not None:
+        q = q.where(Employee.id.in_(employee_ids))
+    emps = (await db.execute(q)).scalars().all()
+    if not emps:
+        return []
+    ids = [e.id for e in emps]
+
+    # Davomat: (xodim, yil, oy) bo'yicha — ishga kirish sanasidan oldingilar hisobga kirmaydi
+    y_att = func.extract("year", Attendance.work_date)
+    m_att = func.extract("month", Attendance.work_date)
+    att_rows = (await db.execute(
+        select(Attendance.employee_id, y_att, m_att, func.count(Attendance.id),
+               func.coalesce(func.sum(Attendance.hours_worked), 0),
+               func.coalesce(func.sum(Attendance.daily_pay), 0))
+        .join(Employee, Employee.id == Attendance.employee_id)
+        .where(Attendance.employee_id.in_(ids), Attendance.hours_worked > 0,
+               or_(Employee.hire_date.is_(None), Attendance.work_date >= Employee.hire_date))
+        .group_by(Attendance.employee_id, y_att, m_att)
+    )).all()
+    att_map = {(r[0], int(r[1]), int(r[2])): (int(r[3]), Decimal(r[4] or 0), Decimal(r[5] or 0))
+               for r in att_rows}
+
+    adv_rows = (await db.execute(
+        select(SalaryAdvance, FinanceTransaction.method, FinanceCategory.code)
+        .outerjoin(FinanceTransaction, FinanceTransaction.id == SalaryAdvance.tx_id)
+        .outerjoin(FinanceCategory, FinanceCategory.id == FinanceTransaction.category_id)
+        .where(SalaryAdvance.employee_id.in_(ids))
+        .order_by(SalaryAdvance.advance_date, SalaryAdvance.created_at)
+    )).all()
+    adj_rows = (await db.execute(
+        select(SalaryAdjustment).where(SalaryAdjustment.employee_id.in_(ids))
+        .order_by(SalaryAdjustment.created_at)
+    )).scalars().all()
+    ov_rows = (await db.execute(
+        select(SalaryOverride).where(SalaryOverride.employee_id.in_(ids))
+        .order_by(SalaryOverride.created_at)
+    )).scalars().all()
+    rate_rows = (await db.execute(
+        select(SalaryRate).where(SalaryRate.employee_id.in_(ids))
+        .order_by(SalaryRate.effective_from.desc(), SalaryRate.created_at.desc())
+    )).scalars().all()
+
+    user_ids = {r[0].created_by_id for r in adv_rows} | {a.created_by_id for a in adj_rows} \
+        | {o.created_by_id for o in ov_rows} | {r.created_by_id for r in rate_rows}
+    user_ids.discard(None)
+    names: dict[uuid.UUID, str] = {}
+    if user_ids:
+        names = dict((await db.execute(
+            select(User.id, User.full_name).where(User.id.in_(user_ids))
+        )).all())
+
+    advs: dict = {}
+    for adv, method, cat_code in adv_rows:
+        advs.setdefault((adv.employee_id, adv.advance_date.year, adv.advance_date.month), []) \
+            .append((adv, method, cat_code))
+    adjs: dict = {}
+    for a in adj_rows:
+        adjs.setdefault((a.employee_id, a.year, a.month), []).append(a)
+    ovs: dict = {}
+    for o in ov_rows:
+        ovs.setdefault((o.employee_id, o.year, o.month), []).append(o)
+    rates: dict = {}
+    for r in rate_rows:
+        rates.setdefault(r.employee_id, []).append(r)
+
+    # Har xodimning yozuvi bor oylari — oylar oralig'ini aniqlash uchun
+    keys_by_emp: dict[uuid.UUID, set[tuple[int, int]]] = {}
+    for eid, y, m in (*att_map, *advs, *adjs, *ovs):
+        keys_by_emp.setdefault(eid, set()).add((y, m))
+
+    today = date.today()
+    out: list[SalaryHistoryDetail] = []
+    for e in emps:
+        keys = keys_by_emp.get(e.id, set())
+        emp_rates = rates.get(e.id, [])
+        if e.hire_date:
+            start = (e.hire_date.year, e.hire_date.month)
+        elif keys:
+            start = min(keys)
+        else:
+            start = None
+        if keys:
+            start = min(start, min(keys))
+        if e.status == "active":
+            end = (today.year, today.month)
+        else:
+            end = max(keys) if keys else None
+        if keys:
+            end = max(end, max(keys))
+
+        months: list[SalaryHistoryMonth] = []
+        last_paid: Optional[date] = None
+        for y, m in (_month_iter(start, end) if start and end else ()):
+            m_start = date(y, m, 1)
+            m_end = date(y, m, calendar.monthrange(y, m)[1])
+            eff_start = max(m_start, e.hire_date) if e.hire_date else m_start
+            before_hire = eff_start > m_end
+
+            rate_type, rate_amount = e.salary_type, (e.salary_amount or Decimal(0))
+            for r in emp_rates:  # yangidan eskiga — `_rate_on` bilan bir xil
+                if r.effective_from <= m_end:
+                    rate_type, rate_amount = r.salary_type, (r.amount or Decimal(0))
+                    break
+            present, hours, att_pay = att_map.get((e.id, y, m), (0, Decimal(0), Decimal(0)))
+            m_ovs = ovs.get((e.id, y, m), [])
+            m_adjs = adjs.get((e.id, y, m), [])
+            m_advs = advs.get((e.id, y, m), [])
+            active_ov = [o for o in m_ovs if o.status == "active"]
+            override = Decimal(active_ov[-1].amount or 0) if active_ov else None
+            bonus = sum((a.amount or Decimal(0) for a in m_adjs
+                         if a.status == "active" and a.kind == "bonus"), Decimal(0))
+            penalty = sum((a.amount or Decimal(0) for a in m_adjs
+                           if a.status == "active" and a.kind == "penalty"), Decimal(0))
+
+            payments: list[SalaryHistoryPayment] = []
+            paid = Decimal(0)
+            for adv, method, cat_code in m_advs:
+                counted = adv.status == "active" and not before_hire and adv.advance_date >= eff_start
+                if counted:
+                    paid += adv.amount or Decimal(0)
+                if adv.status == "active":
+                    last_paid = max(last_paid, adv.advance_date) if last_paid else adv.advance_date
+                is_salary = cat_code == "employee_salary" or (
+                    cat_code is None and (adv.note or "").startswith("Oylik to'lovi"))
+                payments.append(SalaryHistoryPayment(
+                    id=adv.id, advance_date=adv.advance_date, amount=adv.amount,
+                    currency=adv.currency, note=adv.note, status=adv.status,
+                    kind="salary" if is_salary else "advance",
+                    method=method, in_finance=adv.tx_id is not None, counted=counted,
+                    created_at=adv.created_at, created_by_name=names.get(adv.created_by_id),
+                    voided_at=adv.updated_at if adv.status == "void" else None,
+                ))
+
+            if before_hire:
+                gross = Decimal(0)
+                present, hours, att_pay = 0, Decimal(0), Decimal(0)
+            else:
+                gross = rate_amount if rate_type == "fixed" else att_pay
+                if override is not None:
+                    gross = override
+                gross = gross + bonus - penalty
+
+            has_records = bool(m_advs or m_adjs or m_ovs or present)
+            if gross == 0 and not has_records:
+                continue
+            months.append(SalaryHistoryMonth(
+                year=y, month=m, salary_type=rate_type, rate_amount=rate_amount,
+                present_days=present, total_hours=hours, attendance_pay=att_pay,
+                override=override, bonus=bonus, penalty=penalty,
+                gross=gross, paid=paid, balance=gross - paid, before_hire=before_hire,
+                payments=payments,
+                adjustments=[SalaryHistoryAdjustment(
+                    id=a.id, kind=a.kind, amount=a.amount, note=a.note, status=a.status,
+                    created_at=a.created_at, created_by_name=names.get(a.created_by_id),
+                    voided_at=a.updated_at if a.status == "void" else None,
+                ) for a in m_adjs],
+                overrides=[SalaryHistoryOverride(
+                    id=o.id, amount=o.amount, note=o.note, status=o.status,
+                    created_at=o.created_at, created_by_name=names.get(o.created_by_id),
+                    voided_at=o.updated_at if o.status == "void" else None,
+                ) for o in m_ovs],
+            ))
+
+        months.reverse()  # yangi oydan eskisiga
+        total_gross = sum((mo.gross for mo in months), Decimal(0))
+        total_paid = sum((mo.paid for mo in months), Decimal(0))
+        out.append(SalaryHistoryDetail(
+            employee_id=e.id, full_name=e.full_name,
+            department_type=e.department_type or "production", status=e.status,
+            hire_date=e.hire_date, salary_type=e.salary_type,
+            salary_amount=e.salary_amount or Decimal(0),
+            months_count=len(months), total_gross=total_gross, total_paid=total_paid,
+            balance=total_gross - total_paid, last_payment_date=last_paid,
+            rates=[SalaryHistoryRate(
+                effective_from=r.effective_from, salary_type=r.salary_type, amount=r.amount,
+                note=r.note, created_at=r.created_at, created_by_name=names.get(r.created_by_id),
+            ) for r in emp_rates],
+            months=months,
+        ))
+    return out
+
+
+@router.get("/salary-history", response_model=list[SalaryHistoryEmployee])
+async def salary_history(db: Annotated[AsyncSession, Depends(get_db)], _: CurrentUser):
+    """Barcha xodimlar (ishlamayotganlari ham) — butun davr bo'yicha oylik jamilari.
+
+    Ishlayotganlar birinchi, keyin ism bo'yicha. Tafsilot — /salary-history/{id}.
+    """
+    rows = await _salary_ledger(db)
+    rows = [r for r in rows if r.months_count > 0]
+    rows.sort(key=lambda r: (r.status != "active", r.full_name.lower()))
+    return [SalaryHistoryEmployee.model_validate(r.model_dump(exclude={"rates", "months"}))
+            for r in rows]
+
+
+@router.get("/salary-history/{employee_id}", response_model=SalaryHistoryDetail)
+async def salary_history_detail(employee_id: uuid.UUID,
+                                db: Annotated[AsyncSession, Depends(get_db)], _: CurrentUser):
+    """Bitta xodimning to'liq oylik tarixi: har oy hisobi, har bir to'lov (qachon
+    kiritilgani, kim kiritgani, naqd/karta, bekor qilinganlari ham), bonus/jarima,
+    qo'lda belgilangan oyliklar va stavka tarixi."""
+    rows = await _salary_ledger(db, [employee_id])
+    if not rows:
+        raise HTTPException(404, "Xodim topilmadi")
+    return rows[0]
 
 
 # ---- Salary rates (stavka tarixi) ----

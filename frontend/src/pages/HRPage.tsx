@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, Pencil, Users, Briefcase, BadgeCheck, ChevronRight, Wallet, HandCoins, Coins, Scale } from 'lucide-react';
+import { Plus, Search, Pencil, Users, Briefcase, BadgeCheck, ChevronRight, Wallet, HandCoins, Coins, Scale, History } from 'lucide-react';
 
 import { api } from '@/api/client';
 import Card from '@/components/ui/Card';
@@ -12,6 +12,7 @@ import EmployeeHistoryModal, { HistoryKind } from '@/features/hr/EmployeeHistory
 import PositionsSection from '@/features/hr/PositionsSection';
 import SalaryDebtsSection from '@/features/hr/SalaryDebtsSection';
 import EmployeeLoansSection from '@/features/hr/EmployeeLoansSection';
+import SalaryHistorySection from '@/features/hr/SalaryHistorySection';
 import SalaryAdjustmentModal from '@/features/hr/SalaryAdjustmentModal';
 import RepayDebtModal from '@/features/hr/RepayDebtModal';
 
@@ -30,7 +31,7 @@ const HR_MONTHS: Record<string, string> = {
   '12': 'Dekabr',
 };
 
-type Tab = 'employees' | 'positions' | 'debts' | 'loans';
+type Tab = 'employees' | 'positions' | 'debts' | 'loans' | 'salaryHistory';
 type GroupKey = 'office' | 'assembly' | 'production';
 
 // Xodim turini bo'limga ajratamiz: ofis bo'limi, yig'uv bo'limi, ishlab chiqarish.
@@ -98,6 +99,7 @@ export default function HRPage() {
   const isPositions = tab === 'positions';
   const isDebts = tab === 'debts';
   const isLoans = tab === 'loans';
+  const isSalaryHistory = tab === 'salaryHistory';
   const isEmployees = tab === 'employees';
   const now = new Date();
   const [curYear, setCurYear] = useState(now.getFullYear());
@@ -198,6 +200,9 @@ export default function HRPage() {
         <TabButton active={tab === 'loans'} onClick={() => setTab('loans')} icon={<Coins size={16} />}>
           Xodim qarzlari
         </TabButton>
+        <TabButton active={tab === 'salaryHistory'} onClick={() => setTab('salaryHistory')} icon={<History size={16} />}>
+          Oylik tarixi
+        </TabButton>
       </div>
 
       {isEmployees && (
@@ -226,6 +231,8 @@ export default function HRPage() {
         <SalaryDebtsSection />
       ) : isLoans ? (
         <EmployeeLoansSection />
+      ) : isSalaryHistory ? (
+        <SalaryHistorySection />
       ) : (
         <Card>
           <div className="flex items-center gap-2 mb-4 flex-wrap">
