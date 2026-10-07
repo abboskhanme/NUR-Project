@@ -204,6 +204,54 @@ class EmployeeLoanGroup(BaseModel):
     items: list[EmployeeLoanOut]
 
 
+# ---- Xodim qarzlari: to'liq tarix (yopilgan va o'chirilganlar ham) ----
+class LoanHistoryPayment(BaseModel):
+    id: uuid.UUID
+    amount: Decimal
+    pay_date: date
+    note: Optional[str] = None
+    created_at: datetime
+    created_by_name: Optional[str] = None
+    deleted_at: Optional[datetime] = None
+    deleted_by_name: Optional[str] = None
+
+
+class LoanHistoryEdit(BaseModel):
+    """Qarz tahriri: qaysi maydon nimadan nimaga o'zgargani."""
+    at: datetime
+    by_name: Optional[str] = None
+    changes: dict[str, list[Optional[str]]]   # {"amount": ["10000000.00", "11545000.00"], ...}
+
+
+class LoanHistoryItem(BaseModel):
+    id: uuid.UUID
+    amount: Decimal
+    currency: str
+    source: str
+    loan_date: date
+    note: Optional[str] = None
+    status: str                       # active / closed / deleted
+    created_at: datetime
+    created_by_name: Optional[str] = None
+    deleted_at: Optional[datetime] = None
+    deleted_by_name: Optional[str] = None
+    paid: Decimal = Decimal(0)        # o'chirilmagan to'lovlar yig'indisi
+    balance: Decimal = Decimal(0)     # amount − paid
+    payments: list[LoanHistoryPayment] = []   # o'chirilganlari ham, sana bo'yicha o'sib boruvchi
+    edits: list[LoanHistoryEdit] = []
+
+
+class LoanHistoryGroup(BaseModel):
+    """Bitta xodimning butun qarz tarixi. Jamilar o'chirilgan yozuvlarsiz hisoblanadi."""
+    employee_id: uuid.UUID
+    full_name: str
+    department_type: str
+    total_taken: Decimal              # olingan (o'chirilmagan qarzlar)
+    total_paid: Decimal               # so'ndirilgan
+    balance: Decimal                  # hozirgi qoldiq
+    items: list[LoanHistoryItem]
+
+
 class EmployeeOut(ORMBase):
     id: uuid.UUID
     full_name: str

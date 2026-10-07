@@ -14,6 +14,7 @@ import MoneyInput from '@/components/ui/MoneyInput';
 import DateInput from '@/components/ui/DateInput';
 import { formatUZS } from '@/lib/format';
 import { usePermissions } from '@/lib/permissions';
+import EmployeeLoansHistory from './EmployeeLoansHistory';
 
 interface Payment {
   id: string;
@@ -77,6 +78,7 @@ export default function EmployeeLoansSection() {
     { kind: 'loan'; loan: Loan } | { kind: 'payment'; loanId: string; payment: Payment } | null
   >(null);
   const [busy, setBusy] = useState(false);
+  const [view, setView] = useState<'active' | 'history'>('active');
 
   const { data, isLoading } = useQuery<LoanGroup[]>({
     queryKey: ['hr', 'employee-loans'],
@@ -108,8 +110,38 @@ export default function EmployeeLoansSection() {
     }
   }
 
+  const viewTabs = (
+    <div className="flex gap-1 border-b border-black/5">
+      {([
+        { key: 'active', label: 'Faol qarzlar' },
+        { key: 'history', label: "To'liq tarix" },
+      ] as const).map((tb) => (
+        <button key={tb.key} onClick={() => setView(tb.key)}
+          className={
+            'px-4 py-2 text-sm font-medium -mb-px border-b-2 transition-colors ' +
+            (view === tb.key
+              ? 'border-primary text-primary'
+              : 'border-transparent text-ink-soft hover:text-ink')
+          }>
+          {tb.label}
+        </button>
+      ))}
+    </div>
+  );
+
+  if (view === 'history') {
+    return (
+      <div className="space-y-4">
+        {viewTabs}
+        <EmployeeLoansHistory />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
+      {viewTabs}
+
       {/* Jami qoldiq + qo'shish */}
       <div className="rounded-card border border-danger/20 bg-danger/5 p-4">
         <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -173,7 +205,7 @@ export default function EmployeeLoansSection() {
         message={
           confirm?.kind === 'payment'
             ? 'Bu so\'ndirish yozuvi o\'chiriladi, qoldiq qaytadi.'
-            : "Qarz va uning butun so'ndirish tarixi o'chiriladi."
+            : "Qarz ro'yxatdan o'chiriladi (\"To'liq tarix\"da o'chirilgan bo'lib qoladi)."
         }
         confirmText="O'chirish"
         variant="danger"

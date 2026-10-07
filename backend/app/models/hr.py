@@ -1,10 +1,10 @@
 """HR: employees, departments, positions, attendance, payroll."""
 import uuid
-from datetime import date, time
+from datetime import date, datetime, time
 from decimal import Decimal
 from typing import Optional
 
-from sqlalchemy import Boolean, Date, ForeignKey, Integer, Numeric, String, Text, Time, UniqueConstraint
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, Time, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -191,9 +191,14 @@ class EmployeeLoan(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     source: Mapped[str] = mapped_column(String(20), default="firma", server_default="firma")
     loan_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     note: Mapped[Optional[str]] = mapped_column(Text)
-    # "active" yoki "closed" (to'liq so'ndirilgan/yopilgan, lekin tarixda qoladi)
+    # "active", "closed" (to'liq so'ndirilgan) yoki "deleted" (o'chirilgan) — hammasi tarixda qoladi
     status: Mapped[str] = mapped_column(String(10), default="active", server_default="active")
     created_by_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+    )
+    # Yumshoq o'chirish: yozuv bazadan o'chmaydi, faqat belgilanadi (to'liq tarix uchun)
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    deleted_by_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
     )
 
@@ -201,7 +206,7 @@ class EmployeeLoan(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 class EmployeeLoanPayment(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     """Xodim qarzini so'ndirish (qaytarish) yozuvi — ichki tarix.
 
-    Qarz qoldig'i = EmployeeLoan.amount − shu qarzga tegishli barcha to'lovlar yig'indisi.
+    Qarz qoldig'i = EmployeeLoan.amount − shu qarzga tegishli o'chirilmagan to'lovlar yig'indisi.
     """
     __tablename__ = "employee_loan_payments"
 
@@ -212,6 +217,11 @@ class EmployeeLoanPayment(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     pay_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     note: Mapped[Optional[str]] = mapped_column(Text)
     created_by_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+    )
+    # Yumshoq o'chirish: o'chirilgan to'lov qoldiqqa ta'sir qilmaydi, lekin tarixda ko'rinadi
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    deleted_by_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
     )
 

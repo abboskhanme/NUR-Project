@@ -1,7 +1,7 @@
 """HR: employees, attendance, advances, payroll."""
 import calendar
 import uuid
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Annotated, Optional
 
@@ -17,6 +17,8 @@ from app.models.hr import (
     PayrollItem, PayrollRun, Position, SalaryAdjustment, SalaryAdvance,
     SalaryOverride, SalaryRate,
 )
+from app.models.system import AuditLog
+from app.models.user import User
 from app.schemas.common import Page
 from app.schemas.hr import (
     AttendanceBatchIn, AttendanceOut,
@@ -24,6 +26,7 @@ from app.schemas.hr import (
     EmployeeCreate, EmployeeLoanGroup, EmployeeLoanIn, EmployeeLoanOut,
     EmployeeLoanPaymentIn, EmployeeLoanPaymentOut, EmployeeLoanUpdate,
     EmployeeMonthSummary, EmployeeOut, EmployeeUpdate,
+    LoanHistoryEdit, LoanHistoryGroup, LoanHistoryItem, LoanHistoryPayment,
     LoanRepayFromSalaryIn, LoanRepayFromSalaryOut,
     MonthDebts, MonthHistoryItem, MonthlySummary,
     PayrollRunIn, PayrollRunOut,
@@ -951,6 +954,7 @@ async def void_salary_override(override_id: uuid.UUID, _user: CurrentUser,
 # ---- Employee loans (bizdan qarzdor xodimlar) ----
 def _loan_out(loan: EmployeeLoan, payments: list[EmployeeLoanPayment]) -> EmployeeLoanOut:
     """Qarzni qoldiq va to'lov tarixi bilan chiqarish obyektiga aylantiradi."""
+    payments = [p for p in payments if p.deleted_at is None]
     paid = sum((p.amount or Decimal(0) for p in payments), Decimal(0))
     out = EmployeeLoanOut.model_validate(loan)
     out.paid = paid
@@ -984,7 +988,10 @@ async def list_employee_loans(
     payments_by_loan: dict[uuid.UUID, list[EmployeeLoanPayment]] = {}
     if loan_ids:
         pres = await db.execute(
-            select(EmployeeLoanPayment).where(EmployeeLoanPayment.loan_id.in_(loan_ids))
+            select(EmployeeLoanPayment).where(
+                EmployeeLoanPayment.loan_id.in_(loan_ids),
+                EmployeeLoanPayment.deleted_at.is_(None),
+            )
         )
         for p in pres.scalars().all():
             payments_by_loan.setdefault(p.loan_id, []).append(p)
@@ -1005,6 +1012,104 @@ async def list_employee_loans(
     # Faqat hozir qarzi bor (qoldiq > 0) xodimlar
     result = [g for g in groups.values() if g.total > 0]
     return sorted(result, key=lambda x: x.total, reverse=True)
+
+
+@router.get("/employee-loans/history", response_model=list[LoanHistoryGroup])
+async def employee_loans_history(
+    db: Annotated[AsyncSession, Depends(get_db)], _: CurrentUser,
+):
+    """Xodim qarzlarining TO'LIQ tarixi — faol, yopilgan va o'chirilgan qarzlar,
+    o'chirilgan so'ndirishlar va tahrirlar bilan. Hech narsa yashirilmaydi.
+
+    Jamilar (olingan/so'ndirilgan/qoldiq) faqat o'chirilmagan yozuvlardan hisoblanadi.
+    Xodimlar ism bo'yicha tartiblanadi.
+    """
+    rows = (await db.execute(
+        select(EmployeeLoan, Employee.full_name, Employee.department_type)
+        .join(Employee, Employee.id == EmployeeLoan.employee_id)
+        .order_by(Employee.full_name, EmployeeLoan.loan_date.desc(), EmployeeLoan.created_at.desc())
+    )).all()
+    loan_ids = [loan.id for loan, _, _ in rows]
+
+    payments_by_loan: dict[uuid.UUID, list[EmployeeLoanPayment]] = {}
+    edits_by_loan: dict[str, list[AuditLog]] = {}
+    if loan_ids:
+        pres = await db.execute(
+            select(EmployeeLoanPayment)
+            .where(EmployeeLoanPayment.loan_id.in_(loan_ids))
+            .order_by(EmployeeLoanPayment.pay_date, EmployeeLoanPayment.created_at)
+        )
+        for p in pres.scalars().all():
+            payments_by_loan.setdefault(p.loan_id, []).append(p)
+        eres = await db.execute(
+            select(AuditLog)
+            .where(AuditLog.entity == "employee_loan", AuditLog.action == "update",
+                   AuditLog.entity_id.in_([str(i) for i in loan_ids]))
+            .order_by(AuditLog.created_at)
+        )
+        for a in eres.scalars().all():
+            edits_by_loan.setdefault(a.entity_id, []).append(a)
+
+    # Kiritgan/o'chirgan foydalanuvchilar ismlari — bitta so'rovda
+    user_ids: set[uuid.UUID] = set()
+    for loan, _, _ in rows:
+        user_ids.update(i for i in (loan.created_by_id, loan.deleted_by_id) if i)
+    for plist in payments_by_loan.values():
+        for p in plist:
+            user_ids.update(i for i in (p.created_by_id, p.deleted_by_id) if i)
+    for elist in edits_by_loan.values():
+        user_ids.update(a.user_id for a in elist if a.user_id)
+    names: dict[uuid.UUID, str] = {}
+    if user_ids:
+        nres = await db.execute(select(User.id, User.full_name).where(User.id.in_(user_ids)))
+        names = {uid: name for uid, name in nres.all()}
+
+    def _name(uid: Optional[uuid.UUID]) -> Optional[str]:
+        return names.get(uid) if uid else None
+
+    groups: dict[uuid.UUID, LoanHistoryGroup] = {}
+    for loan, full_name, dept in rows:
+        plist = payments_by_loan.get(loan.id, [])
+        is_deleted = loan.status == "deleted"
+        paid = sum((p.amount or Decimal(0) for p in plist if p.deleted_at is None), Decimal(0))
+        amount = loan.amount or Decimal(0)
+        item = LoanHistoryItem(
+            id=loan.id, amount=amount, currency=loan.currency, source=loan.source,
+            loan_date=loan.loan_date, note=loan.note, status=loan.status,
+            created_at=loan.created_at, created_by_name=_name(loan.created_by_id),
+            deleted_at=loan.deleted_at, deleted_by_name=_name(loan.deleted_by_id),
+            paid=paid, balance=amount - paid,
+            payments=[
+                LoanHistoryPayment(
+                    id=p.id, amount=p.amount, pay_date=p.pay_date, note=p.note,
+                    created_at=p.created_at, created_by_name=_name(p.created_by_id),
+                    deleted_at=p.deleted_at, deleted_by_name=_name(p.deleted_by_id),
+                )
+                for p in plist
+            ],
+            edits=[
+                LoanHistoryEdit(
+                    at=a.created_at, by_name=_name(a.user_id),
+                    changes={k: [(a.before or {}).get(k), v] for k, v in (a.after or {}).items()},
+                )
+                for a in edits_by_loan.get(str(loan.id), [])
+            ],
+        )
+        g = groups.get(loan.employee_id)
+        if g is None:
+            g = LoanHistoryGroup(
+                employee_id=loan.employee_id, full_name=full_name,
+                department_type=dept or "production",
+                total_taken=Decimal(0), total_paid=Decimal(0), balance=Decimal(0), items=[],
+            )
+            groups[loan.employee_id] = g
+        g.items.append(item)
+        if not is_deleted:
+            g.total_taken += amount
+            g.total_paid += paid
+            g.balance += amount - paid
+
+    return list(groups.values())
 
 
 @router.post("/employee-loans", response_model=EmployeeLoanOut, status_code=201)
@@ -1028,30 +1133,51 @@ async def create_employee_loan(payload: EmployeeLoanIn, user: CurrentUser,
 
 @router.patch("/employee-loans/{loan_id}", response_model=EmployeeLoanOut)
 async def update_employee_loan(loan_id: uuid.UUID, payload: EmployeeLoanUpdate,
-                               _user: CurrentUser, db: Annotated[AsyncSession, Depends(get_db)]):
+                               user: CurrentUser, db: Annotated[AsyncSession, Depends(get_db)]):
     res = await db.execute(select(EmployeeLoan).where(EmployeeLoan.id == loan_id))
     loan = res.scalar_one_or_none()
-    if not loan:
+    if not loan or loan.status == "deleted":
         raise HTTPException(404, "Qarz topilmadi")
+    before: dict[str, Optional[str]] = {}
+    after: dict[str, Optional[str]] = {}
     for field in ("amount", "source", "loan_date", "note", "status"):
         val = getattr(payload, field, None)
-        if val is not None:
-            setattr(loan, field, val)
+        if val is None:
+            continue
+        if field == "status" and val not in ("active", "closed"):
+            raise HTTPException(422, "Noto'g'ri holat")
+        old = getattr(loan, field)
+        if old != val:
+            before[field] = None if old is None else str(old)
+            after[field] = str(val)
+        setattr(loan, field, val)
+    # Tahrir tarixda qolishi uchun — nima nimadan nimaga o'zgargani
+    if after:
+        db.add(AuditLog(
+            user_id=user.id, entity="employee_loan", entity_id=str(loan.id),
+            action="update", before=before, after=after,
+        ))
     await db.commit()
     await db.refresh(loan)
     pres = await db.execute(
-        select(EmployeeLoanPayment).where(EmployeeLoanPayment.loan_id == loan.id)
+        select(EmployeeLoanPayment).where(
+            EmployeeLoanPayment.loan_id == loan.id,
+            EmployeeLoanPayment.deleted_at.is_(None),
+        )
     )
     return _loan_out(loan, list(pres.scalars().all()))
 
 
 @router.delete("/employee-loans/{loan_id}", status_code=204)
-async def delete_employee_loan(loan_id: uuid.UUID, _user: CurrentUser,
+async def delete_employee_loan(loan_id: uuid.UUID, user: CurrentUser,
                                db: Annotated[AsyncSession, Depends(get_db)]):
+    """Qarzni o'chiradi — yumshoq: ro'yxatdan tushadi, lekin to'liq tarixda qoladi."""
     res = await db.execute(select(EmployeeLoan).where(EmployeeLoan.id == loan_id))
     loan = res.scalar_one_or_none()
-    if loan:
-        await db.delete(loan)  # to'lovlar CASCADE bilan o'chadi
+    if loan and loan.status != "deleted":
+        loan.status = "deleted"
+        loan.deleted_at = datetime.now(timezone.utc)
+        loan.deleted_by_id = user.id
         await db.commit()
 
 
@@ -1063,14 +1189,14 @@ async def add_loan_payment(loan_id: uuid.UUID, payload: EmployeeLoanPaymentIn,
     """Qarzga so'ndirish (to'lov) yozadi. Qoldiqdan ortiq to'lov rad etiladi."""
     res = await db.execute(select(EmployeeLoan).where(EmployeeLoan.id == loan_id))
     loan = res.scalar_one_or_none()
-    if not loan:
+    if not loan or loan.status == "deleted":
         raise HTTPException(404, "Qarz topilmadi")
     if payload.amount is None or payload.amount <= 0:
         raise HTTPException(422, "Summa 0 dan katta bo'lishi kerak")
 
     pres = await db.execute(
         select(func.coalesce(func.sum(EmployeeLoanPayment.amount), 0))
-        .where(EmployeeLoanPayment.loan_id == loan_id)
+        .where(EmployeeLoanPayment.loan_id == loan_id, EmployeeLoanPayment.deleted_at.is_(None))
     )
     paid = pres.scalar() or Decimal(0)
     balance = (loan.amount or Decimal(0)) - paid
@@ -1096,8 +1222,11 @@ async def add_loan_payment(loan_id: uuid.UUID, payload: EmployeeLoanPaymentIn,
 
 @router.delete("/employee-loans/{loan_id}/payments/{payment_id}", status_code=204)
 async def delete_loan_payment(loan_id: uuid.UUID, payment_id: uuid.UUID,
-                              _user: CurrentUser, db: Annotated[AsyncSession, Depends(get_db)]):
-    """So'ndirishni bekor qiladi (o'chiradi). Qarz qaytadan ochiq (active) bo'ladi."""
+                              user: CurrentUser, db: Annotated[AsyncSession, Depends(get_db)]):
+    """So'ndirishni bekor qiladi (yumshoq o'chirish — tarixda qoladi).
+
+    Qarz qaytadan ochiq (active) bo'ladi.
+    """
     res = await db.execute(
         select(EmployeeLoanPayment).where(
             EmployeeLoanPayment.id == payment_id,
@@ -1105,9 +1234,10 @@ async def delete_loan_payment(loan_id: uuid.UUID, payment_id: uuid.UUID,
         )
     )
     pay = res.scalar_one_or_none()
-    if not pay:
+    if not pay or pay.deleted_at is not None:
         return
-    await db.delete(pay)
+    pay.deleted_at = datetime.now(timezone.utc)
+    pay.deleted_by_id = user.id
     # Qarz yopilgan bo'lsa, to'lov o'chgach qoldiq paydo bo'ladi — qayta ochamiz
     loan_res = await db.execute(select(EmployeeLoan).where(EmployeeLoan.id == loan_id))
     loan = loan_res.scalar_one_or_none()
@@ -1152,7 +1282,8 @@ async def repay_loan_from_salary(employee_id: uuid.UUID, payload: LoanRepayFromS
     paid_rows = (await db.execute(
         select(EmployeeLoanPayment.loan_id,
                func.coalesce(func.sum(EmployeeLoanPayment.amount), 0))
-        .where(EmployeeLoanPayment.loan_id.in_(loan_ids))
+        .where(EmployeeLoanPayment.loan_id.in_(loan_ids),
+               EmployeeLoanPayment.deleted_at.is_(None))
         .group_by(EmployeeLoanPayment.loan_id)
     )).all()
     paid_map = {lid: Decimal(s or 0) for lid, s in paid_rows}
