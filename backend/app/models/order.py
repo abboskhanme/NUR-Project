@@ -19,6 +19,12 @@ ORDER_STATUSES = (
     "rejected",   # Rad etildi
 )
 
+# Navbat bosqichlari (Order.queue_stage). None = Kutilmoqda.
+QUEUE_STAGES = (
+    "assembling",  # Yig'ilmoqda
+    "ready",       # Tayyor
+)
+
 
 class Order(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "orders"
@@ -49,6 +55,9 @@ class Order(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     # Navbat bo'limida qo'lda kiritiladigan taxminiy chiqib-ketish sanasi.
     # pickup_date'dan farqli — faqat Navbat sahifasida ko'rinadi va tahrirlanadi.
     queue_departure_date: Mapped[Optional[date]] = mapped_column(Date, index=True)
+    # Navbat bo'limidagi ishlab chiqarish bosqichi — buyurtma statusidan mustaqil,
+    # sotuv/hisobotlarga ta'sir qilmaydi. None = Kutilmoqda.
+    queue_stage: Mapped[Optional[str]] = mapped_column(String(20))
 
     # Inventory linkage (optional — pick a unique unit from SKLAD KATYOL)
     inventory_id: Mapped[Optional[uuid.UUID]] = mapped_column(

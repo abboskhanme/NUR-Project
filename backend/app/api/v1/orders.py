@@ -15,7 +15,7 @@ from app.core.dependencies import CurrentUser
 from app.core.permissions import has_special, module_guard, require_permission
 from app.db.session import get_db
 from app.models.customer import Customer
-from app.models.order import Order, OrderItem, Payment
+from app.models.order import QUEUE_STAGES, Order, OrderItem, Payment
 from app.models.product import Inventory
 from app.models.user import User
 from app.schemas.common import Page
@@ -23,6 +23,7 @@ from app.schemas.order import (
     OrderCreate, OrderOut, OrderStatusChange, OrderUpdate, UnitUidUpdate,
     SalespersonUpdate, SalespersonOption, OverrideAmounts,
     PaymentIn, PaymentUpdate, PaymentOut, SalesSummary, SalespersonCount, QueueItemOut, QueueMove, QueueAdd,
+    QueueStageUpdate,
 )
 from app.services.order_service import generate_order_code, is_valid_transition
 from app.services import pdf_service
@@ -168,6 +169,7 @@ async def _revert_to_queue(db: AsyncSession, order: Order, note: Optional[str] =
     prev = order.status
     order.status = "new"
     order.delivered_at = None
+    order.queue_stage = None
     line = f"[status revert] {prev} -> new"
     if note:
         line += f": {note}"
@@ -466,6 +468,24 @@ async def queue_move(order_id: uuid.UUID, payload: QueueMove, current: CurrentUs
     return _queue_out(await _load_queue(db, current))
 
 
+@router.post("/{order_id}/queue-stage", response_model=QueueItemOut)
+async def set_queue_stage(order_id: uuid.UUID, payload: QueueStageUpdate, current: CurrentUser,
+                          db: Annotated[AsyncSession, Depends(get_db)]):
+    """Navbatdagi buyurtma bosqichi: Kutilmoqda (null) / Yig'ilmoqda / Tayyor.
+    Faqat Navbat bo'limi uchun — buyurtma statusiga ta'sir qilmaydi."""
+    stage = payload.stage or None
+    if stage is not None and stage not in QUEUE_STAGES:
+        raise HTTPException(400, "Noma'lum bosqich")
+    orders = await _load_queue(db, current)
+    target = next((o for o in orders if o.id == order_id), None)
+    if target is None:
+        raise HTTPException(404, "Buyurtma navbatda topilmadi")
+    target.queue_stage = stage
+    await db.commit()
+    out = _queue_out(await _load_queue(db, current))
+    return next(i for i in out if i.id == order_id)
+
+
 @router.post("/{order_id}/to-queue", response_model=OrderOut)
 async def add_to_queue(order_id: uuid.UUID, payload: QueueAdd, current: CurrentUser,
                        db: Annotated[AsyncSession, Depends(get_db)]):
@@ -494,6 +514,7 @@ async def remove_from_queue(order_id: uuid.UUID, current: CurrentUser,
         raise HTTPException(404, "Buyurtma topilmadi")
     o.in_queue = False
     o.priority = 0
+    o.queue_stage = None
     await db.commit()
     res = await db.execute(_order_query().where(Order.id == order_id))
     return res.scalar_one()

@@ -2,12 +2,12 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { ChevronsUp, ChevronUp, ChevronDown, ListOrdered, Search, Coins, MapPin } from 'lucide-react';
+import { ChevronsUp, ChevronUp, ChevronDown, ListOrdered, Search, Coins, MapPin, Hammer, PackageCheck } from 'lucide-react';
 
 import { api } from '@/api/client';
 import Card from '@/components/ui/Card';
 import EmptyState from '@/components/ui/EmptyState';
-import { CellDate } from '@/components/ui/TablePickers';
+import { CellDate, CellSelect, type CellOption } from '@/components/ui/TablePickers';
 import { formatDate, formatUZS } from '@/lib/format';
 
 interface ProductMini { product_type?: string; model?: string | null; name?: string | null; kvm?: number | null; display_name?: string; }
@@ -15,10 +15,38 @@ interface Item { product?: ProductMini | null; bunker_direction?: string | null;
 interface QueueOrder {
   id: string; code: string; status: string; order_date: string; pickup_date?: string | null; position: number;
   queue_departure_date?: string | null;
+  queue_stage?: QueueStage | null;
   customer?: { full_name: string; phone?: string; region?: string | null } | null;
   items: Item[];
   items_total_uzs: string; paid_uzs: string; balance_uzs: string;
 }
+
+// Navbat bosqichi — faqat shu bo'lim uchun, buyurtma statusidan mustaqil.
+// '' = Kutilmoqda (hali boshlanmagan).
+type QueueStage = 'assembling' | 'ready';
+type StageValue = QueueStage | '';
+
+const STAGE_OPTIONS: CellOption[] = [
+  { value: 'assembling', label: "Yig'ilmoqda" },
+  { value: 'ready', label: 'Tayyor' },
+];
+const STAGE_LABEL: Record<QueueStage, string> = { assembling: "Yig'ilmoqda", ready: 'Tayyor' };
+// Holat pilli va butun qator foni
+const STAGE_PILL: Record<StageValue, string> = {
+  '': 'bg-black/5 border-black/10',
+  assembling: 'bg-warning/15 border-warning/30 text-warning',
+  ready: 'bg-success/15 border-success/30 text-success',
+};
+const STAGE_ROW: Record<StageValue, string> = {
+  '': 'hover:bg-black/5',
+  assembling: 'bg-warning/10 hover:bg-warning/15',
+  ready: 'bg-success/10 hover:bg-success/15',
+};
+const STAGE_STRIPE: Record<StageValue, string> = {
+  '': '',
+  assembling: 'shadow-[inset_3px_0_0_#F39C12]',
+  ready: 'shadow-[inset_3px_0_0_#27AE60]',
+};
 
 function itemSummary(o: QueueOrder, dirRight: string, dirLeft: string): string {
   if (!o.items?.length) return '—';
@@ -39,6 +67,8 @@ export default function QueuePage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [search, setSearch] = useState('');
+  // Tepadagi bosqich cardini bosish — jadvalda faqat shu bosqichdagilar
+  const [stageFilter, setStageFilter] = useState<StageValue>('');
 
   const dirRight = "O'NG";
   const dirLeft = "CHAP";
@@ -61,6 +91,16 @@ export default function QueuePage() {
     return { due };
   }, [queue]);
 
+  const stageCounts = useMemo(() => {
+    let assembling = 0;
+    let ready = 0;
+    for (const o of queue) {
+      if (o.queue_stage === 'assembling') assembling++;
+      else if (o.queue_stage === 'ready') ready++;
+    }
+    return { assembling, ready };
+  }, [queue]);
+
   // Yuklar chiqib ketayotgan viloyatlar ro'yxati
   const regions = useMemo(() => {
     const set = new Set<string>();
@@ -73,9 +113,10 @@ export default function QueuePage() {
   const searching = search.trim().length > 0;
   const pendingShown = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return allPending;
+    const byStage = stageFilter ? allPending.filter((o) => o.queue_stage === stageFilter) : allPending;
+    if (!q) return byStage;
     const qDigits = q.replace(/\D/g, '');
-    return allPending.filter((o) => {
+    return byStage.filter((o) => {
       if (o.code.toLowerCase().includes(q)) return true;
       if (o.customer?.full_name?.toLowerCase().includes(q)) return true;
       if (o.customer?.region?.toLowerCase().includes(q)) return true;
@@ -83,7 +124,7 @@ export default function QueuePage() {
       if (itemSummary(o, dirRight, dirLeft).toLowerCase().includes(q)) return true;
       return false;
     });
-  }, [allPending, search, dirRight, dirLeft]);
+  }, [allPending, search, stageFilter, dirRight, dirLeft]);
 
   // Bir xil chiqib-ketish sanasidagi yuklarni alohida cardlarga guruhlash.
   // Sana belgilanmaganlar birinchi guruh sifatida chiqadi (e'tibor talab qiladi).
@@ -123,14 +164,28 @@ export default function QueuePage() {
     }
   }
 
+  async function setStage(id: string, stage: StageValue) {
+    const key = ['orders', 'queue'];
+    const prev = qc.getQueryData<QueueOrder[]>(key);
+    qc.setQueryData<QueueOrder[]>(key, (old) =>
+      old?.map((o) => (o.id === id ? { ...o, queue_stage: stage || null } : o)));
+    try {
+      await api.post(`/orders/${id}/queue-stage`, { stage: stage || null });
+    } catch (err: any) {
+      qc.setQueryData(key, prev);
+      toast.error(err?.response?.data?.detail || "Xatolik yuz berdi");
+    }
+  }
+
   function renderTable(rows: QueueOrder[], reorderable: boolean) {
     return (
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="text-left text-ink-soft border-b border-black/5">
             <tr>
-              <th className="py-2 pr-3 w-10">#</th>
+              <th className="py-2 pl-2 pr-3 w-10">#</th>
               <th className="py-2 pr-3">Chiqib ketish</th>
+              <th className="py-2 pr-3">Holat</th>
               <th className="py-2 pr-3">Mijoz</th>
               <th className="py-2 pr-3">Mahsulotlar</th>
               <th className="py-2 pr-3">Sana</th>
@@ -139,10 +194,12 @@ export default function QueuePage() {
             </tr>
           </thead>
           <tbody>
-            {rows.map((o, idx) => (
+            {rows.map((o, idx) => {
+              const stage: StageValue = o.queue_stage ?? '';
+              return (
               <tr key={o.id} onClick={() => navigate(`/orders/${o.id}`)}
-                  className="border-b border-black/5 hover:bg-black/5 cursor-pointer">
-                <td className="py-2 pr-3">
+                  className={`border-b border-black/5 cursor-pointer transition-colors ${STAGE_ROW[stage]}`}>
+                <td className={`py-2 pl-2 pr-3 ${STAGE_STRIPE[stage]}`}>
                   <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-primary/10 text-primary font-bold text-xs">
                     {o.position || idx + 1}
                   </span>
@@ -152,6 +209,17 @@ export default function QueuePage() {
                     value={o.queue_departure_date ?? ''}
                     onChange={(iso) => iso !== (o.queue_departure_date ?? '') && setDepartureDate(o.id, iso)}
                     triggerClassName="w-full bg-transparent border border-transparent hover:border-black/10 focus:border-primary rounded px-1 py-0.5 outline-none"
+                  />
+                </td>
+                <td className="py-2 pr-3" onClick={(e) => e.stopPropagation()}>
+                  <CellSelect
+                    value={stage}
+                    onChange={(v) => v !== stage && setStage(o.id, v as StageValue)}
+                    options={STAGE_OPTIONS}
+                    allowEmpty
+                    emptyLabel="Kutilmoqda"
+                    placeholder="Kutilmoqda"
+                    triggerClassName={`w-[120px] rounded-full border px-2.5 py-1 text-xs font-medium ${STAGE_PILL[stage]}`}
                   />
                 </td>
                 <td className="py-2 pr-3">
@@ -180,7 +248,8 @@ export default function QueuePage() {
                   </td>
                 )}
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -209,9 +278,32 @@ export default function QueuePage() {
       </div>
 
       {queue.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
+          {/* Navbat bosqichlari — bosilsa jadval shu bosqich bo'yicha filtrlanadi */}
+          <button type="button" onClick={() => setStageFilter((f) => (f === 'assembling' ? '' : 'assembling'))}
+                  title="Faqat yig'ilayotganlarni ko'rsatish"
+                  className={`text-left rounded-card border border-warning/25 bg-warning/10 p-4 flex items-start justify-between gap-2 transition-shadow hover:shadow-cozy ${stageFilter === 'assembling' ? 'ring-2 ring-warning' : ''}`}>
+            <div className="min-w-0">
+              <div className="text-sm font-medium text-warning truncate">Yig'ilmoqda</div>
+              <div className="text-2xl font-bold mt-2 text-warning">{stageCounts.assembling} ta</div>
+            </div>
+            <div className="w-10 h-10 rounded-button bg-warning/20 text-warning flex items-center justify-center shrink-0">
+              <Hammer size={18} />
+            </div>
+          </button>
+          <button type="button" onClick={() => setStageFilter((f) => (f === 'ready' ? '' : 'ready'))}
+                  title="Faqat tayyorlarni ko'rsatish"
+                  className={`text-left rounded-card border border-success/25 bg-success/10 p-4 flex items-start justify-between gap-2 transition-shadow hover:shadow-cozy ${stageFilter === 'ready' ? 'ring-2 ring-success' : ''}`}>
+            <div className="min-w-0">
+              <div className="text-sm font-medium text-success truncate">Tayyor</div>
+              <div className="text-2xl font-bold mt-2 text-success">{stageCounts.ready} ta</div>
+            </div>
+            <div className="w-10 h-10 rounded-button bg-success/20 text-success flex items-center justify-center shrink-0">
+              <PackageCheck size={18} />
+            </div>
+          </button>
           {/* Qoldiq — to'lanishi kerak summa, qizil */}
-          <div className="rounded-card border border-danger/25 bg-danger/10 p-4 flex items-start justify-between">
+          <div className="col-span-2 rounded-card border border-danger/25 bg-danger/10 p-4 flex items-start justify-between">
             <div>
               <div className="text-sm font-medium text-danger/90">To‘lanishi kerak (qoldiq)</div>
               <div className="text-2xl font-bold mt-2 text-danger">{formatUZS(totals.due)}</div>
@@ -221,7 +313,7 @@ export default function QueuePage() {
             </div>
           </div>
           {/* Chiqib ketayotgan viloyatlar */}
-          <div className="rounded-card border border-primary/25 bg-primary/10 p-4 flex items-start justify-between">
+          <div className="col-span-2 sm:col-span-4 lg:col-span-2 rounded-card border border-primary/25 bg-primary/10 p-4 flex items-start justify-between">
             <div className="min-w-0">
               <div className="text-sm font-medium text-primary/90">Yuklar chiqadigan viloyatlar</div>
               {regions.length > 0 ? (
@@ -264,12 +356,26 @@ export default function QueuePage() {
             </p>
           )}
         </Card>
+      ) : stageFilter && pendingShown.length === 0 ? (
+        <Card>
+          <EmptyState title="Topilmadi" description={`«${STAGE_LABEL[stageFilter]}» holatidagi buyurtma yo'q`} />
+        </Card>
       ) : (
         <div className="space-y-4">
+          {stageFilter && (
+            <div className="flex items-center justify-between gap-2 flex-wrap text-xs text-ink-soft">
+              <span>
+                Faqat «{STAGE_LABEL[stageFilter]}» buyurtmalar ko'rsatilmoqda — tartibni o'zgartirish tugmalari yashirildi.
+              </span>
+              <button onClick={() => setStageFilter('')} className="text-primary hover:underline font-medium">
+                Filtrni olib tashlash ✕
+              </button>
+            </div>
+          )}
           {dateGroups.map((g) => (
             <Card key={g.date || '__none__'}
                   title={`${g.date ? formatDate(g.date) : "Sana belgilanmagan"} (${g.rows.length})`}>
-              {renderTable(g.rows, true)}
+              {renderTable(g.rows, !stageFilter)}
             </Card>
           ))}
         </div>

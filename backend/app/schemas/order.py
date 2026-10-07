@@ -185,6 +185,7 @@ class OrderOut(ORMBase):
     in_queue: bool = False
     pickup_date: Optional[date] = None
     queue_departure_date: Optional[date] = None
+    queue_stage: Optional[str] = None
     inventory_id: Optional[uuid.UUID] = None
     unit_uid: Optional[str] = None
     area_m2: Optional[int] = None
@@ -265,6 +266,11 @@ class QueueItemOut(OrderOut):
 class QueueAdd(BaseModel):
     # Navbatga o'tkazishda rejalashtirilgan chiqib-ketish sanasi (ixtiyoriy)
     pickup_date: Optional[date] = None
+
+
+class QueueStageUpdate(BaseModel):
+    # None = Kutilmoqda, "assembling" = Yig'ilmoqda, "ready" = Tayyor
+    stage: Optional[str] = None
 
 
 class QueueMove(BaseModel):
