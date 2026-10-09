@@ -1,6 +1,6 @@
 """Oylik maqsadlar — sotuv soni va tushum (UZS) bo'yicha.
 
-Bosh sahifada hammaga ko'rinadi (reports:read), lekin faqat
+Bosh sahifada hammaga ko'rinadi (reports:read yoki dashboard:read), lekin faqat
 `system:goals_manage` ruxsatli foydalanuvchi belgilaydi/o'zgartiradi.
 
 Endpointlar:
@@ -77,9 +77,9 @@ def _serialize(goal: Optional[MonthlyGoal], month_start: date,
 @router.get("/current")
 async def current_goal(
     db: Annotated[AsyncSession, Depends(get_db)],
-    _: Annotated[User, Depends(require_permission("reports:read"))],
+    _: Annotated[User, Depends(require_permission("reports:read", "dashboard:read"))],
 ):
-    """Joriy oy maqsadi va real progress. Hisobot ko'rish huquqi yetarli."""
+    """Joriy oy maqsadi va real progress. Hisobot yoki Bosh sahifa ko'rish huquqi yetarli."""
     today = date.today()
     ms = _month_start(today)
     goal = (await db.execute(

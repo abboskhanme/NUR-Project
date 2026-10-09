@@ -5,7 +5,7 @@ import {
   X, Check, ShieldCheck, Sparkles, Lock, ShieldAlert,
   Users, ShoppingCart, Package, Warehouse, Wrench, Wallet,
   UserSquare2, BarChart3, Settings, Send, UserCog, Coins, PackageOpen, Factory,
-  Building2, Globe, Target,
+  Building2, Globe, Target, LayoutDashboard,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { api } from '@/api/client';
@@ -30,6 +30,7 @@ const PERM_VERBS: Record<string, string> = {
 };
 
 const MODULE_ICONS: Record<Module, LucideIcon> = {
+  dashboard: LayoutDashboard,
   users: UserCog,
   customers: Users,
   orders: ShoppingCart,
@@ -109,6 +110,7 @@ export default function RoleModal({
   const [special, setSpecial] = useState<Set<string>>(initial.special);
 
   const moduleLabels: Record<Module, string> = {
+    dashboard: 'Bosh sahifa',
     users: 'Foydalanuvchilar',
     customers: 'Mijozlar',
     orders: 'Sotuv',

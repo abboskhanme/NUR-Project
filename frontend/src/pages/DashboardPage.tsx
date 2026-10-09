@@ -51,7 +51,8 @@ function CashCardSplit(
 export default function DashboardPage() {
   const { canModule } = usePermissions();
   const canFinance = canModule('finance');
-  const canReports = canModule('reports');
+  // KPI qismi Bosh sahifa ruxsatiga bog'langan (Hisobotlar moduliga emas)
+  const canReports = canModule('dashboard');
 
   const balance = useQuery<BalanceSummary>({
     queryKey: ['balance-summary'],

@@ -28,7 +28,7 @@ export interface NavItem {
 export function useNavItems(): NavItem[] {
   const { canModule, isSuperadmin } = usePermissions();
   const items: NavItem[] = [
-    { to: '/', label: 'Bosh sahifa', icon: LayoutDashboard, exact: true, module: 'reports' },
+    { to: '/', label: 'Bosh sahifa', icon: LayoutDashboard, exact: true, module: 'dashboard' },
     { to: '/targets', label: 'Maqsadlar', icon: Target, module: 'targets' },
     { to: '/orders', label: 'Sotuv', icon: ShoppingCart, module: 'orders' },
     { to: '/queue', label: 'Navbat', icon: ListOrdered, module: 'orders' },

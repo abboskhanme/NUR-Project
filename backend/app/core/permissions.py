@@ -31,6 +31,7 @@ from app.models.user import User
 # Markaziy katalog — yangi modul/verb qo'shsangiz, shu yerdan boshlang.
 # =============================================================================
 MODULES: list[str] = [
+    "dashboard",   # Bosh sahifa (oylik KPI, eslatmalar, maqsad) — faqat ko'rish
     "users",       # Foydalanuvchilar va rollar
     "customers",   # Mijozlar
     "orders",      # Sotuv buyurtmalari

@@ -27,7 +27,7 @@ from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import CurrentUser
-from app.core.permissions import module_guard
+from app.core.permissions import VERBS, module_guard, require_permission
 from app.db.session import get_db
 from app.services import excel_service
 from app.models.customer import Customer
@@ -39,7 +39,12 @@ from app.models.service import ServiceTicket, ServiceTrip
 from app.models.supply import GoodsReceipt, Item, Vendor
 from app.models.user import User
 
-router = APIRouter(dependencies=[Depends(module_guard("reports"))])
+# Bosh sahifa endpoint'lari alohida `dashboard` ruxsati bilan ham ochiladi —
+# rolga Hisobotlarni bermasdan faqat Bosh sahifani ko'rsatish mumkin bo'lsin.
+DASHBOARD_PATHS = ("/reports/dashboard", "/reports/sales/income-expense")
+dashboard_access = require_permission("dashboard:read", *(f"reports:{v}" for v in VERBS))
+
+router = APIRouter(dependencies=[Depends(module_guard("reports", exempt=DASHBOARD_PATHS))])
 
 # Rad etilgan buyurtma SOTUV emas — jami son va summa ko'rsatkichlariga
 # qo'shilmaydi (Sotuv bo'limi, hisobotlar va bosh sahifada bir xil qoida).
@@ -82,7 +87,7 @@ def _orders_revenue_subq(date_from: date, date_to: date):
 # --------------------------------------------------------------------------- #
 # DASHBOARD — bosh sahifa
 # --------------------------------------------------------------------------- #
-@router.get("/dashboard")
+@router.get("/dashboard", dependencies=[Depends(dashboard_access)])
 async def dashboard(
     db: Annotated[AsyncSession, Depends(get_db)], _: CurrentUser,
 ):
@@ -307,7 +312,7 @@ async def sales_trend(
 # --------------------------------------------------------------------------- #
 # SALES — income vs expense (haftalik, moliyadan)
 # --------------------------------------------------------------------------- #
-@router.get("/sales/income-expense")
+@router.get("/sales/income-expense", dependencies=[Depends(dashboard_access)])
 async def income_expense(
     db: Annotated[AsyncSession, Depends(get_db)], _: CurrentUser,
     year: Optional[int] = None, month: Optional[int] = None,

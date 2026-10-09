@@ -77,14 +77,14 @@ function SupplyIndexRedirect() {
 }
 
 /**
- * Bosh sahifa "hisobotlar" (reports) moduliga bog'langan. Ruxsat bo'lsa — dashboard;
+ * Bosh sahifa alohida "dashboard" ruxsatiga bog'langan (rol matritsasida). Ruxsat bo'lsa — dashboard;
  * bo'lmasa — foydalanuvchining birinchi mavjud bo'limiga yo'naltiramiz (sikldan saqlanish
  * uchun "/" ga qaytarmaymiz).
  */
 function HomeRoute() {
   const { canModule } = usePermissions();
   const navItems = useNavItems();
-  if (canModule('reports')) return <DashboardPage />;
+  if (canModule('dashboard')) return <DashboardPage />;
   const first = navItems.find((it) => it.to !== '/');
   return <Navigate to={first?.to ?? '/settings'} replace />;
 }
