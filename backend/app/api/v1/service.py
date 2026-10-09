@@ -8,7 +8,7 @@ from typing import Annotated, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import aliased, selectinload
 
 from app.core import settings_store
 from app.core.dependencies import CurrentUser
@@ -63,14 +63,23 @@ async def _get_full(db: AsyncSession, ticket_id: uuid.UUID) -> Optional[ServiceT
 
 
 @router.get("/summary", response_model=ServiceSummary)
-async def summary(db: Annotated[AsyncSession, Depends(get_db)], _: CurrentUser):
+async def summary(db: Annotated[AsyncSession, Depends(get_db)], _: CurrentUser,
+                  search: Optional[str] = None, has_location: Optional[bool] = None,
+                  region: Optional[str] = None):
+    """KPI kartalari. Ro'yxatdagi filtrlar (viloyat, lokatsiyasiz, qidiruv)
+    bu yerga ham beriladi — status filtri esa yo'q, chunki kartalar o'zi
+    status bo'yicha taqsimot."""
     rows = (await db.execute(
-        select(ServiceTicket.status, func.count(ServiceTicket.id)).group_by(ServiceTicket.status)
+        _filter_tickets(select(ServiceTicket.status, func.count(ServiceTicket.id)),
+                        search=search, has_location=has_location, region=region)
+        .group_by(ServiceTicket.status)
     )).all()
     counts = {s: c for s, c in rows}
     open_statuses = ("new", "scheduled")
     in_warranty_open = (await db.execute(
-        select(func.count(ServiceTicket.id)).where(
+        _filter_tickets(select(func.count(ServiceTicket.id)),
+                        search=search, has_location=has_location, region=region)
+        .where(
             ServiceTicket.in_warranty.is_(True),
             ServiceTicket.status.in_(open_statuses),
         )
@@ -212,6 +221,41 @@ def _ticket_date_ref():
 def _region_expr():
     """Mijoz viloyati; bo'sh/NULL bo'lsa "Ko'rsatilmagan"."""
     return func.coalesce(func.nullif(func.btrim(Customer.region), ""), UNKNOWN_REGION)
+
+
+def _filter_tickets(q, *, search: Optional[str] = None,
+                    has_location: Optional[bool] = None, region: Optional[str] = None):
+    """Arizalar ro'yxati va KPI kartalari uchun umumiy filtrlar — ikkalasi
+    bir xil sonni ko'rsatishi uchun bitta joyda."""
+    if region:
+        # Viloyat mijoz kartochkasidan olinadi (hisobotlardagi mezon bilan bir xil)
+        q = (q.join(Customer, Customer.id == ServiceTicket.customer_id)
+              .where(_region_expr() == region.strip()))
+    if has_location is not None:
+        q = q.where(ServiceTicket.lat.isnot(None) if has_location
+                    else ServiceTicket.lat.is_(None))
+    if search and search.strip():
+        term = search.strip()
+        like = f"%{term}%"
+        # Alias — viloyat filtri Customer'ni tashqi so'rovga join qilgan bo'lishi mumkin
+        cust = aliased(Customer)
+        customer_conds = [cust.full_name.ilike(like), cust.address.ilike(like)]
+        digits = re.sub(r"\D", "", term)
+        # Telefon faqat raqamga o'xshash so'rovda solishtiriladi ("90 123", "+998-90…") —
+        # aks holda "OPTIMA 400" dagi "400" ham telefonlarga mos kelib qolardi
+        if len(digits) >= 3 and re.fullmatch(r"[\d\s()+-]+", term):
+            for col in (cust.phone, cust.phone2):
+                customer_conds.append(
+                    func.regexp_replace(col, "[^0-9]", "", "g").ilike(f"%{digits}%"))
+        q = q.where(or_(
+            ServiceTicket.code.ilike(like), ServiceTicket.problem.ilike(like),
+            ServiceTicket.ext_product.ilike(like), ServiceTicket.serial_id.ilike(like),
+            ServiceTicket.address.ilike(like),
+            ServiceTicket.customer_id.in_(select(cust.id).where(or_(*customer_conds))),
+            ServiceTicket.order_id.in_(
+                select(Order.id).where(or_(Order.code.ilike(like), Order.unit_uid.ilike(like)))),
+        ))
+    return q
 
 
 def _category_expr():
@@ -512,21 +556,11 @@ async def list_tickets(db: Annotated[AsyncSession, Depends(get_db)], _: CurrentU
     )
     if status:
         q = q.where(ServiceTicket.status == status)
-    if region:
-        # Viloyat mijoz kartochkasidan olinadi (hisobotlardagi mezon bilan bir xil)
-        q = (q.join(Customer, Customer.id == ServiceTicket.customer_id)
-              .where(_region_expr() == region.strip()))
+    q = _filter_tickets(q, search=search, has_location=has_location, region=region)
     if in_warranty is not None:
         q = q.where(ServiceTicket.in_warranty == in_warranty)
     if customer_id:
         q = q.where(ServiceTicket.customer_id == customer_id)
-    if has_location is not None:
-        q = q.where(ServiceTicket.lat.isnot(None) if has_location
-                    else ServiceTicket.lat.is_(None))
-    if search:
-        like = f"%{search}%"
-        q = q.where(or_(ServiceTicket.code.ilike(like), ServiceTicket.problem.ilike(like),
-                        ServiceTicket.ext_product.ilike(like)))
     total = (await db.execute(select(func.count()).select_from(q.subquery()))).scalar() or 0
     res = await db.execute(q.order_by(ServiceTicket.opened_at.desc())
                            .offset((page - 1) * page_size).limit(page_size))
@@ -910,10 +944,11 @@ async def customer_search(
     q: str = Query(..., min_length=1), limit: int = Query(8, ge=1, le=20),
 ):
     """Servis arizasi uchun kengaytirilgan qidiruv: mijoz ismi, telefon raqami
-    (ajratgichlardan qat'i nazar — faqat raqamlar solishtiriladi, masalan "2233"
-    ham "22 33" ham topadi) yoki buyurtma ID (kodi) bo'yicha.
+    (asosiy va qo'shimcha; ajratgichlardan qat'i nazar — faqat raqamlar
+    solishtiriladi, masalan "2233" ham "22 33" ham topadi), manzil yoki buyurtma
+    ID (qo'lda kiritilgan ID yoki tizim kodi) bo'yicha.
 
-    Buyurtma kodi bo'yicha topilganda natijaga o'sha buyurtma biriktiriladi —
+    Buyurtma ID bo'yicha topilganda natijaga o'sha buyurtma biriktiriladi —
     modalда mijoz + buyurtma avtomatik tanlanadi.
     """
     term = q.strip()
@@ -925,11 +960,12 @@ async def customer_search(
     hits: list[CustomerSearchHit] = []
     seen: set[uuid.UUID] = set()
 
-    # 1) Buyurtma kodi bo'yicha — mos buyurtma va uning egasi (avtomatik tanlash uchun)
+    # 1) Buyurtma ID (qo'lda kiritilgan yoki tizim kodi) — mos buyurtma va uning
+    #    egasi (avtomatik tanlash uchun)
     order_rows = (await db.execute(
         select(Order)
         .options(selectinload(Order.items).selectinload(OrderItem.product))
-        .where(Order.code.ilike(like))
+        .where(or_(Order.code.ilike(like), Order.unit_uid.ilike(like)))
         .order_by(Order.order_date.desc())
         .limit(limit)
     )).scalars().unique().all()
@@ -946,16 +982,18 @@ async def customer_search(
             continue
         hits.append(CustomerSearchHit(
             customer_id=c.id, full_name=c.full_name, phone=c.phone, address=c.address,
-            order_id=o.id, order_code=o.code, product_summary=_product_summary(o),
+            order_id=o.id, order_code=o.code, unit_uid=o.unit_uid,
+            product_summary=_product_summary(o),
         ))
         seen.add(c.id)
 
-    # 2) Mijoz ismi yoki telefon raqami (raqamlar bo'yicha) — buyurtmasiz
-    conds = [Customer.full_name.ilike(like)]
+    # 2) Mijoz ismi, manzili yoki telefon raqami (raqamlar bo'yicha) — buyurtmasiz
+    conds = [Customer.full_name.ilike(like), Customer.address.ilike(like)]
     if digits:
-        conds.append(
-            func.regexp_replace(Customer.phone, "[^0-9]", "", "g").ilike(f"%{digits}%")
-        )
+        for col in (Customer.phone, Customer.phone2):
+            conds.append(
+                func.regexp_replace(col, "[^0-9]", "", "g").ilike(f"%{digits}%")
+            )
     crows = (await db.execute(
         select(Customer).where(or_(*conds))
         .order_by(Customer.created_at.desc()).limit(limit)

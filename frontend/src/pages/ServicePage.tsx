@@ -76,9 +76,17 @@ export default function ServicePage() {
   const [detailId, setDetailId] = useState<string | null>(null);
   const [tab, setTab] = useState<'tickets' | 'trips' | 'partsStats' | 'money' | 'report'>('tickets');
 
+  // Kartalar ro'yxat filtrlariga (viloyat, lokatsiyasiz, qidiruv) bo'ysunadi;
+  // status filtri berilmaydi — kartalarning o'zi status bo'yicha taqsimot
   const summaryQ = useQuery<Summary>({
-    queryKey: ['service-summary'],
-    queryFn: () => api.get('/service/summary').then((r) => r.data),
+    queryKey: ['service-summary', search, onlyNoLoc, region],
+    queryFn: () => api.get('/service/summary', {
+      params: {
+        search: search.trim() || undefined,
+        has_location: onlyNoLoc ? false : undefined,
+        region: region || undefined,
+      },
+    }).then((r) => r.data),
   });
 
   // Viloyat filtri variantlari — arizalarda haqiqatan uchraydiganlari
@@ -223,7 +231,7 @@ export default function ServicePage() {
           </button>
           <div className="relative flex-1 sm:flex-none">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft" />
-            <input className="input pl-9 w-full sm:w-56" placeholder="Kod yoki muammo…"
+            <input className="input pl-9 w-full sm:w-56" placeholder="Ism, telefon, ID yoki muammo…"
                    value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
         </div>

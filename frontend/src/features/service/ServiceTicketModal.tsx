@@ -11,7 +11,8 @@ import LocationInput from '@/features/service/LocationInput';
 interface Customer { id: string; full_name: string; phone: string; address?: string | null }
 interface SearchHit {
   customer_id: string; full_name: string; phone: string; address?: string | null;
-  order_id?: string | null; order_code?: string | null; product_summary?: string | null;
+  order_id?: string | null; order_code?: string | null; unit_uid?: string | null;
+  product_summary?: string | null;
 }
 interface Order {
   id: string; code: string; delivered_at?: string | null; status: string;
@@ -237,7 +238,7 @@ export default function ServiceTicketModal({
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft" />
               <input
                 className="input pl-9"
-                placeholder="Ism, telefon yoki buyurtma ID bo'yicha qidiring…"
+                placeholder="Ism, telefon, buyurtma ID yoki manzil bo'yicha qidiring…"
                 value={search}
                 onChange={(e) => { setSearch(e.target.value); setCustomer(null); setOrder(null); setPendingOrderId(null); setNoOrder(false); }}
               />
@@ -253,7 +254,8 @@ export default function ServiceTicketModal({
                     </span>
                     {h.order_code && (
                       <span className="badge bg-primary/10 text-primary shrink-0 inline-flex items-center gap-1">
-                        <Package size={12} /> {h.order_code}
+                        {/* Qo'lda kiritilgan ID (kafolat hujjatidagi) bo'lsa — o'shani ko'rsatamiz */}
+                        <Package size={12} /> {h.unit_uid || h.order_code}
                       </span>
                     )}
                   </button>

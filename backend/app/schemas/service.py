@@ -296,6 +296,7 @@ class CustomerSearchHit(ORMBase):
     address: Optional[str] = None
     order_id: Optional[uuid.UUID] = None
     order_code: Optional[str] = None
+    unit_uid: Optional[str] = None   # qo'lda kiritilgan buyurtma ID (kafolat hujjatidagi)
     product_summary: Optional[str] = None
 
 
