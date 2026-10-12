@@ -40,3 +40,14 @@
 {$DOMAIN_APEX:http://apex.invalid} {
     redir https://www.{host}{uri} permanent
 }
+
+# Ikkinchi brend (docker-compose.brand2.yml) — o'z domeni, shu Caddy orqali.
+# Hamma narsa brand2-frontend ga boradi; /api ni u o'zi brand2 backendiga
+# uzatadi (frontend/nginx.brand2.conf), shuning uchun bu yerda faqat bitta qator.
+#
+# .env.prod da beriladi:  BRAND2_DOMAIN=erp.brand2.uz
+# Berilmasa — DOMAIN_APEX kabi hech qachon mos kelmaydigan manzil.
+{$BRAND2_DOMAIN:http://brand2.invalid} {
+    encode gzip
+    reverse_proxy brand2-frontend:80
+}

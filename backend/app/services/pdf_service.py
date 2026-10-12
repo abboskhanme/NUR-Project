@@ -383,7 +383,7 @@ def _build(elements: list) -> bytes:
         buf, pagesize=A4,
         leftMargin=20 * mm, rightMargin=20 * mm,
         topMargin=16 * mm, bottomMargin=16 * mm,
-        title="NUR", author=settings.COMPANY_NAME,
+        title=settings.BRAND_SHORT_NAME, author=settings.COMPANY_NAME,
     )
     doc.build(elements)
     return buf.getvalue()
@@ -707,4 +707,4 @@ def _footer_note() -> str:
         parts.append(settings.COMPANY_PHONE)
     if settings.COMPANY_WEBSITE:
         parts.append(settings.COMPANY_WEBSITE)
-    return " · ".join(parts) + "  —  ushbu hujjat NUR ERP tizimida shakllantirildi."
+    return " · ".join(parts) + f"  —  ushbu hujjat {settings.BRAND_SHORT_NAME} ERP tizimida shakllantirildi."

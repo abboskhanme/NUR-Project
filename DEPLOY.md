@@ -283,6 +283,53 @@ gunzip < /opt/backups/nur_erp_2026-06-03_0300.sql.gz | docker exec -i nur-postgr
 
 ---
 
+## Ikkinchi brend (xuddi shu kod, alohida bo'sh baza)
+
+Shu droplet'da NUR yonida ikkinchi nusxa: o'z bazasi (`brand2-postgres`), o'z
+fayllari, o'z domeni. Kod bitta — `git pull` ikkalasiga ham tushadi, lekin har biri
+alohida qayta build qilinadi. Caddy NUR'niki (80/443 bitta), brand2 domeni uning
+ichidagi alohida blok.
+
+**Birinchi o'rnatish** (`/opt/NUR-Project` da, `git pull` dan keyin):
+
+```bash
+# 1) Domen: DNS A-yozuvini droplet IP'siga yo'naltiring, so'ng .env.prod ga:
+echo 'BRAND2_DOMAIN=erp.brand2.uz' >> .env.prod
+#    Caddy yangi o'zgaruvchini olsin (faqat caddy qayta yaratiladi, ~2 soniya)
+docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --no-deps caddy
+
+# 2) Brend sozlamalari va parollar
+cp .env.brand2.example .env.brand2 && nano .env.brand2
+
+# 3) Ishga tushirish — bo'sh baza birinchi startda o'zi quriladi
+docker compose -f docker-compose.brand2.yml --env-file .env.brand2 up -d --build
+
+# 4) Birinchi super-admin (parolni terminal so'raydi)
+docker compose -f docker-compose.brand2.yml --env-file .env.brand2 exec brand2-backend \
+    python scripts/create_superadmin.py +998901112233 "Ism Familiya"
+```
+
+**Kod yangilanganda** — NUR'dan keyin brand2 ni ham:
+```bash
+docker compose -f docker-compose.brand2.yml --env-file .env.brand2 up -d --build
+```
+
+**Backup** — `/opt/backup-db.sh` ga qo'shing:
+```bash
+docker exec brand2-postgres pg_dump -U postgres brand2_erp | gzip > /opt/backups/brand2_erp_$STAMP.sql.gz
+```
+
+Muhim:
+- Servis nomlari ataylab `brand2-` bilan boshlanadi va NUR tarmog'iga faqat
+  `brand2-frontend` qo'shiladi (`/api` ni u o'zi brand2 backendiga uzatadi —
+  `frontend/nginx.brand2.conf`). Shu sabab brand2 NUR bazasini ko'ra olmaydi.
+- Kafolat hujjatidagi imzo rasmlari: `brand2-backend` ichidagi
+  `/app/uploads/doc-assets/` (`imzo-savdo.png`, `imzo-servis.png`); yo'q bo'lsa
+  bo'sh imzo chizig'i.
+- Logo: faylni `frontend/public/` ga qo'yib, `.env.brand2` da `BRAND_LOGO=/fayl.jpg`.
+
+---
+
 ## Muammolar (troubleshooting)
 
 - **Sayt ochilmayapti / SSL xatosi** → DNS hali tarqalmagan bo'lishi mumkin. `dig www.nurtechnogroup.uz` bilan IP to'g'ri ko'rsatayotganini tekshiring. Caddy loglarini ko'ring.

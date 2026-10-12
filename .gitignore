@@ -26,6 +26,7 @@ frontend/.env.local
 # Secrets — never commit real env files (templates *.example are tracked)
 .env
 .env.prod
+.env.brand2
 .env.local
 *.sql
 

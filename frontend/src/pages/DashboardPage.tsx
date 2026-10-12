@@ -17,6 +17,7 @@ import StatusDonut from '@/features/dashboard/StatusDonut';
 import RevenueArea from '@/features/dashboard/RevenueArea';
 import GoalCard from '@/features/dashboard/GoalCard';
 import type { DashboardData } from '@/features/dashboard/types';
+import { BRAND } from '@/lib/brand';
 
 interface BalanceSummary {
   // Naqd (sevf) qoldiqlari
@@ -87,7 +88,7 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Bosh sahifa</h1>
-        <p className="text-sm text-ink-soft">NUR TECHNO GROUP — joriy holat</p>
+        <p className="text-sm text-ink-soft">{BRAND.company} — joriy holat</p>
       </div>
 
       {!canFinance && !canReports && (

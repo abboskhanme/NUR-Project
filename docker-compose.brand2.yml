@@ -1,0 +1,133 @@
+# Ikkinchi brend — xuddi shu kod, lekin O'ZINING bo'sh bazasi, fayllari va domeni.
+# NUR bilan bitta droplet'da ishlaydi; NUR'ning Caddy'si brand2 domenini
+# (.env.prod dagi BRAND2_DOMAIN) brand2-frontend ga uzatadi.
+#
+# Ishga tushirish (NUR stack'i ishlab turgan bo'lishi kerak — uning tarmog'i kerak):
+#   docker compose -f docker-compose.brand2.yml --env-file .env.brand2 up -d --build
+# Birinchi super-admin:
+#   docker compose -f docker-compose.brand2.yml --env-file .env.brand2 exec brand2-backend \
+#       python scripts/create_superadmin.py +998901112233 "Ism Familiya"
+#
+# Xavfsizlik: barcha servislar «brand2-» bilan nomlangan va faqat brand2-frontend
+# NUR tarmog'iga qo'shiladi. Oddiy nom (postgres, backend, agent) NUR tarmog'ida
+# NUR konteynerlariga ham resolve bo'lardi — brand2 NUR bazasiga ulanib qolishi
+# mumkin edi.
+name: brand2-erp-prod
+
+x-backend-env: &backend-env
+  env_file: .env.brand2
+  environment:
+    APP_ENV: production
+    DEBUG: "false"
+    DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD}@brand2-postgres:5432/brand2_erp
+    APP_NAME: ${BRAND_APP_NAME}
+    COMPANY_NAME: ${BRAND_COMPANY}
+    BRAND_SHORT_NAME: ${BRAND_SHORT_NAME:?.env.brand2 da BRAND_SHORT_NAME kerak}
+    # NUR'ning imzolari va kafolat telefonlari brand2 hujjatlariga tushmasin:
+    # imzo rasmlari brand2'ning o'z uploads volume'idan olinadi (yo'q bo'lsa —
+    # bo'sh imzo chizig'i), telefonlar faqat .env.brand2 dan.
+    DOC_ASSETS_DIR: /app/uploads/doc-assets
+    DOC_SALES_PHONES: ${DOC_SALES_PHONES:-}
+    DOC_SERVICE_PHONES: ${DOC_SERVICE_PHONES:-}
+
+services:
+  brand2-postgres:
+    image: postgres:16-alpine
+    container_name: brand2-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?.env.brand2 da POSTGRES_PASSWORD kerak}
+      POSTGRES_DB: brand2_erp
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d brand2_erp"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  brand2-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: brand2-backend
+    restart: unless-stopped
+    <<: *backend-env
+    volumes:
+      - backend_uploads:/app/uploads
+    depends_on:
+      brand2-postgres:
+        condition: service_healthy
+    # Bo'sh baza birinchi startda init_empty_db.py bilan quriladi (keyingi
+    # startlarda u hech narsa qilmaydi), so'ng odatdagi migratsiyalar.
+    command: >
+      sh -c "
+        python scripts/init_empty_db.py &&
+        alembic upgrade head &&
+        uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1
+      "
+    # Bot va ko'prik jadvallar tayyor bo'lgach (init + migratsiya) ishga tushsin
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:8000/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  brand2-telegram-bot:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: brand2-telegram-bot
+    restart: unless-stopped
+    <<: *backend-env
+    depends_on:
+      brand2-backend:
+        condition: service_healthy
+    command: ["python", "-m", "app.integrations.telegram"]
+
+  brand2-wa-bridge:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: brand2-wa-bridge
+    restart: unless-stopped
+    <<: *backend-env
+    depends_on:
+      brand2-backend:
+        condition: service_healthy
+    command: ["python", "-m", "app.integrations.wa_bridge"]
+
+  brand2-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+      args:
+        VITE_BRAND_APP_NAME: ${BRAND_APP_NAME:?.env.brand2 da BRAND_APP_NAME kerak}
+        VITE_BRAND_COMPANY: ${BRAND_COMPANY:?.env.brand2 da BRAND_COMPANY kerak}
+        VITE_BRAND_INITIAL: ${BRAND_INITIAL:-}
+        # Bo'sh qolsa NUR qiymatlari chiqmasin: logo yo'q → chekda nom, aloqa → «—»
+        VITE_BRAND_LOGO: ${BRAND_LOGO:-none}
+        VITE_BRAND_EMAIL: ${BRAND_EMAIL:-—}
+        VITE_BRAND_PHONE: ${BRAND_PHONE:-—}
+        VITE_BRAND_SITE: ${BRAND_SITE:-—}
+    container_name: brand2-frontend
+    restart: unless-stopped
+    volumes:
+      - ./frontend/nginx.brand2.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - brand2-backend
+    networks:
+      - default
+      - nur
+
+networks:
+  # NUR stack'ining tarmog'i — faqat Caddy brand2-frontend ga yetishi uchun
+  nur:
+    external: true
+    name: nur-erp-prod_default
+
+volumes:
+  postgres_data:
+  backend_uploads:

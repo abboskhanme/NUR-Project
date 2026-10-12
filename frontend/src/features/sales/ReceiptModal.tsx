@@ -4,6 +4,7 @@ import { X, Printer } from 'lucide-react';
 
 import { formatDate, formatPhone } from '@/lib/format';
 import type { OrderFull } from './OrdersTable';
+import { BRAND } from '@/lib/brand';
 
 // Kompaniya aloqa raqamlari (chek pastida tagma-tag chiqadi)
 const COMPANY_PHONES = ['+998 97 058 20 25', '+998 97 318 20 25', '+998 99 675 20 22'];
@@ -64,17 +65,21 @@ export default function ReceiptModal({ order, onClose }: { order: OrderFull; onC
     <div>
       {/* Logo + sarlavha */}
       <div style={{ textAlign: 'center' }}>
-        <img
-          src="/nur-logo.jpg"
-          alt="NUR TECHNO GROUP"
-          // Qora fon → oq, oltin rasm → qora (oq qog'ozli termal printer uchun)
-          style={{
-            width: '51mm',
-            maxWidth: '90%',
-            display: 'inline-block',
-            filter: 'grayscale(1) invert(1) contrast(4) brightness(1.05)',
-          }}
-        />
+        {BRAND.logo === 'none' ? (
+          <div style={{ fontWeight: 800, fontSize: 18 }}>{BRAND.company}</div>
+        ) : (
+          <img
+            src={BRAND.logo}
+            alt={BRAND.company}
+            // Qora fon → oq, oltin rasm → qora (oq qog'ozli termal printer uchun)
+            style={{
+              width: '51mm',
+              maxWidth: '90%',
+              display: 'inline-block',
+              filter: 'grayscale(1) invert(1) contrast(4) brightness(1.05)',
+            }}
+          />
+        )}
       </div>
       <div style={hr} />
 

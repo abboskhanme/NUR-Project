@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { ShieldCheck, Trash2, ArrowLeft } from 'lucide-react';
+import { BRAND } from '@/lib/brand';
 
 /**
  * Ochiq huquqiy sahifalar — /privacy va /data-deletion.
@@ -12,10 +13,10 @@ import { ShieldCheck, Trash2, ArrowLeft } from 'lucide-react';
  * xabarlarni qayta ishlaydi, uchinchi tomonlarga sotilmaydi.
  */
 
-const COMPANY = 'NUR TECHNO GROUP';
-const EMAIL = 'info@nurtechnogroup.uz';
-const PHONE = '+998 97 666 26 75';
-const SITE = 'www.nurtechnogroup.uz';
+const COMPANY = BRAND.company;
+const EMAIL = BRAND.email;
+const PHONE = BRAND.phone;
+const SITE = BRAND.site;
 // Oxirgi yangilanish sanasi — matn o'zgarsa shuni ham yangilang
 const UPDATED = '11.08.2026';
 

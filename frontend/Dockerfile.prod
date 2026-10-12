@@ -11,6 +11,22 @@ RUN npm ci || npm install
 COPY . .
 # VITE_API_BASE_URL ataylab berilmaydi — kod default '/api/v1' (nisbiy yo'l)
 # ishlatadi, shuning uchun frontend va backend bir domenda bo'lib, CORS shart emas.
+# Brend (ikkinchi nusxa uchun, docker-compose.brand2.yml). Bo'sh qolsa —
+# src/lib/brand.ts dagi NUR qiymatlari ishlatiladi.
+ARG VITE_BRAND_APP_NAME=""
+ARG VITE_BRAND_COMPANY=""
+ARG VITE_BRAND_INITIAL=""
+ARG VITE_BRAND_LOGO=""
+ARG VITE_BRAND_EMAIL=""
+ARG VITE_BRAND_PHONE=""
+ARG VITE_BRAND_SITE=""
+ENV VITE_BRAND_APP_NAME=$VITE_BRAND_APP_NAME \
+    VITE_BRAND_COMPANY=$VITE_BRAND_COMPANY \
+    VITE_BRAND_INITIAL=$VITE_BRAND_INITIAL \
+    VITE_BRAND_LOGO=$VITE_BRAND_LOGO \
+    VITE_BRAND_EMAIL=$VITE_BRAND_EMAIL \
+    VITE_BRAND_PHONE=$VITE_BRAND_PHONE \
+    VITE_BRAND_SITE=$VITE_BRAND_SITE
 RUN npm run build
 
 # ---- Stage 2: serve ----

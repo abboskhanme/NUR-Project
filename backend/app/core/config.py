@@ -79,6 +79,9 @@ class Settings(BaseSettings):
     COMPANY_ADDRESS: str = ""
     COMPANY_INN_LABEL: str = ""   # masalan: "STIR: 123456789"
     COMPANY_WEBSITE: str = ""
+    # Tizimning qisqa nomi — PDF sarlavhasi va "... ERP tizimida shakllantirildi"
+    # izohi uchun. Ikkinchi brend nusxasida .env orqali almashtiriladi.
+    BRAND_SHORT_NAME: str = "NUR"
 
     # Hujjat imzolari — kafolat sertifikatiga avtomatik qo'yiladigan imzo
     # rasmlari. Rasmlar `DOC_ASSETS_DIR` papkasidan olinadi (bo'sh bo'lsa

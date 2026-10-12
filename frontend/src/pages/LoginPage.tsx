@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import { api } from '@/api/client';
 import { useAuthStore } from '@/stores/auth';
 import PhoneInput from '@/components/ui/PhoneInput';
+import { BRAND } from '@/lib/brand';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -37,9 +38,9 @@ export default function LoginPage() {
     <div className="min-h-screen bg-bg flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-6">
-          <div className="inline-flex w-14 h-14 rounded-2xl bg-primary text-white text-xl font-bold items-center justify-center shadow-cozy">N</div>
-          <h1 className="mt-3 text-2xl font-bold">NUR Project</h1>
-          <p className="text-sm text-ink-soft mt-1">NUR TECHNO GROUP — ichki tizim</p>
+          <div className="inline-flex w-14 h-14 rounded-2xl bg-primary text-white text-xl font-bold items-center justify-center shadow-cozy">{BRAND.initial}</div>
+          <h1 className="mt-3 text-2xl font-bold">{BRAND.appName}</h1>
+          <p className="text-sm text-ink-soft mt-1">{BRAND.company} — ichki tizim</p>
         </div>
 
         <form onSubmit={onSubmit} className="card space-y-4">

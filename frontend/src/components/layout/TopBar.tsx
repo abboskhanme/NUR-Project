@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/auth';
 import UserAvatar from '@/features/users/UserAvatar';
 import GlobalSearch from '@/features/search/GlobalSearch';
+import { BRAND } from '@/lib/brand';
 
 export default function TopBar() {
   const navigate = useNavigate();
@@ -30,7 +31,7 @@ export default function TopBar() {
 
   return (
     <header className="sticky top-0 z-10 h-16 bg-card border-b border-black/5 flex items-center justify-between px-4 md:px-6">
-      <div className="font-medium text-ink text-sm md:text-base truncate">NUR TECHNO GROUP</div>
+      <div className="font-medium text-ink text-sm md:text-base truncate">{BRAND.company}</div>
 
       <div className="flex items-center gap-2">
         <button

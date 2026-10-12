@@ -151,6 +151,8 @@ services:
       # Ko'rsatilmasa mos kelmaydigan manzil beriladi: apex xizmat qilinmaydi
       # va Caddy unga sertifikat ham so'ramaydi (bo'sh qiymat sintaksisni buzardi).
       DOMAIN_APEX: ${DOMAIN_APEX:-http://apex.invalid}
+      # Ikkinchi brend domeni (docker-compose.brand2.yml). Berilmasa — ishlatilmaydi.
+      BRAND2_DOMAIN: ${BRAND2_DOMAIN:-http://brand2.invalid}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data

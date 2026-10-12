@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, ChevronDown, type LucideIcon } from 'lucide-
 import { useUIStore } from '@/stores/ui';
 import { cn } from '@/lib/cn';
 import { useNavItems, type NavItem } from './navItems';
+import { BRAND } from '@/lib/brand';
 
 export default function Sidebar() {
   const collapsed = useUIStore((s) => s.sidebarCollapsed);
@@ -40,8 +41,8 @@ export default function Sidebar() {
   return (
     <aside className="h-screen sticky top-0 bg-card border-r border-black/5 flex flex-col">
       <div className="flex items-center gap-3 px-4 h-16 border-b border-black/5">
-        <div className="w-9 h-9 rounded-button bg-primary text-white flex items-center justify-center font-bold">N</div>
-        {!collapsed && <div className="font-semibold text-sm">NUR Project</div>}
+        <div className="w-9 h-9 rounded-button bg-primary text-white flex items-center justify-center font-bold">{BRAND.initial}</div>
+        {!collapsed && <div className="font-semibold text-sm">{BRAND.appName}</div>}
       </div>
 
       <nav className="flex-1 overflow-y-auto py-2">
