@@ -4,6 +4,9 @@
 #
 # Ishga tushirish (NUR stack'i ishlab turgan bo'lishi kerak — uning tarmog'i kerak):
 #   docker compose -f docker-compose.brand2.yml --env-file .env.brand2 up -d --build
+# Telegram bot va WhatsApp ko'prigi «bots» profili ortida (1 GB droplet'da RAM
+# tejash uchun) — tokenlar kiritilgach yoqiladi:
+#   docker compose -f docker-compose.brand2.yml --env-file .env.brand2 --profile bots up -d --build
 # Birinchi super-admin:
 #   docker compose -f docker-compose.brand2.yml --env-file .env.brand2 exec brand2-backend \
 #       python scripts/create_superadmin.py +998901112233 "Ism Familiya"
@@ -76,6 +79,7 @@ services:
       start_period: 20s
 
   brand2-telegram-bot:
+    profiles: ["bots"]
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -88,6 +92,7 @@ services:
     command: ["python", "-m", "app.integrations.telegram"]
 
   brand2-wa-bridge:
+    profiles: ["bots"]
     build:
       context: ./backend
       dockerfile: Dockerfile
