@@ -16,13 +16,13 @@ from app.core.permissions import has_special, module_guard, require_permission
 from app.db.session import get_db
 from app.models.customer import Customer
 from app.models.order import QUEUE_STAGES, Order, OrderItem, Payment
-from app.models.product import Inventory
+from app.models.product import Inventory, Product
 from app.models.user import User
 from app.schemas.common import Page
 from app.schemas.order import (
     OrderCreate, OrderOut, OrderStatusChange, OrderUpdate, UnitUidUpdate,
     SalespersonUpdate, SalespersonOption, OverrideAmounts,
-    PaymentIn, PaymentUpdate, PaymentOut, SalesSummary, SalespersonCount, QueueItemOut, QueueMove, QueueAdd,
+    PaymentIn, PaymentUpdate, PaymentOut, SalesSummary, SalespersonCount, ModelCount, QueueItemOut, QueueMove, QueueAdd,
     QueueStageUpdate,
 )
 from app.services.order_service import generate_order_code, is_valid_transition
@@ -315,6 +315,37 @@ async def sales_summary(
     status_counts, revenue_total, paid_total, cur_sp = await _period(date_from, date_to)
     total_orders = sum(status_counts.values())
 
+    # Model bo'yicha yetkazilmagan dona soni — qaysi modeldan nechta hali yetkazilishi kerak
+    cur_base = _sold_only(_apply_filters(select(Order), current, status, salesperson_id,
+                                         customer_id, date_from, date_to, search))
+    cur_ids = select(cur_base.with_only_columns(Order.id).subquery().c.id)
+    mc_rows = (await db.execute(
+        select(OrderItem.product_id, OrderItem.bunker_direction,
+               func.coalesce(func.sum(OrderItem.quantity), 0))
+        .join(Order, Order.id == OrderItem.order_id)
+        .join(Product, Product.id == OrderItem.product_id)
+        .where(OrderItem.order_id.in_(cur_ids))
+        .where(Order.status.in_(ACTIVE_QUEUE_STATUSES))
+        .where(Product.product_type != "additional")
+        .group_by(OrderItem.product_id, OrderItem.bunker_direction)
+    )).all()
+    prod_names: dict[uuid.UUID, str] = {}
+    if mc_rows:
+        pids = {r[0] for r in mc_rows}
+        prods = (await db.execute(select(Product).where(Product.id.in_(pids)))).scalars().all()
+        prod_names = {p.id: p.display_name for p in prods}
+    model_map: dict[str, ModelCount] = {}
+    for pid, direction, qty in mc_rows:
+        qty = int(qty or 0)
+        name = prod_names.get(pid, "—")
+        mc = model_map.setdefault(name, ModelCount(name=name))
+        mc.count += qty
+        if direction == "right":
+            mc.right += qty
+        elif direction == "left":
+            mc.left += qty
+    model_counts = sorted(model_map.values(), key=lambda m: (-m.count, m.name))
+
     # Oldingi davr (qiyoslash) — faqat cmp oralig'i berilганда
     prev_st = prev_sp = None
     orders_prev = delivered_prev = pending_prev = None
@@ -365,6 +396,7 @@ async def sales_summary(
         total_orders=total_orders,
         status_counts=status_counts,
         salesperson_counts=salesperson_counts,
+        model_counts=model_counts,
         revenue_total=revenue_total,
         paid_total=paid_total,
         outstanding_total=(revenue_total or Decimal(0)) - (paid_total or Decimal(0)),

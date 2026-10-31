@@ -230,11 +230,21 @@ class SalespersonCount(BaseModel):
     prev_count2: Optional[int] = None
 
 
+class ModelCount(BaseModel):
+    """Hali yetkazilmagan (Navbatda/Tayyor) asosiy mahsulot dona soni, model bo'yicha."""
+    name: str
+    count: int = 0
+    right: int = 0      # o'ng yo'nalishli
+    left: int = 0       # chap yo'nalishli
+
+
 class SalesSummary(BaseModel):
     total_orders: int = 0
     status_counts: dict[str, int] = Field(default_factory=dict)
     # Har bir sotuvchi nechta zakaz olgani (joriy filtr bo'yicha, ko'pdan kamga)
     salesperson_counts: list[SalespersonCount] = Field(default_factory=list)
+    # Yetkazilmagan dona soni model bo'yicha (qo'shimcha mahsulotlarsiz, ko'pdan kamga)
+    model_counts: list[ModelCount] = Field(default_factory=list)
     # Money (UZS)
     revenue_total: Decimal = Decimal(0)       # sum of all order item totals
     paid_total: Decimal = Decimal(0)          # sum of all payments

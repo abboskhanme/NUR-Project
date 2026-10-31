@@ -7,6 +7,7 @@ import { ChevronsUp, ChevronUp, ChevronDown, ListOrdered, Search, Coins, MapPin,
 import { api } from '@/api/client';
 import Card from '@/components/ui/Card';
 import EmptyState from '@/components/ui/EmptyState';
+import ModelCountsCard, { type ModelCount } from '@/components/ui/ModelCountsCard';
 import { CellDate, CellSelect, type CellOption } from '@/components/ui/TablePickers';
 import { formatDate, formatUZS } from '@/lib/format';
 
@@ -99,6 +100,24 @@ export default function QueuePage() {
       else if (o.queue_stage === 'ready') ready++;
     }
     return { assembling, ready };
+  }, [queue]);
+
+  // Qaysi modeldan nechta tayyorlash kerak — butun navbat bo'yicha (qo'shimchalarsiz)
+  const modelCounts = useMemo(() => {
+    const map = new Map<string, ModelCount>();
+    for (const o of queue) {
+      for (const i of o.items ?? []) {
+        if (i.product?.product_type === 'additional') continue;
+        const name = i.product?.display_name ?? i.product?.model ?? i.product?.name ?? '?';
+        const row = map.get(name) ?? { name, count: 0, right: 0, left: 0 };
+        const qty = i.quantity || 0;
+        row.count += qty;
+        if (i.bunker_direction === 'right') row.right += qty;
+        else if (i.bunker_direction === 'left') row.left += qty;
+        map.set(name, row);
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
   }, [queue]);
 
   // Yuklar chiqib ketayotgan viloyatlar ro'yxati
@@ -334,6 +353,8 @@ export default function QueuePage() {
           </div>
         </div>
       )}
+
+      <ModelCountsCard title="Tayyorlash kerak — modellar bo'yicha" rows={modelCounts} />
 
       {isLoading ? (
         <Card>

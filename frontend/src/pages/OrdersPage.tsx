@@ -6,6 +6,7 @@ import { Plus, Search, ShoppingCart, Wallet, AlertCircle, CalendarClock, FileSpr
 import { api } from '@/api/client';
 import { downloadFile } from '@/lib/download';
 import Card from '@/components/ui/Card';
+import ModelCountsCard, { type ModelCount } from '@/components/ui/ModelCountsCard';
 import EmptyState from '@/components/ui/EmptyState';
 import { formatUZS, formatUSD } from '@/lib/format';
 import OrderModal from '@/features/sales/OrderModal';
@@ -17,6 +18,8 @@ interface Summary {
   total_orders: number;
   status_counts: Record<string, number>;
   salesperson_counts?: SalespersonCount[];
+  // Yetkazilmagan dona soni model bo'yicha (qo'shimcha mahsulotlarsiz)
+  model_counts?: ModelCount[];
   revenue_total: string;
   paid_total: string;
   outstanding_total: string;
@@ -331,6 +334,10 @@ export default function OrdersPage() {
         <Kpi icon={<AlertCircle size={18} />} label="Qoldiq" period={periodLabel}
              value={s ? formatUZS(s.outstanding_total) : '—'} accent="text-danger" />
       </div>
+
+      {/* Qaysi modeldan nechta hali yetkazilmagan — joriy filtr bo'yicha */}
+      <ModelCountsCard title={`Yetkazilmagan — modellar bo'yicha · ${searching ? 'qidiruv' : periodLabel}`}
+                       rows={s?.model_counts ?? []} />
 
       <Card>
         <div className="flex flex-wrap gap-3 mb-4">
